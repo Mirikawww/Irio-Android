@@ -1,0 +1,36 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Kotlin / Compose Desktop
+.kotlin/
+desktop/build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.externalNativeBuild/
+.cxx/
+
+# Local configuration
+local.properties
+keystore.properties
+
+# Signing keys
+keystore/
+*.jks
+*.keystore
+*.p12
+
+# Generated APKs and signing artifacts
+*.apk
+*.aab
+*.apks
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Hermes local planning files
+.hermes/
