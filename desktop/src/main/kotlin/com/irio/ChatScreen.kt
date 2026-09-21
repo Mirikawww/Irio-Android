@@ -123,6 +123,10 @@ import androidx.compose.ui.unit.sp
 import com.composables.ui.components.BottomSheet
 import com.composables.ui.components.BottomSheetDetent
 import com.composables.ui.components.BottomSheetState
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import com.composables.ui.components.Button
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
@@ -229,6 +233,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     val composerBarHeight = with(LocalDensity.current) { composerBarHeightPx.toDp() }
     var toolbarHeightPx by remember { mutableIntStateOf(0) }
     val toolbarHeight = with(LocalDensity.current) { toolbarHeightPx.toDp() }
+    val chatHazeState = rememberHazeState()
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
     val muted = Theme[colors][mutedColor]
@@ -1243,6 +1248,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
+                        .hazeSource(chatHazeState)
                         .padding(horizontal = 16.dp),
                     contentPadding = PaddingValues(
                         top = 16.dp + toolbarHeight,
@@ -1484,11 +1490,17 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 )
                 }
 
-                IrioToolbar(
+                Column(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
-                        .onSizeChanged { toolbarHeightPx = it.height },
+                        .hazeBlur(
+                            input = HazeInput.Sources(chatHazeState),
+                            style = chatToolbarHazeStyle(),
+                        ),
+                ) {
+                IrioToolbar(
+                    modifier = Modifier.onSizeChanged { toolbarHeightPx = it.height },
                     title = { Spacer(Modifier.weight(1f)) },
                     backgroundColor = Color.Transparent,
                     contentColor = content,
@@ -1568,6 +1580,8 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         }
                     },
                 )
+                    Spacer(Modifier.height(ChatToolbarHazeBleed))
+                }
             }
 
         }

@@ -109,6 +109,10 @@ dependencies {
     implementation("com.composables:ui:0.2.0")
     implementation("com.composables:composeunstyled-slider:2.7.0")
 
+    // Haze progressive blur (chat toolbar)
+    implementation("dev.chrisbanes.haze:haze:2.0.0-rc02")
+    implementation("dev.chrisbanes.haze:haze-blur:2.0.0-rc02")
+
     // Markdown
     implementation("com.mikepenz:multiplatform-markdown-renderer:0.45.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.45.0")

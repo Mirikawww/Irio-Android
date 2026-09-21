@@ -18,10 +18,13 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,6 +37,9 @@ import com.composeunstyled.LocalTextStyle
 import com.composeunstyled.ProvideContentColor
 import com.composeunstyled.ProvideTextStyle
 import com.composeunstyled.theme.Theme
+import dev.chrisbanes.haze.HazeProgressive
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.HazeColorEffect
 
 /**
  * 页面顶栏。Composables `Toolbar` Medium 固定 64.dp，默认按钮只有 48.dp，
@@ -123,6 +129,35 @@ internal fun ToolbarCapsule(
 }
 
 internal val IrioToolbarOverflow = 8.dp
+
+/** 胶囊下方再留一段，模糊淡出不要贴着按钮底边。 */
+internal val ChatToolbarHazeBleed = 28.dp
+
+/**
+ * 毛玻璃：主题色半透明着色 + 模糊，顶部最实，向下连同透明度一起淡出。
+ * 对齐 HazeMaterials.thick 的 tint。
+ */
+@Composable
+internal fun chatToolbarHazeStyle(): HazeBlurStyle {
+    val container = Theme[colors][backgroundColorToken]
+    val frost = if (container.luminance() >= 0.5f) 0.83f else 0.9f
+    return remember(container, frost) {
+        HazeBlurStyle {
+            blurRadius(40.dp)
+            backgroundColor(container)
+            colorEffects(
+                listOf(HazeColorEffect.tint(container.copy(alpha = frost))),
+            )
+            progressive(
+                HazeProgressive.verticalGradient(
+                    startIntensity = 1f,
+                    endIntensity = 0f,
+                ),
+            )
+            mask(Brush.verticalGradient(listOf(Color.Black, Color.Transparent)))
+        }
+    }
+}
 
 private val IrioToolbarTitleStyle = TextStyle(
     fontSize = 20.sp,

@@ -138,7 +138,7 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
         adapter = messageAdapter
         itemAnimator = null
         setItemViewCacheSize(8)
-        clipToPadding = true
+        clipToPadding = false
         overScrollMode = View.OVER_SCROLL_NEVER
         addItemDecoration(VerticalMessageSpacing(context, 12))
         addOnScrollListener(object : OnScrollListener() {

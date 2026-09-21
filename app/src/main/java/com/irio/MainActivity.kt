@@ -150,6 +150,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.ui.components.AlertDialog
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
+import kotlin.math.roundToInt
 import com.composables.ui.components.BottomSheet
 import com.composables.ui.components.BottomSheetDetent
 import com.composables.ui.components.BottomSheetState
@@ -278,6 +283,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     val composerBarHeight = with(LocalDensity.current) { composerBarHeightPx.toDp() }
     var toolbarHeightPx by remember { mutableIntStateOf(0) }
     val toolbarHeight = with(LocalDensity.current) { toolbarHeightPx.toDp() }
+    val toolbarContentPaddingPx = with(LocalDensity.current) { (toolbarHeight + 16.dp).toPx().roundToInt() }
+    val chatHazeState = rememberHazeState()
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
     val muted = Theme[colors][mutedColor]
@@ -1532,12 +1539,12 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     controller = messageRecyclerController,
                     modifier = Modifier
                         .fillMaxSize()
+                        .hazeSource(chatHazeState)
                         .padding(
-                            top = toolbarHeight + 16.dp,
                             bottom = composerBarHeight + 16.dp,
                         )
                         .padding(horizontal = 16.dp),
-                    contentPaddingTop = 0,
+                    contentPaddingTop = toolbarContentPaddingPx,
                     contentPaddingBottom = 0,
                     callbacks = messageCallbacks,
                     onVisibleRangeChanged = { first, last ->
@@ -1749,11 +1756,17 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 )
                 }
 
-                IrioToolbar(
+                Column(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
-                        .onSizeChanged { toolbarHeightPx = it.height },
+                        .hazeBlur(
+                            input = HazeInput.Sources(chatHazeState),
+                            style = chatToolbarHazeStyle(),
+                        ),
+                ) {
+                IrioToolbar(
+                    modifier = Modifier.onSizeChanged { toolbarHeightPx = it.height },
                     title = { Spacer(Modifier.weight(1f)) },
                     backgroundColor = Color.Transparent,
                     contentColor = content,
@@ -1838,6 +1851,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         }
                     },
                 )
+                    Spacer(Modifier.height(ChatToolbarHazeBleed))
+                }
             }
 
         }

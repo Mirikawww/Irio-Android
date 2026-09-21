@@ -15,6 +15,8 @@ dependencies {
     implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
     implementation("com.composables:ui:0.2.0")
     implementation("com.composables:composeunstyled-slider:2.7.0")
+    implementation("dev.chrisbanes.haze:haze:2.0.0-rc02")
+    implementation("dev.chrisbanes.haze:haze-blur:2.0.0-rc02")
     implementation("com.mikepenz:multiplatform-markdown-renderer:0.45.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.45.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-code:0.45.0")
