@@ -410,15 +410,27 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
 
     DisposableEffect(Unit) {
         val listener = {
-            val provider = ProviderStore.loadProvider()
-            providers = ProviderStore.loadProviders()
-            activeProviderId = ProviderStore.loadActiveProviderId()
-            selectedModel = provider?.selectedModel.orEmpty()
-            reasoningEffort = ProviderStore.loadReasoningEffort()
-            fastMode = ProviderStore.loadFastMode()
-            mergeModels = ProviderStore.loadMergeModels()
-            webSearchAvailable = SearchStore.hasApiKey()
-            webSearchEnabled = SearchStore.loadWebSearchEnabled()
+            scope.launch(Dispatchers.IO) {
+                val loaded = ProviderStore.loadProviders()
+                val active = ProviderStore.loadActiveProviderId()
+                val provider = loaded.firstOrNull { it.id == active } ?: loaded.firstOrNull()
+                val effort = ProviderStore.loadReasoningEffort()
+                val fast = ProviderStore.loadFastMode()
+                val merge = ProviderStore.loadMergeModels()
+                val searchReady = SearchStore.hasApiKey()
+                val searchOn = SearchStore.loadWebSearchEnabled()
+                withContext(Dispatchers.Main) {
+                    providers = loaded
+                    activeProviderId = active
+                    selectedModel = provider?.selectedModel.orEmpty()
+                    reasoningEffort = effort
+                    fastMode = fast
+                    mergeModels = merge
+                    webSearchAvailable = searchReady
+                    webSearchEnabled = searchOn
+                }
+            }
+            Unit
         }
         val conversationsListener = {
             val current = currentConversationState.value
@@ -1672,7 +1684,7 @@ private fun ModelPicker(
 ) {
     val content = Theme[colors][onBackgroundColor]
     val muted = Theme[colors][mutedColor]
-    val providersWithModels = providers.filter { it.models.isNotEmpty() }
+    val providersWithModels = providers.filter { it.enabledModels().isNotEmpty() }
     if (providersWithModels.isEmpty()) {
         Text(
             "未配置模型",
@@ -1689,10 +1701,10 @@ private fun ModelPicker(
                 if (providerIndex > 0) add(ModelPickerRow.Gap("gap-$providerIndex"))
                 add(ModelPickerRow.GroupLabel("label-${provider.id}", provider.name))
                 val groups = if (mergeModels) {
-                    provider.models.groupBy { model -> model.removeSuffix("-thinking").removeSuffix("-fast") }
+                    provider.enabledModels().groupBy { model -> model.removeSuffix("-thinking").removeSuffix("-fast") }
                 } else {
                     LinkedHashMap<String, List<String>>().apply {
-                        provider.models.forEach { put(it, listOf(it)) }
+                        provider.enabledModels().forEach { put(it, listOf(it)) }
                     }
                 }
                 groups.entries.forEach { (base, variants) ->

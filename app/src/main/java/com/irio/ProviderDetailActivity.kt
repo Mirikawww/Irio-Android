@@ -2,8 +2,10 @@ package com.irio
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
@@ -37,13 +40,16 @@ import com.composables.ui.components.DropdownMenuItem
 import com.composables.ui.components.DropdownMenuPanel
 import com.composables.ui.components.Icon
 import com.composables.ui.components.IconButton
+import com.composables.ui.components.Switch
 import com.composables.ui.components.Text
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.fieldShape
+import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.panelColor
+import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 import kotlinx.coroutines.Dispatchers
@@ -77,6 +83,8 @@ private fun ProviderDetailScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val disabledSaveTicket = remember { java.util.concurrent.atomic.AtomicInteger(0) }
+    val disabledSaveLock = remember { Any() }
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
     var provider by remember { mutableStateOf(ProviderStore.loadProvider(context, providerId)) }
@@ -230,10 +238,26 @@ private fun ProviderDetailScreen(
                         Text("还没有模型")
                     } else {
                         provider!!.models.forEach { model ->
-                            ListRowButton(
-                                label = model,
-                                onClick = { },
-                                enabled = false,
+                            ModelEnabledRow(
+                                model = model,
+                                enabled = model !in provider!!.disabledModels,
+                                onCheckedChange = { on ->
+                                    val current = provider ?: return@ModelEnabledRow
+                                    val disabled = if (on) {
+                                        current.disabledModels - model
+                                    } else {
+                                        current.disabledModels + model
+                                    }
+                                    provider = current.copy(disabledModels = disabled)
+                                    val ticket = disabledSaveTicket.incrementAndGet()
+                                    val id = current.id
+                                    scope.launch(Dispatchers.IO) {
+                                        synchronized(disabledSaveLock) {
+                                            if (ticket != disabledSaveTicket.get()) return@synchronized
+                                            ProviderStore.saveDisabledModels(context, id, disabled)
+                                        }
+                                    }
+                                },
                             )
                         }
                     }
@@ -271,5 +295,27 @@ private fun ProviderDetailScreen(
                 confirmStyle = ButtonStyle.Destructive,
             )
         }
+    }
+}
+
+@Composable
+private fun ModelEnabledRow(
+    model: String,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+            .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            model,
+            modifier = Modifier.weight(1f),
+            color = Theme[colors][onBackgroundColor],
+        )
+        Switch(checked = enabled, onCheckedChange = onCheckedChange)
     }
 }

@@ -41,6 +41,7 @@ data class ProviderConfig(
     val apiKey: String,
     val protocol: ProviderProtocol = ProviderProtocol.CHAT_COMPLETIONS,
     val models: List<String> = emptyList(),
+    val disabledModels: Set<String> = emptySet(),
     val selectedModel: String = "",
 )
 
@@ -48,6 +49,9 @@ data class ModelFetchResult(
     val models: List<String> = emptyList(),
     val error: String? = null,
 )
+
+/** 提供商详情里关掉的模型不进任何模型菜单。缺省集合表示全部开启。 */
+fun ProviderConfig.enabledModels(): List<String> = models.filter { it !in disabledModels }
 
 object ProviderStore {
     private const val PREFS = "provider_settings"
@@ -102,6 +106,7 @@ object ProviderStore {
                         ProviderProtocol.valueOf(item.optString("protocol"))
                     }.getOrDefault(ProviderProtocol.CHAT_COMPLETIONS)
                     val models = stringList(item.optJSONArray("models"))
+                    val disabled = stringList(item.optJSONArray("disabled_models")).filter { it in models }.toSet()
                     val selected = item.optString("selected_model").takeIf { it in models }
                         ?: models.firstOrNull().orEmpty()
                     add(
@@ -112,6 +117,7 @@ object ProviderStore {
                             apiKey = apiKey,
                             protocol = protocol,
                             models = models,
+                            disabledModels = disabled,
                             selectedModel = selected,
                         )
                     )
@@ -150,9 +156,27 @@ object ProviderStore {
         val index = providers.indexOfFirst { it.id == config.id }
         val selected = config.selectedModel.takeIf { it in config.models }
             ?: config.models.firstOrNull().orEmpty()
-        val stored = config.copy(selectedModel = selected)
+        val disabled = config.disabledModels.intersect(config.models.toSet())
+        val stored = config.copy(selectedModel = selected, disabledModels = disabled)
         if (index >= 0) providers[index] = stored else providers.add(stored)
         persist(context, providers, stored.id)
+    }
+
+    fun saveDisabledModels(context: Context, providerId: String, disabled: Set<String>) {
+        val prefs = preferences(context)
+        val array = runCatching { JSONArray(prefs.getString(PROVIDERS, "[]") ?: "[]") }.getOrElse { return }
+        var found = false
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            if (item.optString("id") != providerId) continue
+            val known = stringList(item.optJSONArray("models")).toSet()
+            item.put("disabled_models", JSONArray().apply { disabled.filter { it in known }.forEach(::put) })
+            found = true
+            break
+        }
+        if (!found) return
+        prefs.edit().putString(PROVIDERS, array.toString()).apply()
+        notifyChanged()
     }
 
     fun deleteProvider(context: Context, id: String) {
@@ -230,6 +254,7 @@ object ProviderStore {
                         put("encrypted_key", encrypt(provider.apiKey))
                         put("protocol", provider.protocol.name)
                         put("models", JSONArray().apply { provider.models.forEach(::put) })
+                        put("disabled_models", JSONArray().apply { provider.disabledModels.forEach(::put) })
                         put("selected_model", provider.selectedModel)
                     }
                 )
@@ -261,6 +286,7 @@ object ProviderStore {
                                 put("apiKey", provider.apiKey)
                                 put("protocol", provider.protocol.name)
                                 put("models", JSONArray().apply { provider.models.forEach(::put) })
+                                put("disabled_models", JSONArray().apply { provider.disabledModels.forEach(::put) })
                                 put("selected_model", provider.selectedModel)
                             }
                         )
@@ -301,6 +327,7 @@ object ProviderStore {
                     ProviderProtocol.valueOf(item.optString("protocol"))
                 }.getOrDefault(ProviderProtocol.CHAT_COMPLETIONS)
                 val models = stringList(item.optJSONArray("models"))
+                val disabled = stringList(item.optJSONArray("disabled_models")).filter { it in models }.toSet()
                 val selected = item.optString("selected_model").takeIf { it in models }
                     ?: models.firstOrNull().orEmpty()
                 add(
@@ -311,6 +338,7 @@ object ProviderStore {
                         apiKey = apiKey,
                         protocol = protocol,
                         models = models,
+                        disabledModels = disabled,
                         selectedModel = selected,
                     )
                 )

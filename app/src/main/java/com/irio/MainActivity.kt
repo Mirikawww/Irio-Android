@@ -534,17 +534,31 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             if (key == "theme_preference") return@OnSharedPreferenceChangeListener
             // 自己刚发起的保存：300ms 内跳过回环重载（内存态已是最新）
             if (System.currentTimeMillis() < suppressUntil) return@OnSharedPreferenceChangeListener
-            val provider = ProviderStore.loadProvider(context)
-            providers = ProviderStore.loadProviders(context)
-            activeProviderId = ProviderStore.loadActiveProviderId(context)
-            selectedModel = provider?.selectedModel.orEmpty()
-            reasoningEffort = ProviderStore.loadReasoningEffort(context)
-            fastMode = ProviderStore.loadFastMode(context)
-            mergeModels = ProviderStore.loadMergeModels(context)
-            modelsDevCatalog = ProviderStore.loadModelsDevCatalog(context)
-            modelsDevReasoning = ProviderStore.loadModelsDevReasoning(context)
-            webSearchAvailable = SearchStore.hasApiKey(context)
-            webSearchEnabled = SearchStore.loadWebSearchEnabled(context)
+            scope.launch(Dispatchers.IO) {
+                val loaded = ProviderStore.loadProviders(context)
+                val active = ProviderStore.loadActiveProviderId(context)
+                val provider = loaded.firstOrNull { it.id == active } ?: loaded.firstOrNull()
+                val effort = ProviderStore.loadReasoningEffort(context)
+                val fast = ProviderStore.loadFastMode(context)
+                val merge = ProviderStore.loadMergeModels(context)
+                val catalog = ProviderStore.loadModelsDevCatalog(context)
+                val reasoning = ProviderStore.loadModelsDevReasoning(context)
+                val searchReady = SearchStore.hasApiKey(context)
+                val searchOn = SearchStore.loadWebSearchEnabled(context)
+                withContext(Dispatchers.Main) {
+                    if (System.currentTimeMillis() < suppressUntil) return@withContext
+                    providers = loaded
+                    activeProviderId = active
+                    selectedModel = provider?.selectedModel.orEmpty()
+                    reasoningEffort = effort
+                    fastMode = fast
+                    mergeModels = merge
+                    modelsDevCatalog = catalog
+                    modelsDevReasoning = reasoning
+                    webSearchAvailable = searchReady
+                    webSearchEnabled = searchOn
+                }
+            }
         }
         val conversationsListener = {
             val current = currentConversationState.value
@@ -581,17 +595,31 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         // 自己刚点击保存的场景下跳过，避免对同一批数据做第二次全量解密+解析+状态覆盖。
         val providersListener = {
             if (System.currentTimeMillis() >= suppressUntil) {
-                val provider = ProviderStore.loadProvider(context)
-                providers = ProviderStore.loadProviders(context)
-                activeProviderId = ProviderStore.loadActiveProviderId(context)
-                selectedModel = provider?.selectedModel.orEmpty()
-                reasoningEffort = ProviderStore.loadReasoningEffort(context)
-                fastMode = ProviderStore.loadFastMode(context)
-                mergeModels = ProviderStore.loadMergeModels(context)
-                modelsDevCatalog = ProviderStore.loadModelsDevCatalog(context)
-                modelsDevReasoning = ProviderStore.loadModelsDevReasoning(context)
-                webSearchAvailable = SearchStore.hasApiKey(context)
-                webSearchEnabled = SearchStore.loadWebSearchEnabled(context)
+                scope.launch(Dispatchers.IO) {
+                    val loaded = ProviderStore.loadProviders(context)
+                    val active = ProviderStore.loadActiveProviderId(context)
+                    val provider = loaded.firstOrNull { it.id == active } ?: loaded.firstOrNull()
+                    val effort = ProviderStore.loadReasoningEffort(context)
+                    val fast = ProviderStore.loadFastMode(context)
+                    val merge = ProviderStore.loadMergeModels(context)
+                    val catalog = ProviderStore.loadModelsDevCatalog(context)
+                    val reasoning = ProviderStore.loadModelsDevReasoning(context)
+                    val searchReady = SearchStore.hasApiKey(context)
+                    val searchOn = SearchStore.loadWebSearchEnabled(context)
+                    withContext(Dispatchers.Main) {
+                        if (System.currentTimeMillis() < suppressUntil) return@withContext
+                        providers = loaded
+                        activeProviderId = active
+                        selectedModel = provider?.selectedModel.orEmpty()
+                        reasoningEffort = effort
+                        fastMode = fast
+                        mergeModels = merge
+                        modelsDevCatalog = catalog
+                        modelsDevReasoning = reasoning
+                        webSearchAvailable = searchReady
+                        webSearchEnabled = searchOn
+                    }
+                }
             }
         }
         suppressProviderEcho.fn = { suppressUntil = System.currentTimeMillis() + 300 }
@@ -1952,7 +1980,7 @@ private fun ModelPicker(
     val context = LocalContext.current
     val content = Theme[colors][onBackgroundColor]
     val muted = Theme[colors][mutedColor]
-    val providersWithModels = providers.filter { it.models.isNotEmpty() }
+    val providersWithModels = providers.filter { it.enabledModels().isNotEmpty() }
     if (providersWithModels.isEmpty()) {
         Text(
             "未配置模型",
@@ -1969,10 +1997,10 @@ private fun ModelPicker(
                 if (providerIndex > 0) add(ModelPickerRow.Gap("gap-$providerIndex"))
                 add(ModelPickerRow.GroupLabel("label-${provider.id}", provider.name))
                 val groups = if (mergeModels) {
-                    provider.models.groupBy { ModelCatalog.mergeKey(it, mergeEnabled = true) }
+                    provider.enabledModels().groupBy { ModelCatalog.mergeKey(it, mergeEnabled = true) }
                 } else {
                     LinkedHashMap<String, List<String>>().apply {
-                        provider.models.forEach { put(it, listOf(it)) }
+                        provider.enabledModels().forEach { put(it, listOf(it)) }
                     }
                 }
                 groups.entries.forEach { (base, variants) ->
