@@ -1320,8 +1320,15 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .onSizeChanged { composerBarHeightPx = it.height },
+                        .hazeBlur(
+                            input = HazeInput.Sources(chatHazeState),
+                            style = chatComposerHazeStyle(),
+                        ),
                 ) {
+                    Spacer(Modifier.height(ChatComposerHazeBleed))
+                    Column(
+                        modifier = Modifier.onSizeChanged { composerBarHeightPx = it.height },
+                    ) {
                 if (pendingAttachments.isNotEmpty()) {
                     Row(
                         modifier = Modifier
@@ -1488,6 +1495,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         }
                     }
                 )
+                }
                 }
 
                 Column(

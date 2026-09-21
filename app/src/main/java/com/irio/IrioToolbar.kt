@@ -1,5 +1,7 @@
 package com.irio
 
+import androidx.compose.animation.core.EaseIn
+import androidx.compose.animation.core.EaseOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -133,15 +135,24 @@ internal val IrioToolbarOverflow = 8.dp
 /** 胶囊下方再留一段，模糊淡出不要贴着按钮底边。 */
 internal val ChatToolbarHazeBleed = 28.dp
 
+/** 输入框上方再留一段，模糊淡出不要贴着字段顶边。 */
+internal val ChatComposerHazeBleed = ChatToolbarHazeBleed
+
 /**
- * 毛玻璃：主题色半透明着色 + 模糊，顶部最实，向下连同透明度一起淡出。
- * 对齐 HazeMaterials.thick 的 tint。
+ * 毛玻璃：主题色半透明着色 + 模糊，渐变铺满整段 overlay。
+ * [bottomStrong] false = 顶栏上强下弱（EaseIn）；true = 输入框下强上弱（EaseOut，曲线镜像）。
  */
 @Composable
-internal fun chatToolbarHazeStyle(): HazeBlurStyle {
+internal fun chatToolbarHazeStyle(): HazeBlurStyle = chatEdgeHazeStyle(bottomStrong = false)
+
+@Composable
+internal fun chatComposerHazeStyle(): HazeBlurStyle = chatEdgeHazeStyle(bottomStrong = true)
+
+@Composable
+private fun chatEdgeHazeStyle(bottomStrong: Boolean): HazeBlurStyle {
     val container = Theme[colors][backgroundColorToken]
     val frost = if (container.luminance() >= 0.5f) 0.83f else 0.9f
-    return remember(container, frost) {
+    return remember(container, frost, bottomStrong) {
         HazeBlurStyle {
             blurRadius(40.dp)
             backgroundColor(container)
@@ -150,11 +161,17 @@ internal fun chatToolbarHazeStyle(): HazeBlurStyle {
             )
             progressive(
                 HazeProgressive.verticalGradient(
-                    startIntensity = 1f,
-                    endIntensity = 0f,
+                    easing = if (bottomStrong) EaseOut else EaseIn,
+                    startIntensity = if (bottomStrong) 0f else 1f,
+                    endIntensity = if (bottomStrong) 1f else 0f,
                 ),
             )
-            mask(Brush.verticalGradient(listOf(Color.Black, Color.Transparent)))
+            mask(
+                Brush.verticalGradient(
+                    if (bottomStrong) listOf(Color.Transparent, Color.Black)
+                    else listOf(Color.Black, Color.Transparent),
+                ),
+            )
         }
     }
 }

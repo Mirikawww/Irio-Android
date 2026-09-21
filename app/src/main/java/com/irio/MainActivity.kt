@@ -39,6 +39,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,11 +48,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -284,6 +288,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var toolbarHeightPx by remember { mutableIntStateOf(0) }
     val toolbarHeight = with(LocalDensity.current) { toolbarHeightPx.toDp() }
     val toolbarContentPaddingPx = with(LocalDensity.current) { (toolbarHeight + 16.dp).toPx().roundToInt() }
+    val composerContentPaddingPx = with(LocalDensity.current) { (composerBarHeight + 16.dp).toPx().roundToInt() }
     val chatHazeState = rememberHazeState()
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
@@ -1531,7 +1536,6 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .navigationBarsPadding()
                     .imePadding()
             ) {
                 AndroidMessageList(
@@ -1540,12 +1544,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     modifier = Modifier
                         .fillMaxSize()
                         .hazeSource(chatHazeState)
-                        .padding(
-                            bottom = composerBarHeight + 16.dp,
-                        )
                         .padding(horizontal = 16.dp),
                     contentPaddingTop = toolbarContentPaddingPx,
-                    contentPaddingBottom = 0,
+                    contentPaddingBottom = composerContentPaddingPx,
                     callbacks = messageCallbacks,
                     onVisibleRangeChanged = { first, last ->
                         val snapshot = visibleTranscript
@@ -1583,8 +1584,20 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .onSizeChanged { composerBarHeightPx = it.height },
+                        .hazeBlur(
+                            input = HazeInput.Sources(chatHazeState),
+                            style = chatComposerHazeStyle(),
+                        ),
                 ) {
+                    Spacer(Modifier.height(ChatComposerHazeBleed))
+                    Column(
+                        modifier = Modifier
+                            .windowInsetsPadding(
+                                WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)
+                                    .exclude(WindowInsets.ime),
+                            )
+                            .onSizeChanged { composerBarHeightPx = it.height },
+                    ) {
                 if (pendingAttachments.isNotEmpty()) {
                     Row(
                         modifier = Modifier
@@ -1754,6 +1767,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         }
                     }
                 )
+                }
                 }
 
                 Column(
