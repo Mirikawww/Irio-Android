@@ -2031,8 +2031,11 @@ private fun ProcessEventRow(
             )
             if (event.kind == ProcessEventKind.THINKING && event.content.isNotBlank()) {
                 val thinkingScrollState = rememberScrollState()
+                val wasNearBottom = thinkingScrollState.value >=
+                    thinkingScrollState.maxValue - 48
                 LaunchedEffect(event.content) {
-                    thinkingScrollState.scrollTo(thinkingScrollState.maxValue)
+                    withFrameNanos { }
+                    if (wasNearBottom) thinkingScrollState.scrollTo(thinkingScrollState.maxValue)
                 }
                 Box(
                     modifier = Modifier

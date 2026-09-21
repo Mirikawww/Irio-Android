@@ -59,6 +59,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -134,9 +135,11 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -2344,13 +2347,45 @@ private fun ProcessEventRow(
                 }
             )
             if (event.kind == ProcessEventKind.THINKING && event.content.isNotBlank()) {
-                Text(
-                    event.content,
-                    color = muted,
-                    fontSize = 15.sp,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                val thinkingScrollState = rememberScrollState()
+                val hostView = LocalView.current
+                // Read this during the composition that contains the old text. Reading it
+                // inside LaunchedEffect can already see the newly measured maxValue, making a
+                // view that was at the bottom look like the user had scrolled away.
+                val wasNearBottom = thinkingScrollState.value >=
+                    thinkingScrollState.maxValue - 48
+                LaunchedEffect(event.content) {
+                    withFrameNanos { }
+                    if (wasNearBottom) thinkingScrollState.scrollTo(thinkingScrollState.maxValue)
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(96.dp)
+                        // The row itself lives inside the transcript RecyclerView. Let this
+                        // nested scroller keep the gesture instead of RecyclerView stealing it.
+                        .pointerInteropFilter { event ->
+                            when (event.actionMasked) {
+                                android.view.MotionEvent.ACTION_DOWN -> {
+                                    hostView.parent?.requestDisallowInterceptTouchEvent(true)
+                                    false
+                                }
+                                android.view.MotionEvent.ACTION_UP,
+                                android.view.MotionEvent.ACTION_CANCEL -> {
+                                    hostView.parent?.requestDisallowInterceptTouchEvent(false)
+                                    false
+                                }
+                                else -> false
+                            }
+                        }
+                        .verticalScroll(thinkingScrollState),
+                ) {
+                    Text(
+                        event.content,
+                        color = muted,
+                        fontSize = 15.sp,
+                    )
+                }
             }
         } else if (label != null) {
             Row(
