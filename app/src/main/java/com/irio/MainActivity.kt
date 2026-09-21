@@ -55,9 +55,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -97,7 +95,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
@@ -131,9 +128,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -191,8 +186,7 @@ import com.mikepenz.markdown.model.State
 import com.mikepenz.markdown.model.parseMarkdown
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.distinctUntilChanged
+import androidx.recyclerview.widget.RecyclerView
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.unit.Density
 import org.scilab.forge.jlatexmath.TeXConstants
@@ -268,12 +262,15 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var conversationAction by remember { mutableStateOf<ConversationSummary?>(null) }
     var viewingPhoto by remember { mutableStateOf<ChatAttachment?>(null) }
     var generations by remember { mutableStateOf(emptyMap<Long, ActiveGeneration>()) }
+    val currentConversationState = rememberUpdatedState(currentConversation)
+    val generationsSnapshotState = rememberUpdatedState(generations)
     // 消息 ID 由全局 MessageIds 分配，避免跨会话/重启后的回复错配。
     // 点击保存前标记，DisposableEffect 里的 listener 在 300ms 内跳过自触发回环。
     // 普通引用即可：listener 闭包捕获引用，不需要 Compose 状态观测。
     class SuppressFlag { var fn: () -> Unit = {} }
     val suppressProviderEcho = remember { SuppressFlag() }
-    val listState = rememberLazyListState()
+    val messageRecyclerController = remember { MessageRecyclerController() }
+    var recyclerScrolling by remember { mutableStateOf(false) }
     var composerBarHeightPx by remember { mutableIntStateOf(0) }
     val composerBarHeight = with(LocalDensity.current) { composerBarHeightPx.toDp() }
     var toolbarHeightPx by remember { mutableIntStateOf(0) }
@@ -296,22 +293,18 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     val pageDim = 0.28f * drawerOpenProgress
     val drawerShadowPx = with(density) { 8.dp.toPx() }
     val drawerOpen = drawerProgress >= 0.5f
+    var pendingConversationScroll by remember { mutableStateOf<String?>(null) }
+    var conversationLoadToken by remember { mutableIntStateOf(0) }
     val generatingIds = remember(generations) { generations.values.map { it.conversationId }.toSet() }
+    val groupedConversationRows = remember(conversations) { groupedConversations(conversations) }
     val generatingThisChat = currentConversation.id in generatingIds
     val imeAnimating = remember { AtomicBoolean(false) }
     ImeAnimationProbe(imeAnimating)
     val streamingDeferActive = remember { AtomicBoolean(false) }
-    // 用户拖动/惯性滚动时把流式重组隔到 120ms：见 [shouldPublishStreamUpdate]。
-    // generatingIds 需走 rememberUpdatedState，否则 remember 闭包捕获的是旧值。
-    val generatingIdsState = rememberUpdatedState(generatingIds)
-    val streamDeferConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (generatingIdsState.value.isNotEmpty()) streamingDeferActive.set(true)
-                return Offset.Zero
-            }
-        }
-    }
+    // 预热不能抢首次展示的 CPU：只保留一个可取消的邻近消息任务，
+    // 快速滚动时丢弃旧范围，避免几十个 LaTeX 同时排队。
+    val transcriptPrewarmJob = remember { mutableStateOf<Job?>(null) }
+
     /**
      * 会话正文缓存（LRU 8 条）：conversations 里只有摘要，打开/置顶/流式兜底都要正文，
      * 全部走这里，避免同一会话在同一帧里被重复读盘解析 JSON。
@@ -355,25 +348,6 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     val renderPxPerPt = density.density
     val renderTexScale = remember { ProviderStore.loadTexScale(context) }
 
-    LaunchedEffect(currentConversation.id, visibleTranscript) {
-        if (visibleTranscript.isEmpty()) return@LaunchedEffect
-        snapshotFlow {
-            val visible = listState.layoutInfo.visibleItemsInfo
-            visible.firstOrNull()?.index to visible.lastOrNull()?.index
-        }
-            .distinctUntilChanged()
-            .collect { (first, last) ->
-                if (first == null || last == null) return@collect
-                val start = (first - 2).coerceAtLeast(0)
-                val end = (last + 2).coerceAtMost(visibleTranscript.lastIndex)
-                for (index in start..end) {
-                    prepareFinishedMessage(
-                        visibleTranscript[index], renderContentArgb, renderPxPerPt, renderTexScale, scope,
-                    )
-                }
-            }
-    }
-
     val clearingHistoryState = rememberUpdatedState(clearingHistory)
 
     // 普通冷启动保持空白；系统重建 Activity（包括进程被回收后的恢复）时回到上次会话。
@@ -388,6 +362,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         val restored = withContext(Dispatchers.IO) { ConversationStore.loadLastOpened(context) }
         if (restored != null) {
             cacheConversationContent(restored)
+            pendingConversationScroll = restored.id
             currentConversation = restored
             messages = restored.messages
             // MessageIds 保证跨会话及进程内的消息 ID 不冲突。
@@ -557,8 +532,15 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             webSearchEnabled = SearchStore.loadWebSearchEnabled(context)
         }
         val conversationsListener = {
+            val current = currentConversationState.value
+            val currentId = current.id
+            val currentUpdatedAt = current.updatedAt
+            val streamingThisChat = currentId in generationsSnapshotState.value.values.map { it.conversationId }
             scope.launch(Dispatchers.IO) {
                 val loaded = ConversationStore.loadAll(context)
+                val full = loaded.firstOrNull { it.id == currentId }
+                    ?.takeIf { it.updatedAt != currentUpdatedAt && !streamingThisChat }
+                    ?.let { ConversationStore.load(context, it.id) }
                 withContext(Dispatchers.Main) {
                     // 自触发回环（persistCurrent → save → notifyChanged）里 id 集合没变时，
                     // 逐条比较字段、不变就保留原引用，避免点击发送后整个抽屉重组。
@@ -572,15 +554,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         loaded
                     }
                     if (merged != conversations) conversations = merged
-                    val streamingThisChat = currentConversation.id in generations.values.map { it.conversationId }
-                    if (!streamingThisChat) {
-                        val summary = loaded.firstOrNull { it.id == currentConversation.id }
-                        if (summary != null && summary.updatedAt != currentConversation.updatedAt) {
-                            conversationContent(summary.id)?.let { full ->
-                                currentConversation = full
-                                messages = full.messages
-                            }
-                        }
+                    if (full != null && currentConversation.id == currentId && currentId !in generations.values.map { it.conversationId }) {
+                        currentConversation = full
+                        messages = full.messages
                     }
                 }
             }
@@ -661,18 +637,29 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
     LaunchedEffect(currentConversation.id, visibleTranscript.size, visibleTranscript.lastOrNull()?.id) {
         val last = visibleTranscript.lastOrNull() ?: return@LaunchedEffect
+        if (pendingConversationScroll == currentConversation.id) {
+            pendingConversationScroll = null
+            messageRecyclerController.requestScrollToBottom()
+            return@LaunchedEffect
+        }
         // 用户不在底部（在往回翻看历史）时不抢滚动位置，让浏览保持流畅。
-        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+        if (recyclerScrolling || messageRecyclerController.isScrollInProgress()) return@LaunchedEffect
+        // 新发送的用户消息必须落到底部；只有后续助手更新才受“用户上滑不抢位置”保护。
+        if (last.fromUser) {
+            messageRecyclerController.requestScrollToBottom()
+            return@LaunchedEffect
+        }
+        val lastVisible = messageRecyclerController.lastVisibleIndex()
         val nearBottom = lastVisible >= visibleTranscript.lastIndex - 1
-        if (nearBottom && (last.fromUser || (!last.isPending && !last.isStreaming))) {
-            listState.scrollToItem(visibleTranscript.lastIndex, Int.MAX_VALUE)
+        if (nearBottom && (!last.isPending && !last.isStreaming)) {
+            messageRecyclerController.requestScrollToBottom()
         }
     }
 
     // 拖动停止 / 惯性衰减 / 流式结束后复位 streamingDeferActive，
     // 否则后续流式一直被压在 120ms 的滚动间隔上。
-    LaunchedEffect(listState.isScrollInProgress, generations) {
-        if (!listState.isScrollInProgress) {
+    LaunchedEffect(recyclerScrolling, generations) {
+        if (!recyclerScrolling) {
             // 手指刚抬起时给惯性一点缓冲再放开
             delay(240)
             streamingDeferActive.set(false)
@@ -684,40 +671,25 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             drawerProgress = 0f
             return
         }
-        // 正文只从缓存/磁盘取，避免点击时主线程 JSON 解析大消息列表。
+        val requestToken = conversationLoadToken + 1
+        conversationLoadToken = requestToken
+        // 先关抽屉；正文磁盘读取和 Markdown/TeX 预热都不能阻塞点击反馈。
+        drawerProgress = 0f
         scope.launch(Dispatchers.IO) {
             val full = conversationContent(conversation.id) ?: return@launch
-            cacheConversationContent(full)
-            val presentation = withContext(Dispatchers.Default) {
-                buildTranscriptPresentation(full.id, full.messages)
-            }
-            val firstScreen = (presentation.visible.size - 6).coerceAtLeast(0)
-            for (index in firstScreen until presentation.visible.size) {
-                prepareFinishedMessage(
-                    presentation.visible[index], renderContentArgb, renderPxPerPt, renderTexScale, scope,
-                )
-            }
-            withContext(Dispatchers.Main) {
-                transcriptPresentation = presentation
-                listState.requestScrollToItem(presentation.visible.lastIndex.coerceAtLeast(0), Int.MAX_VALUE)
+            val applied = withContext(Dispatchers.Main) {
+                if (conversationLoadToken != requestToken) return@withContext false
+                pendingConversationScroll = full.id
                 currentConversation = full
                 messages = full.messages
-                drawerProgress = 0f
+                true
             }
-            renderPrewarmOrder(presentation.visible.size, firstScreen, presentation.visible.lastIndex)
-                .drop(presentation.visible.size - firstScreen)
-                .forEach { index ->
-                    prepareFinishedMessage(
-                        presentation.visible[index], renderContentArgb, renderPxPerPt, renderTexScale, scope,
-                    )
-                }
-        }
-        scope.launch(Dispatchers.IO) {
-            ConversationStore.saveLastOpenedId(context, conversation.id)
+            if (applied) ConversationStore.saveLastOpenedId(context, conversation.id)
         }
     }
 
     fun newConversation(closeDrawer: Boolean = true) {
+        conversationLoadToken++
         currentConversation = ConversationStore.newConversation()
         messages = emptyList()
         pendingAttachments = emptyList()
@@ -779,25 +751,29 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     }
 
     fun togglePinned(conversation: ConversationSummary) {
-        val stored = conversationContent(conversation.id) ?: conversation.toConversation()
-        val next = stored.copy(pinned = !stored.pinned)
-        ConversationStore.save(context, next)
-        cacheConversationContent(next)
+        val nextPinned = !conversation.pinned
         conversations = conversations
-            .map { if (it.id == conversation.id) next.summary() else it }
+            .map { if (it.id == conversation.id) it.copy(pinned = nextPinned) else it }
             .sortedWith(compareByDescending<ConversationSummary> { it.pinned }.thenByDescending { it.updatedAt })
         if (currentConversation.id == conversation.id) {
-            currentConversation = next
+            currentConversation = currentConversation.copy(pinned = nextPinned)
+        }
+        scope.launch(Dispatchers.IO) {
+            ConversationStore.load(context, conversation.id)?.let { stored ->
+                ConversationStore.save(context, stored.copy(pinned = nextPinned))
+            }
         }
     }
 
     fun deleteConversation(conversation: ConversationSummary) {
         if (conversation.id in generatingIds) stopGeneration(conversation.id)
-        ConversationStore.delete(context, conversation.id)
-        synchronized(conversationCache) { conversationCache.remove(conversation.id) }
         conversations = conversations.filterNot { it.id == conversation.id }
         if (currentConversation.id == conversation.id) {
             newConversation(closeDrawer = false)
+        }
+        synchronized(conversationCache) { conversationCache.remove(conversation.id) }
+        scope.launch(Dispatchers.IO) {
+            ConversationStore.delete(context, conversation.id)
         }
     }
 
@@ -1323,6 +1299,61 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         persistCurrent(messages, touchUpdatedAt = false)
     }
 
+    fun retryVersionInfo(target: ChatMessage): VersionInfo {
+        val versions = if (target.fromUser) listOf(target) else retryGroups[target.groupId].orEmpty()
+        val index = versions.indexOfFirst { it.id == target.id }.coerceAtLeast(0)
+        return VersionInfo(index + 1, versions.size)
+    }
+
+    fun editVersionInfo(target: ChatMessage): VersionInfo {
+        val versions = if (target.fromUser) editGroups[target.userGroupId].orEmpty() else emptyList()
+        val index = versions.indexOfFirst { it.id == target.id }.coerceAtLeast(0)
+        return VersionInfo(index + 1, versions.size)
+    }
+
+    val messageCallbacks = AndroidMessageCallbacks(
+        markdownScope = scope,
+        onOpenProcess = { event ->
+            processSheetEvent = event
+            processSheetState.targetDetent = BottomSheetDetent.FullyExpanded
+        },
+        onOpenAttachment = ::openAttachment,
+        onCopy = { chatMessage -> clipboard.setText(AnnotatedString(chatMessage.text)) },
+        onRetry = ::retryMessage,
+        canRetry = { chatMessage -> !chatMessage.fromUser && !chatMessage.isPending && !chatMessage.isStreaming },
+        onPrevVersion = { target ->
+            val versions = if (target.fromUser) listOf(target) else retryGroups[target.groupId].orEmpty()
+            val index = versions.indexOfFirst { it.id == target.id }.coerceAtLeast(0)
+            versions.getOrNull(index - 1)?.let { previous -> { showRetryVersion(previous) } }
+        },
+        onNextVersion = { target ->
+            val versions = if (target.fromUser) listOf(target) else retryGroups[target.groupId].orEmpty()
+            val index = versions.indexOfFirst { it.id == target.id }.coerceAtLeast(0)
+            versions.getOrNull(index + 1)?.let { next -> { showRetryVersion(next) } }
+        },
+        isEditing = { chatMessage -> editingMessageId == chatMessage.id },
+        onEdit = { chatMessage ->
+            if (
+                chatMessage.fromUser && !chatMessage.isPending && !chatMessage.isStreaming &&
+                chatMessage.id == visibleTranscript.lastOrNull { it.fromUser }?.id
+            ) {
+                { beginEdit(chatMessage) }
+            } else null
+        },
+        onPrevEditVersion = { target ->
+            val versions = editGroups[target.userGroupId].orEmpty()
+            val index = versions.indexOfFirst { it.id == target.id }.coerceAtLeast(0)
+            versions.getOrNull(index - 1)?.let { previous -> { showEditVersion(previous) } }
+        },
+        onNextEditVersion = { target ->
+            val versions = editGroups[target.userGroupId].orEmpty()
+            val index = versions.indexOfFirst { it.id == target.id }.coerceAtLeast(0)
+            versions.getOrNull(index + 1)?.let { next -> { showEditVersion(next) } }
+        },
+        versionInfo = ::retryVersionInfo,
+        editVersionInfo = ::editVersionInfo,
+    )
+
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
@@ -1381,7 +1412,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                     contentPadding = PaddingValues(bottom = 64.dp),
                 ) {
-                    groupedConversations(conversations).forEach { (label, items) ->
+                    groupedConversationRows.forEach { (label, items) ->
                         item(key = "header-$label") {
                             Text(
                                 label,
@@ -1490,77 +1521,50 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     .navigationBarsPadding()
                     .imePadding()
             ) {
-                LazyColumn(
-                    state = listState,
+                AndroidMessageList(
+                    messages = visibleTranscript,
+                    controller = messageRecyclerController,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp)
-                        .nestedScroll(streamDeferConnection),
-                    contentPadding = PaddingValues(
-                        top = 16.dp + toolbarHeight,
-                        bottom = 16.dp + composerBarHeight,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(
-                        visibleTranscript,
-                        key = { it.id },
-                        // Distinct structures reuse slots independently while scrolling.
-                        contentType = { msg ->
-                            when {
-                                msg.fromUser -> "user"
-                                msg.isError -> "error"
-                                msg.isStreaming || msg.isPending -> "streaming"
-                                else -> "assistant"
-                            }
-                        },
-                    ) { chatMessage ->
-                        val versions = if (chatMessage.fromUser) {
-                            listOf(chatMessage)
-                        } else {
-                            retryGroups[chatMessage.groupId].orEmpty()
-                        }
-                        val versionIndex = versions.indexOfFirst { it.id == chatMessage.id }.coerceAtLeast(0)
-                        val editVersions = if (chatMessage.fromUser) editGroups[chatMessage.userGroupId].orEmpty() else emptyList()
-                        val editIndex = editVersions.indexOfFirst { it.id == chatMessage.id }.coerceAtLeast(0)
-                        MessageRow(
-                            chatMessage = chatMessage,
-                            markdownScope = scope,
-                            onOpenProcess = { event ->
-                                processSheetEvent = event
-                                processSheetState.targetDetent = BottomSheetDetent.FullyExpanded
-                            },
-                            onOpenAttachment = { openAttachment(it) },
-                            onCopy = { clipboard.setText(AnnotatedString(chatMessage.text)) },
-                            onRetry = { retryMessage(chatMessage) },
-                            canRetry = !chatMessage.fromUser && !chatMessage.isPending && !chatMessage.isStreaming,
-                            versionIndex = versionIndex + 1,
-                            versionCount = versions.size,
-                            onPrevVersion = versions.getOrNull(versionIndex - 1)?.let { previous ->
-                                { showRetryVersion(previous) }
-                            },
-                            onNextVersion = versions.getOrNull(versionIndex + 1)?.let { next ->
-                                { showRetryVersion(next) }
-                            },
-                            isEditing = editingMessageId == chatMessage.id,
-                            // 只允许编辑最新一条用户消息：下方不会有其他轮次需要隐藏，重生成路径保持简单正确
-                            onEdit = if (
-                                chatMessage.fromUser && !chatMessage.isPending && !chatMessage.isStreaming &&
-                                chatMessage.id == visibleTranscript.lastOrNull { it.fromUser }?.id
-                            ) {
-                                { beginEdit(chatMessage) }
-                            } else null,
-                            editVersionIndex = editIndex + 1,
-                            editVersionCount = editVersions.size,
-                            onPrevEditVersion = editVersions.getOrNull(editIndex - 1)?.let { previous ->
-                                { showEditVersion(previous) }
-                            },
-                            onNextEditVersion = editVersions.getOrNull(editIndex + 1)?.let { next ->
-                                { showEditVersion(next) }
-                            },
+                        .padding(
+                            top = toolbarHeight + 16.dp,
+                            bottom = composerBarHeight + 16.dp,
                         )
-                    }
-                }
+                        .padding(horizontal = 16.dp),
+                    contentPaddingTop = 0,
+                    contentPaddingBottom = 0,
+                    callbacks = messageCallbacks,
+                    onVisibleRangeChanged = { first, last ->
+                        val snapshot = visibleTranscript
+                        val conversationId = currentConversation.id
+                        val candidates = listOf(first - 1, last + 1)
+                            .filter { it in snapshot.indices }
+                            .distinct()
+                        transcriptPrewarmJob.value?.cancel()
+                        transcriptPrewarmJob.value = if (candidates.isEmpty()) {
+                            null
+                        } else {
+                            scope.launch {
+                                // 先让当前可见行完成首帧和自身渲染，再预热邻居。
+                                withFrameNanos { }
+                                delay(180)
+                                if (currentConversation.id != conversationId) return@launch
+                                candidates.forEach { index ->
+                                    prepareFinishedMessage(
+                                        snapshot[index], renderContentArgb, renderPxPerPt, renderTexScale, scope,
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    onScrollStateChanged = { state ->
+                        val scrolling = state != RecyclerView.SCROLL_STATE_IDLE
+                        recyclerScrolling = scrolling
+                        if (scrolling && generatingIds.isNotEmpty()) {
+                            streamingDeferActive.set(true)
+                        }
+                    },
+                )
 
                 Column(
                     modifier = Modifier
@@ -2138,7 +2142,7 @@ private fun ModelPicker(
 }
 
 @Composable
-private fun MessageRow(
+internal fun MessageRow(
     chatMessage: ChatMessage,
     markdownScope: CoroutineScope,
     onOpenProcess: (ProcessEvent) -> Unit,
@@ -2811,12 +2815,17 @@ internal data class TexCacheKey(
  */
 internal object TexBitmapCache {
     private val cache = SingleFlightCache<TexCacheKey, ImageBitmap>(maxEntries = 64)
+    // JLatexMath has a process-wide rendering lock. Dispatching dozens of
+    // formulas onto Default makes every worker except one block on that lock,
+    // starving Markdown parsing and transcript presentation during first open.
+    // Keep the serialized renderer on its own lane instead.
+    private val renderDispatcher = Dispatchers.Default.limitedParallelism(1)
 
     fun request(
         key: TexCacheKey,
         scope: CoroutineScope,
         render: () -> ImageBitmap?,
-    ): AsyncCacheResult<ImageBitmap> = cache.request(key, scope, Dispatchers.Default) {
+    ): AsyncCacheResult<ImageBitmap> = cache.request(key, scope, renderDispatcher) {
         render() ?: error("TeX rasterization failed")
     }
 
@@ -2841,13 +2850,13 @@ private suspend fun prepareFinishedMessage(
         .filter { it.markdown }
         .map { it.text }
         .distinct()
-        .forEach { FinishedMarkdownCache.prepare(it, scope) }
+        .forEach { FinishedMarkdownCache.request(it, scope, Dispatchers.Default) }
     val formulas = segments.filterIsInstance<MarkdownSegment.TexBlock>().map { it.latex to true } +
         segments.filterIsInstance<MarkdownSegment.Text_>()
             .flatMap { segment -> inlineTexContents(segment.text).map { it to false } }
     formulas.distinct().forEach { (latex, displayStyle) ->
         val key = TexCacheKey(latex, contentArgb, displayStyle, pxPerPt, texScale)
-        TexBitmapCache.prepare(key, scope) {
+        TexBitmapCache.request(key, scope) {
             renderTexBitmap(latex, contentArgb, displayStyle, pxPerPt, texScale)
         }
     }

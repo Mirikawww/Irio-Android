@@ -42,6 +42,32 @@ data class Conversation(
     val tokenUsage: TokenUsage? = null,
 )
 
+/** 抽屉列表用的轻量摘要：不含正文，列表滚动不携带整条会话。 */
+data class ConversationSummary(
+    val id: String,
+    val title: String,
+    val updatedAt: Long,
+    val pinned: Boolean = false,
+    val titlePending: Boolean = false,
+) {
+    fun toConversation(): Conversation = Conversation(
+        id = id,
+        title = title,
+        updatedAt = updatedAt,
+        messages = emptyList(),
+        pinned = pinned,
+        titlePending = titlePending,
+    )
+}
+
+fun Conversation.summary(): ConversationSummary = ConversationSummary(
+    id = id,
+    title = title,
+    updatedAt = updatedAt,
+    pinned = pinned,
+    titlePending = titlePending,
+)
+
 object ConversationStore {
     private const val INDEX = "index.json"
     private const val LAST_ID = "last_id.txt"
@@ -59,6 +85,36 @@ object ConversationStore {
                 }
             }.sortedWith(compareByDescending<Conversation> { it.pinned }.thenByDescending { it.updatedAt })
         }.getOrDefault(emptyList())
+    }
+
+    fun loadAllSummaries(): List<ConversationSummary> {
+        val dir = directory()
+        val indexFile = File(dir, INDEX)
+        if (!indexFile.exists()) return emptyList()
+        return runCatching {
+            val array = JSONArray(indexFile.readText())
+            buildList {
+                for (index in 0 until array.length()) {
+                    val id = array.optString(index)
+                    loadSummary(id)?.let(::add)
+                }
+            }.sortedWith(compareByDescending<ConversationSummary> { it.pinned }.thenByDescending { it.updatedAt })
+        }.getOrDefault(emptyList())
+    }
+
+    private fun loadSummary(id: String): ConversationSummary? {
+        val file = File(directory(), "$id.json")
+        if (!file.exists()) return null
+        return runCatching {
+            val json = JSONObject(file.readText())
+            ConversationSummary(
+                id = json.optString("id"),
+                title = json.optString("title").ifBlank { "新对话" },
+                updatedAt = json.optLong("updatedAt"),
+                pinned = json.optBoolean("pinned"),
+                titlePending = json.optBoolean("titlePending"),
+            )
+        }.getOrNull()
     }
 
     fun load(id: String): Conversation? {

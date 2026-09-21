@@ -196,7 +196,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     var processSheetEvent by remember { mutableStateOf<ProcessEvent?>(null) }
     val processSheetState = rememberBottomSheetState()
     val message = rememberTextFieldState()
-    var conversations by remember { mutableStateOf(ConversationStore.loadAll()) }
+    var conversations by remember { mutableStateOf(emptyList<ConversationSummary>()) }
     var currentConversation by remember {
         mutableStateOf(ConversationStore.newConversation())
     }
@@ -219,9 +219,11 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     var webSearchAvailable by remember { mutableStateOf(SearchStore.hasApiKey()) }
     var webSearchEnabled by remember { mutableStateOf(SearchStore.loadWebSearchEnabled()) }
     var clearHistoryDialogOpen by remember { mutableStateOf(false) }
-    var conversationAction by remember { mutableStateOf<Conversation?>(null) }
+    var conversationAction by remember { mutableStateOf<ConversationSummary?>(null) }
     var viewingPhoto by remember { mutableStateOf<ChatAttachment?>(null) }
     var generations by remember { mutableStateOf(emptyMap<Long, ActiveGeneration>()) }
+    val currentConversationState = rememberUpdatedState(currentConversation)
+    val generationsSnapshotState = rememberUpdatedState(generations)
     val listState = rememberLazyListState()
     var composerBarHeightPx by remember { mutableIntStateOf(0) }
     val composerBarHeight = with(LocalDensity.current) { composerBarHeightPx.toDp() }
@@ -245,6 +247,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     val pageDim = 0.28f * drawerOpenProgress
     val drawerShadowPx = with(density) { 8.dp.toPx() }
     val drawerOpen = drawerProgress >= 0.5f
+    var pendingConversationScroll by remember { mutableStateOf<String?>(null) }
+    var conversationLoadToken by remember { mutableIntStateOf(0) }
+    val groupedConversationRows = remember(conversations) { groupedConversations(conversations) }
     val generatingIds = remember(generations) { generations.values.map { it.conversationId }.toSet() }
     val generatingThisChat = currentConversation.id in generatingIds
     var transcriptPresentation by remember {
@@ -321,9 +326,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 ?: updatedMessages.lastOrNull { !it.fromUser && it.usage != null }?.usage,
         )
         currentConversation = stored
-        conversations = conversations.filterNot { it.id == stored.id } + stored
+        conversations = conversations.filterNot { it.id == stored.id } + stored.summary()
         conversations = conversations.sortedWith(
-            compareByDescending<Conversation> { it.pinned }.thenByDescending { it.updatedAt },
+            compareByDescending<ConversationSummary> { it.pinned }.thenByDescending { it.updatedAt },
         )
         scope.launch(Dispatchers.IO) {
             ConversationStore.save(stored)
@@ -365,9 +370,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 // titlePending 期间用截断文本临时显示；已生成的标题不被覆盖
                 title = if (stored.titlePending) ConversationStore.titleFrom(nextMessages) else stored.title,
             )
-            conversations = conversations.filterNot { it.id == next.id } + next
+            conversations = conversations.filterNot { it.id == next.id } + next.summary()
             conversations = conversations.sortedWith(
-                compareByDescending<Conversation> { it.pinned }.thenByDescending { it.updatedAt },
+                compareByDescending<ConversationSummary> { it.pinned }.thenByDescending { it.updatedAt },
             )
             scope.launch(Dispatchers.IO) {
                 ConversationStore.save(next)
@@ -411,15 +416,20 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             webSearchEnabled = SearchStore.loadWebSearchEnabled()
         }
         val conversationsListener = {
+            val current = currentConversationState.value
+            val currentId = current.id
+            val currentUpdatedAt = current.updatedAt
+            val streamingThisChat = currentId in generationsSnapshotState.value.values.map { it.conversationId }
             scope.launch(Dispatchers.IO) {
-                val loaded = ConversationStore.loadAll()
+                val loaded = ConversationStore.loadAllSummaries()
+                val full = loaded.firstOrNull { it.id == currentId }
+                    ?.takeIf { it.updatedAt != currentUpdatedAt && !streamingThisChat }
+                    ?.let { ConversationStore.load(it.id) }
                 withContext(Dispatchers.Main) {
                     conversations = loaded
-                    val latest = loaded.firstOrNull { it.id == currentConversation.id }
-                    val streamingThisChat = currentConversation.id in generations.values.map { it.conversationId }
-                    if (latest != null && latest.updatedAt != currentConversation.updatedAt && !streamingThisChat) {
-                        currentConversation = latest
-                        messages = latest.messages
+                    if (full != null && currentConversation.id == currentId && currentId !in generations.values.map { it.conversationId }) {
+                        currentConversation = full
+                        messages = full.messages
                     }
                 }
             }
@@ -457,39 +467,47 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
 
     LaunchedEffect(currentConversation.id, visibleTranscript.size, visibleTranscript.lastOrNull()?.id) {
         val last = visibleTranscript.lastOrNull() ?: return@LaunchedEffect
-        if (last.fromUser || (!last.isPending && !last.isStreaming)) {
+        if (pendingConversationScroll == currentConversation.id) {
+            pendingConversationScroll = null
+            listState.scrollToItem(visibleTranscript.lastIndex, Int.MAX_VALUE)
+            return@LaunchedEffect
+        }
+        if (listState.isScrollInProgress) return@LaunchedEffect
+        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+        val nearBottom = lastVisible >= visibleTranscript.lastIndex - 1
+        if (nearBottom && (last.fromUser || (!last.isPending && !last.isStreaming))) {
             listState.scrollToItem(visibleTranscript.lastIndex, Int.MAX_VALUE)
         }
     }
 
-    fun openConversation(conversation: Conversation) {
-        scope.launch(Dispatchers.Default) {
-            val presentation = buildTranscriptPresentation(conversation.id, conversation.messages)
-            val firstScreen = (presentation.visible.size - 6).coerceAtLeast(0)
-            for (index in firstScreen until presentation.visible.size) {
-                prepareFinishedMessage(
-                    presentation.visible[index], renderContentArgb, renderPxPerPt, renderTexScale, scope,
-                )
+    LaunchedEffect(Unit) {
+        conversations = withContext(Dispatchers.IO) { ConversationStore.loadAllSummaries() }
+    }
+
+    fun openConversation(conversation: ConversationSummary) {
+        if (conversation.id == currentConversation.id) {
+            drawerProgress = 0f
+            return
+        }
+        val requestToken = conversationLoadToken + 1
+        conversationLoadToken = requestToken
+        // 先关抽屉；正文磁盘读取和 Markdown/TeX 预热都不能阻塞点击反馈。
+        drawerProgress = 0f
+        scope.launch(Dispatchers.IO) {
+            val full = ConversationStore.load(conversation.id) ?: return@launch
+            val applied = withContext(Dispatchers.Main) {
+                if (conversationLoadToken != requestToken) return@withContext false
+                pendingConversationScroll = full.id
+                currentConversation = full
+                messages = full.messages
+                true
             }
-            withContext(Dispatchers.Main) {
-                transcriptPresentation = presentation
-                listState.requestScrollToItem(presentation.visible.lastIndex.coerceAtLeast(0), Int.MAX_VALUE)
-                currentConversation = conversation
-                messages = conversation.messages
-                drawerProgress = 0f
-            }
-            ConversationStore.saveLastOpenedId(conversation.id)
-            renderPrewarmOrder(presentation.visible.size, firstScreen, presentation.visible.lastIndex)
-                .drop(presentation.visible.size - firstScreen)
-                .forEach { index ->
-                    prepareFinishedMessage(
-                        presentation.visible[index], renderContentArgb, renderPxPerPt, renderTexScale, scope,
-                    )
-                }
+            if (applied) ConversationStore.saveLastOpenedId(conversation.id)
         }
     }
 
     fun newConversation(closeDrawer: Boolean = true) {
+        conversationLoadToken++
         currentConversation = ConversationStore.newConversation()
         messages = emptyList()
         // The counter is never reset: message ids are used as keys in [generations] and
@@ -526,22 +544,29 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         }
     }
 
-    fun togglePinned(conversation: Conversation) {
-        val stored = ConversationStore.load(conversation.id) ?: conversation
-        val next = stored.copy(pinned = !stored.pinned)
-        ConversationStore.save(next)
-        conversations = ConversationStore.loadAll()
+    fun togglePinned(conversation: ConversationSummary) {
+        val nextPinned = !conversation.pinned
+        conversations = conversations
+            .map { if (it.id == conversation.id) it.copy(pinned = nextPinned) else it }
+            .sortedWith(compareByDescending<ConversationSummary> { it.pinned }.thenByDescending { it.updatedAt })
         if (currentConversation.id == conversation.id) {
-            currentConversation = currentConversation.copy(pinned = next.pinned)
+            currentConversation = currentConversation.copy(pinned = nextPinned)
+        }
+        scope.launch(Dispatchers.IO) {
+            ConversationStore.load(conversation.id)?.let { stored ->
+                ConversationStore.save(stored.copy(pinned = nextPinned))
+            }
         }
     }
 
-    fun deleteConversation(conversation: Conversation) {
+    fun deleteConversation(conversation: ConversationSummary) {
         if (conversation.id in generatingIds) stopGeneration(conversation.id)
-        ConversationStore.delete(conversation.id)
-        conversations = ConversationStore.loadAll()
+        conversations = conversations.filterNot { it.id == conversation.id }
         if (currentConversation.id == conversation.id) {
             newConversation(closeDrawer = false)
+        }
+        scope.launch(Dispatchers.IO) {
+            ConversationStore.delete(conversation.id)
         }
     }
 
@@ -577,13 +602,14 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 ?: return@launch
             val title = ChatApi.generateTitle(provider, titleModel, userText, assistantText)
             if (title.isNullOrBlank()) return@launch
-            val current = conversations.firstOrNull { it.id == conversationId } ?: return@launch
-            if (!current.titlePending) return@launch
+            val summary = conversations.firstOrNull { it.id == conversationId } ?: return@launch
+            if (!summary.titlePending) return@launch
+            val current = ConversationStore.load(conversationId) ?: return@launch
             val updated = current.copy(title = title, titlePending = false)
             withContext(Dispatchers.Main) {
-                conversations = conversations.map { if (it.id == updated.id) updated else it }
+                conversations = conversations.map { if (it.id == updated.id) updated.summary() else it }
                 if (currentConversation.id == updated.id) {
-                    currentConversation = updated
+                    currentConversation = currentConversation.copy(title = title, titlePending = false)
                 }
             }
             withContext(Dispatchers.IO) {
@@ -1103,7 +1129,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                     contentPadding = PaddingValues(bottom = 64.dp),
                 ) {
-                    groupedConversations(conversations).forEach { (label, items) ->
+                    groupedConversationRows.forEach { (label, items) ->
                         item(key = "header-$label") {
                             Text(
                                 label,
@@ -2237,7 +2263,7 @@ private fun mergeProcess(current: List<ProcessEvent>, snapshot: List<ProcessEven
     }
 }
 
-private fun groupedConversations(conversations: List<Conversation>): List<Pair<String, List<Conversation>>> {
+private fun groupedConversations(conversations: List<ConversationSummary>): List<Pair<String, List<ConversationSummary>>> {
     val pinned = conversations.filter { it.pinned }
     val rest = conversations.filterNot { it.pinned }
     return buildList {
