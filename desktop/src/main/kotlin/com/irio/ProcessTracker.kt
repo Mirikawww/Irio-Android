@@ -78,8 +78,8 @@ internal class ProcessTracker {
         )
     }
 
-    fun onToolFinished() {
-        finishLiveTool()
+    fun onToolFinished(content: String = "") {
+        finishLiveTool(content)
     }
 
     /** Number of events still in progress: callers use this to tell whether the batch is closed. */
@@ -109,10 +109,13 @@ internal class ProcessTracker {
         liveSearchId = null
     }
 
-    private fun finishLiveTool() {
+    private fun finishLiveTool(content: String = "") {
         val id = liveToolId ?: return
         events.replaceAll { event ->
-            if (event.id == id) event.copy(live = false) else event
+            if (event.id == id) event.copy(
+                content = content.ifBlank { event.content },
+                live = false,
+            ) else event
         }
         liveToolId = null
     }

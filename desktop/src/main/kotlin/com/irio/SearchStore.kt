@@ -220,6 +220,42 @@ object WebSearch {
     }
 }
 
+object WebFetch {
+    fun fetch(provider: SearchProvider, apiKey: String, url: String, cancellation: ChatRequestCancellation? = null): WebSearchResult {
+        val target = url.trim()
+        if (!target.startsWith("http://") && !target.startsWith("https://")) return WebSearchResult("网页地址必须以 http:// 或 https:// 开头")
+        val endpoint = if (provider == SearchProvider.TAVILY) "https://api.tavily.com/extract" else "https://api.exa.ai/contents"
+        val connection = URL(endpoint).openConnection() as HttpURLConnection
+        cancellation?.attach(connection)
+        return try {
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 20_000
+            connection.readTimeout = 30_000
+            connection.doOutput = true
+            if (provider == SearchProvider.TAVILY) connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            else connection.setRequestProperty("x-api-key", apiKey)
+            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            val payload = if (provider == SearchProvider.TAVILY) JSONObject().put("urls", JSONArray().put(target))
+            else JSONObject().put("urls", JSONArray().put(target)).put("text", true)
+            connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+            val status = connection.responseCode
+            val body = (if (status in 200..299) connection.inputStream else connection.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (cancellation?.isCancelled() == true) WebSearchResult("网页读取已停止")
+            else if (status !in 200..299) WebSearchResult("网页读取失败（HTTP $status）")
+            else {
+                val item = JSONObject(body).optJSONArray("results")?.optJSONObject(0)
+                val text = if (provider == SearchProvider.TAVILY) item?.optString("raw_content") else item?.optString("text")
+                WebSearchResult(text.orEmpty().ifBlank { "网页没有可读取的正文" })
+            }
+        } catch (error: Exception) {
+            if (cancellation?.isCancelled() == true) WebSearchResult("网页读取已停止") else WebSearchResult(error.message ?: "网页读取失败")
+        } finally {
+            cancellation?.detach(connection)
+            connection.disconnect()
+        }
+    }
+}
+
 object TavilySearch {
     const val ENDPOINT = "https://api.tavily.com"
     const val SEARCH_PATH = "/search"

@@ -69,4 +69,15 @@ class ProcessTrackerToolTest {
         assertEquals(MemoryTool.UPDATE, event.toolName)
         assertFalse(event.live)
     }
+
+    @Test
+    fun webFetchToolEventKeepsFetchedContentForDetails() {
+        val tracker = ProcessTracker()
+        tracker.onToolStarted(WebFetchTool.NAME)
+        tracker.onToolFinished("网页正文")
+        val event = tracker.snapshot().single()
+        assertEquals(WebFetchTool.NAME, event.toolName)
+        assertEquals("网页正文", event.content)
+        assertFalse(event.live)
+    }
 }

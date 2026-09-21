@@ -10,9 +10,11 @@ class MemoryToolTest {
     @Test
     fun labelsMatchToolNames() {
         assertEquals("获取时间", MemoryTool.liveLabel(TimeTool.NAME))
+        assertEquals("浏览网页中", MemoryTool.liveLabel(WebFetchTool.NAME))
         assertEquals("读取记忆", MemoryTool.liveLabel(MemoryTool.GET))
         assertEquals("写入记忆", MemoryTool.liveLabel(MemoryTool.UPDATE))
         assertEquals("已获取时间", MemoryTool.doneLabel(TimeTool.NAME))
+        assertEquals("已浏览网页", MemoryTool.doneLabel(WebFetchTool.NAME))
         assertEquals("已读取记忆", MemoryTool.doneLabel(MemoryTool.GET))
         assertEquals("已写入记忆", MemoryTool.doneLabel(MemoryTool.UPDATE))
     }

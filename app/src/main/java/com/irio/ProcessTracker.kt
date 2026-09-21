@@ -78,8 +78,8 @@ internal class ProcessTracker {
         )
     }
 
-    fun onToolFinished() {
-        finishLiveTool()
+    fun onToolFinished(content: String = "") {
+        finishLiveTool(content)
     }
 
     /** 统计结束后仍在进行中的事件数量：调用方据此判断这批事件是否已经闭合。 */
@@ -109,10 +109,13 @@ internal class ProcessTracker {
         liveSearchId = null
     }
 
-    private fun finishLiveTool() {
+    private fun finishLiveTool(content: String = "") {
         val id = liveToolId ?: return
         events.replaceAll { event ->
-            if (event.id == id) event.copy(live = false) else event
+            if (event.id == id) event.copy(
+                content = content.ifBlank { event.content },
+                live = false,
+            ) else event
         }
         liveToolId = null
     }

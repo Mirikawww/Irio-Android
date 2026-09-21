@@ -82,6 +82,8 @@ data class ChatStreamUpdate(
     val toolActive: Boolean? = null,
     /** 本地工具名，配合 [toolActive] 给过程行显示「读取记忆 / 写入记忆」等。 */
     val toolName: String = "",
+    /** 工具完成后展示在可展开详情中的结果内容。 */
+    val toolContent: String = "",
     /** 工具调用多轮对话时，标记新一轮开始，UI 应清空当前流式文本。 */
     val newRound: Boolean = false,
     val usage: TokenUsage? = null,
@@ -1069,6 +1071,29 @@ internal object WebSearchTool {
     }
 }
 
+internal object WebFetchTool {
+    const val NAME = "web_fetch"
+    const val DESCRIPTION = "Fetch and read the main text of a web page. Call with {\"url\":\"https://...\"}."
+
+    private fun parameters(): JSONObject = JSONObject()
+        .put("type", "object")
+        .put("properties", JSONObject().put(
+            "url", JSONObject().put("type", "string").put("description", "The full URL to read"),
+        ))
+        .put("required", JSONArray().put("url"))
+        .put("additionalProperties", false)
+
+    fun schemaFor(protocol: ProviderProtocol): JSONObject = when (protocol) {
+        ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().put("type", "function").put(
+            "function", JSONObject().put("name", NAME).put("description", DESCRIPTION).put("parameters", parameters()),
+        )
+        ProviderProtocol.RESPONSES -> JSONObject().put("type", "function").put("name", NAME)
+            .put("description", DESCRIPTION).put("parameters", parameters()).put("strict", true)
+        ProviderProtocol.ANTHROPIC -> JSONObject().put("name", NAME).put("description", DESCRIPTION)
+            .put("input_schema", parameters())
+    }
+}
+
 internal object ImageGenTool {
     const val NAME = "generate_image"
     const val DESCRIPTION =
@@ -1180,6 +1205,7 @@ internal object MemoryTool {
 
     fun liveLabel(name: String): String = when (name) {
         TimeTool.NAME -> "获取时间"
+        WebFetchTool.NAME -> "浏览网页中"
         GET -> "读取记忆"
         UPDATE -> "写入记忆"
         else -> "调用工具"
@@ -1187,6 +1213,7 @@ internal object MemoryTool {
 
     fun doneLabel(name: String): String = when (name) {
         TimeTool.NAME -> "已获取时间"
+        WebFetchTool.NAME -> "已浏览网页"
         GET -> "已读取记忆"
         UPDATE -> "已写入记忆"
         else -> "已调用工具"

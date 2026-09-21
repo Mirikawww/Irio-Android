@@ -128,6 +128,7 @@ class ToolRegistry(providers: Iterable<ToolProvider> = emptyList()) {
         fun default(): ToolRegistry = ToolRegistry(
             listOf(
                 WebSearchToolProvider(),
+                WebFetchToolProvider(),
                 ImageGenToolProvider(),
                 TimeToolProvider(),
             )
@@ -175,6 +176,44 @@ internal class WebSearchToolProvider : ToolProvider {
             )
         )
         ToolExecutionResult(text = result.text, searchPages = result.pageCount)
+    }
+}
+
+internal class WebFetchToolProvider : ToolProvider {
+    override val id: String = "web-fetch"
+
+    override fun definitions(protocol: ProviderProtocol): List<JSONObject> =
+        listOf(WebFetchTool.schemaFor(protocol))
+
+    override fun handles(name: String): Boolean = name == WebFetchTool.NAME
+
+    override suspend fun execute(
+        call: ChatToolCall,
+        context: ToolExecutionContext,
+    ): ToolExecutionResult = withContext(Dispatchers.IO) {
+        if (!context.webSearch || context.searchApiKey.isBlank()) {
+            return@withContext ToolExecutionResult("网页读取工具当前不可用：请先启用网页搜索并配置密钥。")
+        }
+        context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = WebFetchTool.NAME))
+        var resultText = ""
+        return@withContext try {
+            val result = WebFetch.fetch(
+                provider = context.searchProvider,
+                apiKey = context.searchApiKey,
+                url = ToolArguments.value(call.arguments, "url"),
+                cancellation = context.cancellation,
+            )
+            resultText = result.text
+            ToolExecutionResult(result.text)
+        } finally {
+            context.onUpdate(
+                ChatStreamUpdate(
+                    toolActive = false,
+                    toolName = WebFetchTool.NAME,
+                    toolContent = resultText,
+                )
+            )
+        }
     }
 }
 

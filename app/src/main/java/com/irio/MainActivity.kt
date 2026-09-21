@@ -875,7 +875,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             .takeUnless { ModelCatalog.isImageModel(context, selectedModel) } ?: ""
         val requestRegistry = ToolRegistry(
             buildList {
-                if (requestWebSearch) add(WebSearchToolProvider())
+                if (requestWebSearch) {
+                    add(WebSearchToolProvider())
+                    add(WebFetchToolProvider())
+                }
                 if (requestImageGenModel.isNotBlank()) add(ImageGenToolProvider())
                 add(TimeToolProvider())
                 if (MemoryStore.loadEnabled(context)) add(MemoryToolProvider())
@@ -990,7 +993,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 if (update.searching == true && !cancelled) process.onSearchStarted()
                                 if (update.searching == false) process.onSearchFinished(update.searchPagesDelta, update.searchContent)
                                 if (update.toolActive == true && !cancelled) process.onToolStarted(update.toolName)
-                                if (update.toolActive == false) process.onToolFinished()
+                                if (update.toolActive == false) process.onToolFinished(update.toolContent)
                                 if (update.done) process.finishAll()
                             }
                             // 停止后不再把普通增量绘制到 UI；上面的终止事件仍用于闭合过程状态。
