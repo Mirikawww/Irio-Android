@@ -1684,7 +1684,7 @@ private fun ModelPicker(
 ) {
     val content = Theme[colors][onBackgroundColor]
     val muted = Theme[colors][mutedColor]
-    val providersWithModels = providers.filter { it.enabledModels().isNotEmpty() }
+    val providersWithModels = providers.filter { it.enabled && it.enabledModels().isNotEmpty() }
     if (providersWithModels.isEmpty()) {
         Text(
             "未配置模型",

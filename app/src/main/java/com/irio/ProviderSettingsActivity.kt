@@ -56,6 +56,7 @@ import com.composables.ui.components.DropdownMenuItem
 import com.composables.ui.components.DropdownMenuPanel
 import com.composables.ui.components.Icon
 import com.composables.ui.components.IconButton
+import com.composables.ui.components.Switch
 import com.composables.ui.components.Text
 import com.composables.ui.components.TextField
 import com.composables.ui.theme.backgroundColor
@@ -67,6 +68,7 @@ import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -84,6 +86,8 @@ class ProviderSettingsActivity : ComponentActivity() {
 private fun ProviderSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val pendingEnabled = remember { ConcurrentHashMap<String, Boolean>() }
+    val enabledSaveLock = remember { Any() }
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
     var providers by remember { mutableStateOf(ProviderStore.loadProviders(context)) }
@@ -151,13 +155,27 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             providers.forEach { provider ->
-                ListRowButton(
-                    label = provider.name,
-                    onClick = {
+                ProviderEnabledRow(
+                    name = provider.name,
+                    enabled = provider.enabled,
+                    onOpen = {
                         context.startActivity(
                             Intent(context, ProviderDetailActivity::class.java)
-                                .putExtra(ProviderDetailActivity.EXTRA_ID, provider.id)
+                                .putExtra(ProviderDetailActivity.EXTRA_ID, provider.id),
                         )
+                    },
+                    onCheckedChange = { on ->
+                        providers = providers.map { current ->
+                            if (current.id == provider.id) current.copy(enabled = on) else current
+                        }
+                        pendingEnabled[provider.id] = on
+                        val id = provider.id
+                        scope.launch(Dispatchers.IO) {
+                            synchronized(enabledSaveLock) {
+                                if (pendingEnabled[id] != on) return@synchronized
+                                ProviderStore.saveProviderEnabled(context, id, on)
+                            }
+                        }
                     },
                 )
             }
@@ -321,6 +339,22 @@ internal fun DialogButtonRow(
             style = confirmStyle,
         ) { Text(confirmLabel) }
     }
+}
+
+@Composable
+private fun ProviderEnabledRow(
+    name: String,
+    enabled: Boolean,
+    onOpen: () -> Unit,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    ListRowButton(
+        label = name,
+        onClick = onOpen,
+        trailing = {
+            Switch(checked = enabled, onCheckedChange = onCheckedChange)
+        },
+    )
 }
 
 internal object PasswordMask : OutputTransformation {

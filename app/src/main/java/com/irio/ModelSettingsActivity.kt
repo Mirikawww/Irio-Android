@@ -330,6 +330,7 @@ private fun ImageGenModelPicker(
     var menuOpen by remember { mutableStateOf(false) }
     // 只列生图模型（models.dev modalities.output 含 image）；普通聊天模型不该被选为图片生成目标。
     val providers = remember { ProviderStore.loadProviders(context) }
+        .filter { it.enabled }
         .map { provider ->
             provider.copy(models = provider.enabledModels().filter { model -> ModelCatalog.isImageModel(context, model) })
         }
@@ -443,6 +444,7 @@ private fun TitleModelPicker(
     val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
     val providers = remember { ProviderStore.loadProviders(context) }
+        .filter { it.enabled }
         .map { provider ->
             provider.copy(models = provider.enabledModels().filterNot { model -> ModelCatalog.isImageModel(context, model) })
         }

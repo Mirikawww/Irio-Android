@@ -42,6 +42,7 @@ data class ProviderConfig(
     val protocol: ProviderProtocol = ProviderProtocol.CHAT_COMPLETIONS,
     val models: List<String> = emptyList(),
     val disabledModels: Set<String> = emptySet(),
+    val enabled: Boolean = true,
     val selectedModel: String = "",
 )
 
@@ -118,6 +119,7 @@ object ProviderStore {
                             protocol = protocol,
                             models = models,
                             disabledModels = disabled,
+                            enabled = item.optBoolean("enabled", true),
                             selectedModel = selected,
                         )
                     )
@@ -171,6 +173,22 @@ object ProviderStore {
             if (item.optString("id") != providerId) continue
             val known = stringList(item.optJSONArray("models")).toSet()
             item.put("disabled_models", JSONArray().apply { disabled.filter { it in known }.forEach(::put) })
+            found = true
+            break
+        }
+        if (!found) return
+        prefs.edit().putString(PROVIDERS, array.toString()).apply()
+        notifyChanged()
+    }
+
+    fun saveProviderEnabled(context: Context, providerId: String, enabled: Boolean) {
+        val prefs = preferences(context)
+        val array = runCatching { JSONArray(prefs.getString(PROVIDERS, "[]") ?: "[]") }.getOrElse { return }
+        var found = false
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            if (item.optString("id") != providerId) continue
+            item.put("enabled", enabled)
             found = true
             break
         }
@@ -255,6 +273,7 @@ object ProviderStore {
                         put("protocol", provider.protocol.name)
                         put("models", JSONArray().apply { provider.models.forEach(::put) })
                         put("disabled_models", JSONArray().apply { provider.disabledModels.forEach(::put) })
+                        put("enabled", provider.enabled)
                         put("selected_model", provider.selectedModel)
                     }
                 )
@@ -287,6 +306,7 @@ object ProviderStore {
                                 put("protocol", provider.protocol.name)
                                 put("models", JSONArray().apply { provider.models.forEach(::put) })
                                 put("disabled_models", JSONArray().apply { provider.disabledModels.forEach(::put) })
+                                put("enabled", provider.enabled)
                                 put("selected_model", provider.selectedModel)
                             }
                         )
@@ -339,6 +359,7 @@ object ProviderStore {
                         protocol = protocol,
                         models = models,
                         disabledModels = disabled,
+                        enabled = item.optBoolean("enabled", true),
                         selectedModel = selected,
                     )
                 )

@@ -46,6 +46,7 @@ fun ListRowButton(
     shape: Shape = Theme[shapes][largeShape],
     contentPadding: PaddingValues? = null,
     onLongClick: (() -> Unit)? = null,
+    trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val contentColor = if (style == ButtonStyle.Ghost) {
         Theme[colors][onBackgroundColor]
@@ -70,6 +71,10 @@ fun ListRowButton(
         }
         Text(label)
         Spacer(Modifier.weight(1f))
+        if (trailing != null) {
+            Spacer(Modifier.width(8.dp))
+            trailing()
+        }
     }
     var longPressConsumed by remember { mutableStateOf(false) }
     val handleClick = {
