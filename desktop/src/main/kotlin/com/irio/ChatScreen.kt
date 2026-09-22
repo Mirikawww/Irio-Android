@@ -474,11 +474,13 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         if (providers.none { it.models.isNotEmpty() }) modelMenuOpen = false
     }
 
-    val inFlight = generations.isNotEmpty()
+    val inFlight = currentConversation.id in generatingIds
     val activeProvider = providers.firstOrNull { it.id == activeProviderId }
-    LaunchedEffect(activeProviderId, activeProvider?.endpointUrl, inFlight) {
-        if (EndpointWarmup.shouldWarm(activeProvider, inFlight)) {
-            withContext(Dispatchers.IO) { EndpointWarmup.warmBlocking(activeProvider!!) }
+    LaunchedEffect(activeProviderId, activeProvider?.endpointUrl, currentConversation.id, inFlight) {
+        val provider = activeProvider ?: return@LaunchedEffect
+        val scopeId = currentConversation.id
+        if (EndpointWarmup.shouldWarm(provider, inFlight)) {
+            withContext(Dispatchers.IO) { EndpointWarmup.warmBlocking(provider, scopeId) }
         }
     }
 
@@ -508,6 +510,8 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         }
         val requestToken = conversationLoadToken + 1
         conversationLoadToken = requestToken
+        val previousId = currentConversation.id
+        val keepPool = previousId in generatingIds
         // 先关抽屉；正文磁盘读取和 Markdown/TeX 预热都不能阻塞点击反馈。
         drawerProgress = 0f
         scope.launch(Dispatchers.IO) {
@@ -519,11 +523,16 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 messages = full.messages
                 true
             }
-            if (applied) ConversationStore.saveLastOpenedId(conversation.id)
+            if (applied) {
+                ConversationStore.saveLastOpenedId(conversation.id)
+                if (!keepPool) IrioHttp.evictConversation(previousId)
+            }
         }
     }
 
     fun newConversation(closeDrawer: Boolean = true) {
+        val previousId = currentConversation.id
+        val keepPool = previousId in generatingIds
         conversationLoadToken++
         currentConversation = ConversationStore.newConversation()
         messages = emptyList()
@@ -532,6 +541,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         pendingAttachments = emptyList()
         composerStatus = null
         if (closeDrawer) drawerProgress = 0f
+        if (!keepPool) IrioHttp.evictConversation(previousId)
     }
 
     fun stopGeneration(conversationId: String = currentConversation.id) {
@@ -545,6 +555,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     fun clearAllHistory() {
         clearingHistory = true
         generations.values.forEach { it.cancellation.cancel() }
+        IrioHttp.evictAllScopes()
         ConversationStore.deleteAll()
         conversations = emptyList()
         message.clearText()
@@ -578,6 +589,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
 
     fun deleteConversation(conversation: ConversationSummary) {
         if (conversation.id in generatingIds) stopGeneration(conversation.id)
+        IrioHttp.evictConversation(conversation.id)
         conversations = conversations.filterNot { it.id == conversation.id }
         if (currentConversation.id == conversation.id) {
             newConversation(closeDrawer = false)
@@ -617,7 +629,13 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 .firstOrNull { titleModel in it.models }
                 ?: ProviderStore.loadProvider()
                 ?: return@launch
-            val title = ChatApi.generateTitle(provider, titleModel, userText, assistantText)
+            val title = ChatApi.generateTitle(
+                provider,
+                titleModel,
+                userText,
+                assistantText,
+                connectionScope = "$conversationId#title",
+            )
             if (title.isNullOrBlank()) return@launch
             val summary = conversations.firstOrNull { it.id == conversationId } ?: return@launch
             if (!summary.titlePending) return@launch
@@ -753,6 +771,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         systemPrompt = requestSystemPrompt,
                         imageGenModel = requestImageGenModel,
                         toolRegistry = requestRegistry,
+                        connectionScope = requestConversationId,
                         cancellation = requestCancellation,
                         onUpdate = update@{ update ->
                             val cancelled = requestCancellation.isCancelled()

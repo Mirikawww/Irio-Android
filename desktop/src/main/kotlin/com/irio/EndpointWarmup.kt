@@ -12,17 +12,19 @@ internal object EndpointWarmup {
         return url.startsWith("http://") || url.startsWith("https://")
     }
 
-    fun warmBlocking(provider: ProviderConfig): Boolean {
+    fun warmBlocking(provider: ProviderConfig, scope: String = ""): Boolean {
         if (!shouldWarm(provider, inFlight = false)) return false
         if (!inFlightWarm.compareAndSet(false, true)) return false
         return try {
             val origin = ProviderEndpoints.origin(provider.endpointUrl) + "/"
             val headOk = exchange(
+                scope,
                 Request.Builder().url(origin).head().header("Connection", "keep-alive").build(),
             )
             if (headOk == true) return true
             if (headOk == false) {
                 exchange(
+                    scope,
                     Request.Builder().url(origin).get().header("Connection", "keep-alive").build(),
                 ) != null
             } else {
@@ -40,9 +42,9 @@ internal object EndpointWarmup {
      * false = 需要 GET fallback（405/501，或 HEAD 抛 IOException）
      * null = 连 origin 都构不出来
      */
-    private fun exchange(request: Request): Boolean? {
+    private fun exchange(scope: String, request: Request): Boolean? {
         return try {
-            IrioHttp.client.newCall(request).execute().use { response ->
+            IrioHttp.clientFor(scope).newCall(request).execute().use { response ->
                 when (response.code) {
                     405, 501 -> if (request.method == "HEAD") false else true
                     else -> true

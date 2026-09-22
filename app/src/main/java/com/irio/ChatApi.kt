@@ -157,6 +157,7 @@ object ChatApi {
         systemPrompt: String? = null,
         imageGenModel: String = "",
         toolRegistry: ToolRegistry = ToolRegistry.default(),
+        connectionScope: String = "",
         cancellation: ChatRequestCancellation,
         onUpdate: suspend (ChatStreamUpdate) -> Unit,
         appContext: android.content.Context? = null,
@@ -192,6 +193,7 @@ object ChatApi {
                 fastMode = fastMode,
                 systemPrompt = systemPrompt,
                 toolRegistry = toolRegistry,
+                connectionScope = connectionScope,
                 cancellation = cancellation,
                 onUpdate = onUpdate,
             )
@@ -239,6 +241,7 @@ object ChatApi {
         model: String,
         firstUserMessage: String,
         firstAssistantMessage: String,
+        connectionScope: String = "",
     ): String? = withContext(Dispatchers.IO) {
         runCatching {
             val prompt = buildString {
@@ -276,12 +279,16 @@ object ChatApi {
                     )
                 }
             }
+            if (provider.protocol != ProviderProtocol.ANTHROPIC) {
+                body.putConversationKey(connectionScope)
+            }
             val builder = Request.Builder()
                 .url(requestUrl(provider))
                 .post(body.toString().toByteArray(Charsets.UTF_8).toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .header("Accept", "application/json")
+                .isolateConversation(connectionScope)
             applyAuth(builder, provider)
-            val call = IrioHttp.client.newCall(builder.build())
+            val call = IrioHttp.clientFor(connectionScope).newCall(builder.build())
             var response: okhttp3.Response? = null
             try {
                 response = call.execute()
@@ -354,11 +361,13 @@ object ChatApi {
         fastMode: Boolean,
         systemPrompt: String?,
         toolRegistry: ToolRegistry,
+        connectionScope: String,
         cancellation: ChatRequestCancellation,
         onUpdate: suspend (ChatStreamUpdate) -> Unit,
     ): ChatCompletionResult {
         val bodyBytes = requestBody(
             provider.protocol, model, messages, reasoningEffort, fastMode, systemPrompt, toolRegistry,
+            conversationId = connectionScope,
         ).toByteArray(Charsets.UTF_8)
         val request = try {
             val builder = Request.Builder()
@@ -368,12 +377,13 @@ object ChatApi {
                 .header("Cache-Control", "no-cache, no-store")
                 .header("Pragma", "no-cache")
                 .header("X-Request-ID", UUID.randomUUID().toString())
+                .isolateConversation(connectionScope)
             applyAuth(builder, provider)
             builder.build()
         } catch (_: Exception) {
             return ChatCompletionResult(error = "端点 URL 无效")
         }
-        val call = IrioHttp.client.newCall(request)
+        val call = IrioHttp.clientFor(connectionScope).newCall(request)
         cancellation.attach(call)
         var response: okhttp3.Response? = null
 
@@ -668,6 +678,20 @@ object ChatApi {
         }
     }.getOrNull()
 
+    /**
+     * 幻灵（sub2api）在请求没带会话号时，用 tools + instructions 的稳定前缀生成同一个
+     * x-grok-conv-id。每条新对话的工具和记忆都一样，所以上游把它们黏成一条对话。
+     * 键放在请求体里：带下划线的 session_id 头会被 nginx 丢掉。
+     */
+    private fun JSONObject.putConversationKey(conversationId: String) {
+        if (conversationId.isNotEmpty()) put("prompt_cache_key", conversationId)
+    }
+
+    private fun okhttp3.Request.Builder.isolateConversation(conversationId: String): okhttp3.Request.Builder {
+        if (conversationId.isEmpty()) return this
+        return header("X-Grok-Conv-Id", conversationId)
+    }
+
     private fun requestBody(
         protocol: ProviderProtocol,
         model: String,
@@ -676,6 +700,7 @@ object ChatApi {
         fastMode: Boolean,
         systemPrompt: String?,
         toolRegistry: ToolRegistry,
+        conversationId: String = "",
     ): String {
         fun toolsArray(): JSONArray? {
             val tools = JSONArray()
@@ -697,6 +722,7 @@ object ChatApi {
                 }
                 messages.forEach { put(it.toChatCompletionsJson()) }
             })
+            putConversationKey(conversationId)
         }.toString()
         ProviderProtocol.RESPONSES -> JSONObject().apply {
             put("model", model)
@@ -711,6 +737,7 @@ object ChatApi {
                     message.toResponsesItems().forEach(::put)
                 }
             })
+            putConversationKey(conversationId)
         }.toString()
         ProviderProtocol.ANTHROPIC -> JSONObject().apply {
             put("model", model)

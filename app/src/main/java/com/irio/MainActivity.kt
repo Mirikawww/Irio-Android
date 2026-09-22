@@ -651,14 +651,17 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentProviders by rememberUpdatedState(providers)
     val currentActiveId by rememberUpdatedState(activeProviderId)
-    val currentInFlight by rememberUpdatedState(generations.isNotEmpty())
+    val currentConversationId by rememberUpdatedState(currentConversation.id)
+    val currentConversationBusy by rememberUpdatedState(currentConversation.id in generatingIds)
     val activeProvider = currentProviders.firstOrNull { it.id == currentActiveId }
 
-    LaunchedEffect(currentActiveId, activeProvider?.endpointUrl, currentInFlight) {
+    LaunchedEffect(currentActiveId, activeProvider?.endpointUrl, currentConversationId, currentConversationBusy) {
+        val provider = activeProvider ?: return@LaunchedEffect
+        val scopeId = currentConversationId
         if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
-            EndpointWarmup.shouldWarm(activeProvider, currentInFlight)
+            EndpointWarmup.shouldWarm(provider, currentConversationBusy)
         ) {
-            withContext(Dispatchers.IO) { EndpointWarmup.warmBlocking(activeProvider!!) }
+            withContext(Dispatchers.IO) { EndpointWarmup.warmBlocking(provider, scopeId) }
         }
     }
 
@@ -667,8 +670,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             when (event) {
                 Lifecycle.Event.ON_START -> {
                     val provider = currentProviders.firstOrNull { it.id == currentActiveId }
-                    if (EndpointWarmup.shouldWarm(provider, currentInFlight)) {
-                        scope.launch(Dispatchers.IO) { EndpointWarmup.warmBlocking(provider!!) }
+                    val scopeId = currentConversationId
+                    if (EndpointWarmup.shouldWarm(provider, currentConversationBusy)) {
+                        scope.launch(Dispatchers.IO) { EndpointWarmup.warmBlocking(provider!!, scopeId) }
                     }
                 }
                 else -> Unit
@@ -716,6 +720,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         }
         val requestToken = conversationLoadToken + 1
         conversationLoadToken = requestToken
+        val previousId = currentConversation.id
+        val keepPool = previousId in generatingIds
         // 先关抽屉；正文磁盘读取和 Markdown/TeX 预热都不能阻塞点击反馈。
         drawerProgress = 0f
         scope.launch(Dispatchers.IO) {
@@ -727,17 +733,23 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 messages = full.messages
                 true
             }
-            if (applied) ConversationStore.saveLastOpenedId(context, conversation.id)
+            if (applied) {
+                ConversationStore.saveLastOpenedId(context, conversation.id)
+                if (!keepPool) IrioHttp.evictConversation(previousId)
+            }
         }
     }
 
     fun newConversation(closeDrawer: Boolean = true) {
+        val previousId = currentConversation.id
+        val keepPool = previousId in generatingIds
         conversationLoadToken++
         currentConversation = ConversationStore.newConversation()
         messages = emptyList()
         pendingAttachments = emptyList()
         composerStatus = null
         if (closeDrawer) drawerProgress = 0f
+        if (!keepPool) IrioHttp.evictConversation(previousId)
     }
 
     val processSheetOpen = processSheetState.targetDetent != BottomSheetDetent.Hidden
@@ -777,6 +789,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     fun clearAllHistory() {
         clearingHistory = true
         generations.values.forEach { it.cancellation.cancel() }
+        IrioHttp.evictAllScopes()
         ConversationStore.deleteAll(context)
         conversations = emptyList()
         message.clearText()
@@ -810,6 +823,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
     fun deleteConversation(conversation: ConversationSummary) {
         if (conversation.id in generatingIds) stopGeneration(conversation.id)
+        IrioHttp.evictConversation(conversation.id)
         conversations = conversations.filterNot { it.id == conversation.id }
         if (currentConversation.id == conversation.id) {
             newConversation(closeDrawer = false)
@@ -857,7 +871,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 .firstOrNull { titleModel in it.models }
                 ?: ProviderStore.loadProvider(context)
                 ?: return@launch
-            val title = ChatApi.generateTitle(provider, titleModel, userText, assistantText)
+            val title = ChatApi.generateTitle(
+                provider,
+                titleModel,
+                userText,
+                assistantText,
+                connectionScope = "$conversationId#title",
+            )
             if (title.isNullOrBlank()) return@launch
             // 仍要确认标题没被别的路径改掉（并发防抢占）
             val current = conversations.firstOrNull { it.id == conversationId } ?: return@launch
@@ -1011,6 +1031,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         systemPrompt = requestSystemPrompt,
                         imageGenModel = requestImageGenModel,
                         toolRegistry = requestRegistry,
+                        connectionScope = requestConversationId,
                         cancellation = requestCancellation,
                         appContext = context,
                         onUpdate = update@{ update ->
