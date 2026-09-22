@@ -60,38 +60,9 @@ fun Conversation.summary(): ConversationSummary =
     ConversationSummary(id = id, title = title, updatedAt = updatedAt, pinned = pinned, titlePending = titlePending)
 
 object ConversationStore {
-    private const val INDEX = "index.json"
     private const val LAST_ID = "last_id.txt"
 
-    fun loadAll(context: Context): List<ConversationSummary> {
-        val dir = directory(context)
-        val indexFile = File(dir, INDEX)
-        if (!indexFile.exists()) return emptyList()
-        return runCatching {
-            val array = JSONArray(indexFile.readText())
-            buildList {
-                for (index in 0 until array.length()) {
-                    val id = array.optString(index)
-                    loadSummary(context, id)?.let(::add)
-                }
-            }.sortedWith(compareByDescending<ConversationSummary> { it.pinned }.thenByDescending { it.updatedAt })
-        }.getOrDefault(emptyList())
-    }
-
-    private fun loadSummary(context: Context, id: String): ConversationSummary? {
-        val file = File(directory(context), "$id.json")
-        if (!file.exists()) return null
-        return runCatching {
-            val json = JSONObject(file.readText())
-            ConversationSummary(
-                id = json.optString("id"),
-                title = json.optString("title").ifBlank { "新对话" },
-                updatedAt = json.optLong("updatedAt"),
-                pinned = json.optBoolean("pinned"),
-                titlePending = json.optBoolean("titlePending"),
-            )
-        }.getOrNull()
-    }
+    fun loadAll(context: Context): List<ConversationSummary> = ConversationSummaries.load(directory(context))
 
     fun load(context: Context, id: String): Conversation? {
         val file = File(directory(context), "$id.json")
@@ -101,35 +72,40 @@ object ConversationStore {
 
     fun save(context: Context, conversation: Conversation) {
         val dir = directory(context)
-        File(dir, "${conversation.id}.json").writeText(conversation.toJson().toString())
-        val ids = (loadIndex(context).filterNot { it == conversation.id } + conversation.id)
-            .distinct()
-        File(dir, INDEX).writeText(JSONArray(ids).toString())
-        notifyChanged()
+        val wrote = ConversationSummaries.commit(dir, conversation.summary()) {
+            File(dir, "${conversation.id}.json").writeText(conversation.toJson().toString())
+        }
+        if (wrote) notifyChanged()
     }
 
     fun replaceAll(context: Context, conversations: List<Conversation>, lastOpenedId: String?) {
         val dir = directory(context)
-        dir.listFiles()?.forEach { it.delete() }
-        dir.mkdirs()
-        conversations.forEach { conversation ->
-            File(dir, "${conversation.id}.json").writeText(conversation.toJson().toString())
+        ConversationSummaries.withLock {
+            dir.listFiles()?.forEach { it.delete() }
+            dir.mkdirs()
+            conversations.forEach { conversation ->
+                File(dir, "${conversation.id}.json").writeText(conversation.toJson().toString())
+            }
+            ConversationSummaries.replace(dir, conversations.map { it.summary() })
+            val lastFile = File(dir, LAST_ID)
+            if (lastOpenedId.isNullOrBlank()) lastFile.delete() else lastFile.writeText(lastOpenedId)
         }
-        File(dir, INDEX).writeText(JSONArray(conversations.map { it.id }).toString())
-        val lastFile = File(dir, LAST_ID)
-        if (lastOpenedId.isNullOrBlank()) lastFile.delete() else lastFile.writeText(lastOpenedId)
         notifyChanged()
     }
 
     fun importCoexist(context: Context, incoming: List<Conversation>) {
-        incoming.forEach { remote ->
-            val local = load(context, remote.id)
-            if (local == null || remote.updatedAt >= local.updatedAt) {
-                val dir = directory(context)
-                File(dir, "${remote.id}.json").writeText(remote.toJson().toString())
-                val ids = (loadIndex(context).filterNot { it == remote.id } + remote.id).distinct()
-                File(dir, INDEX).writeText(JSONArray(ids).toString())
+        val dir = directory(context)
+        ConversationSummaries.withLock {
+            val current = ConversationSummaries.load(dir).toMutableList()
+            incoming.forEach { remote ->
+                val local = load(context, remote.id)
+                if (local == null || remote.updatedAt >= local.updatedAt) {
+                    File(dir, "${remote.id}.json").writeText(remote.toJson().toString())
+                    current.removeAll { it.id == remote.id }
+                    current.add(remote.summary())
+                }
             }
+            ConversationSummaries.replace(dir, current)
         }
         notifyChanged()
     }
@@ -157,11 +133,13 @@ object ConversationStore {
     }
 
     fun delete(context: Context, id: String) {
-        File(directory(context), "$id.json").delete()
-        val ids = loadIndex(context).filterNot { it == id }
-        File(directory(context), INDEX).writeText(JSONArray(ids).toString())
-        if (loadLastOpenedId(context) == id) {
-            File(directory(context), LAST_ID).delete()
+        val dir = directory(context)
+        ConversationSummaries.withLock {
+            File(dir, "$id.json").delete()
+            ConversationSummaries.remove(dir, id)
+            if (loadLastOpenedId(context) == id) {
+                File(dir, LAST_ID).delete()
+            }
         }
         notifyChanged()
     }
@@ -203,17 +181,6 @@ object ConversationStore {
         val first = messages.firstOrNull { it.fromUser && it.text.isNotBlank() }?.text
             ?: messages.firstOrNull { it.fromUser }?.attachments?.firstOrNull()?.name
         return first?.trim()?.replace('\n', ' ')?.take(24)?.ifBlank { "新对话" } ?: "新对话"
-    }
-
-    private fun loadIndex(context: Context): List<String> {
-        val file = File(directory(context), INDEX)
-        if (!file.exists()) return emptyList()
-        return runCatching {
-            val array = JSONArray(file.readText())
-            buildList {
-                for (index in 0 until array.length()) add(array.optString(index))
-            }
-        }.getOrDefault(emptyList())
     }
 
     private fun directory(context: Context): File {

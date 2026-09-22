@@ -69,53 +69,11 @@ fun Conversation.summary(): ConversationSummary = ConversationSummary(
 )
 
 object ConversationStore {
-    private const val INDEX = "index.json"
     private const val LAST_ID = "last_id.txt"
 
-    fun loadAll(): List<Conversation> {
-        val dir = directory()
-        val indexFile = File(dir, INDEX)
-        if (!indexFile.exists()) return emptyList()
-        return runCatching {
-            val array = JSONArray(indexFile.readText())
-            buildList {
-                for (index in 0 until array.length()) {
-                    val id = array.optString(index)
-                    load(id)?.let(::add)
-                }
-            }.sortedWith(compareByDescending<Conversation> { it.pinned }.thenByDescending { it.updatedAt })
-        }.getOrDefault(emptyList())
-    }
+    fun loadAll(): List<Conversation> = loadAllSummaries().mapNotNull { load(it.id) }
 
-    fun loadAllSummaries(): List<ConversationSummary> {
-        val dir = directory()
-        val indexFile = File(dir, INDEX)
-        if (!indexFile.exists()) return emptyList()
-        return runCatching {
-            val array = JSONArray(indexFile.readText())
-            buildList {
-                for (index in 0 until array.length()) {
-                    val id = array.optString(index)
-                    loadSummary(id)?.let(::add)
-                }
-            }.sortedWith(compareByDescending<ConversationSummary> { it.pinned }.thenByDescending { it.updatedAt })
-        }.getOrDefault(emptyList())
-    }
-
-    private fun loadSummary(id: String): ConversationSummary? {
-        val file = File(directory(), "$id.json")
-        if (!file.exists()) return null
-        return runCatching {
-            val json = JSONObject(file.readText())
-            ConversationSummary(
-                id = json.optString("id"),
-                title = json.optString("title").ifBlank { "新对话" },
-                updatedAt = json.optLong("updatedAt"),
-                pinned = json.optBoolean("pinned"),
-                titlePending = json.optBoolean("titlePending"),
-            )
-        }.getOrNull()
-    }
+    fun loadAllSummaries(): List<ConversationSummary> = ConversationSummaries.load(directory())
 
     fun load(id: String): Conversation? {
         val file = File(directory(), "$id.json")
@@ -125,35 +83,40 @@ object ConversationStore {
 
     fun save(conversation: Conversation) {
         val dir = directory()
-        File(dir, "${conversation.id}.json").writeText(conversation.toJson().toString())
-        val ids = (loadIndex().filterNot { it == conversation.id } + conversation.id)
-            .distinct()
-        File(dir, INDEX).writeText(JSONArray(ids).toString())
-        notifyChanged()
+        val wrote = ConversationSummaries.commit(dir, conversation.summary()) {
+            File(dir, "${conversation.id}.json").writeText(conversation.toJson().toString())
+        }
+        if (wrote) notifyChanged()
     }
 
     fun replaceAll(conversations: List<Conversation>, lastOpenedId: String?) {
         val dir = directory()
-        dir.listFiles()?.forEach { it.delete() }
-        dir.mkdirs()
-        conversations.forEach { conversation ->
-            File(dir, "${conversation.id}.json").writeText(conversation.toJson().toString())
+        ConversationSummaries.withLock {
+            dir.listFiles()?.forEach { it.delete() }
+            dir.mkdirs()
+            conversations.forEach { conversation ->
+                File(dir, "${conversation.id}.json").writeText(conversation.toJson().toString())
+            }
+            ConversationSummaries.replace(dir, conversations.map { it.summary() })
+            val lastFile = File(dir, LAST_ID)
+            if (lastOpenedId.isNullOrBlank()) lastFile.delete() else lastFile.writeText(lastOpenedId)
         }
-        File(dir, INDEX).writeText(JSONArray(conversations.map { it.id }).toString())
-        val lastFile = File(dir, LAST_ID)
-        if (lastOpenedId.isNullOrBlank()) lastFile.delete() else lastFile.writeText(lastOpenedId)
         notifyChanged()
     }
 
     fun importCoexist(incoming: List<Conversation>) {
-        incoming.forEach { remote ->
-            val local = load(remote.id)
-            if (local == null || remote.updatedAt >= local.updatedAt) {
-                val dir = directory()
-                File(dir, "${remote.id}.json").writeText(remote.toJson().toString())
-                val ids = (loadIndex().filterNot { it == remote.id } + remote.id).distinct()
-                File(dir, INDEX).writeText(JSONArray(ids).toString())
+        val dir = directory()
+        ConversationSummaries.withLock {
+            val current = ConversationSummaries.load(dir).toMutableList()
+            incoming.forEach { remote ->
+                val local = load(remote.id)
+                if (local == null || remote.updatedAt >= local.updatedAt) {
+                    File(dir, "${remote.id}.json").writeText(remote.toJson().toString())
+                    current.removeAll { it.id == remote.id }
+                    current.add(remote.summary())
+                }
             }
+            ConversationSummaries.replace(dir, current)
         }
         notifyChanged()
     }
@@ -180,11 +143,13 @@ object ConversationStore {
     }
 
     fun delete(id: String) {
-        File(directory(), "$id.json").delete()
-        val ids = loadIndex().filterNot { it == id }
-        File(directory(), INDEX).writeText(JSONArray(ids).toString())
-        if (loadLastOpenedId() == id) {
-            File(directory(), LAST_ID).delete()
+        val dir = directory()
+        ConversationSummaries.withLock {
+            File(dir, "$id.json").delete()
+            ConversationSummaries.remove(dir, id)
+            if (loadLastOpenedId() == id) {
+                File(dir, LAST_ID).delete()
+            }
         }
         notifyChanged()
     }
@@ -197,7 +162,7 @@ object ConversationStore {
 
     fun loadLastOpened(): Conversation? {
         val last = loadLastOpenedId()?.let { load(it) }
-        return last ?: loadAll().firstOrNull()
+        return last ?: loadAllSummaries().firstOrNull()?.let { load(it.id) }
     }
 
     fun saveLastOpenedId(id: String) {
@@ -224,17 +189,6 @@ object ConversationStore {
         val first = messages.firstOrNull { it.fromUser && it.text.isNotBlank() }?.text
             ?: messages.firstOrNull { it.fromUser }?.attachments?.firstOrNull()?.name
         return first?.trim()?.replace('\n', ' ')?.take(24)?.ifBlank { "新对话" } ?: "新对话"
-    }
-
-    private fun loadIndex(): List<String> {
-        val file = File(directory(), INDEX)
-        if (!file.exists()) return emptyList()
-        return runCatching {
-            val array = JSONArray(file.readText())
-            buildList {
-                for (index in 0 until array.length()) add(array.optString(index))
-            }
-        }.getOrDefault(emptyList())
     }
 
     private fun directory(): File = AppPaths.conversations
