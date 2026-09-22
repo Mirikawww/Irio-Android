@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DataObject
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Memory
@@ -20,9 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.composables.ui.components.ButtonStyle
-import com.composables.ui.components.Icon
-import com.composables.ui.components.IconButton
 import com.composables.ui.components.Text
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
@@ -53,16 +49,7 @@ private fun SettingsScreen(onBack: () -> Unit) {
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
-                    IconButton(
-                        onClick = onBack,
-                        style = ButtonStyle.Ghost,
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
-                            tint = content,
-                        )
-                    }
+                    IrioBackButton(onBack)
                 }
             )
         }

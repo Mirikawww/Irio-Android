@@ -16,9 +16,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -27,12 +31,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.composables.ui.components.ButtonSize
+import com.composables.ui.components.ButtonStyle
+import com.composables.ui.components.Icon
+import com.composables.ui.components.IconButton
 import com.composables.ui.theme.backgroundColor as backgroundColorToken
 import com.composables.ui.theme.colors
+import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor as onBackgroundColorToken
 import com.composables.ui.theme.panelColor
 import com.composeunstyled.LocalTextStyle
@@ -114,6 +127,69 @@ fun IrioToolbar(
 }
 
 internal val ToolbarCapsuleShape = RoundedCornerShape(50)
+
+/**
+ * 圆形图标按钮。强调色只填这个圆，图标用对比色，不跟强调色。
+ * 黑色在深色主题里改用前景色当圆，避免黑圆贴在深色底上消失。
+ * [active] 为 false（例如发不出去）时用淡圆，不跟强调色。
+ */
+@Composable
+internal fun AccentCircleIconButton(
+    onClick: () -> Unit,
+    imageVector: ImageVector,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    active: Boolean = true,
+    buttonSize: Dp = 32.dp,
+    iconSize: Dp = 20.dp,
+) {
+    val background = Theme[colors][backgroundColorToken]
+    val content = Theme[colors][onBackgroundColorToken]
+    val showAccent = active && enabled
+    val accent = ThemeStore.accent
+    val fill: Color
+    val iconTint: Color
+    if (!showAccent) {
+        fill = Theme[colors][mutedColor].copy(alpha = 0.28f)
+        iconTint = Theme[colors][mutedColor]
+    } else if (accent == AccentColor.BLACK && background.luminance() < 0.5f) {
+        fill = content
+        iconTint = background
+    } else {
+        fill = accent.color
+        iconTint = accent.onContent()
+    }
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        style = ButtonStyle.Ghost,
+        buttonSize = ButtonSize.Small,
+        shape = CircleShape,
+        modifier = modifier
+            .size(buttonSize)
+            .background(fill, CircleShape)
+            .semantics { this.contentDescription = contentDescription },
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(iconSize),
+            tint = iconTint,
+        )
+    }
+}
+
+@Composable
+internal fun IrioBackButton(onClick: () -> Unit) {
+    AccentCircleIconButton(
+        onClick = onClick,
+        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+        contentDescription = "返回",
+        buttonSize = 36.dp,
+        iconSize = 22.dp,
+    )
+}
 
 @Composable
 internal fun ToolbarCapsule(

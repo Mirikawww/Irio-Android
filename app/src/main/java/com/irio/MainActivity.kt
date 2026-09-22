@@ -1786,7 +1786,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         }
                     },
                     trailing = {
-                        IconButton(
+                        val sendActive = generatingThisChat || canSend
+                        AccentCircleIconButton(
                             onClick = {
                                 when {
                                     generatingThisChat -> stopGeneration()
@@ -1794,26 +1795,12 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                     else -> submitMessage()
                                 }
                             },
-                            enabled = generatingThisChat || canSend,
-                            style = ButtonStyle.Ghost,
-                            buttonSize = ButtonSize.Small,
-                            modifier = Modifier
-                                .size(32.dp)
-                                .semantics {
-                                    contentDescription = if (generatingThisChat) "停止输出" else "Send message"
-                                },
-                        ) {
-                            Icon(
-                                imageVector = if (generatingThisChat) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward,
-                                contentDescription = if (generatingThisChat) "停止输出" else "Send message",
-                                modifier = Modifier.size(if (generatingThisChat) 22.dp else 20.dp),
-                                tint = when {
-                                    generatingThisChat -> content
-                                    canSend -> Theme[colors][primaryColor]
-                                    else -> muted
-                                }
-                            )
-                        }
+                            imageVector = if (generatingThisChat) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward,
+                            contentDescription = if (generatingThisChat) "停止输出" else "Send message",
+                            enabled = sendActive,
+                            active = sendActive,
+                            iconSize = if (generatingThisChat) 22.dp else 20.dp,
+                        )
                     }
                 )
                 }

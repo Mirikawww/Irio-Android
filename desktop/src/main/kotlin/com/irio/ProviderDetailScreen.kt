@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -83,16 +82,7 @@ fun ProviderDetailScreen(
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
-                    IconButton(
-                        onClick = onBack,
-                        style = ButtonStyle.Ghost,
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
-                            tint = content,
-                        )
-                    }
+                    IrioBackButton(onBack)
                 }
             )
         }
