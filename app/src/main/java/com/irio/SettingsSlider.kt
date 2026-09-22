@@ -36,6 +36,7 @@ fun SettingsSlider(
     onValueChangeFinished: (() -> Unit)? = null,
 ) {
     val content = Theme[colors][onBackgroundColor]
+    val accentFill = if (ThemeStore.accent == AccentColor.BLACK) content else ThemeStore.accent.color
     val muted = Theme[colors][mutedColor]
     val min = valueRange.first
     val max = valueRange.last
@@ -75,7 +76,7 @@ fun SettingsSlider(
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .fillMaxWidth(state.fraction)
-                                .background(content),
+                                .background(accentFill),
                         )
                     }
                 }
@@ -85,7 +86,7 @@ fun SettingsSlider(
                     modifier = Modifier
                         .size(16.dp)
                         .clip(CircleShape)
-                        .background(content),
+                        .background(accentFill),
                 )
             },
         )

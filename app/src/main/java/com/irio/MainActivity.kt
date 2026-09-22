@@ -2277,6 +2277,7 @@ internal fun MessageRow(
                                         .background(
                                             color = when {
                                                 isEditing -> Theme[colors][primaryColor].copy(alpha = 0.16f)
+                                                ThemeStore.accent != AccentColor.BLACK -> ThemeStore.accent.softened()
                                                 else -> Theme[colors][panelColor]
                                             },
                                             shape = RoundedCornerShape(16.dp),
@@ -2291,7 +2292,11 @@ internal fun MessageRow(
                                         .padding(horizontal = 14.dp, vertical = 10.dp),
                                     fontSize = 16.sp,
                                     lineHeight = 22.sp,
-                                    color = if (isEditing) Theme[colors][primaryColor] else Theme[colors][onPanelColor],
+                                    color = when {
+                                        isEditing -> Theme[colors][primaryColor]
+                                        ThemeStore.accent != AccentColor.BLACK -> Color(0xFF1A1A1A)
+                                        else -> Theme[colors][onPanelColor]
+                                    },
                                 )
                             }
                         }

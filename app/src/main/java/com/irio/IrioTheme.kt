@@ -160,10 +160,14 @@ private val SurfaceOverride: ThemeComposable = buildTheme {
         controlColor to if (amoled) Color(0xFF1A1A1A) else Theme[colors][controlColor],
         onControlColor to Theme[colors][onControlColor],
         thumbColor to Theme[colors][thumbColor],
-        // Keep switches strictly monochrome in dark mode. The stock theme uses translucent
-        // white tracks there, which reads as grey against the dark surfaces.
+        // Off-track stays monochrome. On-track follows a non-black accent; black
+        // keeps the existing monochrome selected track.
         switchTrackColor to if (darkTheme) Color(0xFF4A4A4A) else Theme[colors][switchTrackColor],
-        switchSelectedTrackColor to if (darkTheme) Color.Black else Theme[colors][switchSelectedTrackColor],
+        switchSelectedTrackColor to if (ThemeStore.accent == AccentColor.BLACK) {
+            if (darkTheme) Color.Black else Theme[colors][switchSelectedTrackColor]
+        } else {
+            ThemeStore.accent.color
+        },
         switchThumbColor to if (darkTheme) Color.White else Theme[colors][switchThumbColor],
         selectedControlColor to if (amoled) Color(0xFF222222) else Theme[colors][selectedControlColor],
         onSelectedControlColor to Theme[colors][onSelectedControlColor],

@@ -40,7 +40,8 @@ enum class ThemePreference(val label: String, val stored: String) {
 }
 
 enum class AccentColor(val label: String, val stored: String, val color: Color) {
-    BLACK("黑色", "black", Color.Black);
+    BLACK("黑色", "black", Color.Black),
+    BLUE("蓝色", "blue", Color(0xFF3B82F6));
 
     companion object {
         fun fromStored(value: String?): AccentColor =
@@ -50,6 +51,16 @@ enum class AccentColor(val label: String, val stored: String, val color: Color) 
     fun onContent(): Color {
         val luminance = color.red * 0.299f + color.green * 0.587f + color.blue * 0.114f
         return if (luminance > 0.6f) Color.Black else Color.White
+    }
+
+    /** Pale solid tint for user bubbles. Not the raw accent. */
+    fun softened(): Color {
+        val mix = 0.22f
+        return Color(
+            red = color.red * mix + (1f - mix),
+            green = color.green * mix + (1f - mix),
+            blue = color.blue * mix + (1f - mix),
+        )
     }
 }
 
