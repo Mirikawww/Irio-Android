@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -118,7 +119,16 @@ fun LinkSettingsScreen(onBack: () -> Unit) {
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
-                    IrioBackButton(onBack)
+                    IconButton(
+                        onClick = onBack,
+                        style = ButtonStyle.Ghost,
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "返回",
+                            tint = content,
+                        )
+                    }
                 },
             )
         },

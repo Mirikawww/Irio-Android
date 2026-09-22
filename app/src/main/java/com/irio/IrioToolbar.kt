@@ -21,8 +21,6 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -178,17 +176,6 @@ internal fun AccentCircleIconButton(
             tint = iconTint,
         )
     }
-}
-
-@Composable
-internal fun IrioBackButton(onClick: () -> Unit) {
-    AccentCircleIconButton(
-        onClick = onClick,
-        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-        contentDescription = "返回",
-        buttonSize = 36.dp,
-        iconSize = 22.dp,
-    )
 }
 
 @Composable

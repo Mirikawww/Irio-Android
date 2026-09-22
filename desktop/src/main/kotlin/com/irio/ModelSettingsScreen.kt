@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.input.maxLength
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Scaffold
@@ -116,7 +117,16 @@ fun ModelSettingsScreen(onBack: () -> Unit) {
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
-                    IrioBackButton(onBack)
+                    IconButton(
+                        onClick = onBack,
+                        style = ButtonStyle.Ghost,
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "返回",
+                            tint = content,
+                        )
+                    }
                 },
             )
         },

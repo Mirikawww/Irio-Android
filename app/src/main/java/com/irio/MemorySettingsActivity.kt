@@ -18,6 +18,8 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -35,6 +37,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.composables.ui.components.ButtonStyle
+import com.composables.ui.components.Icon
+import com.composables.ui.components.IconButton
 import com.composables.ui.components.Text
 import com.composables.ui.components.Switch
 import com.composables.ui.components.TextField
@@ -93,7 +98,16 @@ private fun MemorySettingsScreen(onBack: () -> Unit) {
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
-                    IrioBackButton(onBack)
+                    IconButton(
+                        onClick = onBack,
+                        style = ButtonStyle.Ghost,
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "返回",
+                            tint = content,
+                        )
+                    }
                 },
             )
         },

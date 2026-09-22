@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Scaffold
@@ -78,7 +79,16 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
-                    IrioBackButton(onBack)
+                    IconButton(
+                        onClick = onBack,
+                        style = ButtonStyle.Ghost,
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "返回",
+                            tint = content,
+                        )
+                    }
                 },
             )
         },
