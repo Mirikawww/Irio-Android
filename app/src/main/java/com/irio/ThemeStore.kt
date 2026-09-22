@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 
 enum class ResolvedTheme {
     LIGHT,
@@ -38,10 +39,25 @@ enum class ThemePreference(val label: String, val stored: String) {
     }
 }
 
+enum class AccentColor(val label: String, val stored: String, val color: Color) {
+    BLACK("黑色", "black", Color.Black);
+
+    companion object {
+        fun fromStored(value: String?): AccentColor =
+            entries.firstOrNull { it.stored.equals(value, ignoreCase = true) } ?: BLACK
+    }
+
+    fun onContent(): Color {
+        val luminance = color.red * 0.299f + color.green * 0.587f + color.blue * 0.114f
+        return if (luminance > 0.6f) Color.Black else Color.White
+    }
+}
+
 object ThemeStore {
     private const val PREFS = "appearance_settings"
     private const val KEY = "theme_preference"
     private const val AUTO_AMOLED_KEY = "auto_amoled"
+    private const val ACCENT_KEY = "accent_color"
     private const val CONTEXT_RING_KEY = "context_ring"
     private const val LEGACY_PREFS = "provider_settings"
     private const val LEGACY_KEY = "theme_preference"
@@ -50,6 +66,9 @@ object ThemeStore {
         private set
 
     var autoAmoled by mutableStateOf(false)
+        private set
+
+    var accent by mutableStateOf(AccentColor.BLACK)
         private set
 
     /** 圆环暂未开放：始终关。 */
@@ -69,6 +88,7 @@ object ThemeStore {
                 ?: context.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE).getString(LEGACY_KEY, null)
             preference = ThemePreference.fromStored(stored)
             autoAmoled = appearance.getBoolean(AUTO_AMOLED_KEY, false)
+            accent = AccentColor.fromStored(appearance.getString(ACCENT_KEY, null))
             contextRing = false
             if (appearance.getString(KEY, null) == null && stored != null) {
                 appearance.edit().putString(KEY, stored).apply()
@@ -94,6 +114,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(AUTO_AMOLED_KEY, enabled)
+            .apply()
+    }
+
+    fun saveAccent(context: Context, value: AccentColor) {
+        ensureLoaded(context)
+        if (accent == value) return
+        accent = value
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(ACCENT_KEY, value.stored)
             .apply()
     }
 

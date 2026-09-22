@@ -2,6 +2,7 @@ package com.irio
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
@@ -22,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.ui.components.Button
@@ -47,14 +51,25 @@ import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 
 @Composable
+private fun AccentSwatch(color: Color) {
+    Box(
+        modifier = Modifier
+            .size(12.dp)
+            .background(color, CircleShape),
+    )
+}
+
+@Composable
 fun AppearanceSettingsScreen(onBack: () -> Unit) {
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
 
     var texScalePercent by remember { mutableIntStateOf((ProviderStore.loadTexScale() * 100).toInt()) }
     val themePreference = ThemeStore.preference
+    val accent = ThemeStore.accent
     val autoAmoled = ThemeStore.autoAmoled
     var themeMenuOpen by remember { mutableStateOf(false) }
+    var accentMenuOpen by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = background,
@@ -133,6 +148,58 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         Icon(
                             imageVector = Icons.Rounded.KeyboardArrowDown,
                             contentDescription = "选择主题",
+                        )
+                    }
+                }
+                Text("强调色", color = Theme[colors][mutedColor], fontSize = 13.sp)
+                DropdownMenu(
+                    expanded = accentMenuOpen,
+                    onExpandedChange = { accentMenuOpen = it },
+                    alignment = DropdownMenuAlignment.Start,
+                    panel = {
+                        DropdownMenuPanel {
+                            AccentColor.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    onClick = {
+                                        ThemeStore.saveAccent(option)
+                                        accentMenuOpen = false
+                                    },
+                                    leading = {
+                                        if (accent == option) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        } else {
+                                            Spacer(Modifier.size(16.dp))
+                                        }
+                                    },
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        AccentSwatch(option.color)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(option.label)
+                                    }
+                                }
+                            }
+                        }
+                    },
+                ) {
+                    Button(
+                        onClick = { accentMenuOpen = !accentMenuOpen },
+                        modifier = Modifier.fillMaxWidth(),
+                        style = ButtonStyle.Secondary,
+                        shape = Theme[shapes][fieldShape],
+                        buttonSize = ButtonSize.Regular,
+                    ) {
+                        AccentSwatch(accent.color)
+                        Spacer(Modifier.width(8.dp))
+                        Text(accent.label)
+                        Spacer(Modifier.weight(1f))
+                        Icon(
+                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = "选择强调色",
                         )
                     }
                 }

@@ -3,6 +3,7 @@ package com.irio
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import org.json.JSONObject
 
 enum class ResolvedTheme {
@@ -38,15 +39,32 @@ enum class ThemePreference(val label: String, val stored: String) {
     }
 }
 
+enum class AccentColor(val label: String, val stored: String, val color: Color) {
+    BLACK("黑色", "black", Color.Black);
+
+    fun onContent(): Color {
+        val luminance = color.red * 0.299f + color.green * 0.587f + color.blue * 0.114f
+        return if (luminance > 0.6f) Color.Black else Color.White
+    }
+
+    companion object {
+        fun fromStored(value: String?): AccentColor =
+            entries.firstOrNull { it.stored.equals(value, ignoreCase = true) } ?: BLACK
+    }
+}
+
 object ThemeStore {
     private const val KEY = "theme_preference"
     private const val AUTO_AMOLED_KEY = "auto_amoled"
+    private const val ACCENT_KEY = "accent_color"
     private const val CONTEXT_RING_KEY = "context_ring"
 
     private val initial = loadInitial()
     var preference by mutableStateOf(initial.first)
         private set
     var autoAmoled by mutableStateOf(initial.second)
+        private set
+    var accent by mutableStateOf(initial.third)
         private set
     var contextRing by mutableStateOf(false)
         private set
@@ -64,6 +82,12 @@ object ThemeStore {
         updateAppearance { it.put(AUTO_AMOLED_KEY, enabled) }
     }
 
+    fun saveAccent(value: AccentColor) {
+        if (accent == value) return
+        accent = value
+        updateAppearance { it.put(ACCENT_KEY, value.stored) }
+    }
+
     fun saveContextRing(enabled: Boolean) {
         contextRing = false
         updateAppearance { it.put(CONTEXT_RING_KEY, false) }
@@ -76,12 +100,13 @@ object ThemeStore {
         AppPaths.appearanceFile.writeText(appearance.toString())
     }
 
-    private fun loadInitial(): Pair<ThemePreference, Boolean> {
+    private fun loadInitial(): Triple<ThemePreference, Boolean, AccentColor> {
         val appearance = runCatching { JSONObject(AppPaths.appearanceFile.readText()) }.getOrNull()
         val fromAppearance = appearance?.optString(KEY)?.takeIf { it.isNotBlank() }
         val autoAmoled = appearance?.optBoolean(AUTO_AMOLED_KEY, false) ?: false
+        val accent = AccentColor.fromStored(appearance?.optString(ACCENT_KEY)?.takeIf { it.isNotBlank() })
         if (fromAppearance != null) {
-            return ThemePreference.fromStored(fromAppearance) to autoAmoled
+            return Triple(ThemePreference.fromStored(fromAppearance), autoAmoled, accent)
         }
         val legacy = runCatching {
             JSONObject(AppPaths.providersFile.readText()).optString(KEY)
@@ -90,6 +115,6 @@ object ThemeStore {
         if (legacy != null) {
             updateAppearance { it.put(KEY, preference.stored) }
         }
-        return preference to autoAmoled
+        return Triple(preference, autoAmoled, accent)
     }
 }

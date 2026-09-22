@@ -149,8 +149,12 @@ private val SurfaceOverride: ThemeComposable = buildTheme {
         panelColor to if (amoled) Color(0xFF121212) else Theme[colors][panelColor],
         onPanelColor to Theme[colors][onPanelColor],
         mutedColor to Theme[colors][mutedColor],
-        primaryColor to Theme[colors][primaryColor],
-        onPrimaryColor to if (amoled) Color.Black else Theme[colors][onPrimaryColor],
+        primaryColor to ThemeStore.accent.color,
+        onPrimaryColor to if (ThemeStore.accent == AccentColor.BLACK) {
+            if (amoled) Color.Black else Theme[colors][onPrimaryColor]
+        } else {
+            ThemeStore.accent.onContent()
+        },
         secondaryColor to if (amoled) Color(0xFF121212) else Theme[colors][secondaryColor],
         onSecondaryColor to Theme[colors][onSecondaryColor],
         controlColor to if (amoled) Color(0xFF1A1A1A) else Theme[colors][controlColor],
