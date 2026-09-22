@@ -1222,6 +1222,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         composerStatus = null
         message.clearText()
         startGeneration(currentConversation.id, history + userMessage, reply)
+        keyboardController?.hide()
+        focusManager.clearFocus()
     }
 
     /** 点击用户气泡：文本与附件带回输入框进入编辑模式（仅最新一条用户消息）。 */
@@ -1308,6 +1310,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         message.clearText()
         pendingAttachments = emptyList()
         editingMessageId = null
+        keyboardController?.hide()
+        focusManager.clearFocus()
         if (reply != null) {
             startGeneration(currentConversation.id, history, reply)
         }

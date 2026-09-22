@@ -1009,6 +1009,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         message.clearText()
         pendingAttachments = emptyList()
         editingMessageId = null
+        focusManager.clearFocus()
         if (reply != null) {
             startGeneration(currentConversation.id, history, reply)
         }
@@ -1052,6 +1053,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         composerStatus = null
         message.clearText()
         startGeneration(currentConversation.id, history + userMessage, reply)
+        focusManager.clearFocus()
     }
 
     fun retryMessage(assistant: ChatMessage) {
