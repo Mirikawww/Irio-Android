@@ -3069,8 +3069,8 @@ private fun AssistantMarkdown(
                         }
                         segment is MarkdownSegment.Text_ -> Text(
                             segment.text,
-                            fontSize = 17.sp,
-                            lineHeight = 30.sp,
+                            fontSize = bodyStyle.fontSize,
+                            lineHeight = bodyStyle.lineHeight,
                             color = contentColor,
                         )
                     }
@@ -3112,7 +3112,7 @@ private fun TexBlock(latex: String, colorArgb: Int, density: Density, texScale: 
         }
     } else {
         // Parse failure: keep the raw LaTeX visible.
-        Text(latex, fontSize = 17.sp, lineHeight = 30.sp)
+        Text(latex, fontSize = 17.sp, lineHeight = 26.sp)
     }
 }
 

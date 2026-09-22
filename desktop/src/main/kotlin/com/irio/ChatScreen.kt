@@ -2607,8 +2607,8 @@ private fun AssistantMarkdown(
                         }
                         segment is MarkdownSegment.Text_ -> Text(
                             segment.text,
-                            fontSize = 17.sp,
-                            lineHeight = 35.7.sp,
+                            fontSize = bodyStyle.fontSize,
+                            lineHeight = bodyStyle.lineHeight,
                             color = contentColor,
                         )
                     }
