@@ -9,7 +9,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(compose.desktop.currentOs)
+    implementation(compose.desktop.windows_x64)
     implementation(compose.material3)
     implementation("org.jetbrains.compose.material:material-icons-core:1.7.3")
     implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
@@ -40,11 +40,5 @@ dependencies {
 compose.desktop {
     application {
         mainClass = "com.irio.MainKt"
-        // OpenJDK AWT XIM on Linux does not deliver preedit into Compose or
-        // place the Fcitx candidate window on the caret (JBR-8273). JBR does.
-        javaHome = "${System.getProperty("user.home")}/.local/share/jbr/jbr-21.0.6-linux-x64-b895.91"
-        jvmArgs(
-            "-Djava.awt.im.style=on-the-spot",
-        )
     }
 }

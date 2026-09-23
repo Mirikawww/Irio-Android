@@ -14,9 +14,6 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 
 fun main() {
-    if (System.getProperty("java.awt.im.style").isNullOrBlank()) {
-        System.setProperty("java.awt.im.style", "on-the-spot")
-    }
     application {
         LinkRuntime.ensure()
         Window(

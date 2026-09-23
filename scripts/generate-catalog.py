@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate app assets (model-names.json, model-reasoning.json, model-image.json, model-context.json)
-and desktop resources from https://models.dev/api.json.
+"""Regenerate app assets and Windows desktop resources from https://models.dev/api.json.
 Run from the Irio repo root."""
 import json, urllib.request
 
