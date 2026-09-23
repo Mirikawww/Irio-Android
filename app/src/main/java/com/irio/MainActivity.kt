@@ -312,6 +312,16 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var conversationLoadToken by remember { mutableIntStateOf(0) }
     val generatingIds = remember(generations) { generations.values.map { it.conversationId }.toSet() }
     val groupedConversationRows = remember(conversations) { groupedConversations(conversations) }
+    val conversationDrawerRows = remember(groupedConversationRows) {
+        buildList {
+            groupedConversationRows.forEach { (label, items) ->
+                add(ConversationDrawerRow.Header("header-$label", label))
+                items.forEach { conversation ->
+                    add(ConversationDrawerRow.Conversation(conversation))
+                }
+            }
+        }
+    }
     val generatingThisChat = currentConversation.id in generatingIds
     val imeAnimating = remember { AtomicBoolean(false) }
     ImeAnimationProbe(imeAnimating)
@@ -1478,21 +1488,24 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             )
             Spacer(Modifier.heightIn(min = 8.dp))
             Box(modifier = Modifier.weight(1f)) {
-                LazyColumn(
+                AndroidComposeRecyclerList(
+                    items = conversationDrawerRows,
+                    key = { it.key },
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
                     contentPadding = PaddingValues(bottom = 64.dp),
+                    itemSpacing = 2.dp,
                 ) {
-                    groupedConversationRows.forEach { (label, items) ->
-                        item(key = "header-$label") {
+                    when (val row = it) {
+                        is ConversationDrawerRow.Header -> {
                             Text(
-                                label,
+                                row.text,
                                 modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
                                 color = muted,
                                 fontSize = 12.sp,
                             )
                         }
-                        items(items, key = { it.id }) { conversation ->
+                        is ConversationDrawerRow.Conversation -> {
+                            val conversation = row.summary
                             DropdownMenu(
                                 expanded = conversationAction?.id == conversation.id,
                                 onExpandedChange = { expanded ->
@@ -1955,6 +1968,15 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     }
 }
 
+private sealed interface ConversationDrawerRow {
+    val key: String
+
+    data class Header(override val key: String, val text: String) : ConversationDrawerRow
+    data class Conversation(val summary: ConversationSummary) : ConversationDrawerRow {
+        override val key: String = summary.id
+    }
+}
+
 /** 模型列表的预计算行：文本与目标模型在 remember 里一次算好，滚动路径零文本处理。 */
 private sealed interface ModelPickerRow {
     val key: String
@@ -2134,55 +2156,45 @@ private fun ModelPicker(
                     }
                 }
                 DropdownMenuPanel(modifier = Modifier.width(200.dp)) {
-                    LazyColumn(
+                    AndroidComposeRecyclerList(
+                        items = rows,
+                        key = { it.key },
                         modifier = Modifier
                             .width(200.dp)
-                            .heightIn(max = 520.dp)
+                            .heightIn(max = 520.dp),
                     ) {
-                        items(
-                            count = rows.size,
-                            key = { rows[it].key },
-                            contentType = { index ->
-                                when (rows[index]) {
-                                    is ModelPickerRow.Gap -> "gap"
-                                    is ModelPickerRow.GroupLabel -> "label"
-                                    is ModelPickerRow.Model -> "model"
-                                }
-                            },
-                        ) { index ->
-                            when (val row = rows[index]) {
-                                is ModelPickerRow.Gap -> Spacer(Modifier.height(10.dp))
-                                is ModelPickerRow.GroupLabel -> Text(
-                                    // 提供商分组小字：与下方条目文本左对齐，与上一组之间留出空隙
-                                    row.text,
-                                    modifier = Modifier
-                                        .padding(start = 36.dp)
-                                        .padding(top = 6.dp, bottom = 2.dp),
-                                    color = Theme[colors][mutedColor],
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                is ModelPickerRow.Model -> {
-                                    val active = row.providerId == activeProviderId && selectedModel in row.variants
-                                    DropdownMenuItem(
-                                        onClick = { onSelectedModelChange(row.target, row.providerId) },
-                                        leading = {
-                                            if (active) {
-                                                Icon(
-                                                    imageVector = Icons.Rounded.Check,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(16.dp),
-                                                )
-                                            } else {
-                                                Spacer(Modifier.size(16.dp))
-                                            }
-                                        },
-                                    ) {
-                                        Text(
-                                            row.display,
-                                            fontSize = 15.5.sp,
-                                        )
-                                    }
+                        when (val row = it) {
+                            is ModelPickerRow.Gap -> Spacer(Modifier.height(10.dp))
+                            is ModelPickerRow.GroupLabel -> Text(
+                                // 提供商分组小字：与下方条目文本左对齐，与上一组之间留出空隙
+                                row.text,
+                                modifier = Modifier
+                                    .padding(start = 36.dp)
+                                    .padding(top = 6.dp, bottom = 2.dp),
+                                color = Theme[colors][mutedColor],
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            is ModelPickerRow.Model -> {
+                                val active = row.providerId == activeProviderId && selectedModel in row.variants
+                                DropdownMenuItem(
+                                    onClick = { onSelectedModelChange(row.target, row.providerId) },
+                                    leading = {
+                                        if (active) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        } else {
+                                            Spacer(Modifier.size(16.dp))
+                                        }
+                                    },
+                                ) {
+                                    Text(
+                                        row.display,
+                                        fontSize = 15.5.sp,
+                                    )
                                 }
                             }
                         }
