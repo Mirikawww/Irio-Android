@@ -3,6 +3,8 @@ package com.irio
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -120,11 +122,11 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("主题", color = Theme[colors][mutedColor], fontSize = 13.sp)
                 DropdownMenu(
                     expanded = themeMenuOpen,
                     onExpandedChange = { themeMenuOpen = it },
-                    alignment = DropdownMenuAlignment.Start,
+                    modifier = Modifier.fillMaxWidth(),
+                    alignment = DropdownMenuAlignment.End,
                     panel = {
                         DropdownMenuPanel {
                             ThemePreference.entries.forEach { option ->
@@ -133,42 +135,61 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                         ThemeStore.save(context, option)
                                         themeMenuOpen = false
                                     },
+                                    modifier = Modifier.fillMaxWidth(),
                                     leading = {
                                         if (themePreference == option) {
                                             Icon(
                                                 imageVector = Icons.Rounded.Check,
                                                 contentDescription = null,
+                                                tint = Theme[colors][onPanelColor],
                                                 modifier = Modifier.size(16.dp),
                                             )
                                         } else {
                                             Spacer(Modifier.size(16.dp))
                                         }
                                     },
-                                ) { Text(option.label) }
+                                ) { Text(option.label, color = Theme[colors][onPanelColor]) }
                             }
                         }
                     },
                 ) {
-                    Button(
-                        onClick = { themeMenuOpen = !themeMenuOpen },
-                        modifier = Modifier.fillMaxWidth(),
-                        style = ButtonStyle.Secondary,
-                        shape = Theme[shapes][fieldShape],
-                        buttonSize = ButtonSize.Regular,
+                    val interactionSource = remember { MutableInteractionSource() }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = { themeMenuOpen = !themeMenuOpen },
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(themePreference.label)
-                        Spacer(Modifier.weight(1f))
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = "选择主题",
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("主题", color = Theme[colors][onPanelColor])
+                            Text(themePreference.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+                        }
+                        IconButton(
+                            onClick = { themeMenuOpen = !themeMenuOpen },
+                            style = ButtonStyle.Ghost,
+                            buttonSize = ButtonSize.Small,
+                            shape = CircleShape,
+                            modifier = Modifier.size(32.dp),
+                            interactionSource = interactionSource,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = "选择主题",
+                                tint = Theme[colors][onPanelColor],
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
                 }
-                Text("强调色", color = Theme[colors][mutedColor], fontSize = 13.sp)
                 DropdownMenu(
                     expanded = accentMenuOpen,
                     onExpandedChange = { accentMenuOpen = it },
-                    alignment = DropdownMenuAlignment.Start,
+                    modifier = Modifier.fillMaxWidth(),
+                    alignment = DropdownMenuAlignment.End,
                     panel = {
                         DropdownMenuPanel {
                             AccentColor.entries.forEach { option ->
@@ -177,11 +198,13 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                         ThemeStore.saveAccent(context, option)
                                         accentMenuOpen = false
                                     },
+                                    modifier = Modifier.fillMaxWidth(),
                                     leading = {
                                         if (accent == option) {
                                             Icon(
                                                 imageVector = Icons.Rounded.Check,
                                                 contentDescription = null,
+                                                tint = Theme[colors][onPanelColor],
                                                 modifier = Modifier.size(16.dp),
                                             )
                                         } else {
@@ -192,28 +215,47 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         AccentSwatch(option.color)
                                         Spacer(Modifier.width(8.dp))
-                                        Text(option.label)
+                                        Text(option.label, color = Theme[colors][onPanelColor])
                                     }
                                 }
                             }
                         }
                     },
                 ) {
-                    Button(
-                        onClick = { accentMenuOpen = !accentMenuOpen },
-                        modifier = Modifier.fillMaxWidth(),
-                        style = ButtonStyle.Secondary,
-                        shape = Theme[shapes][fieldShape],
-                        buttonSize = ButtonSize.Regular,
+                    val interactionSource = remember { MutableInteractionSource() }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = { accentMenuOpen = !accentMenuOpen },
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        AccentSwatch(accent.color)
-                        Spacer(Modifier.width(8.dp))
-                        Text(accent.label)
-                        Spacer(Modifier.weight(1f))
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = "选择强调色",
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("强调色", color = Theme[colors][onPanelColor])
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                AccentSwatch(accent.color)
+                                Spacer(Modifier.width(8.dp))
+                                Text(accent.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+                            }
+                        }
+                        IconButton(
+                            onClick = { accentMenuOpen = !accentMenuOpen },
+                            style = ButtonStyle.Ghost,
+                            buttonSize = ButtonSize.Small,
+                            shape = CircleShape,
+                            modifier = Modifier.size(32.dp),
+                            interactionSource = interactionSource,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = "选择强调色",
+                                tint = Theme[colors][onPanelColor],
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
                 }
                 Row(

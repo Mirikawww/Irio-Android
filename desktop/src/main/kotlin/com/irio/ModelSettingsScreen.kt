@@ -1,6 +1,8 @@
 package com.irio
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.maxLength
@@ -32,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -144,30 +148,49 @@ fun ModelSettingsScreen(onBack: () -> Unit) {
                 DropdownMenu(
                     expanded = providerMenuOpen,
                     onExpandedChange = { providerMenuOpen = it },
-                    alignment = DropdownMenuAlignment.Start,
+                    modifier = Modifier.fillMaxWidth(),
+                    alignment = DropdownMenuAlignment.End,
                     panel = {
                         DropdownMenuPanel {
                             SearchProvider.entries.forEach { option ->
                                 DropdownMenuItem(
                                     onClick = { switchProvider(option) },
-                                ) { Text(option.label) }
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text(option.label, color = Theme[colors][onPanelColor]) }
                             }
                         }
                     },
                 ) {
-                    Button(
-                        onClick = { providerMenuOpen = !providerMenuOpen },
-                        modifier = Modifier.fillMaxWidth(),
-                        style = ButtonStyle.Secondary,
-                        shape = Theme[shapes][fieldShape],
-                        buttonSize = ButtonSize.Regular,
+                    val interactionSource = remember { MutableInteractionSource() }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = { providerMenuOpen = !providerMenuOpen },
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(provider.label)
-                        Spacer(Modifier.weight(1f))
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = "选择搜索提供方",
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("搜索提供商", color = Theme[colors][onPanelColor])
+                            Text(provider.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+                        }
+                        IconButton(
+                            onClick = { providerMenuOpen = !providerMenuOpen },
+                            style = ButtonStyle.Ghost,
+                            buttonSize = ButtonSize.Small,
+                            shape = CircleShape,
+                            modifier = Modifier.size(32.dp),
+                            interactionSource = interactionSource,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = "选择搜索提供方",
+                                tint = Theme[colors][onPanelColor],
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
                 }
                 ProviderField(
@@ -293,15 +316,11 @@ private fun ImageGenModelPicker(
         ?.let { (_, model) -> model }
         ?: "未配置"
 
-    Text(
-        "图片生成模型",
-        color = Theme[colors][mutedColor],
-        fontSize = 13.sp,
-    )
     DropdownMenu(
         expanded = menuOpen,
         onExpandedChange = { menuOpen = it },
-        alignment = DropdownMenuAlignment.Start,
+        modifier = Modifier.fillMaxWidth(),
+        alignment = DropdownMenuAlignment.End,
         panel = {
             // 与主页模型选择器同款式：固定 200dp 宽面板 + 提供商分组小字标签 + 选中 Check。
             // 面板会对内容做 width(IntrinsicSize.Max) 固有测量，LazyColumn 不支持固有测量会直接崩溃，
@@ -331,11 +350,13 @@ private fun ImageGenModelPicker(
                                     onSelect(model)
                                     menuOpen = false
                                 },
+                                modifier = Modifier.fillMaxWidth(),
                                 leading = {
                                     if (model == selected) {
                                         Icon(
                                             imageVector = Icons.Rounded.Check,
                                             contentDescription = null,
+                                            tint = Theme[colors][onPanelColor],
                                             modifier = Modifier.size(16.dp),
                                         )
                                     } else {
@@ -354,25 +375,42 @@ private fun ImageGenModelPicker(
             }
         },
     ) {
-        Button(
-            onClick = { menuOpen = !menuOpen },
-            modifier = Modifier.fillMaxWidth(),
-            style = ButtonStyle.Secondary,
-            shape = Theme[shapes][fieldShape],
-            buttonSize = ButtonSize.Regular,
+        val interactionSource = remember { MutableInteractionSource() }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = { menuOpen = !menuOpen },
+                ),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 与搜索提供方按钮同构：单一 weight 让文本占满剩余空间并左对齐，
-            // 图标贴右缘；不要加第二个 weight，否则文本与图标会被挤向中间。
-            Text(
-                selectedLabel,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                imageVector = Icons.Rounded.KeyboardArrowDown,
-                contentDescription = "选择图片生成模型",
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text("图片生成模型", color = Theme[colors][onPanelColor])
+                Text(
+                    selectedLabel,
+                    color = Theme[colors][mutedColor],
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(
+                onClick = { menuOpen = !menuOpen },
+                style = ButtonStyle.Ghost,
+                buttonSize = ButtonSize.Small,
+                shape = CircleShape,
+                modifier = Modifier.size(32.dp),
+                interactionSource = interactionSource,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = "选择图片生成模型",
+                    tint = Theme[colors][onPanelColor],
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }
@@ -404,15 +442,11 @@ private fun TitleModelPicker(
         ?.let { (_, model) -> model }
         ?: "跟随对话模型"
 
-    Text(
-        "标题生成模型",
-        color = Theme[colors][mutedColor],
-        fontSize = 13.sp,
-    )
     DropdownMenu(
         expanded = menuOpen,
         onExpandedChange = { menuOpen = it },
-        alignment = DropdownMenuAlignment.Start,
+        modifier = Modifier.fillMaxWidth(),
+        alignment = DropdownMenuAlignment.End,
         panel = {
             DropdownMenuPanel(modifier = Modifier.width(200.dp)) {
                 Column(
@@ -426,11 +460,13 @@ private fun TitleModelPicker(
                             onSelect("")
                             menuOpen = false
                         },
+                        modifier = Modifier.fillMaxWidth(),
                         leading = {
                             if (selected.isBlank()) {
                                 Icon(
                                     imageVector = Icons.Rounded.Check,
                                     contentDescription = null,
+                                    tint = Theme[colors][onPanelColor],
                                     modifier = Modifier.size(16.dp),
                                 )
                             } else {
@@ -457,11 +493,13 @@ private fun TitleModelPicker(
                                     onSelect(model)
                                     menuOpen = false
                                 },
+                                modifier = Modifier.fillMaxWidth(),
                                 leading = {
                                     if (model == selected) {
                                         Icon(
                                             imageVector = Icons.Rounded.Check,
                                             contentDescription = null,
+                                            tint = Theme[colors][onPanelColor],
                                             modifier = Modifier.size(16.dp),
                                         )
                                     } else {
@@ -477,23 +515,42 @@ private fun TitleModelPicker(
             }
         },
     ) {
-        Button(
-            onClick = { menuOpen = !menuOpen },
-            modifier = Modifier.fillMaxWidth(),
-            style = ButtonStyle.Secondary,
-            shape = Theme[shapes][fieldShape],
-            buttonSize = ButtonSize.Regular,
+        val interactionSource = remember { MutableInteractionSource() }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = { menuOpen = !menuOpen },
+                ),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                selectedLabel,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                imageVector = Icons.Rounded.KeyboardArrowDown,
-                contentDescription = "选择标题生成模型",
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text("标题生成模型", color = Theme[colors][onPanelColor])
+                Text(
+                    selectedLabel,
+                    color = Theme[colors][mutedColor],
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(
+                onClick = { menuOpen = !menuOpen },
+                style = ButtonStyle.Ghost,
+                buttonSize = ButtonSize.Small,
+                shape = CircleShape,
+                modifier = Modifier.size(32.dp),
+                interactionSource = interactionSource,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = "选择标题生成模型",
+                    tint = Theme[colors][onPanelColor],
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }
