@@ -144,7 +144,7 @@ fun ModelSettingsScreen(onBack: () -> Unit) {
                 .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SettingsSectionCard(title = "搜索") {
+            SettingsSectionCard {
                 DropdownMenu(
                     expanded = providerMenuOpen,
                     onExpandedChange = { providerMenuOpen = it },
@@ -207,7 +207,7 @@ fun ModelSettingsScreen(onBack: () -> Unit) {
                     onValueChange = { maxResults = provider.clampMaxResults(it) },
                 )
             }
-            SettingsSectionCard(title = "工具") {
+            SettingsSectionCard {
                 SettingsSlider(
                     label = "单轮工具调用",
                     value = maxRounds,
@@ -243,7 +243,7 @@ fun ModelSettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
-            SettingsSectionCard(title = "系统提示词") {
+            SettingsSectionCard {
                 ListRowButton(
                     label = "编辑系统提示词",
                     onClick = { systemPromptDialogOpen = true },
@@ -557,7 +557,6 @@ private fun TitleModelPicker(
 
 @Composable
 private fun SettingsSectionCard(
-    title: String,
     content: @Composable () -> Unit,
 ) {
     Column(
@@ -567,7 +566,6 @@ private fun SettingsSectionCard(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(title, color = Theme[colors][mutedColor], fontSize = 13.sp)
         content()
     }
 }

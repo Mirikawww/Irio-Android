@@ -293,7 +293,6 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("公式", color = Theme[colors][mutedColor], fontSize = 13.sp)
                 SettingsSlider(
                     label = "公式大小",
                     value = texScalePercent,
