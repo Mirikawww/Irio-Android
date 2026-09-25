@@ -5,6 +5,7 @@ import me.saket.telephoto.zoomable.rememberZoomableState
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloatAsState
@@ -124,6 +125,8 @@ import com.composables.ui.components.BottomSheet
 import com.composables.ui.components.BottomSheetDetent
 import com.composables.ui.components.BottomSheetState
 import dev.chrisbanes.haze.HazeInput
+
+
 import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -205,6 +208,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         mutableStateOf(ConversationStore.newConversation())
     }
     var messages by remember { mutableStateOf(currentConversation.messages) }
+    var newUserMessageId by remember { mutableStateOf<Long?>(null) }
     var pendingAttachments by remember { mutableStateOf(emptyList<ChatAttachment>()) }
     var clearingHistory by remember { mutableStateOf(false) }
     var composerStatus by remember { mutableStateOf<String?>(null) }
@@ -1040,6 +1044,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             fromUser = true,
             attachments = attachments,
         )
+        newUserMessageId = userMessage.id
         val reply = ChatMessage(
             id = MessageIds.next(),
             text = "",
@@ -1312,6 +1317,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         val editIndex = editVersions.indexOfFirst { it.id == chatMessage.id }.coerceAtLeast(0)
                         MessageRow(
                             chatMessage = chatMessage,
+                            newUserMessageId = newUserMessageId,
+
+
                             markdownScope = scope,
                             onOpenProcess = { event ->
                                 processSheetEvent = event
@@ -1910,6 +1918,9 @@ private fun ModelPicker(
 @Composable
 private fun MessageRow(
     chatMessage: ChatMessage,
+    newUserMessageId: Long? = null,
+
+
     markdownScope: CoroutineScope,
     onOpenProcess: (ProcessEvent) -> Unit,
     onOpenAttachment: (ChatAttachment) -> Unit,
@@ -1927,9 +1938,23 @@ private fun MessageRow(
     onPrevEditVersion: (() -> Unit)? = null,
     onNextEditVersion: (() -> Unit)? = null,
 ) {
+    val isNewUserMessage = chatMessage.fromUser && chatMessage.id == newUserMessageId
+    val entranceProgress = remember(chatMessage.id) {
+        Animatable(if (isNewUserMessage) 0f else 1f)
+    }
+    LaunchedEffect(chatMessage.id, isNewUserMessage) {
+        if (isNewUserMessage) {
+            entranceProgress.animateTo(1f, animationSpec = tween(260, easing = FastOutSlowInEasing))
+        }
+    }
     val alignment = if (chatMessage.fromUser) Alignment.CenterEnd else Alignment.CenterStart
     Box(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                alpha = if (isNewUserMessage) entranceProgress.value else 1f
+
+            },
         contentAlignment = alignment,
     ) {
         Column(

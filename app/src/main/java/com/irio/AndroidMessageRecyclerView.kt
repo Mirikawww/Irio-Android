@@ -18,6 +18,8 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.CoroutineScope
 
+
+
 /**
  * Callbacks owned by MainScreen. The adapter only renders a message and never owns chat state.
  */
@@ -36,6 +38,8 @@ internal data class AndroidMessageCallbacks(
     val onNextEditVersion: (ChatMessage) -> (() -> Unit)?,
     val versionInfo: (ChatMessage) -> VersionInfo,
     val editVersionInfo: (ChatMessage) -> VersionInfo,
+    val newUserMessageId: Long?,
+
 )
 
 internal data class VersionInfo(val index: Int, val count: Int)
@@ -322,6 +326,9 @@ private fun AndroidMessageRow(
     key(message.id) {
         MessageRow(
             chatMessage = message,
+            newUserMessageId = callbacks.newUserMessageId,
+
+
             markdownScope = callbacks.markdownScope,
             onOpenProcess = callbacks.onOpenProcess,
             onOpenAttachment = callbacks.onOpenAttachment,

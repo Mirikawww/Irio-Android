@@ -17,6 +17,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloatAsState
@@ -155,6 +156,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.ui.components.AlertDialog
 import dev.chrisbanes.haze.HazeInput
+
+
 import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -250,6 +253,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         mutableStateOf(ConversationStore.newConversation())
     }
     var messages by remember { mutableStateOf(currentConversation.messages) }
+    var newUserMessageId by remember { mutableStateOf<Long?>(null) }
     var pendingAttachments by remember { mutableStateOf(emptyList<ChatAttachment>()) }
     var clearingHistory by remember { mutableStateOf(false) }
     var composerStatus by remember { mutableStateOf<String?>(null) }
@@ -1219,6 +1223,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             fromUser = true,
             attachments = attachments,
         )
+        newUserMessageId = userMessage.id
         val reply = ChatMessage(
             id = MessageIds.next(),
             text = "",
@@ -1433,6 +1438,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         },
         versionInfo = ::retryVersionInfo,
         editVersionInfo = ::editVersionInfo,
+        newUserMessageId = newUserMessageId,
+
+
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -2247,6 +2255,9 @@ private fun ModelPicker(
 @Composable
 internal fun MessageRow(
     chatMessage: ChatMessage,
+    newUserMessageId: Long? = null,
+
+
     markdownScope: CoroutineScope,
     onOpenProcess: (ProcessEvent) -> Unit,
     onOpenAttachment: (ChatAttachment) -> Unit,
@@ -2264,9 +2275,23 @@ internal fun MessageRow(
     onPrevEditVersion: (() -> Unit)? = null,
     onNextEditVersion: (() -> Unit)? = null,
 ) {
+    val isNewUserMessage = chatMessage.fromUser && chatMessage.id == newUserMessageId
+    val entranceProgress = remember(chatMessage.id) {
+        Animatable(if (isNewUserMessage) 0f else 1f)
+    }
+    LaunchedEffect(chatMessage.id, isNewUserMessage) {
+        if (isNewUserMessage) {
+            entranceProgress.animateTo(1f, animationSpec = tween(260, easing = FastOutSlowInEasing))
+        }
+    }
     val alignment = if (chatMessage.fromUser) Alignment.CenterEnd else Alignment.CenterStart
     Box(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                alpha = if (isNewUserMessage) entranceProgress.value else 1f
+
+            },
         contentAlignment = alignment,
     ) {
         Column(
