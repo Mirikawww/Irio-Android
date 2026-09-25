@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DeleteSweep
-
+import androidx.compose.material.icons.rounded.ImportExport
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,7 +44,26 @@ fun OtherSettingsScreen(onBack: () -> Unit) {
             icon = Icons.Rounded.DeleteSweep,
             onClick = { showClearHistoryDialog = true },
         )
-
+        Spacer(Modifier.height(12.dp))
+        ListRowButton(
+            label = "导出数据",
+            icon = Icons.Rounded.ImportExport,
+            onClick = {
+                FilePickers.saveBackup("irio-${System.currentTimeMillis()}.irio")?.let { file ->
+                    file.outputStream().use { BackupStore.export(it) }
+                }
+            },
+        )
+        Spacer(Modifier.height(12.dp))
+        ListRowButton(
+            label = "导入数据",
+            icon = Icons.Rounded.ImportExport,
+            onClick = {
+                FilePickers.openBackup()?.let { file ->
+                    file.inputStream().use { BackupStore.import(it) }
+                }
+            },
+        )
     }
 
     IrioAlertDialog(

@@ -1,7 +1,8 @@
 package com.irio
 
 import android.os.Bundle
-
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -11,7 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DeleteSweep
-
+import androidx.compose.material.icons.rounded.ImportExport
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +42,19 @@ class OtherSettingsActivity : ComponentActivity() {
 private fun OtherSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var showClearHistoryDialog by remember { mutableStateOf(false) }
-
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        context.contentResolver.openOutputStream(uri)?.use { BackupStore.export(context, it) }
+    }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        context.contentResolver.openInputStream(uri)?.use { BackupStore.import(context, it) }
+        (context as? OtherSettingsActivity)?.recreate()
+    }
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
 
@@ -73,7 +86,18 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                 icon = Icons.Rounded.DeleteSweep,
                 onClick = { showClearHistoryDialog = true },
             )
-
+            Spacer(Modifier.height(12.dp))
+            ListRowButton(
+                label = "导出数据",
+                icon = Icons.Rounded.ImportExport,
+                onClick = { exportLauncher.launch("irio-${System.currentTimeMillis()}.irio") },
+            )
+            Spacer(Modifier.height(12.dp))
+            ListRowButton(
+                label = "导入数据",
+                icon = Icons.Rounded.ImportExport,
+                onClick = { importLauncher.launch(arrayOf("application/octet-stream", "application/zip", "*/*")) },
+            )
         }
     }
 

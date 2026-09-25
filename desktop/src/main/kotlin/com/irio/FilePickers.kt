@@ -21,6 +21,19 @@ object FilePickers {
         return File(dir, name)
     }
 
+    fun saveBackup(defaultName: String): File? = chooseFile("导出 Irio 数据", FileDialog.SAVE, defaultName)
+
+    fun openBackup(): File? = chooseFile("导入 Irio 数据", FileDialog.LOAD, null)
+
+    private fun chooseFile(title: String, mode: Int, defaultName: String?): File? {
+        val dialog = FileDialog(null as Frame?, title, mode)
+        dialog.file = defaultName
+        dialog.isVisible = true
+        val dir = dialog.directory ?: return null
+        val name = dialog.file ?: return null
+        return File(dir, name)
+    }
+
     private fun pick(imagesOnly: Boolean): List<File> {
         val dialog = FileDialog(null as Frame?, if (imagesOnly) "选择照片" else "选择文件", FileDialog.LOAD)
         dialog.isMultipleMode = true
