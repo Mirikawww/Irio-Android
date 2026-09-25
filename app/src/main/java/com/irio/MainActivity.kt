@@ -1703,12 +1703,15 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
                 // 编辑模式提示条：正在编辑某条用户消息
                 if (editingMessageId != null) {
+                    val editAccent = if (
+                        ThemeStore.accent == AccentColor.BLACK && Theme[colors][backgroundColor].red < 0.5f
+                    ) Theme[colors][onBackgroundColor] else Theme[colors][primaryColor]
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp)
                             .background(
-                                color = Theme[colors][primaryColor].copy(alpha = 0.12f),
+                                color = editAccent.copy(alpha = 0.12f),
                                 shape = RoundedCornerShape(10.dp),
                             )
                             .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -1719,12 +1722,12 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             imageVector = Icons.Rounded.Edit,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = Theme[colors][primaryColor],
+                            tint = editAccent,
                         )
                         Text(
                             "正在编辑消息。",
                             modifier = Modifier.weight(1f),
-                            color = Theme[colors][primaryColor],
+                            color = editAccent,
                             fontSize = 13.sp,
                         )
                         Icon(
@@ -1733,7 +1736,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             modifier = Modifier
                                 .size(16.dp)
                                 .clickable(onClick = { cancelEdit() }),
-                            tint = Theme[colors][primaryColor],
+                            tint = editAccent,
                         )
                     }
                 }
