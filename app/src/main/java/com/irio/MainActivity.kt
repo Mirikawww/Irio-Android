@@ -2016,11 +2016,27 @@ private fun ModelPicker(
     val muted = Theme[colors][mutedColor]
     val providersWithModels = providers.filter { it.enabled && it.enabledModels().isNotEmpty() }
     if (providersWithModels.isEmpty()) {
-        Text(
-            "未配置模型",
-            color = muted,
-            fontSize = 16.sp,
-        )
+        Button(
+            onClick = {},
+            enabled = false,
+            style = ButtonStyle.Ghost,
+            buttonSize = ButtonSize.Small,
+            shape = ToolbarCapsuleShape,
+            modifier = Modifier.semantics { contentDescription = "选择模型" },
+        ) {
+            Text(
+                "未配置模型",
+                fontSize = 15.sp,
+                color = muted,
+                maxLines = 1,
+            )
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowDown,
+                contentDescription = "选择模型",
+                modifier = Modifier.size(18.dp),
+                tint = muted,
+            )
+        }
         return
     }
     // 每个提供商内部合并 -thinking / -fast 变体；不同提供商之间不合并。
