@@ -41,7 +41,8 @@ enum class ThemePreference(val label: String, val stored: String) {
 
 enum class AccentColor(val label: String, val stored: String, val color: Color) {
     BLACK("黑色", "black", Color.Black),
-    BLUE("蓝色", "blue", Color(0xFF3B82F6));
+    BLUE("蓝色", "blue", Color(0xFF3B82F6)),
+    PINK("粉色", "pink", Color(0xFFEC4899));
 
     companion object {
         fun fromStored(value: String?): AccentColor =
