@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DataObject
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material3.Scaffold
@@ -110,6 +111,14 @@ private fun SettingsScreen(onBack: () -> Unit) {
                 icon = Icons.Rounded.Devices,
                 onClick = {
                     context.startActivity(Intent(context, LinkSettingsActivity::class.java))
+                },
+            )
+            Spacer(Modifier.height(12.dp))
+            ListRowButton(
+                label = "其他",
+                icon = Icons.Rounded.MoreHoriz,
+                onClick = {
+                    context.startActivity(Intent(context, OtherSettingsActivity::class.java))
                 },
             )
         }

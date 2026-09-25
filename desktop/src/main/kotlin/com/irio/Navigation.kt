@@ -7,6 +7,7 @@ sealed class Screen {
     data object Model : Screen()
     data object Appearance : Screen()
     data object Memory : Screen()
+    data object Other : Screen()
     data object Providers : Screen()
     data class ProviderDetail(val id: String) : Screen()
 }

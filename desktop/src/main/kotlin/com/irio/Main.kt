@@ -42,6 +42,7 @@ private fun IrioApp() {
                 onModel = { screen = Screen.Model },
                 onAppearance = { screen = Screen.Appearance },
                 onMemory = { screen = Screen.Memory },
+                onOther = { screen = Screen.Other },
             )
             Screen.Link -> LinkSettingsScreen(
                 onBack = { screen = Screen.Settings },
@@ -53,6 +54,9 @@ private fun IrioApp() {
                 onBack = { screen = Screen.Settings },
             )
             Screen.Memory -> MemorySettingsScreen(
+                onBack = { screen = Screen.Settings },
+            )
+            Screen.Other -> OtherSettingsScreen(
                 onBack = { screen = Screen.Settings },
             )
             Screen.Providers -> ProviderSettingsScreen(
