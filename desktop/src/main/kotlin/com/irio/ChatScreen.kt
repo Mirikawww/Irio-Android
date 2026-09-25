@@ -131,6 +131,7 @@ import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import com.composables.ui.components.Button
+
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.DropdownMenu
@@ -1939,6 +1940,7 @@ private fun MessageRow(
     onNextEditVersion: (() -> Unit)? = null,
 ) {
     val isNewUserMessage = chatMessage.fromUser && chatMessage.id == newUserMessageId
+
     val entranceProgress = remember(chatMessage.id) {
         Animatable(if (isNewUserMessage) 0f else 1f)
     }
@@ -1980,6 +1982,8 @@ private fun MessageRow(
                                 .background(
                                     color = when {
                                         isEditing -> Theme[colors][primaryColor].copy(alpha = 0.16f)
+                                        Theme[colors][backgroundColor].red < 0.5f && ThemeStore.accent == AccentColor.BLUE -> Color(0xFF16345C)
+                                        Theme[colors][backgroundColor].red < 0.5f -> Color(0xFF2A2A2A)
                                         ThemeStore.accent != AccentColor.BLACK -> ThemeStore.accent.softened()
                                         else -> Theme[colors][panelColor]
                                     },
@@ -1997,6 +2001,7 @@ private fun MessageRow(
                             lineHeight = 33.6.sp,
                             color = when {
                                 isEditing -> Theme[colors][primaryColor]
+                                Theme[colors][backgroundColor].red < 0.5f -> Theme[colors][onPanelColor]
                                 ThemeStore.accent != AccentColor.BLACK -> Color(0xFF1A1A1A)
                                 else -> Theme[colors][onPanelColor]
                             },
