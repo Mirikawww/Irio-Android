@@ -2611,16 +2611,16 @@ private fun AssistantMarkdown(
         ProviderStore.addChangeListener(listener)
         onDispose { ProviderStore.removeChangeListener(listener) }
     }
-    val bodyStyle = TextStyle(fontSize = 17.sp, lineHeight = 35.7.sp)
+    val bodyStyle = TextStyle(fontSize = 17.sp, lineHeight = 35.7.sp, color = contentColor)
     val inlineCode = irioInlineCodeStyle()
     val codeBlock = irioCodeBlockStyle()
     val typography = markdownTypography(
-        h1 = TextStyle(fontSize = 24.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold),
-        h2 = TextStyle(fontSize = 22.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold),
-        h3 = TextStyle(fontSize = 20.sp, lineHeight = 35.7.sp, fontWeight = FontWeight.Bold),
-        h4 = TextStyle(fontSize = 18.sp, lineHeight = 35.7.sp, fontWeight = FontWeight.Bold),
-        h5 = TextStyle(fontSize = 17.sp, lineHeight = 35.7.sp, fontWeight = FontWeight.Bold),
-        h6 = TextStyle(fontSize = 17.sp, lineHeight = 35.7.sp, fontWeight = FontWeight.Medium),
+        h1 = TextStyle(fontSize = 24.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold, color = contentColor),
+        h2 = TextStyle(fontSize = 22.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold, color = contentColor),
+        h3 = TextStyle(fontSize = 20.sp, lineHeight = 35.7.sp, fontWeight = FontWeight.Bold, color = contentColor),
+        h4 = TextStyle(fontSize = 18.sp, lineHeight = 35.7.sp, fontWeight = FontWeight.Bold, color = contentColor),
+        h5 = TextStyle(fontSize = 17.sp, lineHeight = 35.7.sp, fontWeight = FontWeight.Bold, color = contentColor),
+        h6 = TextStyle(fontSize = 17.sp, lineHeight = 35.7.sp, fontWeight = FontWeight.Medium, color = contentColor),
         text = bodyStyle,
         paragraph = bodyStyle,
         quote = bodyStyle,
@@ -2706,7 +2706,7 @@ private fun TexBlock(latex: String, colorArgb: Int, texScale: Float, renderScope
         }
     } else {
         // Parse failure: keep the raw LaTeX visible.
-        Text(latex, fontSize = 17.sp, lineHeight = 35.7.sp)
+        Text(latex, fontSize = 17.sp, lineHeight = 35.7.sp, color = Theme[colors][onBackgroundColor])
     }
 }
 
