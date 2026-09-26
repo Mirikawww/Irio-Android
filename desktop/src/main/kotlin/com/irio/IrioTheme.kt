@@ -80,6 +80,9 @@ fun AppTheme(content: @Composable () -> Unit) {
 
 private val LocalAmoledTheme = staticCompositionLocalOf { false }
 
+@Composable
+internal fun accentDisplayColor(accent: AccentColor): Color = accent.color
+
 private val SurfaceOverride: ThemeComposable = buildTheme {
     val amoled = LocalAmoledTheme.current
     val darkTheme = LocalColorScheme.current == ColorScheme.Dark

@@ -18,6 +18,9 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+
 import com.composables.ui.theme.ColorScheme
 import com.composables.ui.theme.ComposablesTheme
 import com.composables.ui.theme.LocalColorScheme
@@ -117,6 +120,12 @@ fun AppTheme(content: @Composable () -> Unit) {
     )
     val darkTheme = resolvedTheme.isDark
     val colorScheme = if (darkTheme) ColorScheme.Dark else ColorScheme.Light
+    val monetColors = if (Build.VERSION.SDK_INT >= 31) {
+        val dynamic = if (darkTheme) dynamicDarkColorScheme(view.context) else dynamicLightColorScheme(view.context)
+        DynamicAccent(primary = dynamic.primary, onPrimary = dynamic.onPrimary)
+    } else {
+        null
+    }
 
     SideEffect {
         val activity = view.context as? ComponentActivity ?: return@SideEffect
@@ -131,6 +140,7 @@ fun AppTheme(content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalColorScheme provides colorScheme,
         LocalAmoledTheme provides (resolvedTheme == ResolvedTheme.AMOLED),
+        LocalDynamicAccent provides monetColors,
     ) {
         ComposablesTheme {
             SurfaceOverride(content)
@@ -139,18 +149,39 @@ fun AppTheme(content: @Composable () -> Unit) {
 }
 
 private val LocalAmoledTheme = staticCompositionLocalOf { false }
+private val LocalDynamicAccent = staticCompositionLocalOf<DynamicAccent?> { null }
+
+private data class DynamicAccent(
+    val primary: Color,
+    val onPrimary: Color,
+)
+
+@Composable
+internal fun accentDisplayColor(accent: AccentColor): Color =
+    if (accent == AccentColor.MONET) {
+        LocalDynamicAccent.current?.primary ?: accent.color
+    } else {
+        accent.color
+    }
 
 private val SurfaceOverride: ThemeComposable = buildTheme {
     val amoled = LocalAmoledTheme.current
     val darkTheme = LocalColorScheme.current == ColorScheme.Dark
+    val dynamicAccent = LocalDynamicAccent.current
     properties[colors] = mapOf(
         backgroundColor to if (amoled) Color.Black else Theme[colors][backgroundColor],
         onBackgroundColor to Theme[colors][onBackgroundColor],
         panelColor to if (amoled) Color(0xFF121212) else Theme[colors][panelColor],
         onPanelColor to Theme[colors][onPanelColor],
         mutedColor to Theme[colors][mutedColor],
-        primaryColor to ThemeStore.accent.color,
-        onPrimaryColor to if (ThemeStore.accent == AccentColor.BLACK) {
+        primaryColor to if (ThemeStore.accent == AccentColor.MONET) {
+            dynamicAccent?.primary ?: ThemeStore.accent.color
+        } else {
+            ThemeStore.accent.color
+        },
+        onPrimaryColor to if (ThemeStore.accent == AccentColor.MONET && dynamicAccent != null) {
+            dynamicAccent.onPrimary
+        } else if (ThemeStore.accent == AccentColor.BLACK) {
             if (amoled) Color.Black else Theme[colors][onPrimaryColor]
         } else {
             ThemeStore.accent.onContent()
@@ -166,7 +197,11 @@ private val SurfaceOverride: ThemeComposable = buildTheme {
         switchSelectedTrackColor to if (ThemeStore.accent == AccentColor.BLACK) {
             if (darkTheme) Color.Black else Theme[colors][switchSelectedTrackColor]
         } else {
-            ThemeStore.accent.color
+            if (ThemeStore.accent == AccentColor.MONET) {
+                dynamicAccent?.primary ?: ThemeStore.accent.color
+            } else {
+                ThemeStore.accent.color
+            }
         },
         switchThumbColor to if (darkTheme) Color.White else Theme[colors][switchThumbColor],
         selectedControlColor to if (amoled) Color(0xFF222222) else Theme[colors][selectedControlColor],

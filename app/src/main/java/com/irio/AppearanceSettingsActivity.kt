@@ -219,7 +219,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                     },
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        AccentSwatch(option.color)
+                                        AccentSwatch(accentDisplayColor(option))
                                         Spacer(Modifier.width(8.dp))
                                         Text(
                                             option.label,
@@ -246,7 +246,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text("强调色", color = Theme[colors][onPanelColor])
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                AccentSwatch(accent.color)
+                                AccentSwatch(accentDisplayColor(accent))
                                 Spacer(Modifier.width(8.dp))
                                 Text(
                                     accent.label,
