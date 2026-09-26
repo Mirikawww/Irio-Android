@@ -56,9 +56,15 @@ import com.composeunstyled.theme.Theme
 private fun AccentSwatch(color: Color) {
     Box(
         modifier = Modifier
-            .size(12.dp)
-            .background(color, CircleShape),
-    )
+            .size(16.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .background(color, CircleShape),
+        )
+    }
 }
 
 @Composable
@@ -202,7 +208,11 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         AccentSwatch(option.color)
                                         Spacer(Modifier.width(8.dp))
-                                        Text(option.label, color = Theme[colors][onPanelColor])
+                                        Text(
+                                            option.label,
+                                            color = Theme[colors][onPanelColor],
+                                            lineHeight = 16.sp,
+                                        )
                                     }
                                 }
                             }
@@ -225,7 +235,12 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 AccentSwatch(accent.color)
                                 Spacer(Modifier.width(8.dp))
-                                Text(accent.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+                                Text(
+                                    accent.label,
+                                    color = Theme[colors][mutedColor],
+                                    fontSize = 13.sp,
+                                    lineHeight = 16.sp,
+                                )
                             }
                         }
                         IconButton(
