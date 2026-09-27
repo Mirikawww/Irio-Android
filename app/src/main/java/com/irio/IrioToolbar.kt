@@ -46,6 +46,8 @@ import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor as onBackgroundColorToken
 import com.composables.ui.theme.panelColor
+import com.composables.ui.theme.primaryColor as primaryColorToken
+import com.composables.ui.theme.onPrimaryColor as onPrimaryColorToken
 import com.composeunstyled.LocalTextStyle
 import com.composeunstyled.ProvideContentColor
 import com.composeunstyled.ProvideTextStyle
@@ -155,8 +157,8 @@ internal fun AccentCircleIconButton(
         fill = content
         iconTint = background
     } else {
-        fill = accent.color
-        iconTint = accent.onContent()
+        fill = Theme[colors][primaryColorToken]
+        iconTint = Theme[colors][onPrimaryColorToken]
     }
     IconButton(
         onClick = onClick,

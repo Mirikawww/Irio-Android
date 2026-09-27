@@ -22,6 +22,7 @@ import com.composables.ui.components.Text
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
+import com.composables.ui.theme.primaryColor
 import com.composeunstyled.UnstyledSlider
 import com.composeunstyled.theme.Theme
 import kotlin.math.roundToInt
@@ -36,7 +37,7 @@ fun SettingsSlider(
     onValueChangeFinished: (() -> Unit)? = null,
 ) {
     val content = Theme[colors][onBackgroundColor]
-    val accentFill = if (ThemeStore.accent == AccentColor.BLACK) content else ThemeStore.accent.color
+    val accentFill = if (ThemeStore.accent == AccentColor.BLACK) content else Theme[colors][primaryColor]
     val muted = Theme[colors][mutedColor]
     val min = valueRange.first
     val max = valueRange.last
