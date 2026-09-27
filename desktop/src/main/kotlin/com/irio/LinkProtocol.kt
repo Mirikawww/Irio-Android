@@ -212,6 +212,7 @@ object LinkConversationJson {
                                 put("isError", message.isError)
                                 put("retryGroup", message.groupId)
                                 put("selected", message.selected)
+                                message.responseToUserId?.let { put("responseToUserId", it) }
                                 message.usage?.let { usage ->
                                     put(
                                         "usage",
@@ -262,6 +263,7 @@ object LinkConversationJson {
                         isError = item.optBoolean("isError"),
                         retryGroup = item.optLong("retryGroup").takeIf { it != 0L } ?: item.optLong("id"),
                         selected = if (item.has("selected")) item.optBoolean("selected") else true,
+                        responseToUserId = item.optLong("responseToUserId").takeIf { it != 0L },
                         usage = tokenUsageFrom(item.optJSONObject("usage")),
                     )
                 )

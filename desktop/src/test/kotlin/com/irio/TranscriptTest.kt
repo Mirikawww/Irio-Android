@@ -45,4 +45,60 @@ class TranscriptTest {
         assertEquals(listOf(2L, 3L), groups[2L].orEmpty().map { it.id })
         assertEquals(listOf(4L), groups[4L].orEmpty().map { it.id })
     }
+
+    @Test
+    fun editedUserVersionOnlyShowsItsOwnReplies() {
+        val original = ChatMessage(id = 1, text = "one", fromUser = true, selected = false)
+        val edited = ChatMessage(id = 4, text = "two", fromUser = true, editGroup = 1, selected = true)
+        val replyOne = ChatMessage(
+            id = 2,
+            text = "reply 1",
+            fromUser = false,
+            retryGroup = 2,
+            selected = true,
+            responseToUserId = original.id,
+        )
+        val replyTwo = ChatMessage(
+            id = 3,
+            text = "reply 2",
+            fromUser = false,
+            retryGroup = 2,
+            selected = false,
+            responseToUserId = original.id,
+        )
+        val replyThree = ChatMessage(
+            id = 5,
+            text = "reply 3",
+            fromUser = false,
+            retryGroup = 2,
+            responseToUserId = edited.id,
+        )
+        val allMessages = listOf(original, replyOne, replyTwo, edited, replyThree)
+
+        assertEquals(listOf(edited.id, replyThree.id), visibleMessages(allMessages).map { it.id })
+        assertEquals(listOf(replyThree.id), buildTranscriptPresentation("test", allMessages).retryGroups[2L].orEmpty().map { it.id })
+        val originalMessages = selectEditVersion(allMessages, original)
+        val originalReply = originalMessages.first { it.id == replyOne.id }
+        assertEquals(
+            listOf(replyOne.id, replyTwo.id),
+            buildTranscriptPresentation("test", selectRetryVersion(originalMessages, originalReply))
+                .retryGroups[2L].orEmpty().map { it.id },
+        )
+        assertEquals(
+            listOf(original.id, replyOne.id),
+            visibleMessages(selectRetryVersion(originalMessages, originalReply)).map { it.id },
+        )
+    }
+
+    @Test
+    fun legacyMessagesInferReplyOwnershipByPosition() {
+        val original = ChatMessage(id = 1, text = "one", fromUser = true, selected = false)
+        val edited = ChatMessage(id = 4, text = "two", fromUser = true, editGroup = 1, selected = true)
+        val oldReplyOne = ChatMessage(id = 2, text = "old 1", fromUser = false, retryGroup = 2, selected = true)
+        val oldReplyTwo = ChatMessage(id = 3, text = "old 2", fromUser = false, retryGroup = 2, selected = true)
+        val newReply = ChatMessage(id = 5, text = "new", fromUser = false, selected = true)
+        val allMessages = listOf(original, oldReplyOne, oldReplyTwo, edited, newReply)
+
+        assertEquals(listOf(edited.id, newReply.id), visibleMessages(allMessages).map { it.id })
+    }
 }

@@ -16,6 +16,8 @@ data class ChatMessage(
     val isStreaming: Boolean = false,
     val retryGroup: Long = 0L,
     val selected: Boolean = true,
+    /** 回复所属的用户消息版本；旧数据为空时按消息顺序推断。 */
+    val responseToUserId: Long? = null,
     /** 用户消息编辑版本组：同组内多条用户消息为同一消息的不同版本；0 = 未编辑过。 */
     val editGroup: Long = 0L,
     /** 最近一次接口回报的 usage；圆环只读这份数据，不做本地估算。 */
@@ -220,6 +222,7 @@ object ConversationStore {
                             put("isError", message.isError)
                             put("retryGroup", message.groupId)
                             put("selected", message.selected)
+                            message.responseToUserId?.let { put("responseToUserId", it) }
                             if (message.fromUser && message.editGroup != 0L) put("editGroup", message.userGroupId)
                             message.usage?.let { usage ->
                                 put(
@@ -300,6 +303,7 @@ object ConversationStore {
                         isError = item.optBoolean("isError"),
                         retryGroup = item.optLong("retryGroup").takeIf { it != 0L } ?: item.optLong("id"),
                         selected = if (item.has("selected")) item.optBoolean("selected") else true,
+                        responseToUserId = item.optLong("responseToUserId").takeIf { it != 0L },
                         editGroup = if (item.optBoolean("fromUser")) {
                             item.optLong("editGroup").takeIf { it != 0L } ?: 0L
                         } else 0L,

@@ -1230,6 +1230,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             text = "",
             fromUser = false,
             isPending = true,
+            responseToUserId = userMessage.id,
         )
         val history = visibleMessages(messages).filterNot { it.isError || it.isPending }
         messages = messages + userMessage + reply
@@ -1290,9 +1291,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             selected = true,
         )
         // 原用户消息的回复组（紧随 target 之后的 assistant 消息的 groupId）
-        val replyGroupId = messages.drop(targetIndex + 1)
-            .firstOrNull { !it.fromUser && !it.isError }
-            ?.groupId
+        val replyGroupId = replyGroupForUserVersion(messages, target)
         // history = 新版本之前可见消息（含新版本本身，等同新发送）
         val history = buildList {
             addAll(visibleMessages(messages.subList(0, targetIndex)).filterNot { it.isError || it.isPending })
@@ -1306,6 +1305,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 isPending = true,
                 retryGroup = groupId,
                 selected = true,
+                responseToUserId = version.id,
             )
         }
         messages = buildList {
@@ -1339,8 +1339,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
      */
     fun showEditVersion(target: ChatMessage) {
         val targetIndex = messages.indexOfFirst { it.id == target.id }
+        val pairedReplyGroupId = replyGroupForUserVersion(messages, target)
         val pairedReply = messages.drop(targetIndex + 1)
-            .firstOrNull { !it.fromUser && !it.isError }
+            .firstOrNull { !it.fromUser && !it.isError && it.groupId == pairedReplyGroupId }
         messages = selectEditVersion(messages, target)
         if (pairedReply != null) {
             messages = selectRetryVersion(messages, pairedReply)
@@ -1363,6 +1364,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             isPending = true,
             retryGroup = groupId,
             selected = true,
+            responseToUserId = assistant.responseToUserId
+                ?: messages.take(firstIndex).lastOrNull { it.fromUser }?.id,
         )
         val lastIndex = messages.indexOfLast { !it.fromUser && it.groupId == groupId }
         messages = buildList {

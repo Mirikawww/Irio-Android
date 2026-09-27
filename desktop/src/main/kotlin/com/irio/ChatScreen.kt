@@ -982,9 +982,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             editGroup = target.userGroupId,
             selected = true,
         )
-        val replyGroupId = messages.drop(targetIndex + 1)
-            .firstOrNull { !it.fromUser && !it.isError }
-            ?.groupId
+        val replyGroupId = replyGroupForUserVersion(messages, target)
         val history = buildList {
             addAll(visibleMessages(messages.subList(0, targetIndex)).filterNot { it.isError || it.isPending })
             add(version)
@@ -997,6 +995,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 isPending = true,
                 retryGroup = groupId,
                 selected = true,
+                responseToUserId = version.id,
             )
         }
         messages = buildList {
@@ -1026,8 +1025,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
      */
     fun showEditVersion(target: ChatMessage) {
         val targetIndex = messages.indexOfFirst { it.id == target.id }
+        val pairedReplyGroupId = replyGroupForUserVersion(messages, target)
         val pairedReply = messages.drop(targetIndex + 1)
-            .firstOrNull { !it.fromUser && !it.isError }
+            .firstOrNull { !it.fromUser && !it.isError && it.groupId == pairedReplyGroupId }
         messages = selectEditVersion(messages, target)
         if (pairedReply != null) {
             messages = selectRetryVersion(messages, pairedReply)
@@ -1051,6 +1051,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             text = "",
             fromUser = false,
             isPending = true,
+            responseToUserId = userMessage.id,
         )
         val history = visibleMessages(messages).filterNot { it.isError || it.isPending }
         messages = messages + userMessage + reply
@@ -1081,6 +1082,8 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             isPending = true,
             retryGroup = groupId,
             selected = true,
+            responseToUserId = assistant.responseToUserId
+                ?: messages.take(firstIndex).lastOrNull { it.fromUser }?.id,
         )
         val lastIndex = messages.indexOfLast { !it.fromUser && it.groupId == groupId }
         messages = buildList {
