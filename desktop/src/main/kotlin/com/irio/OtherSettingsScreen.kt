@@ -8,7 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DeleteSweep
-import androidx.compose.material.icons.rounded.ImportExport
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,7 +48,7 @@ fun OtherSettingsScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         ListRowButton(
             label = "导出数据",
-            icon = Icons.Rounded.ImportExport,
+            icon = Icons.Rounded.Upload,
             onClick = {
                 FilePickers.saveBackup("irio-${System.currentTimeMillis()}.irio")?.let { file ->
                     file.outputStream().use { BackupStore.export(it) }
@@ -57,7 +58,7 @@ fun OtherSettingsScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         ListRowButton(
             label = "导入数据",
-            icon = Icons.Rounded.ImportExport,
+            icon = Icons.Rounded.Download,
             onClick = {
                 FilePickers.openBackup()?.let { file ->
                     file.inputStream().use { BackupStore.import(it) }

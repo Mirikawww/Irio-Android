@@ -297,6 +297,7 @@ object ProviderStore {
 
     fun applySnapshot(json: JSONObject, overwrite: Boolean) {
         val incoming = parseSnapshotProviders(json)
+        if (incoming.isEmpty() && json.optJSONArray("providers")?.length() ?: 0 > 0) return
         if (overwrite) {
             persist(incoming, json.optString("activeId"))
             json.optString("reasoning").takeIf { it.isNotBlank() }?.let { name ->
