@@ -1,5 +1,6 @@
 package com.irio
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -68,7 +70,7 @@ import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPanelColor
-import com.composables.ui.theme.panelColor
+
 import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
@@ -98,8 +100,7 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
     var imageGenModel by remember { mutableStateOf(ToolStore.loadImageGenModel(context)) }
     var imageGenMenuOpen by remember { mutableStateOf(false) }
     var titleModel by remember { mutableStateOf(ToolStore.loadTitleModel(context)) }
-    var systemPromptDialogOpen by remember { mutableStateOf(false) }
-    val systemPrompt = rememberTextFieldState(SystemPromptStore.load(context))
+
     val currentProvider by rememberUpdatedState(provider)
     val currentMaxResults by rememberUpdatedState(maxResults)
     val currentMaxRounds by rememberUpdatedState(maxRounds)
@@ -259,11 +260,10 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                         ToolStore.saveTitleModel(context, model)
                     },
                 )
-            }
-            SettingsSectionCard {
-                ListRowButton(
-                    label = "编辑系统提示词",
-                    onClick = { systemPromptDialogOpen = true },
+                SystemPromptRow(
+                    onClick = {
+                        context.startActivity(Intent(context, SystemPromptSettingsActivity::class.java))
+                    },
                 )
             }
             SettingsSectionCard {
@@ -297,46 +297,39 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    IrioAlertDialog(
-        visible = systemPromptDialogOpen,
-        onDismissRequest = { systemPromptDialogOpen = false },
-        backgroundColor = Theme[colors][panelColor],
-        contentColor = Theme[colors][onPanelColor],
+}
+
+@Composable
+private fun SystemPromptRow(onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column {
-            DialogTitle("系统提示词")
-            Spacer(Modifier.height(16.dp))
-            TextField(
-                state = systemPrompt,
-                modifier = Modifier.fillMaxWidth(),
-                accessibilityLabel = "系统提示词",
-                placeholder = {
-                    Text(
-                        "以系统身份注入每次对话的指令",
-                        style = FieldTextStyle.copy(baselineShift = BaselineShift(0.12f)),
-                    )
-                },
-                textStyle = FieldTextStyle,
-                lineHeight = 20.sp,
-                fontSize = 16.sp,
-                shape = Theme[shapes][fieldShape],
-                contentPadding = PaddingValues(12.dp),
-                lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 5, maxHeightInLines = 12),
-                inputTransformation = InputTransformation.maxLength(SystemPromptStore.MAX_CHARS),
-            )
-            Spacer(Modifier.height(16.dp))
-            DialogButtonRow(
-                confirmLabel = "保存",
-                onConfirm = {
-                    SystemPromptStore.save(context, systemPrompt.text.toString())
-                    systemPromptDialogOpen = false
-                },
-                onCancel = {
-                    // 放弃未保存的改动：还原为磁盘内容
-                    val saved = SystemPromptStore.load(context)
-                    systemPrompt.edit { replace(0, length, saved) }
-                    systemPromptDialogOpen = false
-                },
+        Text(
+            "编辑系统提示词",
+            modifier = Modifier.weight(1f),
+            color = Theme[colors][onPanelColor],
+        )
+        IconButton(
+            onClick = onClick,
+            style = ButtonStyle.Ghost,
+            buttonSize = ButtonSize.Small,
+            shape = CircleShape,
+            modifier = Modifier.size(32.dp),
+            interactionSource = interactionSource,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = "编辑系统提示词",
+                tint = Theme[colors][onPanelColor],
+                modifier = Modifier.size(20.dp),
             )
         }
     }

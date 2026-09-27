@@ -49,6 +49,10 @@ private fun IrioApp() {
             )
             Screen.Model -> ModelSettingsScreen(
                 onBack = { screen = Screen.Settings },
+                onSystemPrompt = { screen = Screen.SystemPrompt },
+            )
+            Screen.SystemPrompt -> SystemPromptSettingsScreen(
+                onBack = { screen = Screen.Model },
             )
             Screen.Appearance -> AppearanceSettingsScreen(
                 onBack = { screen = Screen.Settings },
