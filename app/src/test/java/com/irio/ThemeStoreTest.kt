@@ -42,5 +42,12 @@ class ThemeStoreTest {
         assertEquals(AppLanguage.ZH_CN, AppLanguage.fromStored("ZH-CN"))
         assertEquals("简体中文", AppLanguage.ZH_CN.label)
         assertEquals("zh-CN", AppLanguage.ZH_CN.stored)
+        assertEquals(AppLanguage.EN, AppLanguage.fromStored("en"))
+        assertEquals(AppLanguage.EN, AppLanguage.fromStored("EN"))
+        assertEquals("English", AppLanguage.EN.label)
+        assertEquals("en", AppLanguage.EN.stored)
+        assertEquals("Appearance", translate(AppLanguage.EN, "外观"))
+        assertEquals("外观", translate(AppLanguage.ZH_CN, "外观"))
+        assertEquals("New chat", translate(AppLanguage.EN, "新对话"))
     }
 }

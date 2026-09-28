@@ -63,7 +63,7 @@ fun MemorySettingsScreen(onBack: () -> Unit) {
         containerColor = background,
         topBar = {
             IrioToolbar(
-                title = { Text("记忆") },
+                title = { Text(tr("记忆")) },
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
@@ -73,7 +73,7 @@ fun MemorySettingsScreen(onBack: () -> Unit) {
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = tr("返回"),
                             tint = content,
                         )
                     }
@@ -97,7 +97,7 @@ fun MemorySettingsScreen(onBack: () -> Unit) {
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("启用记忆", modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
+                Text(tr("启用记忆"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
                 Switch(
                     checked = enabled,
                     onCheckedChange = {
@@ -107,17 +107,17 @@ fun MemorySettingsScreen(onBack: () -> Unit) {
                 )
             }
             Text(
-                "会作为长期用户信息注入之后的对话，不会自动从聊天里提取。",
+                tr("会作为长期用户信息注入之后的对话，不会自动从聊天里提取。"),
                 color = muted,
                 fontSize = 13.sp,
             )
             TextField(
                 state = memory,
                 modifier = Modifier.fillMaxWidth(),
-                accessibilityLabel = "记忆内容",
+                accessibilityLabel = tr("记忆内容"),
                 placeholder = {
                     Text(
-                        "要记住的内容",
+                        tr("要记住的内容"),
                         style = FieldTextStyle.copy(baselineShift = BaselineShift(0.12f)),
                     )
                 },

@@ -72,7 +72,7 @@ fun ProviderDetailScreen(
         containerColor = background,
         topBar = {
             IrioToolbar(
-                title = { Text(provider?.name ?: "提供商") },
+                title = { Text(provider?.name ?: tr("提供商")) },
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
@@ -82,7 +82,7 @@ fun ProviderDetailScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = tr("返回"),
                             tint = content,
                         )
                     }
@@ -100,17 +100,17 @@ fun ProviderDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (provider == null) {
-                Text("找不到这个提供商")
+                Text(tr("找不到这个提供商"))
             } else {
-                ProviderField("名称", name, KeyboardType.Text, trailingSpace = false)
+                ProviderField(tr("名称"), name, KeyboardType.Text, trailingSpace = false)
                 ProtocolPicker(
                     protocol = protocol,
                     expanded = protocolMenuOpen,
                     onExpandedChange = { protocolMenuOpen = it },
                     onSelect = { protocol = it },
                 )
-                ProviderField("端点 URL", endpoint, KeyboardType.Uri, trailingSpace = false)
-                ProviderField("密钥", apiKey, KeyboardType.Password, mask = true, trailingSpace = false)
+                ProviderField(tr("端点 URL"), endpoint, KeyboardType.Uri, trailingSpace = false)
+                ProviderField(tr("密钥"), apiKey, KeyboardType.Password, mask = true, trailingSpace = false)
                 if (formError != null) {
                     Text(formError!!)
                 }
@@ -143,7 +143,7 @@ fun ProviderDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                     style = ButtonStyle.Primary,
                 ) {
-                    Text(if (saving) "保存中" else "保存")
+                    Text(if (saving) tr("保存中") else tr("保存"))
                 }
                 Button(
                     onClick = {
@@ -168,7 +168,7 @@ fun ProviderDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                     style = ButtonStyle.Secondary,
                 ) {
-                    Text(if (refreshing) "刷新中" else "刷新模型")
+                    Text(if (refreshing) tr("刷新中") else tr("刷新模型"))
                 }
                 Column(
                     modifier = Modifier
@@ -178,7 +178,7 @@ fun ProviderDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (provider!!.models.isEmpty()) {
-                        Text("还没有模型")
+                        Text(tr("还没有模型"))
                     } else {
                         provider!!.models.forEach { model ->
                             ModelEnabledRow(
@@ -210,7 +210,7 @@ fun ProviderDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                     style = ButtonStyle.Destructive,
                 ) {
-                    Text("删除提供商")
+                    Text(tr("删除提供商"))
                 }
             }
         }
@@ -223,12 +223,12 @@ fun ProviderDetailScreen(
         contentColor = Theme[colors][onPanelColor],
     ) {
         Column {
-            DialogTitle("删除提供商")
+            DialogTitle(tr("删除提供商"))
             Spacer(Modifier.height(12.dp))
-            Text("确定要删除“${provider?.name.orEmpty()}”吗？相关模型和已选模型也会被清除。")
+            Text(tr("确定要删除“%s”吗？相关模型和已选模型也会被清除。").format(provider?.name.orEmpty()))
             Spacer(Modifier.height(16.dp))
             DialogButtonRow(
-                confirmLabel = "删除",
+                confirmLabel = tr("删除"),
                 onConfirm = {
                     provider?.id?.let { ProviderStore.deleteProvider(it) }
                     deleteDialogOpen = false

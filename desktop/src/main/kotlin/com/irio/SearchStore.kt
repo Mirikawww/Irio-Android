@@ -223,7 +223,7 @@ object WebSearch {
 object WebFetch {
     fun fetch(provider: SearchProvider, apiKey: String, url: String, cancellation: ChatRequestCancellation? = null): WebSearchResult {
         val target = url.trim()
-        if (!target.startsWith("http://") && !target.startsWith("https://")) return WebSearchResult("网页地址必须以 http:// 或 https:// 开头")
+        if (!target.startsWith("http://") && !target.startsWith("https://")) return WebSearchResult(tr("网页地址必须以 http:// 或 https:// 开头"))
         val endpoint = if (provider == SearchProvider.TAVILY) "https://api.tavily.com/extract" else "https://api.exa.ai/contents"
         val connection = URL(endpoint).openConnection() as HttpURLConnection
         cancellation?.attach(connection)
@@ -240,15 +240,15 @@ object WebFetch {
             connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
             val status = connection.responseCode
             val body = (if (status in 200..299) connection.inputStream else connection.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (cancellation?.isCancelled() == true) WebSearchResult("网页读取已停止")
-            else if (status !in 200..299) WebSearchResult("网页读取失败（HTTP $status）")
+            if (cancellation?.isCancelled() == true) WebSearchResult(tr("网页读取已停止"))
+            else if (status !in 200..299) WebSearchResult(tr("网页读取失败（HTTP %s）").format(status))
             else {
                 val item = JSONObject(body).optJSONArray("results")?.optJSONObject(0)
                 val text = if (provider == SearchProvider.TAVILY) item?.optString("raw_content") else item?.optString("text")
-                WebSearchResult(text.orEmpty().ifBlank { "网页没有可读取的正文" })
+                WebSearchResult(text.orEmpty().ifBlank { tr("网页没有可读取的正文") })
             }
         } catch (error: Exception) {
-            if (cancellation?.isCancelled() == true) WebSearchResult("网页读取已停止") else WebSearchResult(error.message ?: "网页读取失败")
+            if (cancellation?.isCancelled() == true) WebSearchResult(tr("网页读取已停止")) else WebSearchResult(error.message ?: tr("网页读取失败"))
         } finally {
             cancellation?.detach(connection)
             connection.disconnect()
@@ -267,14 +267,14 @@ object TavilySearch {
         maxResults: Int = SearchProvider.TAVILY.maxResultsDefault,
     ): WebSearchResult {
         val trimmed = query.trim()
-        if (trimmed.isBlank()) return WebSearchResult("缺少 query")
-        if (apiKey.isBlank()) return WebSearchResult("未配置 Tavily 密钥")
+        if (trimmed.isBlank()) return WebSearchResult(tr("缺少 query"))
+        if (apiKey.isBlank()) return WebSearchResult(tr("未配置 Tavily 密钥"))
         val connection = runCatching {
             URL("$ENDPOINT$SEARCH_PATH").openConnection() as HttpURLConnection
-        }.getOrElse { return WebSearchResult(it.message ?: "无法连接到 Tavily") }
+        }.getOrElse { return WebSearchResult(it.message ?: tr("无法连接到 Tavily")) }
         cancellation?.attach(connection)
         return try {
-            if (cancellation?.isCancelled() == true) return WebSearchResult("搜索已停止")
+            if (cancellation?.isCancelled() == true) return WebSearchResult(tr("搜索已停止"))
             connection.requestMethod = "POST"
             connection.connectTimeout = 20_000
             connection.readTimeout = 30_000
@@ -291,15 +291,15 @@ object TavilySearch {
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (cancellation?.isCancelled() == true) return WebSearchResult("搜索已停止")
+            if (cancellation?.isCancelled() == true) return WebSearchResult(tr("搜索已停止"))
             if (status !in 200..299) {
-                WebSearchResult(tavilyError(body).ifBlank { "搜索失败（HTTP $status）" })
+                WebSearchResult(tavilyError(body).ifBlank { tr("搜索失败（HTTP %s）").format(status) })
             } else {
                 formatResults(body)
             }
         } catch (error: Exception) {
-            if (cancellation?.isCancelled() == true) WebSearchResult("搜索已停止")
-            else WebSearchResult(error.message ?: "无法连接到 Tavily")
+            if (cancellation?.isCancelled() == true) WebSearchResult(tr("搜索已停止"))
+            else WebSearchResult(error.message ?: tr("无法连接到 Tavily"))
         } finally {
             cancellation?.detach(connection)
             connection.disconnect()
@@ -308,7 +308,7 @@ object TavilySearch {
 
     private fun formatResults(body: String): WebSearchResult {
         val root = runCatching { JSONObject(body) }.getOrNull()
-            ?: return WebSearchResult(body.ifBlank { "没有搜索结果" })
+            ?: return WebSearchResult(body.ifBlank { tr("没有搜索结果") })
         val results = root.optJSONArray("results") ?: JSONArray()
         val text = StringBuilder()
         root.optString("answer").takeIf { it.isNotBlank() }?.let { text.append(it).append("\n\n") }
@@ -319,7 +319,7 @@ object TavilySearch {
             item.optString("content").takeIf { it.isNotBlank() }?.let { text.append(it).append("\n\n") }
         }
         return WebSearchResult(
-            text = text.toString().trim().ifBlank { "没有搜索结果" },
+            text = text.toString().trim().ifBlank { tr("没有搜索结果") },
             pageCount = results.length(),
         )
     }
@@ -341,14 +341,14 @@ object ExaSearch {
         maxResults: Int = SearchProvider.EXA.maxResultsDefault,
     ): WebSearchResult {
         val trimmed = query.trim()
-        if (trimmed.isBlank()) return WebSearchResult("缺少 query")
-        if (apiKey.isBlank()) return WebSearchResult("未配置 Exa 密钥")
+        if (trimmed.isBlank()) return WebSearchResult(tr("缺少 query"))
+        if (apiKey.isBlank()) return WebSearchResult(tr("未配置 Exa 密钥"))
         val connection = runCatching {
             URL(ENDPOINT).openConnection() as HttpURLConnection
-        }.getOrElse { return WebSearchResult(it.message ?: "无法连接到 Exa") }
+        }.getOrElse { return WebSearchResult(it.message ?: tr("无法连接到 Exa")) }
         cancellation?.attach(connection)
         return try {
-            if (cancellation?.isCancelled() == true) return WebSearchResult("搜索已停止")
+            if (cancellation?.isCancelled() == true) return WebSearchResult(tr("搜索已停止"))
             connection.requestMethod = "POST"
             connection.connectTimeout = 20_000
             connection.readTimeout = 30_000
@@ -366,15 +366,15 @@ object ExaSearch {
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (cancellation?.isCancelled() == true) return WebSearchResult("搜索已停止")
+            if (cancellation?.isCancelled() == true) return WebSearchResult(tr("搜索已停止"))
             if (status !in 200..299) {
-                WebSearchResult(exaError(body).ifBlank { "搜索失败（HTTP $status）" })
+                WebSearchResult(exaError(body).ifBlank { tr("搜索失败（HTTP %s）").format(status) })
             } else {
                 formatResults(body)
             }
         } catch (error: Exception) {
-            if (cancellation?.isCancelled() == true) WebSearchResult("搜索已停止")
-            else WebSearchResult(error.message ?: "无法连接到 Exa")
+            if (cancellation?.isCancelled() == true) WebSearchResult(tr("搜索已停止"))
+            else WebSearchResult(error.message ?: tr("无法连接到 Exa"))
         } finally {
             cancellation?.detach(connection)
             connection.disconnect()
@@ -383,7 +383,7 @@ object ExaSearch {
 
     private fun formatResults(body: String): WebSearchResult {
         val root = runCatching { JSONObject(body) }.getOrNull()
-            ?: return WebSearchResult(body.ifBlank { "没有搜索结果" })
+            ?: return WebSearchResult(body.ifBlank { tr("没有搜索结果") })
         val results = root.optJSONArray("results") ?: JSONArray()
         val text = StringBuilder()
         root.optString("context").takeIf { it.isNotBlank() }?.let { text.append(it).append("\n\n") }
@@ -395,7 +395,7 @@ object ExaSearch {
                 ?: item.optString("summary").takeIf { it.isNotBlank() }?.let { text.append(it).append("\n\n") }
         }
         return WebSearchResult(
-            text = text.toString().trim().ifBlank { "没有搜索结果" },
+            text = text.toString().trim().ifBlank { tr("没有搜索结果") },
             pageCount = results.length(),
         )
     }

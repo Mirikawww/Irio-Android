@@ -316,7 +316,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var pendingConversationScroll by remember { mutableStateOf<String?>(null) }
     var conversationLoadToken by remember { mutableIntStateOf(0) }
     val generatingIds = remember(generations) { generations.values.map { it.conversationId }.toSet() }
-    val groupedConversationRows = remember(conversations) { groupedConversations(conversations) }
+    val groupedConversationRows = remember(conversations, ThemeStore.language) { groupedConversations(conversations) }
     val conversationDrawerRows = remember(groupedConversationRows) {
         buildList {
             groupedConversationRows.forEach { (label, items) ->
@@ -524,9 +524,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 else -> merged
             }
             composerStatus = when {
-                loaded.size < uris.size -> "有附件无法读取"
-                slots > ChatApi.MAX_ATTACHMENT_SLOTS -> "附件数量超过 15 个槽位（照片和视频各算半个）"
-                bytes > ChatApi.MAX_ATTACHMENT_BYTES_TOTAL -> "附件总大小超过 5GB"
+                loaded.size < uris.size -> tr("有附件无法读取")
+                slots > ChatApi.MAX_ATTACHMENT_SLOTS -> tr("附件数量超过 15 个槽位（照片和视频各算半个）")
+                bytes > ChatApi.MAX_ATTACHMENT_BYTES_TOTAL -> tr("附件总大小超过 5GB")
                 else -> null
             }
         }
@@ -980,10 +980,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 // （gpt-image 等纯生图模型在 chat/completions 上游必拒），
                 // 最后一条用户消息当 prompt，结果图片作为回复附件回流。非流式，无工具/思考。
                 val result = if (provider == null) {
-                    ChatCompletionResult(error = "请先在设置中添加提供商")
+                    ChatCompletionResult(error = tr("请先在设置中添加提供商"))
                 } else if (ModelCatalog.isImageModel(context, requestModel)) {
                     val lastUserIndex = requestSource.indexOfLast { it.fromUser }
-                    val prompt = requestSource.getOrNull(lastUserIndex)?.text.orEmpty().ifBlank { "图片" }
+                    val prompt = requestSource.getOrNull(lastUserIndex)?.text.orEmpty().ifBlank { tr("图片") }
                     // Images API 无状态：多轮要回传上轮 prompt + 生成图。
                     // 上轮 = 本条用户消息之前最近的一次生图往返（上轮用户 prompt + 其后模型产出的图）。
                     val context = if (lastUserIndex > 0) {
@@ -1013,14 +1013,14 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 attachments = listOf(genResult.attachment),
                                 model = requestModel,
                             )
-                        } else if (requestCancellation.isCancelled() || genResult.error == "图片生成已停止") {
+                        } else if (requestCancellation.isCancelled() || genResult.error == tr("图片生成已停止")) {
                             ChatCompletionResult(stopped = true)
                         } else {
-                            ChatCompletionResult(error = genResult.error ?: "图片生成失败")
+                            ChatCompletionResult(error = genResult.error ?: tr("图片生成失败"))
                         }
                     }
                 } else if (requestModel.isBlank()) {
-                    ChatCompletionResult(error = "请先选择一个可用模型")
+                    ChatCompletionResult(error = tr("请先选择一个可用模型"))
                 } else {
                 val requestMessages = requestSource.map { item ->
                     ChatRequestMessage(
@@ -1492,7 +1492,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 )
         ) {
             ListRowButton(
-                label = "新对话",
+                label = tr("新对话"),
                 icon = Icons.Rounded.Add,
                 style = ButtonStyle.Ghost,
                 contentPadding = DrawerRowPadding,
@@ -1533,7 +1533,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                                 conversationAction = null
                                             },
                                         ) {
-                                            Text(if (conversation.pinned) "取消置顶" else "置顶")
+                                            Text(if (conversation.pinned) tr("取消置顶") else tr("置顶"))
                                         }
                                         DropdownMenuItem(
                                             onClick = {
@@ -1541,13 +1541,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                                 conversationAction = null
                                             },
                                         ) {
-                                            Text("删除对话")
+                                            Text(tr("删除对话"))
                                         }
                                     }
                                 },
                             ) {
                                 ListRowButton(
-                                    label = conversation.title,
+                                    label = displayConversationTitle(conversation.title),
                                     style = ButtonStyle.Ghost,
                                     contentPadding = DrawerRowPadding,
                                     icon = if (conversation.pinned) Icons.Rounded.PushPin else null,
@@ -1567,7 +1567,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         .background(background),
                 ) {
                     ListRowButton(
-                        label = "设置",
+                        label = tr("设置"),
                         icon = Icons.Rounded.Settings,
                         style = ButtonStyle.Ghost,
                         contentPadding = DrawerRowPadding,
@@ -1728,14 +1728,14 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             tint = editAccent,
                         )
                         Text(
-                            "正在编辑消息。",
+                            tr("正在编辑消息。"),
                             modifier = Modifier.weight(1f),
                             color = editAccent,
                             fontSize = 13.sp,
                         )
                         Icon(
                             imageVector = Icons.Rounded.Close,
-                            contentDescription = "取消编辑",
+                            contentDescription = tr("取消编辑"),
                             modifier = Modifier
                                 .size(16.dp)
                                 .clickable(onClick = { cancelEdit() }),
@@ -1782,7 +1782,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                                 modifier = Modifier.size(18.dp),
                                             )
                                         },
-                                    ) { Text("照片") }
+                                    ) { Text(tr("照片")) }
                                     DropdownMenuItem(
                                         onClick = {
                                             attachMenuOpen = false
@@ -1795,7 +1795,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                                 modifier = Modifier.size(18.dp),
                                             )
                                         },
-                                    ) { Text("文件") }
+                                    ) { Text(tr("文件")) }
                                 }
                             },
                         ) {
@@ -1806,11 +1806,11 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 buttonSize = ButtonSize.Small,
                                 modifier = Modifier
                                     .size(32.dp)
-                                    .semantics { contentDescription = "添加附件" },
+                                    .semantics { contentDescription = tr("添加附件") },
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Add,
-                                    contentDescription = "添加附件",
+                                    contentDescription = tr("添加附件"),
                                     modifier = Modifier.size(20.dp),
                                     tint = if (generatingThisChat) muted else content,
                                 )
@@ -1828,7 +1828,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 }
                             },
                             imageVector = if (generatingThisChat) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward,
-                            contentDescription = if (generatingThisChat) "停止输出" else "Send message",
+                            contentDescription = if (generatingThisChat) tr("停止输出") else "Send message",
                             enabled = sendActive,
                             active = sendActive,
                             iconSize = if (generatingThisChat) 22.dp else 20.dp,
@@ -2037,17 +2037,17 @@ private fun ModelPicker(
             style = ButtonStyle.Ghost,
             buttonSize = ButtonSize.Small,
             shape = ToolbarCapsuleShape,
-            modifier = Modifier.semantics { contentDescription = "选择模型" },
+            modifier = Modifier.semantics { contentDescription = tr("选择模型") },
         ) {
             Text(
-                "未配置模型",
+                tr("未配置模型"),
                 fontSize = 15.sp,
                 color = muted,
                 maxLines = 1,
             )
             Icon(
                 imageVector = Icons.Rounded.KeyboardArrowDown,
-                contentDescription = "选择模型",
+                contentDescription = tr("选择模型"),
                 modifier = Modifier.size(18.dp),
                 tint = muted,
             )
@@ -2136,7 +2136,7 @@ private fun ModelPicker(
                                 },
                             ) {
                                 Text(
-                                    option.label,
+                                    tr(option.label),
                                     fontSize = 15.5.sp,
                                     color = if (enabled) Theme[colors][onBackgroundColor] else Theme[colors][mutedColor],
                                 )
@@ -2147,7 +2147,7 @@ private fun ModelPicker(
                             onClick = {},
                             leading = { Spacer(Modifier.size(16.dp)) },
                         ) {
-                            Text("不支持思考", fontSize = 15.5.sp, color = Theme[colors][mutedColor])
+                            Text(tr("不支持思考"), fontSize = 15.5.sp, color = Theme[colors][mutedColor])
                         }
                     }
                     DropdownMenuSeparator()
@@ -2165,7 +2165,7 @@ private fun ModelPicker(
                             }
                         },
                     ) {
-                        Text("快速", fontSize = 15.5.sp)
+                        Text(tr("快速"), fontSize = 15.5.sp)
                     }
                     val webSearchOn = webSearchAvailable && webSearchEnabled
                     DropdownMenuItem(
@@ -2183,7 +2183,7 @@ private fun ModelPicker(
                             }
                         },
                     ) {
-                        Text("网络搜索", fontSize = 15.5.sp)
+                        Text(tr("网络搜索"), fontSize = 15.5.sp)
                     }
                 }
                 DropdownMenuPanel(modifier = Modifier.width(200.dp)) {
@@ -2239,10 +2239,10 @@ private fun ModelPicker(
             style = ButtonStyle.Ghost,
             buttonSize = ButtonSize.Small,
             shape = ToolbarCapsuleShape,
-            modifier = Modifier.semantics { contentDescription = "选择模型" },
+            modifier = Modifier.semantics { contentDescription = tr("选择模型") },
         ) {
             Text(
-                selectedDisplay.ifBlank { "选择模型" },
+                selectedDisplay.ifBlank { tr("选择模型") },
                 modifier = Modifier.widthIn(max = 180.dp),
                 fontSize = 15.sp,
                 color = content,
@@ -2251,7 +2251,7 @@ private fun ModelPicker(
             )
             Icon(
                 imageVector = Icons.Rounded.KeyboardArrowDown,
-                contentDescription = "选择模型",
+                contentDescription = tr("选择模型"),
                 modifier = Modifier.size(18.dp),
                 tint = content,
             )
@@ -2380,7 +2380,7 @@ internal fun MessageRow(
                     (chatMessage.isPending || chatMessage.isStreaming) &&
                         chatMessage.text.isBlank() &&
                         chatMessage.process.none { it.live } -> {
-                        StatusSweepText("请求中")
+                        StatusSweepText(tr("请求中"))
                     }
                     chatMessage.text.isNotBlank() -> {
                         Box(Modifier.padding(vertical = 2.dp)) {
@@ -2474,16 +2474,16 @@ private fun ProcessEventRow(
     val muted = Theme[colors][mutedColor]
     val openable = !event.live && event.content.isNotBlank()
     val label = when (event.kind) {
-        ProcessEventKind.THINKING -> if (event.live) null else "已思考 ${formatThinkingDuration(event.millis)}"
-        ProcessEventKind.SEARCH -> if (event.live) null else "搜索了 ${event.pages} 个网页"
+        ProcessEventKind.THINKING -> if (event.live) null else tr("已思考 %s").format(formatThinkingDuration(event.millis))
+        ProcessEventKind.SEARCH -> if (event.live) null else tr("搜索了 %s 个网页").format(event.pages)
         ProcessEventKind.TOOL -> if (event.live) null else MemoryTool.doneLabel(event.toolName)
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (event.live) {
             StatusSweepText(
                 when (event.kind) {
-                    ProcessEventKind.THINKING -> "思考中"
-                    ProcessEventKind.SEARCH -> "搜索中"
+                    ProcessEventKind.THINKING -> tr("思考中")
+                    ProcessEventKind.SEARCH -> tr("搜索中")
                     ProcessEventKind.TOOL -> MemoryTool.liveLabel(event.toolName)
                 }
             )
@@ -2627,11 +2627,11 @@ private fun PendingAttachmentChip(
             buttonSize = ButtonSize.Small,
             modifier = Modifier
                 .size(28.dp)
-                .semantics { contentDescription = "移除附件" },
+                .semantics { contentDescription = tr("移除附件") },
         ) {
             Icon(
                 imageVector = Icons.Rounded.Close,
-                contentDescription = "移除附件",
+                contentDescription = tr("移除附件"),
                 modifier = Modifier.size(16.dp),
                 tint = Theme[colors][mutedColor],
             )
@@ -2794,7 +2794,7 @@ private fun groupedConversations(conversations: List<ConversationSummary>): List
     val pinned = conversations.filter { it.pinned }
     val rest = conversations.filterNot { it.pinned }
     return buildList {
-        if (pinned.isNotEmpty()) add("置顶" to pinned)
+        if (pinned.isNotEmpty()) add(tr("置顶") to pinned)
         addAll(rest.groupBy { conversationDateLabel(it.updatedAt) }.toList())
     }
 }
@@ -2809,20 +2809,20 @@ private fun conversationDateLabel(updatedAt: Long): String {
     today.set(Calendar.MILLISECOND, 0)
     val yesterday = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
     return when {
-        then.timeInMillis >= today.timeInMillis -> "今天"
-        then.timeInMillis >= yesterday.timeInMillis -> "昨天"
+        then.timeInMillis >= today.timeInMillis -> tr("今天")
+        then.timeInMillis >= yesterday.timeInMillis -> tr("昨天")
         now.get(Calendar.YEAR) == then.get(Calendar.YEAR) ->
-            SimpleDateFormat("M月d日", Locale.CHINA).format(Date(updatedAt))
-        else -> SimpleDateFormat("yyyy年M月d日", Locale.CHINA).format(Date(updatedAt))
+            if (ThemeStore.language == AppLanguage.EN) SimpleDateFormat("MMM d", Locale.ENGLISH).format(Date(updatedAt)) else SimpleDateFormat("M月d日", Locale.CHINA).format(Date(updatedAt))
+        else -> if (ThemeStore.language == AppLanguage.EN) SimpleDateFormat("MMMM d, yyyy", Locale.ENGLISH).format(Date(updatedAt)) else SimpleDateFormat("yyyy年M月d日", Locale.CHINA).format(Date(updatedAt))
     }
 }
 
 private fun formatThinkingDuration(millis: Long): String {
     val seconds = (millis / 1000.0)
     return if (seconds < 10) {
-        String.format(Locale.CHINA, "%.1f 秒", seconds)
+        String.format(Locale.CHINA, tr("%.1f 秒"), seconds)
     } else {
-        "${seconds.toInt()} 秒"
+        tr("%s 秒").format(seconds.toInt())
     }
 }
 
@@ -3425,7 +3425,7 @@ private fun UserEditVersionSwitcher(
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-            contentDescription = "上一版本",
+            contentDescription = tr("上一版本"),
             modifier = Modifier
                 .size(16.dp)
                 .clickable(enabled = onPrev != null, onClick = { onPrev?.invoke() }),
@@ -3438,7 +3438,7 @@ private fun UserEditVersionSwitcher(
         )
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-            contentDescription = "下一版本",
+            contentDescription = tr("下一版本"),
             modifier = Modifier
                 .size(16.dp)
                 .clickable(enabled = onNext != null, onClick = { onNext?.invoke() }),
@@ -3465,7 +3465,7 @@ private fun AssistantActions(
     ) {
         Icon(
             imageVector = Icons.Rounded.ContentCopy,
-            contentDescription = "复制",
+            contentDescription = tr("复制"),
             modifier = Modifier
                 .size(18.dp)
                 .clickable(onClick = onCopy),
@@ -3474,7 +3474,7 @@ private fun AssistantActions(
         if (canRetry) {
             Icon(
                 imageVector = Icons.Rounded.Refresh,
-                contentDescription = "重试",
+                contentDescription = tr("重试"),
                 modifier = Modifier
                     .size(18.dp)
                     .clickable(onClick = onRetry),
@@ -3488,7 +3488,7 @@ private fun AssistantActions(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-                    contentDescription = "上一个回复",
+                    contentDescription = tr("上一个回复"),
                     modifier = Modifier
                         .size(16.dp)
                         .clickable(enabled = onPrevVersion != null, onClick = { onPrevVersion?.invoke() }),
@@ -3501,7 +3501,7 @@ private fun AssistantActions(
                 )
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                    contentDescription = "下一个回复",
+                    contentDescription = tr("下一个回复"),
                     modifier = Modifier
                         .size(16.dp)
                         .clickable(enabled = onNextVersion != null, onClick = { onNextVersion?.invoke() }),
@@ -3573,13 +3573,13 @@ private fun PhotoViewer(
             if (saved) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
-                    contentDescription = "已保存",
+                    contentDescription = tr("已保存"),
                     tint = Color.White,
                 )
             } else {
                 Icon(
                     imageVector = Icons.Rounded.Download,
-                    contentDescription = "下载图片",
+                    contentDescription = tr("下载图片"),
                     tint = Color.White,
                 )
             }
@@ -3600,12 +3600,12 @@ private fun ClearHistoryDialog(
         contentColor = Theme[colors][onPanelColor],
     ) {
         Column {
-            DialogTitle("删除全部历史")
+            DialogTitle(tr("删除全部历史"))
             Spacer(Modifier.height(12.dp))
-            Text("确定要删除全部历史聊天记录吗？此操作无法撤销。")
+            Text(tr("确定要删除全部历史聊天记录吗？此操作无法撤销。"))
             Spacer(Modifier.height(16.dp))
             DialogButtonRow(
-                confirmLabel = "删除",
+                confirmLabel = tr("删除"),
                 onConfirm = onConfirm,
                 onCancel = onDismiss,
                 confirmStyle = ButtonStyle.Destructive,

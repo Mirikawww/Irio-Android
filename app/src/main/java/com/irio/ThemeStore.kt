@@ -40,7 +40,8 @@ enum class ThemePreference(val label: String, val stored: String) {
 }
 
 enum class AppLanguage(val label: String, val stored: String) {
-    ZH_CN("简体中文", "zh-CN");
+    ZH_CN("简体中文", "zh-CN"),
+    EN("English", "en");
 
     companion object {
         fun fromStored(value: String?): AppLanguage =

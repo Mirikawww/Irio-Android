@@ -86,7 +86,7 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         if (!BackupFileValidation.isIrioFile(uri.lastPathSegment.orEmpty())) {
-            importResult = BackupImportResult(false, "只能导入 .irio 格式的备份文件")
+            importResult = BackupImportResult(false, tr("只能导入 .irio 格式的备份文件"))
         } else {
             pendingImportUri = uri
             importDialogOpen = true
@@ -100,8 +100,8 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
         scope.launch(Dispatchers.IO) {
             val result = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { BackupStore.import(context, it, overwrite = overwrite) }
-                    ?: BackupImportResult(false, "无法读取备份文件")
-            }.getOrElse { BackupImportResult(false, it.message ?: "恢复失败") }
+                    ?: BackupImportResult(false, tr("无法读取备份文件"))
+            }.getOrElse { BackupImportResult(false, it.message ?: tr("恢复失败")) }
             (context as? OtherSettingsActivity)?.runOnUiThread {
                 importing = false
                 if (result.success) {
@@ -121,14 +121,14 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
         contentWindowInsets = irioSystemUiInsets(),
         topBar = {
             IrioToolbar(
-                title = { Text("其他") },
+                title = { Text(tr("其他")) },
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
                     IconButton(onClick = onBack, style = ButtonStyle.Ghost) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = tr("返回"),
                             tint = content,
                         )
                     }
@@ -140,19 +140,19 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
         ) {
             ListRowButton(
-                label = "删除所有历史",
+                label = tr("删除所有历史"),
                 icon = Icons.Rounded.DeleteSweep,
                 onClick = { showClearHistoryDialog = true },
             )
             Spacer(Modifier.height(12.dp))
             ListRowButton(
-                label = "导出数据",
+                label = tr("导出数据"),
                 icon = Icons.Rounded.Upload,
                 onClick = { exportLauncher.launch("irio-${System.currentTimeMillis()}.irio") },
             )
             Spacer(Modifier.height(12.dp))
             ListRowButton(
-                label = "导入数据",
+                label = tr("导入数据"),
                 icon = Icons.Rounded.Download,
                 onClick = { importLauncher.launch(arrayOf("application/octet-stream", "application/zip", "*/*")) },
             )
@@ -166,12 +166,12 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
         contentColor = Theme[colors][com.composables.ui.theme.onPanelColor],
     ) {
         Column {
-            DialogTitle("删除所有历史")
+            DialogTitle(tr("删除所有历史"))
             Spacer(Modifier.height(12.dp))
-            Text("确定要删除所有历史聊天记录吗？此操作无法撤销。")
+            Text(tr("确定要删除所有历史聊天记录吗？此操作无法撤销。"))
             Spacer(Modifier.height(16.dp))
             DialogButtonRow(
-                confirmLabel = "删除",
+                confirmLabel = tr("删除"),
                 onConfirm = {
                     ConversationStore.deleteAll(context)
                     showClearHistoryDialog = false
@@ -189,7 +189,7 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
         contentColor = Theme[colors][com.composables.ui.theme.onPanelColor],
     ) {
         Column {
-            DialogTitle("恢复数据")
+            DialogTitle(tr("恢复数据"))
             Spacer(Modifier.height(12.dp))
             DropdownMenu(
                 expanded = importModeMenuOpen,
@@ -198,8 +198,8 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                 alignment = DropdownMenuAlignment.End,
                 panel = {
                     DropdownMenuPanel {
-                        DropdownMenuItem(onClick = { importOverwrite = false; importModeMenuOpen = false }, modifier = Modifier.fillMaxWidth()) { Text("增量恢复") }
-                        DropdownMenuItem(onClick = { importOverwrite = true; importModeMenuOpen = false }, modifier = Modifier.fillMaxWidth()) { Text("覆盖恢复") }
+                        DropdownMenuItem(onClick = { importOverwrite = false; importModeMenuOpen = false }, modifier = Modifier.fillMaxWidth()) { Text(tr("增量恢复")) }
+                        DropdownMenuItem(onClick = { importOverwrite = true; importModeMenuOpen = false }, modifier = Modifier.fillMaxWidth()) { Text(tr("覆盖恢复")) }
                     }
                 },
             ) {
@@ -211,8 +211,8 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("恢复方式", color = Theme[colors][com.composables.ui.theme.onPanelColor])
-                        Text(if (importOverwrite) "覆盖恢复" else "增量恢复", color = Theme[colors][com.composables.ui.theme.mutedColor], fontSize = 13.sp)
+                        Text(tr("恢复方式"), color = Theme[colors][com.composables.ui.theme.onPanelColor])
+                        Text(if (importOverwrite) tr("覆盖恢复") else tr("增量恢复"), color = Theme[colors][com.composables.ui.theme.mutedColor], fontSize = 13.sp)
                     }
                     IconButton(
                         onClick = { importModeMenuOpen = !importModeMenuOpen },
@@ -224,7 +224,7 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                     ) {
                         Icon(
                             imageVector = androidx.compose.material.icons.Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = "选择恢复方式",
+                            contentDescription = tr("选择恢复方式"),
                             tint = Theme[colors][com.composables.ui.theme.onPanelColor],
                             modifier = Modifier.size(20.dp),
                         )
@@ -233,7 +233,7 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
             }
             Spacer(Modifier.height(16.dp))
             DialogButtonRow(
-                confirmLabel = "确认恢复",
+                confirmLabel = tr("确认恢复"),
                 onConfirm = ::startImport,
                 onCancel = { importDialogOpen = false; pendingImportUri = null },
             )
@@ -248,7 +248,7 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
             contentColor = Theme[colors][com.composables.ui.theme.onPanelColor],
         ) {
             Column {
-                DialogTitle("正在恢复数据")
+                DialogTitle(tr("正在恢复数据"))
                 Spacer(Modifier.height(16.dp))
                 ProgressIndicator(progress = 0.5f, modifier = Modifier.fillMaxWidth())
             }
@@ -266,11 +266,11 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                 contentColor = Theme[colors][com.composables.ui.theme.onPanelColor],
             ) {
                 Column {
-                    DialogTitle("恢复失败")
+                    DialogTitle(tr("恢复失败"))
                     Spacer(Modifier.height(12.dp))
                     Text(result.message)
                     Spacer(Modifier.height(16.dp))
-                    DialogButtonRow(confirmLabel = "关闭", onConfirm = { importResult = null }, onCancel = { importResult = null })
+                    DialogButtonRow(confirmLabel = tr("关闭"), onConfirm = { importResult = null }, onCancel = { importResult = null })
                 }
             }
         }

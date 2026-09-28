@@ -231,7 +231,7 @@ object ChatApi {
         }
         return ChatCompletionResult(
             stopped = cancellation.isCancelled(),
-            error = if (cancellation.isCancelled()) null else "工具轮次过多",
+            error = if (cancellation.isCancelled()) null else tr("工具轮次过多"),
             searchPages = searchPages,
         )
     }
@@ -246,10 +246,10 @@ object ChatApi {
     ): String? = withContext(Dispatchers.IO) {
         runCatching {
             val prompt = buildString {
-                append("根据以下对话为这个会话生成一个简短的中文标题，不超过12个字，")
-                append("只输出标题本身，不要任何标点、引号或解释。\n\n用户：")
+                append(tr("根据以下对话为这个会话生成一个简短的中文标题，不超过12个字，"))
+                append(tr("只输出标题本身，不要任何标点、引号或解释。\n\n用户："))
                 append(firstUserMessage.take(500))
-                append("\n助手：")
+                append(tr("\n助手："))
                 append(firstAssistantMessage.take(500))
             }
             val body = when (provider.protocol) {
@@ -382,20 +382,20 @@ object ChatApi {
             applyAuth(builder, provider)
             builder.build()
         } catch (_: Exception) {
-            return ChatCompletionResult(error = "端点 URL 无效")
+            return ChatCompletionResult(error = tr("端点 URL 无效"))
         }
         val call = IrioHttp.clientFor(connectionScope).newCall(request)
         cancellation.attach(call)
         var response: okhttp3.Response? = null
 
         return try {
-            if (cancellation.isCancelled()) throw CancellationException("请求已停止")
+            if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
             response = call.execute()
             val status = response.code
-            if (cancellation.isCancelled()) throw CancellationException("请求已停止")
+            if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
             if (status !in 200..299) {
                 val err = response.body?.string().orEmpty()
-                ChatCompletionResult(error = apiError(err).ifBlank { "请求失败（HTTP $status）" })
+                ChatCompletionResult(error = apiError(err).ifBlank { tr("请求失败（HTTP %s）").format(status) })
             } else {
             var responseModel = model
             val streamedContent = StringBuilder()
@@ -459,7 +459,7 @@ object ChatApi {
                 }
                 while (true) {
                     val line = reader.readLine() ?: break
-                    if (cancellation.isCancelled()) throw CancellationException("请求已停止")
+                    if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
                     when {
                         line.isEmpty() -> if (flush()) break
                         line.startsWith("event:") -> {
@@ -476,9 +476,9 @@ object ChatApi {
                 if (eventData.isNotEmpty()) flush()
                 if (!terminalUpdateSent) onUpdate(ChatStreamUpdate(done = true, model = responseModel, usage = lastUsage))
             }
-            if (cancellation.isCancelled()) throw CancellationException("请求已停止")
+            if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
             val completedTools = ChatProtocol.completedToolCalls(toolCalls)
-            if (cancellation.isCancelled()) throw CancellationException("请求已停止")
+            if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
             val wantsTools = finishReason == "tool_calls" ||
                 finishReason == "tool_use" ||
                 completedTools.isNotEmpty()
@@ -494,7 +494,7 @@ object ChatApi {
                 streamedContent.isBlank() &&
                     streamedAttachments.isEmpty() &&
                     streamedThinking.isBlank() &&
-                    completedTools.isEmpty() -> ChatCompletionResult(error = "端点返回了空回复")
+                    completedTools.isEmpty() -> ChatCompletionResult(error = tr("端点返回了空回复"))
                 else -> ChatCompletionResult(
                     content = streamedContent.toString(),
                     thinking = streamedThinking.toString(),
@@ -514,7 +514,7 @@ object ChatApi {
             if (cancellation.isCancelled() || currentCoroutineContext()[Job]?.isCancelled == true) {
                 ChatCompletionResult(stopped = true)
             } else {
-                ChatCompletionResult(error = error.message ?: "无法连接到端点")
+                ChatCompletionResult(error = error.message ?: tr("无法连接到端点"))
             }
         } finally {
             cancellation.detach(call)
@@ -584,7 +584,7 @@ object ChatApi {
             )
             "response.failed", "error" -> ChatStreamUpdate(
                 error = event.optJSONObject("response")?.optJSONObject("error")?.optString("message")
-                    ?: event.optString("message").ifBlank { "请求失败" },
+                    ?: event.optString("message").ifBlank { tr("请求失败") },
             )
             else -> {
                 val delta = event.optString("delta")
@@ -1222,6 +1222,12 @@ internal object TimeTool {
     /** 设备本地当前时间；一次调用返回完整描述，模型无需再追问。 */
     fun now(): String {
         val current = java.time.ZonedDateTime.now()
+        val time = current.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
+        if (ThemeStore.language == AppLanguage.EN) {
+            val date = current.format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy", java.util.Locale.ENGLISH))
+            val weekday = current.format(java.time.format.DateTimeFormatter.ofPattern("EEEE", java.util.Locale.ENGLISH))
+            return "Current time: $date ($weekday) $time, time zone ${current.zone.id}"
+        }
         val date = current.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年M月d日"))
         val weekday = when (current.dayOfWeek) {
             java.time.DayOfWeek.MONDAY -> "一"
@@ -1232,8 +1238,7 @@ internal object TimeTool {
             java.time.DayOfWeek.SATURDAY -> "六"
             java.time.DayOfWeek.SUNDAY -> "日"
         }
-        val time = current.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
-        return "当前时间：${date}（星期${weekday}）${time}，时区 ${current.zone.id}"
+        return tr("当前时间：%s（星期%s）%s，时区 %s").format(date, weekday, time, current.zone.id)
     }
 }
 
@@ -1250,19 +1255,19 @@ internal object MemoryTool {
             "Call with {\"content\":\"one concise fact in the user's language\"}."
 
     fun liveLabel(name: String): String = when (name) {
-        TimeTool.NAME -> "获取时间"
-        WebFetchTool.NAME -> "浏览网页中"
-        GET -> "读取记忆"
-        UPDATE -> "写入记忆"
-        else -> "调用工具"
+        TimeTool.NAME -> tr("获取时间")
+        WebFetchTool.NAME -> tr("浏览网页中")
+        GET -> tr("读取记忆")
+        UPDATE -> tr("写入记忆")
+        else -> tr("调用工具")
     }
 
     fun doneLabel(name: String): String = when (name) {
-        TimeTool.NAME -> "已获取时间"
-        WebFetchTool.NAME -> "已浏览网页"
-        GET -> "已读取记忆"
-        UPDATE -> "已写入记忆"
-        else -> "已调用工具"
+        TimeTool.NAME -> tr("已获取时间")
+        WebFetchTool.NAME -> tr("已浏览网页")
+        GET -> tr("已读取记忆")
+        UPDATE -> tr("已写入记忆")
+        else -> tr("已调用工具")
     }
 
     fun getSchema(protocol: ProviderProtocol): JSONObject =
@@ -1272,19 +1277,19 @@ internal object MemoryTool {
         functionSchema(protocol, UPDATE, UPDATE_DESCRIPTION, contentParameters())
 
     fun read(context: android.content.Context?): String {
-        if (context == null) return "记忆当前不可用。"
-        if (!MemoryStore.loadEnabled(context)) return "记忆已关闭。"
+        if (context == null) return tr("记忆当前不可用。")
+        if (!MemoryStore.loadEnabled(context)) return tr("记忆已关闭。")
         val content = MemoryStore.loadContent(context).trim()
-        return if (content.isEmpty()) "当前没有已保存的记忆。" else "用户记忆：\n$content"
+        return if (content.isEmpty()) tr("当前没有已保存的记忆。") else tr("用户记忆：\n%s").format(content)
     }
 
     fun write(context: android.content.Context?, addition: String): String {
-        if (context == null) return "记忆当前不可用，未能写入。"
-        if (!MemoryStore.loadEnabled(context)) return "记忆已关闭，未能写入。"
+        if (context == null) return tr("记忆当前不可用，未能写入。")
+        if (!MemoryStore.loadEnabled(context)) return tr("记忆已关闭，未能写入。")
         val trimmed = addition.trim()
-        if (trimmed.isEmpty()) return "没有可写入的内容。"
+        if (trimmed.isEmpty()) return tr("没有可写入的内容。")
         val stored = MemoryStore.appendContent(context, trimmed)
-        return "已写入记忆。当前记忆：\n$stored"
+        return tr("已写入记忆。当前记忆：\n%s").format(stored)
     }
 
     private fun emptyParameters(): JSONObject = JSONObject()

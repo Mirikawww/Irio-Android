@@ -35,19 +35,19 @@ fun OtherSettingsScreen(onBack: () -> Unit) {
     val content = Theme[colors][onBackgroundColor]
 
     SettingsPageScaffold(
-        title = "其他",
+        title = tr("其他"),
         onBack = onBack,
         background = background,
         content = content,
     ) {
         ListRowButton(
-            label = "删除所有历史",
+            label = tr("删除所有历史"),
             icon = Icons.Rounded.DeleteSweep,
             onClick = { showClearHistoryDialog = true },
         )
         Spacer(Modifier.height(12.dp))
         ListRowButton(
-            label = "导出数据",
+            label = tr("导出数据"),
             icon = Icons.Rounded.Upload,
             onClick = {
                 FilePickers.saveBackup("irio-${System.currentTimeMillis()}.irio")?.let { file ->
@@ -57,7 +57,7 @@ fun OtherSettingsScreen(onBack: () -> Unit) {
         )
         Spacer(Modifier.height(12.dp))
         ListRowButton(
-            label = "导入数据",
+            label = tr("导入数据"),
             icon = Icons.Rounded.Download,
             onClick = {
                 FilePickers.openBackup()?.let { file ->
@@ -74,12 +74,12 @@ fun OtherSettingsScreen(onBack: () -> Unit) {
         contentColor = Theme[colors][onPanelColor],
     ) {
         Column {
-            DialogTitle("删除所有历史")
+            DialogTitle(tr("删除所有历史"))
             Spacer(Modifier.height(12.dp))
-            Text("确定要删除所有历史聊天记录吗？此操作无法撤销。")
+            Text(tr("确定要删除所有历史聊天记录吗？此操作无法撤销。"))
             Spacer(Modifier.height(16.dp))
             DialogButtonRow(
-                confirmLabel = "删除",
+                confirmLabel = tr("删除"),
                 onConfirm = {
                     ConversationStore.deleteAll()
                     showClearHistoryDialog = false
@@ -110,7 +110,7 @@ private fun SettingsPageScaffold(
                     IconButton(onClick = onBack, style = ButtonStyle.Ghost) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = tr("返回"),
                             tint = content,
                         )
                     }

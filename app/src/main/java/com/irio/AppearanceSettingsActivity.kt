@@ -98,7 +98,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
         contentWindowInsets = irioSystemUiInsets(),
         topBar = {
             IrioToolbar(
-                title = { Text("外观") },
+                title = { Text(tr("外观")) },
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
@@ -108,7 +108,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = tr("返回"),
                             tint = content,
                         )
                     }
@@ -156,7 +156,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                             Spacer(Modifier.size(16.dp))
                                         }
                                     },
-                                ) { Text(option.label, color = Theme[colors][onPanelColor]) }
+                                ) { Text(tr(option.label), color = Theme[colors][onPanelColor]) }
                             }
                         }
                     },
@@ -173,8 +173,8 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("语言", color = Theme[colors][onPanelColor])
-                            Text(language.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+                            Text(tr("语言"), color = Theme[colors][onPanelColor])
+                            Text(tr(language.label), color = Theme[colors][mutedColor], fontSize = 13.sp)
                         }
                         IconButton(
                             onClick = { languageMenuOpen = !languageMenuOpen },
@@ -186,7 +186,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "选择语言",
+                                contentDescription = tr("选择语言"),
                                 tint = Theme[colors][onPanelColor],
                                 modifier = Modifier.size(20.dp),
                             )
@@ -219,7 +219,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                             Spacer(Modifier.size(16.dp))
                                         }
                                     },
-                                ) { Text(option.label, color = Theme[colors][onPanelColor]) }
+                                ) { Text(tr(option.label), color = Theme[colors][onPanelColor]) }
                             }
                         }
                     },
@@ -236,8 +236,8 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("主题", color = Theme[colors][onPanelColor])
-                            Text(themePreference.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+                            Text(tr("主题"), color = Theme[colors][onPanelColor])
+                            Text(tr(themePreference.label), color = Theme[colors][mutedColor], fontSize = 13.sp)
                         }
                         IconButton(
                             onClick = { themeMenuOpen = !themeMenuOpen },
@@ -249,7 +249,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "选择主题",
+                                contentDescription = tr("选择主题"),
                                 tint = Theme[colors][onPanelColor],
                                 modifier = Modifier.size(20.dp),
                             )
@@ -287,7 +287,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                         AccentSwatch(accentDisplayColor(option))
                                         Spacer(Modifier.width(8.dp))
                                         Text(
-                                            option.label,
+                                            tr(option.label),
                                             color = Theme[colors][onPanelColor],
                                             lineHeight = 16.sp,
                                         )
@@ -309,12 +309,12 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("强调色", color = Theme[colors][onPanelColor])
+                            Text(tr("强调色"), color = Theme[colors][onPanelColor])
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 AccentSwatch(accentDisplayColor(accent))
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    accent.label,
+                                    tr(accent.label),
                                     color = Theme[colors][mutedColor],
                                     fontSize = 13.sp,
                                     lineHeight = 16.sp,
@@ -331,7 +331,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "选择强调色",
+                                contentDescription = tr("选择强调色"),
                                 tint = Theme[colors][onPanelColor],
                                 modifier = Modifier.size(20.dp),
                             )
@@ -343,7 +343,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("自动 AMOLED", color = Theme[colors][onPanelColor])
+                        Text(tr("自动 AMOLED"), color = Theme[colors][onPanelColor])
                     }
                     Switch(
                         checked = autoAmoled,
@@ -357,7 +357,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("上下文圆环", color = Theme[colors][mutedColor])
+                        Text(tr("上下文圆环"), color = Theme[colors][mutedColor])
                     }
                     Switch(
                         checked = false,
@@ -374,7 +374,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 SettingsSlider(
-                    label = "公式大小",
+                    label = tr("公式大小"),
                     value = texScalePercent,
                     valueRange = 60..160,
                     onValueChange = { percent ->

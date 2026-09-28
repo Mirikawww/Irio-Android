@@ -158,7 +158,7 @@ object LinkRuntime {
         stopServer()
         serverJob = scope.launch {
             val bound = runCatching { LinkProtocol.bind() }.getOrElse {
-                _state.update { it.copy(status = "无法在局域网端口 ${LinkProtocol.PORT} 监听") }
+                _state.update { it.copy(status = tr("无法在局域网端口 %s 监听").format(LinkProtocol.PORT)) }
                 return@launch
             }
             server = bound
@@ -185,7 +185,7 @@ object LinkRuntime {
                 "hello" -> handleHello(context, socket, request)
                 "sync-request" -> handleSyncRequest(context, socket, request)
                 "sync-push" -> handleSyncPush(context, socket, request)
-                else -> LinkProtocol.writeJson(socket, JSONObject().put("type", "error").put("message", "未知请求"))
+                else -> LinkProtocol.writeJson(socket, JSONObject().put("type", "error").put("message", tr("未知请求")))
             }
         } catch (_: Exception) {
         } finally {
@@ -195,7 +195,7 @@ object LinkRuntime {
 
     private fun handleHello(context: Context, socket: Socket, request: JSONObject) {
         if (request.optString("hello") != LinkProtocol.HELLO) {
-            LinkProtocol.writeJson(socket, JSONObject().put("type", "error").put("message", "不是 Irio 设备"))
+            LinkProtocol.writeJson(socket, JSONObject().put("type", "error").put("message", tr("不是 Irio 设备")))
             return
         }
         val settings = LinkStore.load(context)
@@ -208,13 +208,13 @@ object LinkRuntime {
             else -> false
         }
         if (!accepted || remoteId.isBlank()) {
-            LinkProtocol.writeJson(socket, JSONObject().put("type", "error").put("message", "配对码无效或已刷新"))
+            LinkProtocol.writeJson(socket, JSONObject().put("type", "error").put("message", tr("配对码无效或已刷新")))
             return
         }
         val peerToken = token.ifBlank { randomToken() }
         val peer = LinkedPeer(
             id = remoteId,
-            name = request.optString("name").ifBlank { "未知设备" },
+            name = request.optString("name").ifBlank { tr("未知设备") },
             platform = runCatching { LinkPlatform.valueOf(request.optString("platform")) }
                 .getOrDefault(LinkPlatform.DESKTOP),
             host = socket.inetAddress.hostAddress ?: request.optString("host"),
@@ -246,7 +246,7 @@ object LinkRuntime {
 
     private fun handleSyncRequest(context: Context, socket: Socket, request: JSONObject) {
         if (!authorized(context, request)) {
-            LinkProtocol.writeJson(socket, JSONObject().put("type", "error").put("message", "未授权"))
+            LinkProtocol.writeJson(socket, JSONObject().put("type", "error").put("message", tr("未授权")))
             return
         }
         LinkProtocol.writeJson(socket, snapshotMessage(context, "sync-data"))
@@ -259,7 +259,7 @@ object LinkRuntime {
 
     private fun handleSyncPush(context: Context, socket: Socket, request: JSONObject) {
         if (!authorized(context, request)) {
-            LinkProtocol.writeJson(socket, JSONObject().put("type", "error").put("message", "未授权"))
+            LinkProtocol.writeJson(socket, JSONObject().put("type", "error").put("message", tr("未授权")))
             return
         }
         applySnapshot(context, request)
@@ -303,11 +303,11 @@ object LinkRuntime {
                 )
                 val reply = LinkProtocol.readJson(socket)
                 if (reply.optString("type") != "hello-ok") {
-                    error(reply.optString("message").ifBlank { "配对失败" })
+                    error(reply.optString("message").ifBlank { tr("配对失败") })
                 }
                 val peer = LinkedPeer(
                     id = reply.optString("deviceId"),
-                    name = reply.optString("name").ifBlank { "未知设备" },
+                    name = reply.optString("name").ifBlank { tr("未知设备") },
                     platform = runCatching { LinkPlatform.valueOf(reply.optString("platform")) }
                         .getOrDefault(LinkPlatform.DESKTOP),
                     host = reply.optString("host").ifBlank { host },
@@ -332,7 +332,7 @@ object LinkRuntime {
         val settings = LinkStore.load(context)
         val peers = settings.peers
         if (peers.isEmpty()) {
-            if (report) _state.update { it.copy(status = "还没有已配对设备") }
+            if (report) _state.update { it.copy(status = tr("还没有已配对设备")) }
             return
         }
         if (report) _state.update { it.copy(syncing = true, syncProgress = 0.08f, status = null) }
@@ -361,7 +361,7 @@ object LinkRuntime {
                 LinkProtocol.writeJson(socket, snapshotMessage(context, "sync-push", peer, overwrite = true))
                 val reply = LinkProtocol.readJson(socket)
                 if (reply.optString("type") != "sync-ok") {
-                    error(reply.optString("message").ifBlank { "同步失败" })
+                    error(reply.optString("message").ifBlank { tr("同步失败") })
                 }
             } else {
                 LinkProtocol.writeJson(
@@ -373,13 +373,13 @@ object LinkRuntime {
                 )
                 val remote = LinkProtocol.readJson(socket)
                 if (remote.optString("type") != "sync-data") {
-                    error(remote.optString("message").ifBlank { "同步失败" })
+                    error(remote.optString("message").ifBlank { tr("同步失败") })
                 }
                 applySnapshot(context, remote)
                 LinkProtocol.writeJson(socket, snapshotMessage(context, "sync-data", peer, overwrite = false))
                 val done = LinkProtocol.readJson(socket)
                 if (done.optString("type") != "sync-ok") {
-                    error(done.optString("message").ifBlank { "同步失败" })
+                    error(done.optString("message").ifBlank { tr("同步失败") })
                 }
             }
             mark(peer.id, LinkConnectionState.CONNECTED)

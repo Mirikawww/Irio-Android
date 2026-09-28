@@ -40,14 +40,14 @@ fun SystemPromptSettingsScreen(onBack: () -> Unit) {
         containerColor = background,
         topBar = {
             IrioToolbar(
-                title = { Text("系统提示词") },
+                title = { Text(tr("系统提示词")) },
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
                     IconButton(onClick = onBack, style = ButtonStyle.Ghost) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = tr("返回"),
                             tint = content,
                         )
                     }
@@ -62,8 +62,8 @@ fun SystemPromptSettingsScreen(onBack: () -> Unit) {
             TextField(
                 state = state,
                 modifier = Modifier.fillMaxWidth(),
-                accessibilityLabel = "系统提示词",
-                placeholder = { Text("以系统身份注入每次对话的指令") },
+                accessibilityLabel = tr("系统提示词"),
+                placeholder = { Text(tr("以系统身份注入每次对话的指令")) },
                 shape = Theme[shapes][fieldShape],
                 contentPadding = PaddingValues(12.dp),
                 lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 5, maxHeightInLines = 12),

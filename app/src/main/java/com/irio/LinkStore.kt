@@ -42,6 +42,6 @@ object LinkStore {
 
     private fun defaultName(): String {
         val model = Build.MODEL?.trim().orEmpty()
-        return if (model.isBlank()) "手机" else model
+        return if (model.isBlank()) tr("手机") else model
     }
 }

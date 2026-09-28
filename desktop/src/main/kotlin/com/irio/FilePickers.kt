@@ -13,7 +13,7 @@ object FilePickers {
 
     /** 保存文件对话框；用户取消返回 null。 */
     fun saveFile(defaultName: String): File? {
-        val dialog = FileDialog(null as Frame?, "保存图片", FileDialog.SAVE)
+        val dialog = FileDialog(null as Frame?, tr("保存图片"), FileDialog.SAVE)
         dialog.file = defaultName
         dialog.isVisible = true
         val dir = dialog.directory ?: return null
@@ -21,9 +21,9 @@ object FilePickers {
         return File(dir, name)
     }
 
-    fun saveBackup(defaultName: String): File? = chooseFile("导出 Irio 数据", FileDialog.SAVE, defaultName)
+    fun saveBackup(defaultName: String): File? = chooseFile(tr("导出 Irio 数据"), FileDialog.SAVE, defaultName)
 
-    fun openBackup(): File? = chooseFile("导入 Irio 数据", FileDialog.LOAD, null)
+    fun openBackup(): File? = chooseFile(tr("导入 Irio 数据"), FileDialog.LOAD, null)
 
     private fun chooseFile(title: String, mode: Int, defaultName: String?): File? {
         val dialog = FileDialog(null as Frame?, title, mode)
@@ -35,7 +35,7 @@ object FilePickers {
     }
 
     private fun pick(imagesOnly: Boolean): List<File> {
-        val dialog = FileDialog(null as Frame?, if (imagesOnly) "选择照片" else "选择文件", FileDialog.LOAD)
+        val dialog = FileDialog(null as Frame?, if (imagesOnly) tr("选择照片") else tr("选择文件"), FileDialog.LOAD)
         dialog.isMultipleMode = true
         if (imagesOnly) {
             dialog.filenameFilter = FilenameFilter { _, name ->

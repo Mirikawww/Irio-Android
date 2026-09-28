@@ -119,7 +119,7 @@ object LinkCodec {
 
     fun peerFrom(json: JSONObject): LinkedPeer = LinkedPeer(
         id = json.optString("id"),
-        name = json.optString("name").ifBlank { "未知设备" },
+        name = json.optString("name").ifBlank { tr("未知设备") },
         platform = runCatching { LinkPlatform.valueOf(json.optString("platform")) }
             .getOrDefault(LinkPlatform.PHONE),
         host = json.optString("host"),

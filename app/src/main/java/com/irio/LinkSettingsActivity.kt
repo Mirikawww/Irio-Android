@@ -133,7 +133,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
         contentWindowInsets = irioSystemUiInsets(),
         topBar = {
             IrioToolbar(
-                title = { Text("互连") },
+                title = { Text(tr("互连")) },
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
@@ -143,7 +143,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = tr("返回"),
                             tint = content,
                         )
                     }
@@ -165,7 +165,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("启用互连", modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
+                    Text(tr("启用互连"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
                     Switch(
                         checked = state.settings.enabled,
                         onCheckedChange = { LinkRuntime.setEnabled(it) },
@@ -173,21 +173,21 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                 }
             }
             Text(
-                "两端必须在同一 Wi-Fi。已发送的文件不会同步。",
+                tr("两端必须在同一 Wi-Fi。已发送的文件不会同步。"),
                 color = muted,
                 fontSize = 13.sp,
             )
             if (state.settings.enabled) {
                 LinkCard {
                     Text(
-                        "本机配对码",
+                        tr("本机配对码"),
                         modifier = Modifier.fillMaxWidth(),
                         color = muted,
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center,
                     )
                     val pairingText = if (state.pairingHost.isBlank()) {
-                        state.pairingCode.ifBlank { "正在获取局域网地址" }
+                        state.pairingCode.ifBlank { tr("正在获取局域网地址") }
                     } else {
                         LinkProtocol.encodeCode(state.pairingCode, state.pairingHost, state.pairingPort)
                     }
@@ -213,10 +213,10 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset { IntOffset(shake.value.toInt(), 0) },
-                    accessibilityLabel = "输入配对码",
+                    accessibilityLabel = tr("输入配对码"),
                     placeholder = {
                         Text(
-                            "输入对方配对码",
+                            tr("输入对方配对码"),
                             style = PairingFieldTextStyle.copy(baselineShift = BaselineShift(0.12f)),
                             color = muted,
                         )
@@ -234,7 +234,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     onClick = { LinkRuntime.pairWithCode(codeState.text.toString()) },
                     modifier = Modifier.fillMaxWidth(),
                     style = ButtonStyle.Secondary,
-                ) { Text("配对") }
+                ) { Text(tr("配对")) }
 
                 DropdownMenu(
                     expanded = modeMenuOpen,
@@ -250,7 +250,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                                         modeMenuOpen = false
                                     },
                                     modifier = Modifier.fillMaxWidth(),
-                                ) { Text(option.label, color = Theme[colors][onPanelColor]) }
+                                ) { Text(tr(option.label), color = Theme[colors][onPanelColor]) }
                             }
                         }
                     },
@@ -269,8 +269,8 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("同步方式", color = Theme[colors][onPanelColor])
-                            Text(state.settings.syncMode.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+                            Text(tr("同步方式"), color = Theme[colors][onPanelColor])
+                            Text(tr(state.settings.syncMode.label), color = Theme[colors][mutedColor], fontSize = 13.sp)
                         }
                         IconButton(
                             onClick = { modeMenuOpen = !modeMenuOpen },
@@ -282,7 +282,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "选择同步方式",
+                                contentDescription = tr("选择同步方式"),
                                 tint = Theme[colors][onPanelColor],
                                 modifier = Modifier.size(20.dp),
                             )
@@ -294,7 +294,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("自动同步数据", modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
+                        Text(tr("自动同步数据"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
                         Switch(
                             checked = state.settings.autoSync,
                             onCheckedChange = { LinkRuntime.setAutoSync(it) },
@@ -306,7 +306,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     onClick = { LinkRuntime.syncNow() },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !state.syncing,
-                ) { Text(if (state.syncing) "正在同步" else "立即同步") }
+                ) { Text(if (state.syncing) tr("正在同步") else tr("立即同步")) }
                 if (state.syncing) {
                     ProgressIndicator(
                         progress = state.syncProgress.coerceIn(0f, 1f),
@@ -314,9 +314,9 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     )
                 }
 
-                Text("已配对设备", color = muted, fontSize = 12.sp)
+                Text(tr("已配对设备"), color = muted, fontSize = 12.sp)
                 if (state.settings.peers.isEmpty()) {
-                    Text("还没有设备", color = muted)
+                    Text(tr("还没有设备"), color = muted)
                 } else {
                     state.settings.peers.forEach { peer ->
                         PeerRow(
@@ -366,13 +366,13 @@ private fun PeerRow(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = peer.platform.label,
+            contentDescription = tr(peer.platform.label),
             modifier = Modifier.size(20.dp),
             tint = content,
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(peer.name, color = content)
-            Text("${peer.platform.label} · ${connection.label}", color = muted, fontSize = 12.sp)
+            Text("%s · %s".format(tr(peer.platform.label), tr(connection.label)), color = muted, fontSize = 12.sp)
         }
         IconButton(
             onClick = onForget,
@@ -380,7 +380,7 @@ private fun PeerRow(
         ) {
             Icon(
                 imageVector = Icons.Rounded.Close,
-                contentDescription = "删除设备",
+                contentDescription = tr("删除设备"),
                 tint = muted,
             )
         }

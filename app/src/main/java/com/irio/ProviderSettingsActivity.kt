@@ -134,7 +134,7 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
         contentWindowInsets = irioSystemUiInsets(),
         topBar = {
             IrioToolbar(
-                title = { Text("提供商") },
+                title = { Text(tr("提供商")) },
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
@@ -144,7 +144,7 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = tr("返回"),
                             tint = content,
                         )
                     }
@@ -187,7 +187,7 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
                 )
             }
             ListRowButton(
-                label = "添加提供商",
+                label = tr("添加提供商"),
                 icon = Icons.Rounded.Add,
                 onClick = {
                     resetAddForm()
@@ -204,9 +204,9 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
         contentColor = Theme[colors][onPanelColor],
     ) {
         Column {
-            DialogTitle("添加提供商")
+            DialogTitle(tr("添加提供商"))
             Spacer(Modifier.height(16.dp))
-            ProviderField("名称", name, KeyboardType.Text)
+            ProviderField(tr("名称"), name, KeyboardType.Text)
             ProtocolPicker(
                 protocol = protocol,
                 expanded = protocolMenuOpen,
@@ -214,14 +214,14 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
                 onSelect = { protocol = it },
             )
             Spacer(Modifier.height(12.dp))
-            ProviderField("端点 URL", endpoint, KeyboardType.Uri)
-            ProviderField("密钥", apiKey, KeyboardType.Password, mask = true)
+            ProviderField(tr("端点 URL"), endpoint, KeyboardType.Uri)
+            ProviderField(tr("密钥"), apiKey, KeyboardType.Password, mask = true)
             if (formError != null) {
                 Text(formError!!)
                 Spacer(Modifier.height(8.dp))
             }
             DialogButtonRow(
-                confirmLabel = if (saving) "保存中" else "保存",
+                confirmLabel = if (saving) tr("保存中") else tr("保存"),
                 confirmEnabled = !saving &&
                     name.text.isNotBlank() &&
                     endpoint.text.toString().isNotBlank() &&
@@ -313,7 +313,7 @@ internal fun ProtocolPicker(
                             onExpandedChange(false)
                         },
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text(option.label, color = Theme[colors][onPanelColor]) }
+                    ) { Text(tr(option.label), color = Theme[colors][onPanelColor]) }
                 }
             }
         },
@@ -332,8 +332,8 @@ internal fun ProtocolPicker(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("协议", color = Theme[colors][onPanelColor])
-                Text(protocol.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+                Text(tr("协议"), color = Theme[colors][onPanelColor])
+                Text(tr(protocol.label), color = Theme[colors][mutedColor], fontSize = 13.sp)
             }
             IconButton(
                 onClick = { onExpandedChange(!expanded) },
@@ -345,7 +345,7 @@ internal fun ProtocolPicker(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = "选择协议",
+                    contentDescription = tr("选择协议"),
                     tint = Theme[colors][onPanelColor],
                     modifier = Modifier.size(20.dp),
                 )
@@ -362,7 +362,7 @@ internal fun DialogButtonRow(
     confirmEnabled: Boolean = true,
     cancelEnabled: Boolean = true,
     confirmStyle: ButtonStyle = ButtonStyle.Primary,
-    cancelLabel: String = "取消",
+    cancelLabel: String = tr("取消"),
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),

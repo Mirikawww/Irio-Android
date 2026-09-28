@@ -43,7 +43,7 @@ fun SettingsScreen(
         containerColor = background,
         topBar = {
             IrioToolbar(
-                title = { Text("设置") },
+                title = { Text(tr("设置")) },
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
@@ -53,7 +53,7 @@ fun SettingsScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = tr("返回"),
                             tint = content,
                         )
                     }
@@ -68,37 +68,37 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
             ListRowButton(
-                label = "提供商",
+                label = tr("提供商"),
                 icon = Icons.Rounded.DataObject,
                 onClick = onProviders,
             )
             Spacer(Modifier.height(12.dp))
             ListRowButton(
-                label = "模型",
+                label = tr("模型"),
                 icon = Icons.Rounded.SmartToy,
                 onClick = onModel,
             )
             Spacer(Modifier.height(12.dp))
             ListRowButton(
-                label = "记忆",
+                label = tr("记忆"),
                 icon = Icons.Rounded.Memory,
                 onClick = onMemory,
             )
             Spacer(Modifier.height(12.dp))
             ListRowButton(
-                label = "外观",
+                label = tr("外观"),
                 icon = Icons.Rounded.Palette,
                 onClick = onAppearance,
             )
             Spacer(Modifier.height(12.dp))
             ListRowButton(
-                label = "互连",
+                label = tr("互连"),
                 icon = Icons.Rounded.Devices,
                 onClick = onLink,
             )
             Spacer(Modifier.height(12.dp))
             ListRowButton(
-                label = "其他",
+                label = tr("其他"),
                 icon = Icons.Rounded.MoreHoriz,
                 onClick = onOther,
             )

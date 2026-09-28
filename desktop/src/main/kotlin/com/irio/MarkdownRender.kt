@@ -246,7 +246,7 @@ private fun IrioMarkdownCheckBox(content: String, node: ASTNode) {
             .padding(end = 8.dp)
             .semantics {
                 role = Role.Checkbox
-                stateDescription = if (checked) "已勾选" else "未勾选"
+                stateDescription = if (checked) tr("已勾选") else tr("未勾选")
             },
         contentAlignment = Alignment.Center,
     ) {

@@ -402,7 +402,7 @@ object ProviderApi {
     fun fetchModels(config: ProviderConfig): ModelFetchResult {
         val connection = runCatching {
             URL(modelsUrl(config.endpointUrl, config.protocol)).openConnection() as HttpURLConnection
-        }.getOrElse { return ModelFetchResult(error = "端点 URL 无效") }
+        }.getOrElse { return ModelFetchResult(error = tr("端点 URL 无效")) }
 
         return try {
             connection.requestMethod = "GET"
@@ -414,14 +414,14 @@ object ProviderApi {
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (status !in 200..299) {
-                ModelFetchResult(error = apiError(body).ifBlank { "获取模型失败（HTTP $status）" })
+                ModelFetchResult(error = apiError(body).ifBlank { tr("获取模型失败（HTTP %s）").format(status) })
             } else {
                 val models = parseModels(body)
-                if (models.isEmpty()) ModelFetchResult(error = "端点没有返回可用模型")
+                if (models.isEmpty()) ModelFetchResult(error = tr("端点没有返回可用模型"))
                 else ModelFetchResult(models = models)
             }
         } catch (error: Exception) {
-            ModelFetchResult(error = error.message ?: "无法连接到端点")
+            ModelFetchResult(error = error.message ?: tr("无法连接到端点"))
         } finally {
             connection.disconnect()
         }
@@ -481,15 +481,15 @@ object ProviderApi {
         context: ImageGenContext? = null,
         cancellation: ChatRequestCancellation? = null,
     ): ImageGenResult {
-        if (cancellation?.isCancelled() == true) return ImageGenResult(error = "图片生成已停止")
+        if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
         if (context != null && context.previousImages.isNotEmpty()) {
             val edited = runCatching { generateImageWithEdits(config, model, prompt, context, cancellation) }.getOrNull()
             if (edited != null) return edited
             // edits 不可用（端点 404/405/415 或网络层拒绝）→ 回落 generations，把上轮 prompt 织进文本
             val combined = buildString {
-                append("上一次生成请求：")
+                append(tr("上一次生成请求："))
                 append(context.previousPrompt.trim())
-                append("。参考图即上一轮的生成结果。本次要求：")
+                append(tr("。参考图即上一轮的生成结果。本次要求："))
                 append(prompt.trim())
             }
             return generateImagePlain(config, model, combined, cancellation)
@@ -505,11 +505,11 @@ object ProviderApi {
     ): ImageGenResult {
         val connection = runCatching {
             URL(imagesUrl(config.endpointUrl)).openConnection() as HttpURLConnection
-        }.getOrElse { return ImageGenResult(error = "端点 URL 无效") }
+        }.getOrElse { return ImageGenResult(error = tr("端点 URL 无效")) }
         cancellation?.attach(connection)
 
         return try {
-            if (cancellation?.isCancelled() == true) return ImageGenResult(error = "图片生成已停止")
+            if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
             connection.requestMethod = "POST"
             connection.connectTimeout = 30_000
             connection.readTimeout = 300_000
@@ -518,7 +518,7 @@ object ProviderApi {
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             connection.setRequestProperty("Accept", "application/json")
             connection.outputStream.use { output ->
-                if (cancellation?.isCancelled() == true) return ImageGenResult(error = "图片生成已停止")
+                if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
                 output.write(
                     JSONObject()
                         .put("model", model)
@@ -530,19 +530,19 @@ object ProviderApi {
                 )
             }
             val status = connection.responseCode
-            if (cancellation?.isCancelled() == true) return ImageGenResult(error = "图片生成已停止")
+            if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (cancellation?.isCancelled() == true) return ImageGenResult(error = "图片生成已停止")
+            if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
             if (status !in 200..299) {
-                ImageGenResult(error = apiError(body).ifBlank { "图片生成失败（HTTP $status）" })
+                ImageGenResult(error = apiError(body).ifBlank { tr("图片生成失败（HTTP %s）").format(status) })
             } else {
                 parseImageResponse(body)
-                    ?: ImageGenResult(error = "图片端点没有返回图片")
+                    ?: ImageGenResult(error = tr("图片端点没有返回图片"))
             }
         } catch (error: Exception) {
-            if (cancellation?.isCancelled() == true) ImageGenResult(error = "图片生成已停止")
-            else ImageGenResult(error = error.message ?: "无法连接到图片端点")
+            if (cancellation?.isCancelled() == true) ImageGenResult(error = tr("图片生成已停止"))
+            else ImageGenResult(error = error.message ?: tr("无法连接到图片端点"))
         } finally {
             cancellation?.detach(connection)
             connection.disconnect()
@@ -563,7 +563,7 @@ object ProviderApi {
         cancellation?.attach(connection)
         val boundary = "irio-${UUID.randomUUID()}"
         return try {
-            if (cancellation?.isCancelled() == true) return ImageGenResult(error = "图片生成已停止")
+            if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
             connection.requestMethod = "POST"
             connection.connectTimeout = 30_000
             connection.readTimeout = 300_000
@@ -572,7 +572,7 @@ object ProviderApi {
             connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
             connection.setRequestProperty("Accept", "application/json")
             DataOutputStream(connection.outputStream).use { output ->
-                if (cancellation?.isCancelled() == true) return ImageGenResult(error = "图片生成已停止")
+                if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
                 fun field(name: String, value: String) {
                     output.writeBytes("--$boundary\r\n")
                     output.writeBytes("Content-Disposition: form-data; name=\"$name\"\r\n\r\n")
@@ -597,19 +597,19 @@ object ProviderApi {
                 output.writeBytes("--$boundary--\r\n")
             }
             val status = connection.responseCode
-            if (cancellation?.isCancelled() == true) return ImageGenResult(error = "图片生成已停止")
+            if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (cancellation?.isCancelled() == true) return ImageGenResult(error = "图片生成已停止")
+            if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
             when {
                 status in 200..299 -> parseImageResponse(body)
-                    ?: ImageGenResult(error = "图片端点没有返回图片")
+                    ?: ImageGenResult(error = tr("图片端点没有返回图片"))
                 // 端点不支持 edits（路由不存在/方法不允许/类型不收）→ 让调用方回落 generations
                 status == 404 || status == 405 || status == 415 -> null
-                else -> ImageGenResult(error = apiError(body).ifBlank { "图片生成失败（HTTP $status）" })
+                else -> ImageGenResult(error = apiError(body).ifBlank { tr("图片生成失败（HTTP %s）").format(status) })
             }
         } catch (error: Exception) {
-            if (cancellation?.isCancelled() == true) ImageGenResult(error = "图片生成已停止")
+            if (cancellation?.isCancelled() == true) ImageGenResult(error = tr("图片生成已停止"))
             else null
         } finally {
             cancellation?.detach(connection)
@@ -652,7 +652,7 @@ object ProviderApi {
                 )
             }
             val url = item.optString("url")
-            if (url.isNotBlank()) return ImageGenResult(error = "图片端点只返回了 URL，请让提供商开启 b64_json 返回")
+            if (url.isNotBlank()) return ImageGenResult(error = tr("图片端点只返回了 URL，请让提供商开启 b64_json 返回"))
         }
         return null
     }

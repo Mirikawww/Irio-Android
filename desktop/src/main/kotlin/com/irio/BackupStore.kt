@@ -50,7 +50,7 @@ object BackupStore {
                     val entry = zip.nextEntry ?: break
                     val relative = entry.name.replace('\\', '/')
                     require(relative.isNotBlank() && !relative.startsWith('/') &&
-                        relative.split('/').none { it == ".." }) { "无效的 Irio 文件" }
+                        relative.split('/').none { it == ".." }) { tr("无效的 Irio 文件") }
                     if (relative == "format") {
                         valid = zip.readBytes().toString(Charsets.UTF_8) == FORMAT
                     } else if (relative == "provider_snapshot.json") {
@@ -65,7 +65,7 @@ object BackupStore {
                     zip.closeEntry()
                 }
             }
-            if (!valid) return BackupImportResult(false, "不是有效的 Irio 导出文件")
+            if (!valid) return BackupImportResult(false, tr("不是有效的 Irio 导出文件"))
             var conversationCount = 0
             stage.walkTopDown().filter { it.isFile }.forEach { staged ->
                 val relative = staged.relativeTo(stage)
@@ -84,13 +84,13 @@ object BackupStore {
             searchSnapshot?.let { SearchStore.applySnapshot(org.json.JSONObject(it), overwrite) }
             return BackupImportResult(
                 success = true,
-                message = "恢复完成",
+                message = tr("恢复完成"),
                 conversationCount = conversationCount,
                 providerRestored = providerRestored,
                 searchRestored = searchRestored,
                 missing = buildList {
-                    if (!providerRestored) add("提供商数据")
-                    if (!searchRestored) add("搜索提供商数据")
+                    if (!providerRestored) add(tr("提供商数据"))
+                    if (!searchRestored) add(tr("搜索提供商数据"))
                 },
             )
         } finally {

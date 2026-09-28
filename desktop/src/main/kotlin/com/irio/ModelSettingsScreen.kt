@@ -120,7 +120,7 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
         containerColor = background,
         topBar = {
             IrioToolbar(
-                title = { Text("模型") },
+                title = { Text(tr("模型")) },
                 backgroundColor = background,
                 contentColor = content,
                 leading = {
@@ -130,7 +130,7 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = tr("返回"),
                             tint = content,
                         )
                     }
@@ -159,7 +159,7 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
                                 DropdownMenuItem(
                                     onClick = { switchProvider(option) },
                                     modifier = Modifier.fillMaxWidth(),
-                                ) { Text(option.label, color = Theme[colors][onPanelColor]) }
+                                ) { Text(tr(option.label), color = Theme[colors][onPanelColor]) }
                             }
                         }
                     },
@@ -176,8 +176,8 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("搜索提供商", color = Theme[colors][onPanelColor])
-                            Text(provider.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+                            Text(tr("搜索提供商"), color = Theme[colors][onPanelColor])
+                            Text(tr(provider.label), color = Theme[colors][mutedColor], fontSize = 13.sp)
                         }
                         IconButton(
                             onClick = { providerMenuOpen = !providerMenuOpen },
@@ -189,7 +189,7 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "选择搜索提供方",
+                                contentDescription = tr("选择搜索提供方"),
                                 tint = Theme[colors][onPanelColor],
                                 modifier = Modifier.size(20.dp),
                             )
@@ -197,14 +197,14 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
                     }
                 }
                 ProviderField(
-                    label = "${provider.label} API 密钥",
+                    label = tr("%s API 密钥").format(tr(provider.label)),
                     state = apiKey,
                     keyboardType = KeyboardType.Password,
                     mask = true,
                     trailingSpace = false,
                 )
                 SettingsSlider(
-                    label = "单次搜索上限",
+                    label = tr("单次搜索上限"),
                     value = maxResults,
                     valueRange = provider.maxResultsMin..provider.maxResultsMax,
                     onValueChange = { maxResults = provider.clampMaxResults(it) },
@@ -212,7 +212,7 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
             }
             SettingsSectionCard {
                 SettingsSlider(
-                    label = "单轮工具调用",
+                    label = tr("单轮工具调用"),
                     value = maxRounds,
                     valueRange = ToolStore.MAX_ROUNDS_MIN..ToolStore.MAX_ROUNDS_MAX,
                     onValueChange = { maxRounds = it },
@@ -237,7 +237,7 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "消息时间戳",
+                        tr("消息时间戳"),
                         modifier = Modifier.weight(1f),
                         color = Theme[colors][onBackgroundColor],
                     )
@@ -251,7 +251,7 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 ) {
                     Text(
-                        "合并模型显示",
+                        tr("合并模型显示"),
                         modifier = Modifier.weight(1f),
                         color = Theme[colors][onBackgroundColor],
                     )
@@ -280,7 +280,7 @@ private fun SystemPromptRow(onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "编辑系统提示词",
+            tr("编辑系统提示词"),
             modifier = Modifier.weight(1f),
             color = Theme[colors][onPanelColor],
         )
@@ -294,7 +294,7 @@ private fun SystemPromptRow(onClick: () -> Unit) {
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                contentDescription = "编辑系统提示词",
+                contentDescription = tr("编辑系统提示词"),
                 tint = Theme[colors][onPanelColor],
                 modifier = Modifier.size(20.dp),
             )
@@ -330,7 +330,7 @@ private fun ImageGenModelPicker(
     val selectedLabel = options
         .firstOrNull { it.second == selected }
         ?.let { (_, model) -> model }
-        ?: "未配置"
+        ?: tr("未配置")
 
     DropdownMenu(
         expanded = menuOpen,
@@ -403,7 +403,7 @@ private fun ImageGenModelPicker(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("图片生成模型", color = Theme[colors][onPanelColor])
+                Text(tr("图片生成模型"), color = Theme[colors][onPanelColor])
                 Text(
                     selectedLabel,
                     color = Theme[colors][mutedColor],
@@ -422,7 +422,7 @@ private fun ImageGenModelPicker(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = "选择图片生成模型",
+                    contentDescription = tr("选择图片生成模型"),
                     tint = Theme[colors][onPanelColor],
                     modifier = Modifier.size(20.dp),
                 )
@@ -456,7 +456,7 @@ private fun TitleModelPicker(
     val selectedLabel = options
         .firstOrNull { it.second == selected }
         ?.let { (_, model) -> model }
-        ?: "跟随对话模型"
+        ?: tr("跟随对话模型")
 
     DropdownMenu(
         expanded = menuOpen,
@@ -490,7 +490,7 @@ private fun TitleModelPicker(
                             }
                         },
                     ) {
-                        Text("跟随对话模型", fontSize = 15.5.sp)
+                        Text(tr("跟随对话模型"), fontSize = 15.5.sp)
                     }
                     providers.forEachIndexed { providerIndex, provider ->
                         if (providerIndex > 0) Spacer(Modifier.height(10.dp))
@@ -543,7 +543,7 @@ private fun TitleModelPicker(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("标题生成模型", color = Theme[colors][onPanelColor])
+                Text(tr("标题生成模型"), color = Theme[colors][onPanelColor])
                 Text(
                     selectedLabel,
                     color = Theme[colors][mutedColor],
@@ -562,7 +562,7 @@ private fun TitleModelPicker(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = "选择标题生成模型",
+                    contentDescription = tr("选择标题生成模型"),
                     tint = Theme[colors][onPanelColor],
                     modifier = Modifier.size(20.dp),
                 )

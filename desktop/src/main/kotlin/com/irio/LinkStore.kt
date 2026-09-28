@@ -38,6 +38,6 @@ object LinkStore {
 
     private fun defaultName(): String {
         val host = runCatching { InetAddress.getLocalHost().hostName }.getOrNull().orEmpty()
-        return host.ifBlank { "电脑" }
+        return host.ifBlank { tr("电脑") }
     }
 }

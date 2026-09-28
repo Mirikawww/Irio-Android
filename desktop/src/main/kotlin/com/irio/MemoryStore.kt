@@ -67,7 +67,7 @@ object MemoryStore {
         val content = loadContent().trim()
         if (content.isEmpty()) return null
         return buildString {
-            append("以下是你应当记住的关于用户的长期信息。请在对话中自然地参考它们，不要主动把整份记忆复述给用户。")
+            append(tr("以下是你应当记住的关于用户的长期信息。请在对话中自然地参考它们，不要主动把整份记忆复述给用户。"))
             append('\n').append(content)
         }
     }

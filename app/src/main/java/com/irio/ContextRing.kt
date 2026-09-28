@@ -38,9 +38,9 @@ fun ContextUsageRing(
             .size(size)
             .semantics {
                 contentDescription = if (windowTokens > 0) {
-                    "上下文 $usedTokens / $windowTokens"
+                    tr("上下文 %s / %s").format(usedTokens, windowTokens)
                 } else {
-                    "上下文用量未知"
+                    tr("上下文用量未知")
                 }
             },
     ) {

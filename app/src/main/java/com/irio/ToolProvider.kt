@@ -111,14 +111,14 @@ class ToolRegistry(providers: Iterable<ToolProvider> = emptyList()) {
 
     suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {
         val provider = providerFor(call.name)
-            ?: return ToolExecutionResult("未知工具 ${call.name}")
+            ?: return ToolExecutionResult(tr("未知工具 %s").format(call.name))
         return try {
             provider.execute(call, context)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
             ToolExecutionResult(
-                text = "工具 ${call.name} 执行失败：${error.message ?: "未知错误"}",
+                text = tr("工具 %s 执行失败：%s").format(call.name, error.message ?: tr("未知错误")),
             )
         }
     }
@@ -154,7 +154,7 @@ internal class WebSearchToolProvider : ToolProvider {
         context: ToolExecutionContext,
     ): ToolExecutionResult = withContext(Dispatchers.IO) {
         if (!context.webSearch || context.searchApiKey.isBlank()) {
-            return@withContext ToolExecutionResult("搜索工具当前不可用：请先启用网页搜索并配置密钥。")
+            return@withContext ToolExecutionResult(tr("搜索工具当前不可用：请先启用网页搜索并配置密钥。"))
         }
         context.onUpdate(ChatStreamUpdate(searching = true))
         val result = WebSearch.search(
@@ -166,7 +166,7 @@ internal class WebSearchToolProvider : ToolProvider {
         )
         if (context.cancellation.isCancelled()) {
             context.onUpdate(ChatStreamUpdate(searching = false))
-            return@withContext ToolExecutionResult("搜索已停止")
+            return@withContext ToolExecutionResult(tr("搜索已停止"))
         }
         context.onUpdate(
             ChatStreamUpdate(
@@ -192,7 +192,7 @@ internal class WebFetchToolProvider : ToolProvider {
         context: ToolExecutionContext,
     ): ToolExecutionResult = withContext(Dispatchers.IO) {
         if (!context.webSearch || context.searchApiKey.isBlank()) {
-            return@withContext ToolExecutionResult("网页读取工具当前不可用：请先启用网页搜索并配置密钥。")
+            return@withContext ToolExecutionResult(tr("网页读取工具当前不可用：请先启用网页搜索并配置密钥。"))
         }
         context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = WebFetchTool.NAME))
         var resultText = ""
@@ -230,9 +230,9 @@ internal class ImageGenToolProvider : ToolProvider {
         context: ToolExecutionContext,
     ): ToolExecutionResult = withContext(Dispatchers.IO) {
         if (context.imageGenModel.isBlank()) {
-            return@withContext ToolExecutionResult("图片生成工具当前不可用：请先配置图片生成模型。")
+            return@withContext ToolExecutionResult(tr("图片生成工具当前不可用：请先配置图片生成模型。"))
         }
-        if (context.cancellation.isCancelled()) return@withContext ToolExecutionResult("图片生成已停止")
+        if (context.cancellation.isCancelled()) return@withContext ToolExecutionResult(tr("图片生成已停止"))
         val prompt = ToolArguments.value(call.arguments, "prompt")
         // Images API 无状态：把最近一轮生成图和 prompt 作为编辑参考传回端点。
         val imageContext = imageContext(context.history)
@@ -246,13 +246,13 @@ internal class ImageGenToolProvider : ToolProvider {
         if (result.attachment != null) {
             context.onUpdate(ChatStreamUpdate(attachments = listOf(result.attachment)))
             val message = if (result.revisedPrompt.isNotBlank()) {
-                "图片已生成并发送给用户（改写后的提示词：${result.revisedPrompt}）。不要重复描述图片内容，直接继续回答。"
+                tr("图片已生成并发送给用户（改写后的提示词：%s）。不要重复描述图片内容，直接继续回答。").format(result.revisedPrompt)
             } else {
-                "图片已生成并发送给用户。不要重复描述图片内容，直接继续回答。"
+                tr("图片已生成并发送给用户。不要重复描述图片内容，直接继续回答。")
             }
             ToolExecutionResult(message)
         } else {
-            ToolExecutionResult("图片生成失败：${result.error ?: "未知错误"}")
+            ToolExecutionResult(tr("图片生成失败：%s").format(result.error ?: tr("未知错误")))
         }
     }
 
@@ -312,7 +312,7 @@ internal class MemoryToolProvider : ToolProvider {
                 MemoryTool.UPDATE -> ToolExecutionResult(
                     MemoryTool.write(context.appContext, ToolArguments.value(call.arguments, "content")),
                 )
-                else -> ToolExecutionResult("未知工具 ${call.name}")
+                else -> ToolExecutionResult(tr("未知工具 %s").format(call.name))
             }
         } finally {
             context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name))
