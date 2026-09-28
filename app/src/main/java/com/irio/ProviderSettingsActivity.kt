@@ -3,6 +3,9 @@ package com.irio
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,8 +15,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldBuffer
@@ -61,7 +66,9 @@ import com.composables.ui.components.Text
 import com.composables.ui.components.TextField
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
+import com.composables.ui.theme.fieldColor
 import com.composables.ui.theme.fieldShape
+import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.panelColor
@@ -200,38 +207,12 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
             DialogTitle("添加提供商")
             Spacer(Modifier.height(16.dp))
             ProviderField("名称", name, KeyboardType.Text)
-            DropdownMenu(
+            ProtocolPicker(
+                protocol = protocol,
                 expanded = protocolMenuOpen,
                 onExpandedChange = { protocolMenuOpen = it },
-                alignment = DropdownMenuAlignment.Start,
-                panel = {
-                    DropdownMenuPanel {
-                        ProviderProtocol.entries.forEach { option ->
-                            DropdownMenuItem(
-                                onClick = {
-                                    protocol = option
-                                    protocolMenuOpen = false
-                                },
-                            ) { Text(option.label) }
-                        }
-                    }
-                },
-            ) {
-                Button(
-                    onClick = { protocolMenuOpen = !protocolMenuOpen },
-                    modifier = Modifier.fillMaxWidth(),
-                    style = ButtonStyle.Secondary,
-                    shape = Theme[shapes][fieldShape],
-                    buttonSize = ButtonSize.Regular,
-                ) {
-                    Text(protocol.label)
-                    Spacer(Modifier.weight(1f))
-                    Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = "选择协议",
-                    )
-                }
-            }
+                onSelect = { protocol = it },
+            )
             Spacer(Modifier.height(12.dp))
             ProviderField("端点 URL", endpoint, KeyboardType.Uri)
             ProviderField("密钥", apiKey, KeyboardType.Password, mask = true)
@@ -309,6 +290,68 @@ internal fun ProviderField(
         outputTransformation = if (mask) PasswordMask else null,
     )
     if (trailingSpace) Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+internal fun ProtocolPicker(
+    protocol: ProviderProtocol,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onSelect: (ProviderProtocol) -> Unit,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onExpandedChange = onExpandedChange,
+        modifier = Modifier.fillMaxWidth(),
+        alignment = DropdownMenuAlignment.End,
+        panel = {
+            DropdownMenuPanel {
+                ProviderProtocol.entries.forEach { option ->
+                    DropdownMenuItem(
+                        onClick = {
+                            onSelect(option)
+                            onExpandedChange(false)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(option.label, color = Theme[colors][onPanelColor]) }
+                }
+            }
+        },
+    ) {
+        val interactionSource = remember { MutableInteractionSource() }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Theme[colors][fieldColor], Theme[shapes][fieldShape])
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = { onExpandedChange(!expanded) },
+                )
+                .padding(start = 12.dp, top = 8.dp, end = 4.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("协议", color = Theme[colors][onPanelColor])
+                Text(protocol.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+            }
+            IconButton(
+                onClick = { onExpandedChange(!expanded) },
+                style = ButtonStyle.Ghost,
+                buttonSize = ButtonSize.Small,
+                shape = CircleShape,
+                modifier = Modifier.size(32.dp),
+                interactionSource = interactionSource,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = "选择协议",
+                    tint = Theme[colors][onPanelColor],
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
 }
 
 @Composable

@@ -15,7 +15,6 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,19 +28,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.composables.ui.components.Button
-import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
-import com.composables.ui.components.DropdownMenu
-import com.composables.ui.components.DropdownMenuAlignment
-import com.composables.ui.components.DropdownMenuItem
-import com.composables.ui.components.DropdownMenuPanel
 import com.composables.ui.components.Icon
 import com.composables.ui.components.IconButton
 import com.composables.ui.components.Switch
 import com.composables.ui.components.Text
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
-import com.composables.ui.theme.fieldShape
 import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPanelColor
@@ -110,38 +103,12 @@ fun ProviderDetailScreen(
                 Text("找不到这个提供商")
             } else {
                 ProviderField("名称", name, KeyboardType.Text, trailingSpace = false)
-                DropdownMenu(
+                ProtocolPicker(
+                    protocol = protocol,
                     expanded = protocolMenuOpen,
                     onExpandedChange = { protocolMenuOpen = it },
-                    alignment = DropdownMenuAlignment.Start,
-                    panel = {
-                        DropdownMenuPanel {
-                            ProviderProtocol.entries.forEach { option ->
-                                DropdownMenuItem(
-                                    onClick = {
-                                        protocol = option
-                                        protocolMenuOpen = false
-                                    },
-                                ) { Text(option.label) }
-                            }
-                        }
-                    },
-                ) {
-                    Button(
-                        onClick = { protocolMenuOpen = !protocolMenuOpen },
-                        modifier = Modifier.fillMaxWidth(),
-                        style = ButtonStyle.Secondary,
-                        shape = Theme[shapes][fieldShape],
-                        buttonSize = ButtonSize.Regular,
-                    ) {
-                        Text(protocol.label)
-                        Spacer(Modifier.weight(1f))
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = "选择协议",
-                        )
-                    }
-                }
+                    onSelect = { protocol = it },
+                )
                 ProviderField("端点 URL", endpoint, KeyboardType.Uri, trailingSpace = false)
                 ProviderField("密钥", apiKey, KeyboardType.Password, mask = true, trailingSpace = false)
                 if (formError != null) {
