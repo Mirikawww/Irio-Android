@@ -3032,7 +3032,7 @@ internal object FinishedMarkdownSegmentsCache {
     fun request(content: String, scope: CoroutineScope): MutableState<List<MarkdownSegment>?> {
         val slot = synchronized(map) { map.getOrPut(content) { mutableStateOf(null) } }
         val result = parsed.request(content, scope, Dispatchers.Default) {
-            markdownSegments(content, streaming = false)
+            markdownSegments(content)
         }
         when {
             result.status == AsyncCacheStatus.READY && slot.value == null -> slot.value = result.value
@@ -3045,7 +3045,7 @@ internal object FinishedMarkdownSegmentsCache {
 
     suspend fun prepare(content: String, scope: CoroutineScope): List<MarkdownSegment>? {
         val result = parsed.request(content, scope, Dispatchers.Default) {
-            markdownSegments(content, streaming = false)
+            markdownSegments(content)
         }
         return result.value ?: result.completion?.await()
     }
@@ -3119,28 +3119,11 @@ private fun AssistantMarkdown(
     streaming: Boolean,
     renderScope: CoroutineScope,
 ) {
-    var renderStreaming by remember { mutableStateOf(streaming) }
-    LaunchedEffect(streaming) {
+    val segments = remember(text) { markdownSegments(text) }
+    val markdownSlots = remember(text, segments, streaming) {
         if (streaming) {
-            renderStreaming = true
+            emptyMap()
         } else {
-            withFrameNanos { }
-            renderStreaming = false
-        }
-    }
-    val segmentSlot = if (!renderStreaming) {
-        remember(text) { FinishedMarkdownSegmentsCache.request(text, renderScope) }
-    } else {
-        null
-    }
-    val preparedSegments = segmentSlot?.value
-    val segments = if (renderStreaming) {
-        remember(text, renderStreaming) { markdownSegments(text, streaming = true) }
-    } else {
-        preparedSegments ?: listOf(MarkdownSegment.Text_("pending", text, markdown = false))
-    }
-    val markdownSlots = if (!renderStreaming) {
-        remember(text, segments) {
             segments
                 .filterIsInstance<MarkdownSegment.Text_>()
                 .filter { it.markdown }
@@ -3149,8 +3132,6 @@ private fun AssistantMarkdown(
                     segment.text to FinishedMarkdownCache.request(segment.text, renderScope, Dispatchers.Default)
                 }
         }
-    } else {
-        emptyMap()
     }
     val contentColor = Theme[colors][onBackgroundColor]
     val context = LocalContext.current
@@ -3186,32 +3167,23 @@ private fun AssistantMarkdown(
         Column {
             segments.forEach { segment ->
                 key(segment.key) {
-                    when {
-                        segment is MarkdownSegment.TexBlock -> FadeInBlock(fadeIn = renderStreaming) {
-                            TexBlock(
-                                latex = segment.latex,
-                                colorArgb = contentColor.toArgb(),
-                                density = density,
-                                texScale = texScale,
-                                renderScope = renderScope,
-                            )
-                        }
-                        segment is MarkdownSegment.Text_ && segment.markdown -> FadeInBlock(fadeIn = renderStreaming) {
+                    when (segment) {
+                        is MarkdownSegment.TexBlock -> TexBlock(
+                            latex = segment.latex,
+                            colorArgb = contentColor.toArgb(),
+                            density = density,
+                            texScale = texScale,
+                            renderScope = renderScope,
+                        )
+                        is MarkdownSegment.Text_ -> {
                             val markdownState = markdownSlots[segment.text]?.value
                             IrioMarkdown(
                                 content = segment.text,
-                                state = if (renderStreaming) null else markdownState,
-                                fallbackToRaw = !renderStreaming && markdownState == null,
+                                state = markdownState,
                                 typography = typography,
                                 imageTransformer = imageTransformer,
                             )
                         }
-                        segment is MarkdownSegment.Text_ -> Text(
-                            segment.text,
-                            fontSize = bodyStyle.fontSize,
-                            lineHeight = bodyStyle.lineHeight,
-                            color = contentColor,
-                        )
                     }
                 }
             }
@@ -3251,7 +3223,7 @@ private fun TexBlock(latex: String, colorArgb: Int, density: Density, texScale: 
         }
     } else {
         // Parse failure: keep the raw LaTeX visible.
-        Text(latex, fontSize = 17.sp, lineHeight = 35.7.sp, color = Theme[colors][onBackgroundColor])
+        Text(latex, fontSize = 17.sp, lineHeight = 26.sp, color = Theme[colors][onBackgroundColor])
     }
 }
 

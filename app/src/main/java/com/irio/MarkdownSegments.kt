@@ -9,38 +9,32 @@ internal sealed interface MarkdownSegment {
     data class TexBlock(override val key: String, val latex: String) : MarkdownSegment
 }
 
-internal fun markdownSegments(text: String, streaming: Boolean): List<MarkdownSegment> {
+/**
+ * Block split shared by the streaming tail and the finished message.
+ * Keys stay on the block index for the whole generation, and every text block is
+ * real Markdown — including the still-open tail. A raw-text tail that later
+ * upgrades to Markdown remounts the paragraph (the flash). Closed `$$` blocks
+ * become formulas; an unclosed delimiter stays in the text block until it closes.
+ */
+internal fun markdownSegments(text: String): List<MarkdownSegment> {
     if (text.isEmpty()) return emptyList()
     val blocks = splitMarkdownBlocks(text)
     val segments = ArrayList<MarkdownSegment>(blocks.size)
     blocks.forEachIndexed { index, block ->
         val tex = texBlockContent(block)
-        if (tex != null) {
-            val last = index == blocks.lastIndex
-            // While streaming, only render closed formula blocks; an unclosed `$$` tail stays raw.
-            val complete = !streaming || !last || isCompleteMarkdownBlock(block) || texBlockClosed(block)
-            if (complete) {
-                segments += MarkdownSegment.TexBlock("tex$index", tex)
-            } else {
-                segments += MarkdownSegment.Text_("pending", block, markdown = false)
-            }
+        if (tex != null && texBlockClosed(block)) {
+            segments += MarkdownSegment.TexBlock("tex$index", tex)
             return@forEachIndexed
         }
-        val last = index == blocks.lastIndex
-        // Streaming tail without a trailing blank line is held raw to keep frozen keys
-        // stable — but a tail whose emphasis markers are already closed (`**加粗**`)
-        // renders fine live. Holding it raw leaves bold/bold-italic looking unrendered
-        // for the whole stream, so let closed-emphasis tails through.
-        val pending = streaming && last && !isCompleteMarkdownBlock(block) && !hasClosedEmphasis(block)
-        val rewritten = when {
-            pending -> block
-            block.trimStart().startsWith("```") -> block
-            else -> normalizeMarkdownEmphasis(rewriteInlineTex(block))
+        val rewritten = if (block.trimStart().startsWith("```")) {
+            block
+        } else {
+            normalizeMarkdownEmphasis(rewriteInlineTex(block))
         }
         segments += MarkdownSegment.Text_(
-            key = if (pending) "pending" else "b$index",
+            key = "b$index",
             text = rewritten,
-            markdown = !pending,
+            markdown = true,
         )
     }
     return segments

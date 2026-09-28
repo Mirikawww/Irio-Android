@@ -1,8 +1,5 @@
 package com.irio
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import com.composables.ui.theme.ColorScheme
 import com.composables.ui.theme.LocalColorScheme
@@ -16,13 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -78,6 +73,7 @@ import com.mikepenz.markdown.model.MarkdownState
 import com.mikepenz.markdown.model.MarkdownTypography
 import com.mikepenz.markdown.model.PlaceholderConfig
 import com.mikepenz.markdown.model.markdownExtendedSpans
+import com.mikepenz.markdown.model.rememberMarkdownState
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.Density
@@ -85,29 +81,10 @@ import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.getTextInNode
+import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.flavours.gfm.GFMTokenTypes.CELL
 import org.intellij.markdown.flavours.gfm.GFMTokenTypes.TABLE_SEPARATOR
-
-/**
- * 流式输出时的块级淡入：每个新出现的正文块从 alpha 0 → 1 过渡。
- * 只在 [fadeIn] 为真（正在流式）时进入，且以块首次进入组合为动画起点——
- * 已冻结块保持 alpha 1，历史消息不重放动画。尺寸立即为最终值，没有布局位移。
- */
-@Composable
-internal fun FadeInBlock(
-    fadeIn: Boolean,
-    content: @Composable () -> Unit,
-) {
-    if (!fadeIn) {
-        content()
-        return
-    }
-    val alpha = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { alpha.animateTo(1f, animationSpec = fadeInSpec()) }
-    Box(modifier = Modifier.graphicsLayer { this.alpha = alpha.value }) { content() }
-}
-
-internal fun fadeInSpec() = tween<Float>(durationMillis = 300, easing = FastOutSlowInEasing)
+import org.intellij.markdown.parser.MarkdownParser
 
 @Composable
 internal fun IrioMarkdown(
@@ -117,7 +94,6 @@ internal fun IrioMarkdown(
     // Pre-parsed state hoisted above the LazyColumn (scroll-back reuse).
     // Null = parse inline, same as before.
     state: MarkdownState? = null,
-    fallbackToRaw: Boolean = false,
 ) {
     val onBg = Theme[colors][onBackgroundColor]
     val dark = LocalColorScheme.current == ColorScheme.Dark
@@ -180,9 +156,16 @@ internal fun IrioMarkdown(
             )
         },
     )
-    if (state != null) {
+    // Lock the renderer on first composition. Switching from Markdown(content)
+    // to Markdown(markdownState) — or falling back to raw text while a cache
+    // fills — disposes the paragraph and flashes it. A cache hit at entry
+    // (scroll-back) skips parsing; a live tail stays on one retained parser.
+    val entryState = remember { state }
+    val flavour = remember { GFMFlavourDescriptor() }
+    val parser = remember(flavour) { MarkdownParser(flavour) }
+    if (entryState != null) {
         Markdown(
-            markdownState = state,
+            markdownState = entryState,
             colors = colors,
             typography = typography,
             modifier = Modifier.fillMaxWidth(),
@@ -190,11 +173,19 @@ internal fun IrioMarkdown(
             extendedSpans = extendedSpans,
             components = components,
         )
-    } else if (fallbackToRaw) {
-        androidx.compose.material3.Text(content, style = typography.text)
     } else {
-        Markdown(
+        // retainState: a new token must not reset this block to Loading (empty box).
+        // immediate: the first frame is parsed before it is shown. A remembered parser
+        // keeps later parent recompositions from looking like a new document.
+        val live = rememberMarkdownState(
             content = content,
+            retainState = true,
+            flavour = flavour,
+            parser = parser,
+            immediate = true,
+        )
+        Markdown(
+            markdownState = live,
             colors = colors,
             typography = typography,
             modifier = Modifier.fillMaxWidth(),
