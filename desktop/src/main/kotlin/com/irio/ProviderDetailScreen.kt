@@ -109,7 +109,7 @@ fun ProviderDetailScreen(
             if (provider == null) {
                 Text("找不到这个提供商")
             } else {
-                ProviderField("名称", name, KeyboardType.Text)
+                ProviderField("名称", name, KeyboardType.Text, trailingSpace = false)
                 DropdownMenu(
                     expanded = protocolMenuOpen,
                     onExpandedChange = { protocolMenuOpen = it },
@@ -142,8 +142,8 @@ fun ProviderDetailScreen(
                         )
                     }
                 }
-                ProviderField("端点 URL", endpoint, KeyboardType.Uri)
-                ProviderField("密钥", apiKey, KeyboardType.Password, mask = true)
+                ProviderField("端点 URL", endpoint, KeyboardType.Uri, trailingSpace = false)
+                ProviderField("密钥", apiKey, KeyboardType.Password, mask = true, trailingSpace = false)
                 if (formError != null) {
                     Text(formError!!)
                 }
