@@ -25,4 +25,15 @@ class MessageTimestampTest {
         assertEquals("hello", ChatApi.stampMessageText("hello", createdAt, fromUser = false))
         assertEquals("hello", ChatApi.stampMessageText("hello", 0L, fromUser = true))
     }
+
+    @Test
+    fun replyClockIsHourMinuteSecondOfFinishTime() {
+        val zone = java.time.ZoneId.of("Asia/Shanghai")
+        val finishedAt = java.time.LocalDateTime.of(2024, 1, 15, 13, 4, 5)
+            .atZone(zone)
+            .toInstant()
+            .toEpochMilli()
+        assertEquals("13:04:05", formatReplyClock(finishedAt, zone))
+        assertEquals("", formatReplyClock(0L, zone))
+    }
 }

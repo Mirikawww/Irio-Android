@@ -23,6 +23,8 @@ data class ChatMessage(
     val editGroup: Long = 0L,
     /** 最近一次接口回报的 usage；圆环只读这份数据，不做本地估算。 */
     val usage: TokenUsage? = null,
+    /** 模型完成这条回复的时刻。0 表示还没完成，或旧数据没有记录。不要用 createdAt 代替，那是开始生成的时间。 */
+    val finishedAt: Long = 0L,
 ) {
     val groupId: Long get() = retryGroup.takeIf { it != 0L } ?: id
     /** 用户版本组键：编辑过取 editGroup，否则取 id（单条即自己）。 */
@@ -31,6 +33,17 @@ data class ChatMessage(
     val thinkingMillis: Long get() = process.filter { it.kind == ProcessEventKind.THINKING }.sumOf { it.millis }
     val searchPages: Int get() = process.filter { it.kind == ProcessEventKind.SEARCH }.sumOf { it.pages }
     val isSearching: Boolean get() = process.any { it.kind == ProcessEventKind.SEARCH && it.live }
+}
+
+/** 回复完成时刻，只显示时分秒。未完成或旧数据返回空串，不拿开始时间充数。 */
+internal fun formatReplyClock(
+    millis: Long,
+    zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+): String {
+    if (millis <= 0L) return ""
+    return java.time.Instant.ofEpochMilli(millis)
+        .atZone(zone)
+        .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
 }
 
 data class Conversation(
@@ -221,6 +234,7 @@ object ConversationStore {
                             put("text", message.text)
                             put("fromUser", message.fromUser)
                             put("createdAt", message.createdAt)
+                            if (message.finishedAt > 0L) put("finishedAt", message.finishedAt)
                             put("isError", message.isError)
                             put("retryGroup", message.groupId)
                             put("selected", message.selected)
@@ -302,6 +316,7 @@ object ConversationStore {
                         text = item.optString("text"),
                         fromUser = item.optBoolean("fromUser"),
                         createdAt = item.optLong("createdAt").takeIf { it > 0L } ?: System.currentTimeMillis(),
+                        finishedAt = item.optLong("finishedAt"),
                         attachments = attachments,
                         process = processEventsFrom(item),
                         isError = item.optBoolean("isError"),

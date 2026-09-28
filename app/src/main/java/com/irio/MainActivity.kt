@@ -1151,6 +1151,11 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                         process = snapshot,
                                         attachments = attachments,
                                         usage = usage,
+                                        finishedAt = if (update.done && snapshot.none { it.live }) {
+                                            System.currentTimeMillis()
+                                        } else {
+                                            0L
+                                        },
                                         isPending = text.isBlank() && snapshot.none { it.live || it.content.isNotBlank() || it.pages > 0 },
                                         isStreaming = (!update.done && !requestCancellation.isCancelled()) ||
                                             snapshot.any { it.live },
@@ -1178,6 +1183,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             }
             val finalProcess = closedProcess
             val finalUsage = result.usage ?: streamedUsage ?: current?.usage
+            val finishedAt = current?.finishedAt?.takeIf { it > 0L } ?: System.currentTimeMillis()
             val finalMessage = when {
                 result.stopped -> {
                     val finalText = streamedText.ifBlank { current?.text.orEmpty() }
@@ -1190,6 +1196,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             process = finalProcess.map { it.copy(live = false) },
                             attachments = finalAttachments,
                             usage = finalUsage,
+                            finishedAt = finishedAt,
                             isPending = false,
                             isStreaming = false,
                         )
@@ -1199,6 +1206,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     text = result.error,
                     process = finalProcess.map { it.copy(live = false) },
                     usage = finalUsage,
+                    finishedAt = finishedAt,
                     isError = true,
                     isPending = false,
                     isStreaming = false,
@@ -1208,6 +1216,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     process = finalProcess.map { it.copy(live = false) },
                     attachments = result.attachments.ifEmpty { streamedAttachments },
                     usage = finalUsage,
+                    finishedAt = finishedAt,
                     isPending = false,
                     isStreaming = false,
                 )
@@ -2485,6 +2494,7 @@ internal fun MessageRow(
                         onCopy = onCopy,
                         onRetry = onRetry,
                         canRetry = canRetry,
+                        finishedAt = chatMessage.finishedAt,
                         versionIndex = versionIndex,
                         versionCount = versionCount,
                         onPrevVersion = onPrevVersion,
@@ -3517,12 +3527,14 @@ private fun AssistantActions(
     onCopy: () -> Unit,
     onRetry: () -> Unit,
     canRetry: Boolean,
+    finishedAt: Long,
     versionIndex: Int,
     versionCount: Int,
     onPrevVersion: (() -> Unit)?,
     onNextVersion: (() -> Unit)?,
 ) {
     val muted = Theme[colors][mutedColor]
+    val clock = formatReplyClock(finishedAt)
     Row(
         modifier = Modifier.padding(top = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -3544,6 +3556,13 @@ private fun AssistantActions(
                     .size(18.dp)
                     .clickable(onClick = onRetry),
                 tint = muted,
+            )
+        }
+        if (clock.isNotEmpty()) {
+            Text(
+                clock,
+                color = muted,
+                fontSize = 13.sp,
             )
         }
         if (versionCount > 1) {
