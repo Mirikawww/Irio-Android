@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.TextAutoSize
@@ -70,6 +72,7 @@ import com.composables.ui.components.TextField
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.destructiveColor
+import com.composables.ui.theme.fieldColor
 import com.composables.ui.theme.fieldShape
 import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.mutedColor
@@ -236,7 +239,8 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                 DropdownMenu(
                     expanded = modeMenuOpen,
                     onExpandedChange = { modeMenuOpen = it },
-                    alignment = DropdownMenuAlignment.Start,
+                    modifier = Modifier.fillMaxWidth(),
+                    alignment = DropdownMenuAlignment.End,
                     panel = {
                         DropdownMenuPanel {
                             LinkSyncMode.entries.forEach { option ->
@@ -245,24 +249,44 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                                         LinkRuntime.setSyncMode(option)
                                         modeMenuOpen = false
                                     },
-                                ) { Text(option.label) }
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text(option.label, color = Theme[colors][onPanelColor]) }
                             }
                         }
                     },
                 ) {
-                    Button(
-                        onClick = { modeMenuOpen = !modeMenuOpen },
-                        modifier = Modifier.fillMaxWidth(),
-                        style = ButtonStyle.Secondary,
-                        shape = Theme[shapes][fieldShape],
-                        buttonSize = ButtonSize.Regular,
+                    val interactionSource = remember { MutableInteractionSource() }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Theme[colors][fieldColor], Theme[shapes][fieldShape])
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = { modeMenuOpen = !modeMenuOpen },
+                            )
+                            .padding(start = 12.dp, top = 8.dp, end = 4.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(state.settings.syncMode.label)
-                        Spacer(Modifier.weight(1f))
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = "选择数据模式",
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("同步方式", color = Theme[colors][onPanelColor])
+                            Text(state.settings.syncMode.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+                        }
+                        IconButton(
+                            onClick = { modeMenuOpen = !modeMenuOpen },
+                            style = ButtonStyle.Ghost,
+                            buttonSize = ButtonSize.Small,
+                            shape = CircleShape,
+                            modifier = Modifier.size(32.dp),
+                            interactionSource = interactionSource,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = "选择同步方式",
+                                tint = Theme[colors][onPanelColor],
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
                 }
                 if (state.settings.syncMode == LinkSyncMode.OVERWRITE) {
