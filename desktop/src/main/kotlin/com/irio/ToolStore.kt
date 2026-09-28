@@ -10,6 +10,7 @@ object ToolStore {
     private const val MAX_ROUNDS = "max_tool_rounds"
     private const val IMAGE_GEN_MODEL = "image_gen_model"
     private const val TITLE_MODEL = "title_model"
+    private const val MESSAGE_TIMESTAMPS = "message_timestamps"
 
     fun loadMaxRounds(): Int =
         clampMaxRounds(loadRoot().optInt(MAX_ROUNDS, MAX_ROUNDS_DEFAULT))
@@ -39,6 +40,16 @@ object ToolStore {
     fun saveImageGenModel(model: String) {
         val root = loadRoot()
         root.put(IMAGE_GEN_MODEL, model)
+        AppPaths.toolsFile.writeText(root.toString())
+    }
+
+    /** 是否在发给模型的用户消息前加上发送时间。默认开启，保持现有行为。 */
+    fun loadMessageTimestamps(): Boolean =
+        loadRoot().optBoolean(MESSAGE_TIMESTAMPS, true)
+
+    fun saveMessageTimestamps(enabled: Boolean) {
+        val root = loadRoot()
+        root.put(MESSAGE_TIMESTAMPS, enabled)
         AppPaths.toolsFile.writeText(root.toString())
     }
 

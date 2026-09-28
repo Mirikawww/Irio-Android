@@ -43,6 +43,8 @@ data class ChatRequestMessage(
     val toolCalls: List<ChatToolCall> = emptyList(),
     val toolCallId: String = "",
     val toolName: String = "",
+    /** 消息发送时间戳（毫秒），仅用于模型侧提示，不渲染到 UI。 */
+    val createdAt: Long = 0L,
 )
 
 data class TokenUsage(
@@ -163,6 +165,7 @@ object ChatApi {
         var searchPages = 0
         var lastUsage: TokenUsage? = null
         val rounds = ToolStore.clampMaxRounds(maxToolRounds)
+        val includeTimestamps = ToolStore.loadMessageTimestamps()
         // Snapshot all runtime capabilities once per request. Only the evolving history is copied
         // between rounds; providers therefore observe one coherent request context.
         val toolContext = ToolExecutionContext(
@@ -184,7 +187,7 @@ object ChatApi {
             val turn = streamOnce(
                 provider = provider,
                 model = model,
-                messages = history,
+                messages = if (includeTimestamps) history else history.map { it.copy(createdAt = 0L) },
                 reasoningEffort = reasoningEffort,
                 fastMode = fastMode,
                 systemPrompt = systemPrompt,
@@ -752,6 +755,7 @@ object ChatApi {
     }
 
     private fun ChatRequestMessage.toChatCompletionsJson(): JSONObject {
+        val stampedText = text.withTimestampPrefix(createdAt, role == "user")
         return JSONObject().apply {
             when {
                 role == "tool" -> {
@@ -761,7 +765,7 @@ object ChatApi {
                 }
                 toolCalls.isNotEmpty() -> {
                     put("role", "assistant")
-                    if (text.isNotBlank()) put("content", text) else put("content", JSONObject.NULL)
+                    if (stampedText.isNotBlank()) put("content", stampedText) else put("content", JSONObject.NULL)
                     put("tool_calls", JSONArray().apply {
                         toolCalls.forEach { call ->
                             put(
@@ -780,7 +784,7 @@ object ChatApi {
                 }
                 else -> {
                     put("role", role)
-                    val parts = openAiParts(text = true)
+                    val parts = openAiParts(text = true, overrideText = stampedText)
                     if (parts.size == 1 && parts[0].optString("type") == "text") {
                         put("content", parts[0].optString("text"))
                     } else {
@@ -814,12 +818,13 @@ object ChatApi {
         return JSONObject().apply {
             put("role", role)
             put("content", JSONArray().apply {
-                openAiParts(text = false).forEach(::put)
+                openAiParts(text = false, overrideText = text.withTimestampPrefix(createdAt, role == "user")).forEach(::put)
             })
         }
     }
 
     private fun ChatRequestMessage.toAnthropicJson(): JSONObject {
+        val stampedText = text.withTimestampPrefix(createdAt, role == "user")
         return JSONObject().apply {
             when {
                 role == "tool" -> {
@@ -840,8 +845,8 @@ object ChatApi {
                         if (thinking.isNotBlank()) {
                             add(JSONObject().put("type", "thinking").put("thinking", thinking))
                         }
-                        if (text.isNotBlank()) {
-                            add(JSONObject().put("type", "text").put("text", text))
+                        if (stampedText.isNotBlank()) {
+                            add(JSONObject().put("type", "text").put("text", stampedText))
                         }
                         toolCalls.forEach { call ->
                             add(
@@ -861,8 +866,8 @@ object ChatApi {
                         if (thinking.isNotBlank() && role != "user") {
                             add(JSONObject().put("type", "thinking").put("thinking", thinking))
                         }
-                        if (text.isNotBlank()) {
-                            add(JSONObject().put("type", "text").put("text", text))
+                        if (stampedText.isNotBlank()) {
+                            add(JSONObject().put("type", "text").put("text", stampedText))
                         }
                         attachments.forEach { attachment ->
                             add(attachment.toAnthropicPart())
@@ -874,13 +879,14 @@ object ChatApi {
         }
     }
 
-    private fun ChatRequestMessage.openAiParts(text: Boolean): List<JSONObject> {
+    private fun ChatRequestMessage.openAiParts(text: Boolean, overrideText: String? = null): List<JSONObject> {
         val textType = if (text) "text" else "input_text"
         val imageType = if (text) "image_url" else "input_image"
         val fileType = if (text) "file" else "input_file"
+        val bodyText = overrideText ?: this@openAiParts.text
         val parts = buildList {
-            if (this@openAiParts.text.isNotBlank()) {
-                add(JSONObject().put("type", textType).put("text", this@openAiParts.text))
+            if (bodyText.isNotBlank()) {
+                add(JSONObject().put("type", textType).put("text", bodyText))
             }
             attachments.forEach { attachment ->
                 val dataUrl = dataUrl(attachment.mimeType, attachment.bytes())
@@ -1027,6 +1033,17 @@ object ChatApi {
             connection.disconnect()
         }
     }
+
+    /** 给用户消息文本加上仅模型可见的时间戳前缀。关闭「消息时间戳」时 createdAt 会被清成 0，这里直接跳过。模型回复不加前缀。 */
+    internal fun stampMessageText(text: String, createdAt: Long, fromUser: Boolean): String {
+        if (!fromUser || createdAt <= 0L) return text
+        val stamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+            .format(java.util.Date(createdAt))
+        return if (text.isBlank()) "[$stamp]" else "[$stamp] $text"
+    }
+
+    private fun String.withTimestampPrefix(createdAt: Long, fromUser: Boolean): String =
+        stampMessageText(this, createdAt, fromUser)
 
     private fun requestUrl(provider: ProviderConfig): String = ProviderEndpoints.chatUrl(provider)
 

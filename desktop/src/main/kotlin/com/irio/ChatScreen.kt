@@ -759,6 +759,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         text = item.text,
                         attachments = item.attachments,
                         thinking = item.thinking,
+                        createdAt = item.createdAt,
                     )
                 }
                 withContext(Dispatchers.IO) {

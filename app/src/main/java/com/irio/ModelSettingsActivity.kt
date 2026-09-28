@@ -100,12 +100,14 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
     var imageGenModel by remember { mutableStateOf(ToolStore.loadImageGenModel(context)) }
     var imageGenMenuOpen by remember { mutableStateOf(false) }
     var titleModel by remember { mutableStateOf(ToolStore.loadTitleModel(context)) }
+    var messageTimestamps by remember { mutableStateOf(ToolStore.loadMessageTimestamps(context)) }
 
     val currentProvider by rememberUpdatedState(provider)
     val currentMaxResults by rememberUpdatedState(maxResults)
     val currentMaxRounds by rememberUpdatedState(maxRounds)
     val currentMergeModels by rememberUpdatedState(mergeModels)
     val currentModelsDevCatalog by rememberUpdatedState(modelsDevCatalog)
+    val currentMessageTimestamps by rememberUpdatedState(messageTimestamps)
     val lifecycleOwner = LocalLifecycleOwner.current
 
     fun persistCurrent() {
@@ -115,6 +117,7 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
         ProviderStore.saveMergeModels(context, currentMergeModels)
         ProviderStore.saveModelsDevCatalog(context, currentModelsDevCatalog)
         ToolStore.saveMaxRounds(context, currentMaxRounds)
+        ToolStore.saveMessageTimestamps(context, currentMessageTimestamps)
     }
 
     fun switchProvider(next: SearchProvider) {
@@ -263,6 +266,14 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                 SystemPromptRow(
                     onClick = {
                         context.startActivity(Intent(context, SystemPromptSettingsActivity::class.java))
+                    },
+                )
+                SettingsSwitchRow(
+                    label = "消息时间戳",
+                    checked = messageTimestamps,
+                    onCheckedChange = {
+                        messageTimestamps = it
+                        ToolStore.saveMessageTimestamps(context, it)
                     },
                 )
             }

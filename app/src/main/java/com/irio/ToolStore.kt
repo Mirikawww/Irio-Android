@@ -11,6 +11,7 @@ object ToolStore {
     private const val MAX_ROUNDS = "max_tool_rounds"
     private const val IMAGE_GEN_MODEL = "image_gen_model"
     private const val TITLE_MODEL = "title_model"
+    private const val MESSAGE_TIMESTAMPS = "message_timestamps"
 
     fun loadMaxRounds(context: Context): Int =
         clampMaxRounds(preferences(context).getInt(MAX_ROUNDS, MAX_ROUNDS_DEFAULT))
@@ -35,6 +36,14 @@ object ToolStore {
 
     fun saveTitleModel(context: Context, model: String) {
         preferences(context).edit().putString(TITLE_MODEL, model).apply()
+    }
+
+    /** 是否在发给模型的用户消息前加上发送时间。默认开启，保持现有行为。 */
+    fun loadMessageTimestamps(context: Context): Boolean =
+        preferences(context).getBoolean(MESSAGE_TIMESTAMPS, true)
+
+    fun saveMessageTimestamps(context: Context, enabled: Boolean) {
+        preferences(context).edit().putBoolean(MESSAGE_TIMESTAMPS, enabled).apply()
     }
 
     private fun preferences(context: Context) =

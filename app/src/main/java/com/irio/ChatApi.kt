@@ -166,6 +166,7 @@ object ChatApi {
         var searchPages = 0
         var lastUsage: TokenUsage? = null
         val rounds = ToolStore.clampMaxRounds(maxToolRounds)
+        val includeTimestamps = appContext?.let { ToolStore.loadMessageTimestamps(it) } ?: true
         // Snapshot all runtime capabilities once per request. Only the evolving history is copied
         // between rounds; providers therefore observe one coherent request context.
         val toolContext = ToolExecutionContext(
@@ -188,7 +189,7 @@ object ChatApi {
             val turn = streamOnce(
                 provider = provider,
                 model = model,
-                messages = history,
+                messages = if (includeTimestamps) history else history.map { it.copy(createdAt = 0L) },
                 reasoningEffort = reasoningEffort,
                 fastMode = fastMode,
                 systemPrompt = systemPrompt,
@@ -1035,18 +1036,16 @@ object ChatApi {
         }
     }
 
-    /** 给用户消息文本加上仅模型可见的时间戳前缀，UI 不会渲染这段内容。 */
-    private fun String.withTimestampPrefix(createdAt: Long): String {
-        if (createdAt <= 0L) return this
+    /** 给用户消息文本加上仅模型可见的时间戳前缀。关闭「消息时间戳」时 createdAt 会被清成 0，这里直接跳过。模型回复不加前缀。 */
+    internal fun stampMessageText(text: String, createdAt: Long, fromUser: Boolean): String {
+        if (!fromUser || createdAt <= 0L) return text
         val stamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
             .format(java.util.Date(createdAt))
-        return if (this.isBlank()) "[$stamp]" else "[$stamp] $this"
+        return if (text.isBlank()) "[$stamp]" else "[$stamp] $text"
     }
 
-    /** 模型自己的回复不需要时间戳前缀，避免模型混淆。 */
-    private fun String.withTimestampPrefix(createdAt: Long, fromUser: Boolean): String {
-        return if (fromUser) withTimestampPrefix(createdAt) else this
-    }
+    private fun String.withTimestampPrefix(createdAt: Long, fromUser: Boolean): String =
+        stampMessageText(this, createdAt, fromUser)
 
     private fun requestUrl(provider: ProviderConfig): String = ProviderEndpoints.chatUrl(provider)
 

@@ -79,11 +79,13 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
     var mergeModels by remember { mutableStateOf(ProviderStore.loadMergeModels()) }
     var imageGenModel by remember { mutableStateOf(ToolStore.loadImageGenModel()) }
     var titleModel by remember { mutableStateOf(ToolStore.loadTitleModel()) }
+    var messageTimestamps by remember { mutableStateOf(ToolStore.loadMessageTimestamps()) }
 
     val currentProvider by rememberUpdatedState(provider)
     val currentMaxResults by rememberUpdatedState(maxResults)
     val currentMaxRounds by rememberUpdatedState(maxRounds)
     val currentMergeModels by rememberUpdatedState(mergeModels)
+    val currentMessageTimestamps by rememberUpdatedState(messageTimestamps)
 
     fun persistCurrent() {
         SearchStore.saveApiKey(apiKey.text.toString(), currentProvider)
@@ -91,6 +93,7 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
         ProviderStore.saveMergeModels(currentMergeModels)
         SearchStore.saveProvider(currentProvider)
         ToolStore.saveMaxRounds(currentMaxRounds)
+        ToolStore.saveMessageTimestamps(currentMessageTimestamps)
     }
 
     fun switchProvider(next: SearchProvider) {
@@ -229,6 +232,20 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
                     },
                 )
                 SystemPromptRow(onClick = onSystemPrompt)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "消息时间戳",
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][onBackgroundColor],
+                    )
+                    Switch(
+                        checked = messageTimestamps,
+                        onCheckedChange = { messageTimestamps = it },
+                    )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,

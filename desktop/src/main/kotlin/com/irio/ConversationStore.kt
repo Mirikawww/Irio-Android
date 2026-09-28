@@ -9,6 +9,7 @@ data class ChatMessage(
     val id: Long,
     val text: String,
     val fromUser: Boolean,
+    val createdAt: Long = System.currentTimeMillis(),
     val attachments: List<ChatAttachment> = emptyList(),
     val process: List<ProcessEvent> = emptyList(),
     val isError: Boolean = false,
@@ -219,6 +220,7 @@ object ConversationStore {
                             put("id", message.id)
                             put("text", message.text)
                             put("fromUser", message.fromUser)
+                            put("createdAt", message.createdAt)
                             put("isError", message.isError)
                             put("retryGroup", message.groupId)
                             put("selected", message.selected)
@@ -298,6 +300,7 @@ object ConversationStore {
                         id = item.optLong("id"),
                         text = item.optString("text"),
                         fromUser = item.optBoolean("fromUser"),
+                        createdAt = item.optLong("createdAt").takeIf { it > 0L } ?: System.currentTimeMillis(),
                         attachments = attachments,
                         process = processEventsFrom(item),
                         isError = item.optBoolean("isError"),
