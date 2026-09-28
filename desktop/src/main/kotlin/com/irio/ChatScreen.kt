@@ -215,6 +215,26 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     var composerStatus by remember { mutableStateOf<String?>(null) }
     /** 正在编辑的用户消息 id；null = 普通发送模式。 */
     var editingMessageId by remember { mutableStateOf<Long?>(null) }
+    // 未发送的输入按会话分开。当前会话的内容只在输入框里，切走才写入这张表。
+    val composerDrafts = remember { mutableMapOf<String, ComposerDraft>() }
+    fun swapComposer(fromId: String, toId: String) {
+        val restored = swapComposerDraft(
+            composerDrafts,
+            fromId,
+            toId,
+            ComposerDraft(
+                text = message.text.toString(),
+                attachments = pendingAttachments,
+                editingMessageId = editingMessageId,
+            ),
+        )
+        if (message.text.toString() != restored.text) {
+            message.edit { replace(0, length, restored.text) }
+        }
+        pendingAttachments = restored.attachments
+        editingMessageId = restored.editingMessageId
+        composerStatus = null
+    }
     var selectedModel by remember {
         mutableStateOf(ProviderStore.loadProvider()?.selectedModel.orEmpty())
     }
@@ -523,7 +543,13 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             val full = ConversationStore.load(conversation.id) ?: return@launch
             val applied = withContext(Dispatchers.Main) {
                 if (conversationLoadToken != requestToken) return@withContext false
+                val previous = currentConversation
+                val previousMessages = messages
                 pendingConversationScroll = full.id
+                swapComposer(previous.id, full.id)
+                if (previousMessages.isEmpty() && previous.messages.isEmpty()) {
+                    composerDrafts.remove(previous.id)
+                }
                 currentConversation = full
                 messages = full.messages
                 true
@@ -536,17 +562,21 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     }
 
     fun newConversation(closeDrawer: Boolean = true) {
-        val previousId = currentConversation.id
-        val keepPool = previousId in generatingIds
+        val previous = currentConversation
+        val previousMessages = messages
+        val keepPool = previous.id in generatingIds
         conversationLoadToken++
-        currentConversation = ConversationStore.newConversation()
+        val created = ConversationStore.newConversation()
+        swapComposer(previous.id, created.id)
+        if (previousMessages.isEmpty() && previous.messages.isEmpty()) {
+            composerDrafts.remove(previous.id)
+        }
+        currentConversation = created
         messages = emptyList()
         // The counter is never reset: message ids are used as keys in [generations] and
         // [replaceInConversation], so restarting at 1 collides with another conversation's ids.
-        pendingAttachments = emptyList()
-        composerStatus = null
         if (closeDrawer) drawerProgress = 0f
-        if (!keepPool) IrioHttp.evictConversation(previousId)
+        if (!keepPool) IrioHttp.evictConversation(previous.id)
     }
 
     fun stopGeneration(conversationId: String = currentConversation.id) {
@@ -562,8 +592,11 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         generations.values.forEach { it.cancellation.cancel() }
         IrioHttp.evictAllScopes()
         ConversationStore.deleteAll()
-        conversations = emptyList()
         message.clearText()
+        pendingAttachments = emptyList()
+        editingMessageId = null
+        composerDrafts.clear()
+        conversations = emptyList()
         newConversation(closeDrawer = false)
         val jobs = generations.values.map { it.job }
         if (jobs.isEmpty()) {
@@ -599,6 +632,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         if (currentConversation.id == conversation.id) {
             newConversation(closeDrawer = false)
         }
+        composerDrafts.remove(conversation.id)
         scope.launch(Dispatchers.IO) {
             ConversationStore.delete(conversation.id)
         }
