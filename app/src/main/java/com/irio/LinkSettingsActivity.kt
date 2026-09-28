@@ -289,10 +289,6 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                         }
                     }
                 }
-                if (state.settings.syncMode == LinkSyncMode.OVERWRITE) {
-                    Text("覆盖：用本机当前数据替换对方。", color = muted, fontSize = 13.sp)
-                }
-
                 LinkCard {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
