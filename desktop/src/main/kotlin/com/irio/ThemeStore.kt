@@ -39,6 +39,15 @@ enum class ThemePreference(val label: String, val stored: String) {
     }
 }
 
+enum class AppLanguage(val label: String, val stored: String) {
+    ZH_CN("简体中文", "zh-CN");
+
+    companion object {
+        fun fromStored(value: String?): AppLanguage =
+            entries.firstOrNull { it.stored.equals(value, ignoreCase = true) } ?: ZH_CN
+    }
+}
+
 enum class AccentColor(val label: String, val stored: String, val color: Color) {
     BLACK("黑色", "black", Color.Black),
     BLUE("蓝色", "blue", Color(0xFF3B82F6)),
@@ -70,14 +79,17 @@ object ThemeStore {
     private const val KEY = "theme_preference"
     private const val AUTO_AMOLED_KEY = "auto_amoled"
     private const val ACCENT_KEY = "accent_color"
+    private const val LANGUAGE_KEY = "language"
     private const val CONTEXT_RING_KEY = "context_ring"
 
     private val initial = loadInitial()
-    var preference by mutableStateOf(initial.first)
+    var preference by mutableStateOf(initial.preference)
         private set
-    var autoAmoled by mutableStateOf(initial.second)
+    var autoAmoled by mutableStateOf(initial.autoAmoled)
         private set
-    var accent by mutableStateOf(initial.third)
+    var accent by mutableStateOf(initial.accent)
+        private set
+    var language by mutableStateOf(initial.language)
         private set
     var contextRing by mutableStateOf(false)
         private set
@@ -101,6 +113,12 @@ object ThemeStore {
         updateAppearance { it.put(ACCENT_KEY, value.stored) }
     }
 
+    fun saveLanguage(value: AppLanguage) {
+        if (language == value) return
+        language = value
+        updateAppearance { it.put(LANGUAGE_KEY, value.stored) }
+    }
+
     fun saveContextRing(enabled: Boolean) {
         contextRing = false
         updateAppearance { it.put(CONTEXT_RING_KEY, false) }
@@ -113,13 +131,14 @@ object ThemeStore {
         AppPaths.appearanceFile.writeText(appearance.toString())
     }
 
-    private fun loadInitial(): Triple<ThemePreference, Boolean, AccentColor> {
+    private fun loadInitial(): LoadedAppearance {
         val appearance = runCatching { JSONObject(AppPaths.appearanceFile.readText()) }.getOrNull()
         val fromAppearance = appearance?.optString(KEY)?.takeIf { it.isNotBlank() }
         val autoAmoled = appearance?.optBoolean(AUTO_AMOLED_KEY, false) ?: false
         val accent = AccentColor.fromStored(appearance?.optString(ACCENT_KEY)?.takeIf { it.isNotBlank() })
+        val language = AppLanguage.fromStored(appearance?.optString(LANGUAGE_KEY)?.takeIf { it.isNotBlank() })
         if (fromAppearance != null) {
-            return Triple(ThemePreference.fromStored(fromAppearance), autoAmoled, accent)
+            return LoadedAppearance(ThemePreference.fromStored(fromAppearance), autoAmoled, accent, language)
         }
         val legacy = runCatching {
             JSONObject(AppPaths.providersFile.readText()).optString(KEY)
@@ -128,6 +147,13 @@ object ThemeStore {
         if (legacy != null) {
             updateAppearance { it.put(KEY, preference.stored) }
         }
-        return Triple(preference, autoAmoled, accent)
+        return LoadedAppearance(preference, autoAmoled, accent, language)
     }
+
+    private data class LoadedAppearance(
+        val preference: ThemePreference,
+        val autoAmoled: Boolean,
+        val accent: AccentColor,
+        val language: AppLanguage,
+    )
 }

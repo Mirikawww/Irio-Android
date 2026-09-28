@@ -39,6 +39,15 @@ enum class ThemePreference(val label: String, val stored: String) {
     }
 }
 
+enum class AppLanguage(val label: String, val stored: String) {
+    ZH_CN("简体中文", "zh-CN");
+
+    companion object {
+        fun fromStored(value: String?): AppLanguage =
+            entries.firstOrNull { it.stored.equals(value, ignoreCase = true) } ?: ZH_CN
+    }
+}
+
 enum class AccentColor(val label: String, val stored: String, val color: Color) {
     BLACK("黑色", "black", Color.Black),
     BLUE("蓝色", "blue", Color(0xFF3B82F6)),
@@ -71,6 +80,7 @@ object ThemeStore {
     private const val KEY = "theme_preference"
     private const val AUTO_AMOLED_KEY = "auto_amoled"
     private const val ACCENT_KEY = "accent_color"
+    private const val LANGUAGE_KEY = "language"
     private const val CONTEXT_RING_KEY = "context_ring"
     private const val LEGACY_PREFS = "provider_settings"
     private const val LEGACY_KEY = "theme_preference"
@@ -82,6 +92,9 @@ object ThemeStore {
         private set
 
     var accent by mutableStateOf(AccentColor.BLACK)
+        private set
+
+    var language by mutableStateOf(AppLanguage.ZH_CN)
         private set
 
     /** 圆环暂未开放：始终关。 */
@@ -102,6 +115,7 @@ object ThemeStore {
             preference = ThemePreference.fromStored(stored)
             autoAmoled = appearance.getBoolean(AUTO_AMOLED_KEY, false)
             accent = AccentColor.fromStored(appearance.getString(ACCENT_KEY, null))
+            language = AppLanguage.fromStored(appearance.getString(LANGUAGE_KEY, null))
             contextRing = false
             if (appearance.getString(KEY, null) == null && stored != null) {
                 appearance.edit().putString(KEY, stored).apply()
@@ -137,6 +151,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putString(ACCENT_KEY, value.stored)
+            .apply()
+    }
+
+    fun saveLanguage(context: Context, value: AppLanguage) {
+        ensureLoaded(context)
+        if (language == value) return
+        language = value
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(LANGUAGE_KEY, value.stored)
             .apply()
     }
 

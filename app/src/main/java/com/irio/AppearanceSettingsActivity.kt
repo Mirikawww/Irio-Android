@@ -87,9 +87,11 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
     var texScalePercent by remember { mutableIntStateOf((ProviderStore.loadTexScale(context) * 100).toInt()) }
     val themePreference = ThemeStore.preference
     val accent = ThemeStore.accent
+    val language = ThemeStore.language
     val autoAmoled = ThemeStore.autoAmoled
     var themeMenuOpen by remember { mutableStateOf(false) }
     var accentMenuOpen by remember { mutableStateOf(false) }
+    var languageMenuOpen by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = background,
@@ -128,6 +130,69 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                DropdownMenu(
+                    expanded = languageMenuOpen,
+                    onExpandedChange = { languageMenuOpen = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    alignment = DropdownMenuAlignment.End,
+                    panel = {
+                        DropdownMenuPanel {
+                            AppLanguage.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    onClick = {
+                                        ThemeStore.saveLanguage(context, option)
+                                        languageMenuOpen = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    leading = {
+                                        if (language == option) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                                tint = Theme[colors][onPanelColor],
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        } else {
+                                            Spacer(Modifier.size(16.dp))
+                                        }
+                                    },
+                                ) { Text(option.label, color = Theme[colors][onPanelColor]) }
+                            }
+                        }
+                    },
+                ) {
+                    val interactionSource = remember { MutableInteractionSource() }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = { languageMenuOpen = !languageMenuOpen },
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("语言", color = Theme[colors][onPanelColor])
+                            Text(language.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+                        }
+                        IconButton(
+                            onClick = { languageMenuOpen = !languageMenuOpen },
+                            style = ButtonStyle.Ghost,
+                            buttonSize = ButtonSize.Small,
+                            shape = CircleShape,
+                            modifier = Modifier.size(32.dp),
+                            interactionSource = interactionSource,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = "选择语言",
+                                tint = Theme[colors][onPanelColor],
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
                 DropdownMenu(
                     expanded = themeMenuOpen,
                     onExpandedChange = { themeMenuOpen = it },

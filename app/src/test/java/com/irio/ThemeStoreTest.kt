@@ -34,4 +34,13 @@ class ThemeStoreTest {
         assertTrue(ResolvedTheme.DARK.isDark)
         assertFalse(ResolvedTheme.LIGHT.isDark)
     }
+
+    @Test
+    fun parsesStoredLanguageAndDefaultsToSimplifiedChinese() {
+        assertEquals(AppLanguage.ZH_CN, AppLanguage.fromStored(null))
+        assertEquals(AppLanguage.ZH_CN, AppLanguage.fromStored("unknown"))
+        assertEquals(AppLanguage.ZH_CN, AppLanguage.fromStored("ZH-CN"))
+        assertEquals("简体中文", AppLanguage.ZH_CN.label)
+        assertEquals("zh-CN", AppLanguage.ZH_CN.stored)
+    }
 }
