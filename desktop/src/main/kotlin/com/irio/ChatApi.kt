@@ -86,7 +86,7 @@ data class ChatStreamUpdate(
     val toolName: String = "",
     /** 工具完成后展示在可展开详情中的结果内容。 */
     val toolContent: String = "",
-    /** 工具调用多轮对话时，标记新一轮开始，UI 应清空当前流式文本。 */
+    /** 工具调用之后的新一轮。UI 保留已输出正文，下一轮正文接在后面，不要清掉上一轮。 */
     val newRound: Boolean = false,
     val usage: TokenUsage? = null,
 )

@@ -241,6 +241,7 @@ object ConversationStore {
                                                 put("millis", event.millis)
                                                 put("pages", event.pages)
                                                 if (event.belowText) put("belowText", true)
+                                                if (event.textOffset > 0) put("textOffset", event.textOffset)
                                                 if (event.toolName.isNotBlank()) put("toolName", event.toolName)
                                             }
                                         )
@@ -347,6 +348,7 @@ internal fun processEventsFrom(item: JSONObject): List<ProcessEvent> {
                         millis = event.optLong("millis"),
                         pages = event.optInt("pages"),
                         belowText = event.optBoolean("belowText"),
+                        textOffset = event.optInt("textOffset"),
                         toolName = event.optString("toolName"),
                     )
                 )

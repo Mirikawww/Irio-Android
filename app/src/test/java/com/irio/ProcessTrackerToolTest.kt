@@ -80,4 +80,51 @@ class ProcessTrackerToolTest {
         assertEquals("网页正文", event.content)
         assertFalse(event.live)
     }
+
+    @Test
+    fun toolBetweenSpeechesStaysAtItsAnchor() {
+        val tracker = ProcessTracker()
+        val first = "先说一句"
+        tracker.onOutputStarted(textLength = first.length)
+        tracker.onToolStarted(TimeTool.NAME)
+        tracker.onToolFinished("12:00")
+        val continued = appendAssistantRoundBreak(first) + "再说一句"
+        tracker.onOutputStarted(textLength = continued.length)
+        val tool = tracker.snapshot().single()
+        assertEquals(first.length, tool.textOffset)
+        assertTrue(tool.belowText)
+        assertEquals(
+            listOf("text:$first", "TOOL", "text:\n\n再说一句"),
+            transcriptLabels(interleaveTranscript(continued, tracker.snapshot())),
+        )
+        assertEquals(continued, settledAssistantText(continued, "再说一句"))
+    }
+
+    @Test
+    fun legacyBelowTextWithoutOffsetStaysAfterTheWholeReply() {
+        val event = ProcessEvent(
+            id = 1,
+            kind = ProcessEventKind.TOOL,
+            belowText = true,
+            toolName = TimeTool.NAME,
+        )
+        assertEquals(
+            listOf("text:全部正文", "TOOL"),
+            transcriptLabels(interleaveTranscript("全部正文", listOf(event))),
+        )
+    }
+
+    @Test
+    fun appendAssistantRoundBreakDoesNotStackBlankLines() {
+        assertEquals("先说\n\n", appendAssistantRoundBreak("先说"))
+        assertEquals("先说\n\n", appendAssistantRoundBreak("先说\n"))
+        assertEquals("先说\n\n", appendAssistantRoundBreak("先说\n\n"))
+    }
+
+    private fun transcriptLabels(pieces: List<TranscriptPiece>): List<String> = pieces.map { piece ->
+        when (piece) {
+            is TranscriptPiece.Text -> "text:${piece.text}"
+            is TranscriptPiece.Event -> piece.event.kind.name
+        }
+    }
 }

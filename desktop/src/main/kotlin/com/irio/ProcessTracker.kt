@@ -8,6 +8,7 @@ internal class ProcessTracker {
     private var liveToolId: Long? = null
     private var thinkingStartedAt: Long? = null
     private var outputStarted = false
+    private var outputLength = 0
 
     fun snapshot(): List<ProcessEvent> = events.toList()
 
@@ -26,6 +27,7 @@ internal class ProcessTracker {
                 content = delta,
                 live = true,
                 belowText = outputStarted,
+                textOffset = eventAnchor(),
             )
         } else {
             events.replaceAll { event ->
@@ -34,10 +36,11 @@ internal class ProcessTracker {
         }
     }
 
-    fun onOutputStarted(now: Long = System.currentTimeMillis()) {
+    fun onOutputStarted(now: Long = System.currentTimeMillis(), textLength: Int = -1) {
         finishThinking(now)
         finishLiveTool()
         outputStarted = true
+        if (textLength >= 0) outputLength = textLength
     }
 
     fun onSearchStarted() {
@@ -51,6 +54,7 @@ internal class ProcessTracker {
             kind = ProcessEventKind.SEARCH,
             live = true,
             belowText = outputStarted,
+            textOffset = eventAnchor(),
         )
     }
 
@@ -62,7 +66,7 @@ internal class ProcessTracker {
         liveSearchId = null
     }
 
-    /** 本地工具调用开始：正文开始后启动的渲染在文本下方。 */
+    /** 本地工具调用开始：锚在当前正文长度上，后续正文排在它后面，而不是整段的最下面。 */
     fun onToolStarted(name: String = "") {
         finishThinking()
         finishLiveTool()
@@ -75,8 +79,11 @@ internal class ProcessTracker {
             live = true,
             belowText = outputStarted,
             toolName = name,
+            textOffset = eventAnchor(),
         )
     }
+
+    private fun eventAnchor(): Int = if (outputStarted) outputLength else 0
 
     fun onToolFinished(content: String = "") {
         finishLiveTool(content)

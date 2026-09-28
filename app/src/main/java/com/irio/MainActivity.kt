@@ -1005,6 +1005,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             try {
                 val provider = requestProvider
                 var streamedText = ""
+                var roundBreakPending = false
                 var streamedAttachments = emptyList<ChatAttachment>()
                 val process = ProcessTracker()
                 var lastPublishAt = 0L
@@ -1089,12 +1090,18 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             val terminalState = update.searching == false || update.toolActive == false || update.done
                             if (!cancelled || terminalState || update.attachments.isNotEmpty()) {
                                 if (!cancelled) {
-                                    if (update.newRound) streamedText = ""
-                                    if (update.delta.isNotEmpty()) streamedText += update.delta
+                                    if (update.newRound && streamedText.isNotEmpty()) roundBreakPending = true
                                     if (update.thinkingDelta.isNotEmpty()) {
                                         process.onThinkingDelta(update.thinkingDelta)
                                     }
-                                    if (update.delta.isNotEmpty()) process.onOutputStarted()
+                                    if (update.delta.isNotEmpty()) {
+                                        if (roundBreakPending) {
+                                            streamedText = appendAssistantRoundBreak(streamedText)
+                                            roundBreakPending = false
+                                        }
+                                        streamedText += update.delta
+                                        process.onOutputStarted(textLength = streamedText.length)
+                                    }
                                 }
                                 if (update.attachments.isNotEmpty()) {
                                     streamedAttachments = (streamedAttachments + update.attachments)
@@ -1197,7 +1204,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     isStreaming = false,
                 )
                 else -> reply.copy(
-                    text = result.content.ifBlank { streamedText },
+                    text = settledAssistantText(streamedText, result.content),
                     process = finalProcess.map { it.copy(live = false) },
                     attachments = result.attachments.ifEmpty { streamedAttachments },
                     usage = finalUsage,
@@ -2407,43 +2414,66 @@ internal fun MessageRow(
                         AttachmentPreview(attachment, boxed = false, onOpen = { onOpenAttachment(attachment) })
                     }
                 }
-                // 正文开始前启动的过程事件（思考/搜索）在文本上方；开始后启动的（工具/后续搜索）在下方
-                chatMessage.process.forEach { event ->
-                    if (!event.belowText) ProcessEventRow(event, onOpen = onOpenProcess)
-                }
-                when {
-                    (chatMessage.isPending || chatMessage.isStreaming) &&
-                        chatMessage.text.isBlank() &&
-                        chatMessage.process.none { it.live } -> {
-                        StatusSweepText(tr("请求中"))
+                if (chatMessage.isError && chatMessage.text.isNotBlank()) {
+                    chatMessage.process.forEach { event ->
+                        if (!event.belowText) ProcessEventRow(event, onOpen = onOpenProcess)
                     }
-                    chatMessage.text.isNotBlank() -> {
-                        Box(Modifier.padding(vertical = 2.dp)) {
-                            CompositionLocalProvider(
-                                LocalTextSelectionColors provides Theme[textSelectionColors][defaultTextSelectionColors],
-                            ) {
-                                SelectionContainer {
-                                    if (chatMessage.isError) {
-                                        Text(
-                                            chatMessage.text,
-                                            color = Theme[colors][destructiveColor],
-                                            fontSize = 17.sp,
-                                            lineHeight = 26.sp,
-                                        )
-                                    } else {
-                                        AssistantMarkdown(
-                                            text = chatMessage.text,
-                                            streaming = chatMessage.isStreaming || chatMessage.isPending,
-                                            renderScope = markdownScope,
-                                        )
+                    Box(Modifier.padding(vertical = 2.dp)) {
+                        CompositionLocalProvider(
+                            LocalTextSelectionColors provides Theme[textSelectionColors][defaultTextSelectionColors],
+                        ) {
+                            SelectionContainer {
+                                Text(
+                                    chatMessage.text,
+                                    color = Theme[colors][destructiveColor],
+                                    fontSize = 17.sp,
+                                    lineHeight = 26.sp,
+                                )
+                            }
+                        }
+                    }
+                    chatMessage.process.forEach { event ->
+                        if (event.belowText) ProcessEventRow(event, onOpen = onOpenProcess)
+                    }
+                } else {
+                    // 过程事件锚在它发生时的正文长度上：先说的话、工具、再说的话，完成输出后也不换位。
+                    val pieces = interleaveTranscript(chatMessage.text, chatMessage.process)
+                    val streamingBody = chatMessage.isStreaming || chatMessage.isPending
+                    val lastTextIndex = pieces.indexOfLast { it is TranscriptPiece.Text }
+                    var seenText = false
+                    pieces.forEachIndexed { index, piece ->
+                        when (piece) {
+                            is TranscriptPiece.Event -> key("process-${piece.event.id}") {
+                                ProcessEventRow(piece.event, onOpen = onOpenProcess)
+                            }
+                            is TranscriptPiece.Text -> {
+                                val shown = if (seenText) piece.text.trimStart('\n') else piece.text
+                                seenText = true
+                                if (shown.isNotBlank()) {
+                                    key("body-$index") {
+                                        Box(Modifier.padding(vertical = 2.dp)) {
+                                            CompositionLocalProvider(
+                                                LocalTextSelectionColors provides Theme[textSelectionColors][defaultTextSelectionColors],
+                                            ) {
+                                                SelectionContainer {
+                                                    AssistantMarkdown(
+                                                        text = shown,
+                                                        streaming = streamingBody && index == lastTextIndex,
+                                                        renderScope = markdownScope,
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-                        // 正文开始后启动的过程事件渲染在已输出文本下方
-                        chatMessage.process.forEach { event ->
-                            if (event.belowText) ProcessEventRow(event, onOpen = onOpenProcess)
-                        }
+                    }
+                    if ((chatMessage.isPending || chatMessage.isStreaming) &&
+                        chatMessage.text.isBlank() &&
+                        chatMessage.process.none { it.live }
+                    ) {
+                        StatusSweepText(tr("请求中"))
                     }
                 }
                 // 停止/结束后正文可能一直为空（例如只输出思考就被停止）：

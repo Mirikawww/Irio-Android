@@ -235,6 +235,7 @@ object LinkConversationJson {
                                                     put("millis", event.millis)
                                                     put("pages", event.pages)
                                                     if (event.belowText) put("belowText", true)
+                                                    if (event.textOffset > 0) put("textOffset", event.textOffset)
                                                     if (event.toolName.isNotBlank()) put("toolName", event.toolName)
                                                 }
                                             )
