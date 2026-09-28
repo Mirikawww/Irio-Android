@@ -74,6 +74,7 @@ import com.mikepenz.markdown.model.ImageWidth
 import com.mikepenz.markdown.model.MarkdownState
 import com.mikepenz.markdown.model.MarkdownTypography
 import com.mikepenz.markdown.model.PlaceholderConfig
+import com.mikepenz.markdown.model.markdownAnimations
 import com.mikepenz.markdown.model.markdownExtendedSpans
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
@@ -163,6 +164,11 @@ internal fun IrioMarkdown(
     val entryState = remember { state }
     val flavour = remember { GFMFlavourDescriptor() }
     val parser = remember(flavour) { MarkdownParser(flavour) }
+    // Default animations are animateContentSize on every MarkdownText. A streaming
+    // tail changes that size on almost every line, so the paragraph bounds tween
+    // open. Snap, including when a formula bitmap replaces its placeholder.
+    val snapTextSize = remember<Modifier.() -> Modifier> { { this } }
+    val animations = markdownAnimations(animateTextSize = snapTextSize)
     if (entryState != null) {
         Markdown(
             markdownState = entryState,
@@ -172,6 +178,7 @@ internal fun IrioMarkdown(
             imageTransformer = imageTransformer,
             extendedSpans = extendedSpans,
             components = components,
+            animations = animations,
         )
     } else {
         // retainState: a new token must not reset this block to Loading (empty box).
@@ -192,6 +199,7 @@ internal fun IrioMarkdown(
             imageTransformer = imageTransformer,
             extendedSpans = extendedSpans,
             components = components,
+            animations = animations,
         )
     }
 }
