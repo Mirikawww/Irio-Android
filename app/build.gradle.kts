@@ -20,8 +20,8 @@ android {
         applicationId = "com.irio"
         minSdk = 33
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = rootProject.providers.gradleProperty("irio.versionCode").get().toInt()
+        versionName = rootProject.providers.gradleProperty("irio.versionName").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

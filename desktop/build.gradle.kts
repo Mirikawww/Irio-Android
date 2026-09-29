@@ -4,8 +4,41 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
 }
 
+val appBuildGeneratedDir = layout.buildDirectory.dir("generated/appbuild/kotlin")
+
+val generateAppBuild = tasks.register("generateAppBuild") {
+    val versionName = providers.gradleProperty("irio.versionName").get()
+    val versionCode = providers.gradleProperty("irio.versionCode").get().toLong()
+    inputs.property("versionName", versionName)
+    inputs.property("versionCode", versionCode)
+    outputs.dir(appBuildGeneratedDir)
+    doLast {
+        val dir = appBuildGeneratedDir.get().asFile.resolve("com/irio")
+        dir.mkdirs()
+        val escapedName = versionName.replace("\\", "\\\\").replace("\"", "\\\"")
+        dir.resolve("DesktopAppBuild.kt").writeText(
+            """
+            package com.irio
+
+            internal object DesktopAppBuild {
+                const val versionName = "$escapedName"
+                const val versionCode = ${versionCode}L
+                const val buildType = "debug"
+            }
+            """.trimIndent() + "\n",
+        )
+    }
+}
+
 kotlin {
     jvmToolchain(21)
+    sourceSets.named("main") {
+        kotlin.srcDir(appBuildGeneratedDir)
+    }
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class.java).configureEach {
+    dependsOn(generateAppBuild)
 }
 
 dependencies {
