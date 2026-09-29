@@ -292,7 +292,7 @@ private fun ModelEnabledRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(background, Theme[shapes][largeShape])
-            .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
