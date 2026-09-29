@@ -308,6 +308,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     val suppressProviderEcho = remember { SuppressFlag() }
     val messageRecyclerController = remember { MessageRecyclerController() }
     var recyclerScrolling by remember { mutableStateOf(false) }
+    var stickToBottom by remember { mutableStateOf(true) }
+    var seenTranscriptConversationId by remember { mutableStateOf<String?>(null) }
+    var seenTranscriptTailId by remember { mutableStateOf<Long?>(null) }
     var composerBarHeightPx by remember { mutableIntStateOf(0) }
     val composerBarHeight = with(LocalDensity.current) { composerBarHeightPx.toDp() }
     var toolbarHeightPx by remember { mutableIntStateOf(0) }
@@ -320,6 +323,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     val muted = Theme[colors][mutedColor]
     val drawerWidth = 280.dp
     val density = LocalDensity.current
+    val transcriptBottomSlackPx = with(density) { 24.dp.toPx().roundToInt() }
     val drawerWidthPx = with(density) { drawerWidth.toPx() }
     var drawerProgress by remember { mutableStateOf(0f) }
     var drawerDragging by remember { mutableStateOf(false) }
@@ -718,25 +722,39 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(currentConversation.id, visibleTranscript.size, visibleTranscript.lastOrNull()?.id) {
-        val last = visibleTranscript.lastOrNull() ?: return@LaunchedEffect
-        if (pendingConversationScroll == currentConversation.id) {
-            pendingConversationScroll = null
-            messageRecyclerController.requestScrollToBottom()
+    LaunchedEffect(
+        currentConversation.id,
+        visibleTranscript.size,
+        visibleTranscript.lastOrNull()?.let(::transcriptTailFollowKey),
+        stickToBottom,
+        recyclerScrolling,
+    ) {
+        if (currentConversation.id != seenTranscriptConversationId) {
+            seenTranscriptConversationId = currentConversation.id
+            seenTranscriptTailId = null
+            stickToBottom = true
+        }
+        val last = visibleTranscript.lastOrNull()
+        if (last == null) {
+            seenTranscriptTailId = null
+            stickToBottom = true
             return@LaunchedEffect
         }
-        // 用户不在底部（在往回翻看历史）时不抢滚动位置，让浏览保持流畅。
-        if (recyclerScrolling || messageRecyclerController.isScrollInProgress()) return@LaunchedEffect
-        // 新发送的用户消息必须落到底部；只有后续助手更新才受“用户上滑不抢位置”保护。
-        if (last.fromUser) {
-            messageRecyclerController.requestScrollToBottom()
+        val opening = pendingConversationScroll == currentConversation.id
+        val force = opening || (last.fromUser && last.id != seenTranscriptTailId)
+        if (opening) pendingConversationScroll = null
+        if (!shouldSnapTranscriptToBottom(
+                stickToBottom = stickToBottom,
+                userScrollInProgress = recyclerScrolling || messageRecyclerController.isScrollInProgress(),
+                force = force,
+            )
+        ) {
+            seenTranscriptTailId = last.id
             return@LaunchedEffect
         }
-        val lastVisible = messageRecyclerController.lastVisibleIndex()
-        val nearBottom = lastVisible >= visibleTranscript.lastIndex - 1
-        if (nearBottom && (!last.isPending && !last.isStreaming)) {
-            messageRecyclerController.requestScrollToBottom()
-        }
+        if (force) stickToBottom = true
+        messageRecyclerController.requestScrollToBottom()
+        seenTranscriptTailId = last.id
     }
 
     // 拖动停止 / 惯性衰减 / 流式结束后复位 streamingDeferActive，
@@ -1705,6 +1723,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         recyclerScrolling = scrolling
                         if (scrolling && generatingIds.isNotEmpty()) {
                             streamingDeferActive.set(true)
+                        }
+                    },
+                    onUserScrollSample = {
+                        if (!messageRecyclerController.isProgrammaticScroll()) {
+                            messageRecyclerController.isPinnedToBottom(transcriptBottomSlackPx)?.let { pinned ->
+                                stickToBottom = pinned
+                            }
                         }
                     },
                 )

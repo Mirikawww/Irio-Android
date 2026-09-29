@@ -58,6 +58,7 @@ internal fun AndroidMessageList(
     callbacks: AndroidMessageCallbacks,
     onVisibleRangeChanged: (first: Int, last: Int) -> Unit,
     onScrollStateChanged: (scrollState: Int) -> Unit,
+    onUserScrollSample: () -> Unit,
 ) {
     AndroidView(
         modifier = modifier,
@@ -66,6 +67,7 @@ internal fun AndroidMessageList(
                 controller.attach(view)
                 view.onVisibleRangeChanged = onVisibleRangeChanged
                 view.onScrollStateChanged = onScrollStateChanged
+                view.onUserScrollSample = onUserScrollSample
                 view.setTranscriptPadding(contentPaddingTop, contentPaddingBottom)
                 view.updateCallbacks(callbacks)
                 view.updateMessages(messages) { controller.flushScrollToBottom() }
@@ -77,6 +79,7 @@ internal fun AndroidMessageList(
             controller.attach(view)
             view.onVisibleRangeChanged = onVisibleRangeChanged
             view.onScrollStateChanged = onScrollStateChanged
+            view.onUserScrollSample = onUserScrollSample
             view.setTranscriptPadding(contentPaddingTop, contentPaddingBottom)
             view.updateCallbacks(callbacks)
             view.updateMessages(messages) { controller.flushScrollToBottom() }
@@ -89,6 +92,7 @@ internal fun AndroidMessageList(
 internal class MessageRecyclerController {
     private var recyclerView: MessageRecyclerView? = null
     private var scrollRequested = false
+    private var programmaticPosts = 0
 
     fun attach(view: MessageRecyclerView) {
         recyclerView = view
@@ -99,6 +103,8 @@ internal class MessageRecyclerController {
         flushScrollToBottom()
     }
 
+    fun isProgrammaticScroll(): Boolean = programmaticPosts > 0
+
     fun flushScrollToBottom() {
         if (!scrollRequested) return
         val view = recyclerView ?: return
@@ -108,30 +114,56 @@ internal class MessageRecyclerController {
             return
         }
         scrollRequested = false
+        programmaticPosts++
         view.post {
             val count = view.itemCountValue()
-            if (count == 0) return@post
-            view.layoutManager?.scrollToPosition(count - 1)
-            view.post {
-                val child = view.layoutManager?.findViewByPosition(count - 1) ?: return@post
-                val bottom = view.height - view.paddingBottom
-                val delta = child.bottom - bottom
-                if (delta != 0) view.scrollBy(0, delta)
+            if (count == 0) {
+                programmaticPosts--
+                return@post
             }
+            view.layoutManager?.scrollToPosition(count - 1)
+            programmaticPosts++
+            view.post {
+                try {
+                    val child = view.layoutManager?.findViewByPosition(count - 1) ?: return@post
+                    val bottom = view.height - view.paddingBottom
+                    val delta = child.bottom - bottom
+                    if (delta != 0) view.scrollBy(0, delta)
+                } finally {
+                    programmaticPosts--
+                }
+            }
+            programmaticPosts--
         }
     }
 
     fun isScrollInProgress(): Boolean =
         recyclerView?.scrollState?.let { it != RecyclerView.SCROLL_STATE_IDLE } ?: false
 
-    fun lastVisibleIndex(): Int =
-        (recyclerView?.layoutManager as? LinearLayoutManager)?.findLastVisibleItemPosition() ?: -1
+    /** 最后一条的底边还在列表视口里才算贴底。还没布局返回 null。 */
+    fun isPinnedToBottom(slackPx: Int): Boolean? {
+        val view = recyclerView ?: return null
+        val count = view.adapter?.itemCount ?: return null
+        if (count == 0) return true
+        if (view.childCount == 0) return null
+        val manager = view.layoutManager as? LinearLayoutManager ?: return null
+        val lastView = manager.findViewByPosition(count - 1)
+        return transcriptViewportPinned(
+            itemCount = count,
+            hasLayout = true,
+            lastVisibleIndex = if (lastView != null) count - 1 else -1,
+            lastEdge = lastView?.bottom ?: 0,
+            viewportEnd = view.height - view.paddingBottom,
+            slackPx = slackPx,
+        )
+    }
 }
 
 internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
     private val messageAdapter = AndroidMessageAdapter()
     var onVisibleRangeChanged: ((first: Int, last: Int) -> Unit)? = null
     var onScrollStateChanged: ((scrollState: Int) -> Unit)? = null
+    var onUserScrollSample: (() -> Unit)? = null
     private var lastNotifiedFirst = RecyclerView.NO_POSITION
     private var lastNotifiedLast = RecyclerView.NO_POSITION
 
@@ -149,10 +181,13 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 onScrollStateChanged?.invoke(newState)
                 notifyVisibleRange()
+                // 手指拖动或惯性结束时采一次。程序 scrollBy 不改变 scroll state。
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) onUserScrollSample?.invoke()
             }
 
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 notifyVisibleRange()
+                if (scrollState != RecyclerView.SCROLL_STATE_IDLE) onUserScrollSample?.invoke()
             }
         })
     }

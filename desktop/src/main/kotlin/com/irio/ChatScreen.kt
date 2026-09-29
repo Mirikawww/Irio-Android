@@ -106,6 +106,9 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -119,8 +122,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import com.composables.ui.components.BottomSheet
 import com.composables.ui.components.BottomSheetDetent
 import com.composables.ui.components.BottomSheetState
@@ -254,6 +259,43 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     val currentConversationState = rememberUpdatedState(currentConversation)
     val generationsSnapshotState = rememberUpdatedState(generations)
     val listState = rememberLazyListState()
+    val stickToBottomState = remember { mutableStateOf(true) }
+    var stickToBottom by stickToBottomState
+    val userDrivingTranscriptState = remember { mutableStateOf(false) }
+    var userDrivingTranscript by userDrivingTranscriptState
+    var seenTranscriptConversationId by remember { mutableStateOf<String?>(null) }
+    var seenTranscriptTailId by remember { mutableStateOf<Long?>(null) }
+    val transcriptScrollGate = remember { TranscriptScrollGate() }
+    val transcriptBottomSlackPx = with(LocalDensity.current) { 24.dp.toPx().roundToInt() }
+    val transcriptFollowConnection = remember(listState, transcriptBottomSlackPx) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (transcriptScrollGate.depth == 0 && source == NestedScrollSource.UserInput) {
+                    userDrivingTranscriptState.value = true
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (transcriptScrollGate.depth == 0 && source == NestedScrollSource.UserInput) {
+                    lazyTranscriptPinnedToBottom(listState, transcriptBottomSlackPx)?.let {
+                        stickToBottomState.value = it
+                    }
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                userDrivingTranscriptState.value = false
+                if (transcriptScrollGate.depth == 0) {
+                    lazyTranscriptPinnedToBottom(listState, transcriptBottomSlackPx)?.let {
+                        stickToBottomState.value = it
+                    }
+                }
+                return Velocity.Zero
+            }
+        }
+    }
     var composerBarHeightPx by remember { mutableIntStateOf(0) }
     val composerBarHeight = with(LocalDensity.current) { composerBarHeightPx.toDp() }
     var toolbarHeightPx by remember { mutableIntStateOf(0) }
@@ -509,19 +551,61 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         }
     }
 
-    LaunchedEffect(currentConversation.id, visibleTranscript.size, visibleTranscript.lastOrNull()?.id) {
-        val last = visibleTranscript.lastOrNull() ?: return@LaunchedEffect
-        if (pendingConversationScroll == currentConversation.id) {
-            pendingConversationScroll = null
-            listState.scrollToItem(visibleTranscript.lastIndex, Int.MAX_VALUE)
+    LaunchedEffect(
+        currentConversation.id,
+        visibleTranscript.size,
+        visibleTranscript.lastOrNull()?.let(::transcriptTailFollowKey),
+        stickToBottom,
+        userDrivingTranscript,
+    ) {
+        if (currentConversation.id != seenTranscriptConversationId) {
+            seenTranscriptConversationId = currentConversation.id
+            seenTranscriptTailId = null
+            stickToBottom = true
+        }
+        val last = visibleTranscript.lastOrNull()
+        if (last == null) {
+            seenTranscriptTailId = null
+            stickToBottom = true
             return@LaunchedEffect
         }
-        if (listState.isScrollInProgress) return@LaunchedEffect
-        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-        val nearBottom = lastVisible >= visibleTranscript.lastIndex - 1
-        if (nearBottom && (last.fromUser || (!last.isPending && !last.isStreaming))) {
-            listState.scrollToItem(visibleTranscript.lastIndex, Int.MAX_VALUE)
+        val opening = pendingConversationScroll == currentConversation.id
+        val force = opening || (last.fromUser && last.id != seenTranscriptTailId)
+        if (opening) pendingConversationScroll = null
+        if (!shouldSnapTranscriptToBottom(
+                stickToBottom = stickToBottom,
+                userScrollInProgress = userDrivingTranscript,
+                force = force,
+            )
+        ) {
+            seenTranscriptTailId = last.id
+            return@LaunchedEffect
         }
+        if (force) stickToBottom = true
+        transcriptScrollGate.depth++
+        try {
+            withFrameNanos { }
+            if (shouldSnapTranscriptToBottom(
+                    stickToBottom = stickToBottom,
+                    userScrollInProgress = userDrivingTranscript,
+                    force = force,
+                )
+            ) {
+                listState.scrollToItem(visibleTranscript.lastIndex, Int.MAX_VALUE)
+            }
+        } finally {
+            transcriptScrollGate.depth--
+        }
+        seenTranscriptTailId = last.id
+    }
+
+    LaunchedEffect(listState, transcriptScrollGate) {
+        snapshotFlow { listState.isScrollInProgress }
+            .collect { scrolling ->
+                if (!scrolling && transcriptScrollGate.depth == 0) {
+                    userDrivingTranscript = false
+                }
+            }
     }
 
     LaunchedEffect(Unit) {
@@ -1340,6 +1424,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
+                        .nestedScroll(transcriptFollowConnection)
                         .fillMaxSize()
                         .hazeSource(chatHazeState)
                         .padding(horizontal = 16.dp),
