@@ -49,6 +49,7 @@ fun OtherSettingsScreen(onBack: () -> Unit) {
         ListRowButton(
             label = tr("导出数据"),
             icon = Icons.Rounded.Upload,
+            experimental = true,
             onClick = {
                 FilePickers.saveBackup("irio-${System.currentTimeMillis()}.irio")?.let { file ->
                     file.outputStream().use { BackupStore.export(it) }
@@ -59,6 +60,7 @@ fun OtherSettingsScreen(onBack: () -> Unit) {
         ListRowButton(
             label = tr("导入数据"),
             icon = Icons.Rounded.Download,
+            experimental = true,
             onClick = {
                 FilePickers.openBackup()?.let { file ->
                     file.inputStream().use { BackupStore.import(it) }

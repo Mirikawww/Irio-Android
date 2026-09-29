@@ -5,23 +5,29 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.composables.ui.components.Button
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
@@ -31,6 +37,8 @@ import com.composables.ui.theme.colors
 import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPanelColor
+import com.composables.ui.theme.onPrimaryColor
+import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 
@@ -46,6 +54,7 @@ fun ListRowButton(
     shape: Shape = Theme[shapes][largeShape],
     contentPadding: PaddingValues? = null,
     onLongClick: (() -> Unit)? = null,
+    experimental: Boolean = false,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val contentColor = if (style == ButtonStyle.Ghost) {
@@ -69,7 +78,13 @@ fun ListRowButton(
             )
             Spacer(Modifier.width(12.dp))
         }
-        Text(label)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label)
+            if (experimental) {
+                Spacer(Modifier.width(8.dp))
+                ExperimentalBadge()
+            }
+        }
         Spacer(Modifier.weight(1f))
         if (trailing != null) {
             Spacer(Modifier.width(8.dp))
@@ -132,4 +147,22 @@ fun ListRowButton(
             content = content,
         )
     }
+}
+
+@Composable
+fun ExperimentalBadge() {
+    Text(
+        tr("实验性"),
+        modifier = Modifier
+            .background(Theme[colors][primaryColor], RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        color = if (ThemeStore.accent == AccentColor.MONET) {
+            Theme[colors][onPrimaryColor]
+        } else {
+            ThemeStore.accent.onContent()
+        },
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        fontWeight = FontWeight.Medium,
+    )
 }

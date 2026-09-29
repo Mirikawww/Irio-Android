@@ -173,7 +173,11 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(tr("语言"), color = Theme[colors][onPanelColor])
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(tr("语言"), color = Theme[colors][onPanelColor])
+                                Spacer(Modifier.width(8.dp))
+                                ExperimentalBadge()
+                            }
                             Text(tr(language.label), color = Theme[colors][mutedColor], fontSize = 13.sp)
                         }
                         IconButton(
@@ -356,8 +360,13 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text(tr("文本淡入"), color = Theme[colors][onPanelColor])
+                        Spacer(Modifier.width(8.dp))
+                        ExperimentalBadge()
                     }
                     Switch(
                         checked = ThemeStore.glyphFade,
@@ -370,8 +379,13 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text(tr("模型差异"), color = Theme[colors][onPanelColor])
+                        Spacer(Modifier.width(8.dp))
+                        ExperimentalBadge()
                     }
                     Switch(
                         checked = ThemeStore.modelDiff,

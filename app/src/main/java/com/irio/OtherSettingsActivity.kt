@@ -148,12 +148,14 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
             ListRowButton(
                 label = tr("导出数据"),
                 icon = Icons.Rounded.Upload,
+                experimental = true,
                 onClick = { exportLauncher.launch("irio-${System.currentTimeMillis()}.irio") },
             )
             Spacer(Modifier.height(12.dp))
             ListRowButton(
                 label = tr("导入数据"),
                 icon = Icons.Rounded.Download,
+                experimental = true,
                 onClick = { importLauncher.launch(arrayOf("application/octet-stream", "application/zip", "*/*")) },
             )
         }

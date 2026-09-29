@@ -85,6 +85,7 @@ private val English = mapOf(
     "复制" to "Copy",
     "导入数据" to "Import",
     "导出数据" to "Export",
+    "实验性" to "Experimental",
     "工具轮次过多" to "Too many tool rounds",
     "已保存" to "Saved",
     "已勾选" to "Checked",
