@@ -83,6 +83,7 @@ object ThemeStore {
     private const val LANGUAGE_KEY = "language"
     private const val CONTEXT_RING_KEY = "context_ring"
     private const val GLYPH_FADE_KEY = "glyph_fade"
+    private const val MODEL_DIFF_KEY = "model_diff"
 
     private val initial = loadInitial()
     var preference by mutableStateOf(initial.preference)
@@ -97,6 +98,8 @@ object ThemeStore {
         private set
     val contextRingEnabled: Boolean = false
     var glyphFade by mutableStateOf(initial.glyphFade)
+        private set
+    var modelDiff by mutableStateOf(initial.modelDiff)
         private set
 
     fun save(value: ThemePreference) {
@@ -129,6 +132,12 @@ object ThemeStore {
         updateAppearance { it.put(GLYPH_FADE_KEY, enabled) }
     }
 
+    fun saveModelDiff(enabled: Boolean) {
+        if (modelDiff == enabled) return
+        modelDiff = enabled
+        updateAppearance { it.put(MODEL_DIFF_KEY, enabled) }
+    }
+
     fun saveContextRing(enabled: Boolean) {
         contextRing = false
         updateAppearance { it.put(CONTEXT_RING_KEY, false) }
@@ -148,8 +157,9 @@ object ThemeStore {
         val accent = AccentColor.fromStored(appearance?.optString(ACCENT_KEY)?.takeIf { it.isNotBlank() })
         val language = AppLanguage.fromStored(appearance?.optString(LANGUAGE_KEY)?.takeIf { it.isNotBlank() })
         val glyphFade = appearance?.optBoolean(GLYPH_FADE_KEY, true) ?: true
+        val modelDiff = appearance?.optBoolean(MODEL_DIFF_KEY, true) ?: true
         if (fromAppearance != null) {
-            return LoadedAppearance(ThemePreference.fromStored(fromAppearance), autoAmoled, accent, language, glyphFade)
+            return LoadedAppearance(ThemePreference.fromStored(fromAppearance), autoAmoled, accent, language, glyphFade, modelDiff)
         }
         val legacy = runCatching {
             JSONObject(AppPaths.providersFile.readText()).optString(KEY)
@@ -158,7 +168,7 @@ object ThemeStore {
         if (legacy != null) {
             updateAppearance { it.put(KEY, preference.stored) }
         }
-        return LoadedAppearance(preference, autoAmoled, accent, language, glyphFade)
+        return LoadedAppearance(preference, autoAmoled, accent, language, glyphFade, modelDiff)
     }
 
     private data class LoadedAppearance(
@@ -167,5 +177,6 @@ object ThemeStore {
         val accent: AccentColor,
         val language: AppLanguage,
         val glyphFade: Boolean,
+        val modelDiff: Boolean,
     )
 }

@@ -358,6 +358,20 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
+                        Text(tr("模型差异"), color = Theme[colors][onPanelColor])
+                    }
+                    Switch(
+                        checked = ThemeStore.modelDiff,
+                        onCheckedChange = { enabled ->
+                            ThemeStore.saveModelDiff(enabled)
+                        },
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(tr("上下文圆环"), color = Theme[colors][mutedColor])
                     }
                     Switch(

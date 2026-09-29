@@ -84,6 +84,7 @@ object ThemeStore {
     private const val LANGUAGE_KEY = "language"
     private const val CONTEXT_RING_KEY = "context_ring"
     private const val GLYPH_FADE_KEY = "glyph_fade"
+    private const val MODEL_DIFF_KEY = "model_diff"
     private const val LEGACY_PREFS = "provider_settings"
     private const val LEGACY_KEY = "theme_preference"
 
@@ -108,6 +109,10 @@ object ThemeStore {
     var glyphFade by mutableStateOf(true)
         private set
 
+    /** 提供商详情里新增/移除模型的绿红底。默认开。 */
+    var modelDiff by mutableStateOf(true)
+        private set
+
     @Volatile
     private var loaded = false
 
@@ -124,6 +129,7 @@ object ThemeStore {
             language = AppLanguage.fromStored(appearance.getString(LANGUAGE_KEY, null))
             contextRing = false
             glyphFade = appearance.getBoolean(GLYPH_FADE_KEY, true)
+            modelDiff = appearance.getBoolean(MODEL_DIFF_KEY, true)
             if (appearance.getString(KEY, null) == null && stored != null) {
                 appearance.edit().putString(KEY, stored).apply()
             }
@@ -178,6 +184,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(GLYPH_FADE_KEY, enabled)
+            .apply()
+    }
+
+    fun saveModelDiff(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (modelDiff == enabled) return
+        modelDiff = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(MODEL_DIFF_KEY, enabled)
             .apply()
     }
 

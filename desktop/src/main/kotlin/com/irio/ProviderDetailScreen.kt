@@ -257,9 +257,10 @@ private fun ModelEnabledRow(
 ) {
     val card = Theme[colors][secondaryColor]
     val ink = Theme[colors][onBackgroundColor]
+    val highlight = ThemeStore.modelDiff
     val background = when (diff) {
-        ModelDiffKind.Removed -> DiffRemovedColor.copy(alpha = DIFF_FILL_ALPHA)
-        ModelDiffKind.Added -> DiffAddedColor.copy(alpha = DIFF_FILL_ALPHA)
+        ModelDiffKind.Removed -> if (highlight) DiffRemovedColor.copy(alpha = DIFF_FILL_ALPHA) else card
+        ModelDiffKind.Added -> if (highlight) DiffAddedColor.copy(alpha = DIFF_FILL_ALPHA) else card
         ModelDiffKind.Unchanged -> card
     }
     val interactive = diff != ModelDiffKind.Removed

@@ -53,6 +53,7 @@ private val English = mapOf(
     "停止输出" to "Stop",
     "公式大小" to "Formula size",
     "文本淡入" to "Text fade-in",
+    "模型差异" to "Model diff",
     "共存" to "Keep both",
     "写入记忆" to "Saving memory",
     "删除全部历史" to "Delete all history",
