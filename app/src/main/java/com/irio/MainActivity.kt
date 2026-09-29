@@ -3207,6 +3207,7 @@ private fun AssistantMarkdown(
                                 state = markdownState,
                                 typography = typography,
                                 imageTransformer = imageTransformer,
+                                glyphFade = streaming,
                             )
                         }
                     }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,6 +81,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.Density
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
+import org.intellij.markdown.MarkdownTokenTypes
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.getTextInNode
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
@@ -95,6 +97,7 @@ internal fun IrioMarkdown(
     // Pre-parsed state hoisted above the LazyColumn (scroll-back reuse).
     // Null = parse inline, same as before.
     state: MarkdownState? = null,
+    glyphFade: Boolean = false,
 ) {
     val onBg = Theme[colors][onBackgroundColor]
     val dark = LocalColorScheme.current == ColorScheme.Dark
@@ -156,6 +159,21 @@ internal fun IrioMarkdown(
                 showHeader = true,
             )
         },
+        // Always this path, not only while streaming. Swapping back to MarkdownParagraph
+        // when the reply settles disposes the text and flashes it.
+        paragraph = { FadingMarkdownParagraph(it) },
+        heading1 = { FadingMarkdownHeading(it, it.typography.h1) },
+        heading2 = { FadingMarkdownHeading(it, it.typography.h2) },
+        heading3 = { FadingMarkdownHeading(it, it.typography.h3) },
+        heading4 = { FadingMarkdownHeading(it, it.typography.h4) },
+        heading5 = { FadingMarkdownHeading(it, it.typography.h5) },
+        heading6 = { FadingMarkdownHeading(it, it.typography.h6) },
+        setextHeading1 = {
+            FadingMarkdownHeading(it, it.typography.h1, MarkdownTokenTypes.SETEXT_CONTENT)
+        },
+        setextHeading2 = {
+            FadingMarkdownHeading(it, it.typography.h2, MarkdownTokenTypes.SETEXT_CONTENT)
+        },
     )
     // Lock the renderer on first composition. Switching from Markdown(content)
     // to Markdown(markdownState) — or falling back to raw text while a cache
@@ -169,38 +187,47 @@ internal fun IrioMarkdown(
     // open. Snap, including when a formula bitmap replaces its placeholder.
     val snapTextSize = remember<Modifier.() -> Modifier> { { this } }
     val animations = markdownAnimations(animateTextSize = snapTextSize)
-    if (entryState != null) {
-        Markdown(
-            markdownState = entryState,
-            colors = colors,
-            typography = typography,
-            modifier = Modifier.fillMaxWidth(),
-            imageTransformer = imageTransformer,
-            extendedSpans = extendedSpans,
-            components = components,
-            animations = animations,
-        )
+    val glyphFadeTracker = remember { StreamingTailFadeTracker() }
+    val glyphFadeSample = if (glyphFade) {
+        val now = streamingNowMs()
+        remember(content) { glyphFadeTracker.update(content, now) }
     } else {
-        // retainState: a new token must not reset this block to Loading (empty box).
-        // immediate: the first frame is parsed before it is shown. A remembered parser
-        // keeps later parent recompositions from looking like a new document.
-        val live = rememberMarkdownState(
-            content = content,
-            retainState = true,
-            flavour = flavour,
-            parser = parser,
-            immediate = true,
-        )
-        Markdown(
-            markdownState = live,
-            colors = colors,
-            typography = typography,
-            modifier = Modifier.fillMaxWidth(),
-            imageTransformer = imageTransformer,
-            extendedSpans = extendedSpans,
-            components = components,
-            animations = animations,
-        )
+        null
+    }
+    CompositionLocalProvider(LocalStreamingGlyphFade provides glyphFadeSample) {
+        if (entryState != null) {
+            Markdown(
+                markdownState = entryState,
+                colors = colors,
+                typography = typography,
+                modifier = Modifier.fillMaxWidth(),
+                imageTransformer = imageTransformer,
+                extendedSpans = extendedSpans,
+                components = components,
+                animations = animations,
+            )
+        } else {
+            // retainState: a new token must not reset this block to Loading (empty box).
+            // immediate: the first frame is parsed before it is shown. A remembered parser
+            // keeps later parent recompositions from looking like a new document.
+            val live = rememberMarkdownState(
+                content = content,
+                retainState = true,
+                flavour = flavour,
+                parser = parser,
+                immediate = true,
+            )
+            Markdown(
+                markdownState = live,
+                colors = colors,
+                typography = typography,
+                modifier = Modifier.fillMaxWidth(),
+                imageTransformer = imageTransformer,
+                extendedSpans = extendedSpans,
+                components = components,
+                animations = animations,
+            )
+        }
     }
 }
 
