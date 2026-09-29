@@ -25,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.composables.ui.components.Button
@@ -62,6 +63,7 @@ fun ProviderDetailScreen(
     var protocolMenuOpen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
+    var refreshDiff by remember { mutableStateOf(ModelRefreshDiff()) }
     var formError by rememberSaveable { mutableStateOf<String?>(null) }
     val name = rememberTextFieldState(provider?.name.orEmpty())
     val endpoint = rememberTextFieldState(provider?.endpointUrl.orEmpty())
@@ -132,6 +134,7 @@ fun ProviderDetailScreen(
                             }
                             saving = false
                             if (result.error == null) {
+                                refreshDiff = modelRefreshDiff(current.models, result.models)
                                 ProviderStore.saveProvider(updated.copy(models = result.models))
                                 provider = ProviderStore.loadProvider(current.id)
                             } else {
@@ -157,6 +160,7 @@ fun ProviderDetailScreen(
                             }
                             refreshing = false
                             if (result.error == null) {
+                                refreshDiff = modelRefreshDiff(current.models, result.models)
                                 ProviderStore.saveProvider(current.copy(models = result.models))
                                 provider = ProviderStore.loadProvider(current.id)
                             } else {
@@ -177,19 +181,21 @@ fun ProviderDetailScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (provider!!.models.isEmpty()) {
+                    if (provider!!.models.isEmpty() && refreshDiff.removed.isEmpty()) {
                         Text(tr("还没有模型"))
                     } else {
-                        provider!!.models.forEach { model ->
+                        modelDiffRows(provider!!.models, refreshDiff).forEach { entry ->
+                            val removed = entry.kind == ModelDiffKind.Removed
                             ModelEnabledRow(
-                                model = model,
-                                enabled = model !in provider!!.disabledModels,
+                                model = entry.model,
+                                enabled = !removed && entry.model !in provider!!.disabledModels,
                                 onCheckedChange = { on ->
+                                    if (removed) return@ModelEnabledRow
                                     val current = provider ?: return@ModelEnabledRow
                                     val disabled = if (on) {
-                                        current.disabledModels - model
+                                        current.disabledModels - entry.model
                                     } else {
-                                        current.disabledModels + model
+                                        current.disabledModels + entry.model
                                     }
                                     provider = current.copy(disabledModels = disabled)
                                     val ticket = disabledSaveTicket.incrementAndGet()
@@ -201,6 +207,7 @@ fun ProviderDetailScreen(
                                         }
                                     }
                                 },
+                                diff = entry.kind,
                             )
                         }
                     }
@@ -246,19 +253,36 @@ private fun ModelEnabledRow(
     model: String,
     enabled: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    diff: ModelDiffKind = ModelDiffKind.Unchanged,
 ) {
+    val card = Theme[colors][secondaryColor]
+    val ink = Theme[colors][onBackgroundColor]
+    val background = when (diff) {
+        ModelDiffKind.Removed -> DiffRemovedColor.copy(alpha = DIFF_FILL_ALPHA)
+        ModelDiffKind.Added -> DiffAddedColor.copy(alpha = DIFF_FILL_ALPHA)
+        ModelDiffKind.Unchanged -> card
+    }
+    val interactive = diff != ModelDiffKind.Removed
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+            .background(background, Theme[shapes][largeShape])
             .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             model,
             modifier = Modifier.weight(1f),
-            color = Theme[colors][onBackgroundColor],
+            color = ink,
         )
-        Switch(checked = enabled, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = if (interactive) enabled else false,
+            onCheckedChange = onCheckedChange,
+            enabled = interactive,
+        )
     }
 }
+
+private val DiffAddedColor = Color(0xFF22C55E)
+private val DiffRemovedColor = Color(0xFFEF4444)
+private const val DIFF_FILL_ALPHA = 0.28f

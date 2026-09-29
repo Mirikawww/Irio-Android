@@ -54,6 +54,39 @@ data class ModelFetchResult(
 /** 提供商详情里关掉的模型不进任何模型菜单。缺省集合表示全部开启。 */
 fun ProviderConfig.enabledModels(): List<String> = models.filter { it !in disabledModels }
 
+enum class ModelDiffKind { Added, Unchanged, Removed }
+
+data class ModelDiffEntry(
+    val model: String,
+    val kind: ModelDiffKind,
+)
+
+/** 一次刷新相对刷新前列表的差。详情页只放在内存里，离开页面即丢。 */
+data class ModelRefreshDiff(
+    val added: Set<String> = emptySet(),
+    val removed: List<String> = emptyList(),
+)
+
+fun modelRefreshDiff(previous: List<String>, next: List<String>): ModelRefreshDiff {
+    val previousSet = previous.toSet()
+    val nextSet = next.toSet()
+    return ModelRefreshDiff(
+        added = next.filterTo(linkedSetOf()) { it !in previousSet },
+        removed = previous.filter { it !in nextSet },
+    )
+}
+
+/** 新增保持拉取顺序并排到最前，未变的留在中间，消失的保持原顺序排到最后。 */
+fun modelDiffRows(current: List<String>, diff: ModelRefreshDiff): List<ModelDiffEntry> {
+    val added = ArrayList<ModelDiffEntry>(diff.added.size)
+    val unchanged = ArrayList<ModelDiffEntry>(current.size)
+    for (model in current) {
+        if (model in diff.added) added += ModelDiffEntry(model, ModelDiffKind.Added)
+        else unchanged += ModelDiffEntry(model, ModelDiffKind.Unchanged)
+    }
+    return added + unchanged + diff.removed.map { ModelDiffEntry(it, ModelDiffKind.Removed) }
+}
+
 object ProviderStore {
     private const val PREFS = "provider_settings"
     private const val PROVIDERS = "providers"
