@@ -1,9 +1,11 @@
 package com.irio
 
 import android.content.Context
+import android.graphics.Outline
 import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -86,6 +88,15 @@ private class ComposeRecyclerView<T : Any>(
         itemAnimator = null
         overScrollMode = View.OVER_SCROLL_NEVER
         clipToPadding = false
+        clipChildren = true
+        // 父级抽屉 graphicsLayer 不裁剪，Compose 的 clip 也盖不住 Android View。
+        // 把绘制锁在视图矩形里，历史行才不会叠到「新对话」上或从设置按钮底下的缝漏出去。
+        outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: Outline) {
+                outline.setRect(0, 0, view.width, view.height)
+            }
+        }
+        clipToOutline = true
         setItemViewCacheSize(4)
     }
 

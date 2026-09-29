@@ -86,6 +86,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
@@ -1297,22 +1298,36 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     start = 4.dp,
                     top = 8.dp,
                     end = 12.dp,
-                    bottom = 8.dp
                 )
         ) {
-            ListRowButton(
-                label = tr("新对话"),
-                icon = Icons.Rounded.Add,
-                style = ButtonStyle.Ghost,
-                contentPadding = DrawerRowPadding,
-                onClick = { newConversation() },
-            )
-            Spacer(Modifier.heightIn(min = 8.dp))
-            Box(modifier = Modifier.weight(1f)) {
+            // 列表在后绘制，且抽屉 graphicsLayer 不裁剪。顶栏必须自带不透明底并压在列表之上，
+            // 否则滚出视口的历史行会叠在「新对话」上，再滚一点就被回收、整行消失。
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .zIndex(1f)
+                    .background(background),
+            ) {
+                ListRowButton(
+                    label = tr("新对话"),
+                    icon = Icons.Rounded.Add,
+                    style = ButtonStyle.Ghost,
+                    contentPadding = DrawerRowPadding,
+                    onClick = { newConversation() },
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clipToBounds(),
+            ) {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clipToBounds(),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
-                    contentPadding = PaddingValues(bottom = 64.dp),
+                    contentPadding = PaddingValues(bottom = 72.dp),
                 ) {
                     groupedConversationRows.forEach { (label, items) ->
                         item(key = "header-$label") {
@@ -1370,7 +1385,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .background(background),
+                        .zIndex(1f)
+                        .background(background)
+                        .padding(bottom = 8.dp),
                 ) {
                     ListRowButton(
                         label = tr("设置"),
