@@ -83,6 +83,7 @@ object ThemeStore {
     private const val ACCENT_KEY = "accent_color"
     private const val LANGUAGE_KEY = "language"
     private const val CONTEXT_RING_KEY = "context_ring"
+    private const val GLYPH_FADE_KEY = "glyph_fade"
     private const val LEGACY_PREFS = "provider_settings"
     private const val LEGACY_KEY = "theme_preference"
 
@@ -103,6 +104,10 @@ object ThemeStore {
         private set
     val contextRingEnabled: Boolean = false
 
+    /** 流式回复的新字淡入。默认开。 */
+    var glyphFade by mutableStateOf(true)
+        private set
+
     @Volatile
     private var loaded = false
 
@@ -118,6 +123,7 @@ object ThemeStore {
             accent = AccentColor.fromStored(appearance.getString(ACCENT_KEY, null))
             language = AppLanguage.fromStored(appearance.getString(LANGUAGE_KEY, null))
             contextRing = false
+            glyphFade = appearance.getBoolean(GLYPH_FADE_KEY, true)
             if (appearance.getString(KEY, null) == null && stored != null) {
                 appearance.edit().putString(KEY, stored).apply()
             }
@@ -162,6 +168,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putString(LANGUAGE_KEY, value.stored)
+            .apply()
+    }
+
+    fun saveGlyphFade(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (glyphFade == enabled) return
+        glyphFade = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(GLYPH_FADE_KEY, enabled)
             .apply()
     }
 

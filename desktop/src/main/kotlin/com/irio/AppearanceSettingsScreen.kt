@@ -344,6 +344,20 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
+                        Text(tr("文本淡入"), color = Theme[colors][onPanelColor])
+                    }
+                    Switch(
+                        checked = ThemeStore.glyphFade,
+                        onCheckedChange = { enabled ->
+                            ThemeStore.saveGlyphFade(enabled)
+                        },
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(tr("上下文圆环"), color = Theme[colors][mutedColor])
                     }
                     Switch(

@@ -188,12 +188,8 @@ internal fun IrioMarkdown(
     val snapTextSize = remember<Modifier.() -> Modifier> { { this } }
     val animations = markdownAnimations(animateTextSize = snapTextSize)
     val glyphFadeTracker = remember { StreamingTailFadeTracker() }
-    val glyphFadeSample = if (glyphFade) {
-        val now = streamingNowMs()
-        remember(content) { glyphFadeTracker.update(content, now) }
-    } else {
-        null
-    }
+    val trackedFade = remember(content) { glyphFadeTracker.update(content, streamingNowMs()) }
+    val glyphFadeSample = if (glyphFade) trackedFade else null
     CompositionLocalProvider(LocalStreamingGlyphFade provides glyphFadeSample) {
         if (entryState != null) {
             Markdown(

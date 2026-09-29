@@ -46,7 +46,8 @@ class ThemeStoreTest {
         assertEquals(AppLanguage.EN, AppLanguage.fromStored("EN"))
         assertEquals("English", AppLanguage.EN.label)
         assertEquals("en", AppLanguage.EN.stored)
-        assertEquals("Appearance", translate(AppLanguage.EN, "外观"))
+        assertEquals("Formula size", translate(AppLanguage.EN, "公式大小"))
+        assertEquals("Text fade-in", translate(AppLanguage.EN, "文本淡入"))
         assertEquals("外观", translate(AppLanguage.ZH_CN, "外观"))
         assertEquals("New chat", translate(AppLanguage.EN, "新对话"))
     }
