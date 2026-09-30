@@ -92,6 +92,7 @@ internal fun AndroidMessageList(
 internal class MessageRecyclerController {
     private var recyclerView: MessageRecyclerView? = null
     private var scrollRequested = false
+    private var alignScheduled = false
     private var programmaticPosts = 0
 
     fun attach(view: MessageRecyclerView) {
@@ -106,33 +107,91 @@ internal class MessageRecyclerController {
     fun isProgrammaticScroll(): Boolean = programmaticPosts > 0
 
     fun flushScrollToBottom() {
-        if (!scrollRequested) return
+        scheduleAlign(attempt = 0)
+    }
+
+    /**
+     * 最后一项已经在屏幕上时只 scrollBy 超出底边的距离。
+     * scrollToPosition 会把该项重新锚到视口顶部，下一帧再拉回底部，
+     * 贴底后再往下滚、或自动跟随途中再滚，都会抽一下。
+     * 高度可能晚一帧才跟上，所以贴住时再看一次；第二次仍没超出就当已经贴底。
+     */
+    private fun scheduleAlign(attempt: Int) {
+        if (!scrollRequested || alignScheduled) return
         val view = recyclerView ?: return
-        if (view.itemCountValue() == 0) return
-        if (view.isMessageUpdatePending()) {
-            view.post { flushScrollToBottom() }
+        if (view.itemCountValue() == 0) {
+            scrollRequested = false
             return
         }
-        scrollRequested = false
-        programmaticPosts++
+        if (view.isMessageUpdatePending()) {
+            alignScheduled = true
+            view.post {
+                alignScheduled = false
+                scheduleAlign(attempt)
+            }
+            return
+        }
+        alignScheduled = true
         view.post {
-            val count = view.itemCountValue()
-            if (count == 0) {
-                programmaticPosts--
+            alignScheduled = false
+            if (!scrollRequested) return@post
+            val current = recyclerView ?: return@post
+            if (current.scrollState != RecyclerView.SCROLL_STATE_IDLE) {
+                // 手指还在滚就丢掉这次。松手后如果仍贴底，effect 会再请求。
+                scrollRequested = false
                 return@post
             }
-            view.layoutManager?.scrollToPosition(count - 1)
-            programmaticPosts++
-            view.post {
+            val count = current.itemCountValue()
+            if (count == 0) {
+                scrollRequested = false
+                return@post
+            }
+            val child = (current.layoutManager as? LinearLayoutManager)
+                ?.findViewByPosition(count - 1)
+            // 这一帖在本帧 layout 之前跑，底边还是旧高度。先等布局，再决定滚不滚。
+            if (attempt == 0) {
+                if (child != null) current.requestLayout()
+                scheduleAlign(attempt = 1)
+                return@post
+            }
+            if (child == null) {
+                scrollRequested = false
+                jumpToUnlaidTail(current, count)
+                return@post
+            }
+            val catchUp = transcriptBottomCatchUpDelta(
+                itemCount = count,
+                lastVisibleIndex = count - 1,
+                lastEdge = child.bottom,
+                viewportEnd = current.height - current.paddingBottom,
+            )
+            scrollRequested = false
+            if (catchUp != null && catchUp > 0) {
+                programmaticPosts++
                 try {
-                    val child = view.layoutManager?.findViewByPosition(count - 1) ?: return@post
-                    val bottom = view.height - view.paddingBottom
-                    val delta = child.bottom - bottom
-                    if (delta != 0) view.scrollBy(0, delta)
+                    current.scrollBy(0, catchUp)
                 } finally {
                     programmaticPosts--
                 }
             }
+        }
+    }
+
+    private fun jumpToUnlaidTail(view: MessageRecyclerView, count: Int) {
+        programmaticPosts++
+        try {
+            view.scrollToPosition(count - 1)
+            programmaticPosts++
+            view.post {
+                try {
+                    val laidOut = view.layoutManager?.findViewByPosition(count - 1) ?: return@post
+                    val overflow = laidOut.bottom - (view.height - view.paddingBottom)
+                    if (overflow != 0) view.scrollBy(0, overflow)
+                } finally {
+                    programmaticPosts--
+                }
+            }
+        } finally {
             programmaticPosts--
         }
     }

@@ -95,4 +95,22 @@ class TranscriptFollowTest {
             ),
         )
     }
+
+    @Test
+    fun catchUpDoesNotScrollWhenTheTailIsAlreadyAtTheBottom() {
+        assertEquals(0, transcriptBottomCatchUpDelta(4, 3, 100, 100))
+        assertEquals(0, transcriptBottomCatchUpDelta(4, 3, 80, 100))
+        assertEquals(0, transcriptBottomCatchUpDelta(0, -1, 0, 100))
+    }
+
+    @Test
+    fun catchUpScrollsOnlyTheOverflowPastTheBottom() {
+        assertEquals(36, transcriptBottomCatchUpDelta(4, 3, 136, 100))
+    }
+
+    @Test
+    fun catchUpJumpsOnlyWhenTheTailIsNotLaidOut() {
+        assertNull(transcriptBottomCatchUpDelta(4, 2, 100, 100))
+        assertNull(transcriptBottomCatchUpDelta(4, -1, 0, 100))
+    }
 }

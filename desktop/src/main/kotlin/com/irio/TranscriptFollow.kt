@@ -61,6 +61,24 @@ internal fun lazyTranscriptPinnedToBottom(state: LazyListState, slackPx: Int): B
     )
 }
 
+/**
+ * 最后一项已经在布局里时，只补它超出视口底边的像素。
+ * 正数才往下滚；0 表示已经贴住或还在底边之上（继续往下拉也算），不要再滚。
+ * 已经贴底时 scrollToItem(Int.MAX_VALUE) / scrollToPosition 会把最后一项重新锚到视口起点，
+ * 下一帧再拉回来，就是抽一下。最后一项还没进布局时返回 null，那时才跳过去。
+ */
+internal fun transcriptBottomCatchUpDelta(
+    itemCount: Int,
+    lastVisibleIndex: Int,
+    lastEdge: Int,
+    viewportEnd: Int,
+): Int? {
+    if (itemCount <= 0) return 0
+    if (lastVisibleIndex < itemCount - 1) return null
+    val overflow = lastEdge - viewportEnd
+    return if (overflow > 0) overflow else 0
+}
+
 /** 程序滚动期间嵌套滚动回调不能清掉贴底锁。 */
 internal class TranscriptScrollGate {
     var depth: Int = 0

@@ -583,19 +583,37 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             return@LaunchedEffect
         }
         if (force) stickToBottom = true
-        transcriptScrollGate.depth++
-        try {
-            withFrameNanos { }
-            if (shouldSnapTranscriptToBottom(
-                    stickToBottom = stickToBottom,
-                    userScrollInProgress = userDrivingTranscript,
-                    force = force,
-                )
-            ) {
-                listState.scrollToItem(visibleTranscript.lastIndex, Int.MAX_VALUE)
+        // 等这一帧把长高的尾部量完再决定滚多少。已经贴住底边就不要滚：
+        // scrollToItem(Int.MAX_VALUE) 会把最后一项重新锚到视口起点，下一帧拉回来，就是抽一下。
+        withFrameNanos { }
+        if (!shouldSnapTranscriptToBottom(
+                stickToBottom = stickToBottom,
+                userScrollInProgress = userDrivingTranscript,
+                force = force,
+            )
+        ) {
+            seenTranscriptTailId = last.id
+            return@LaunchedEffect
+        }
+        val info = listState.layoutInfo
+        val lastVisible = info.visibleItemsInfo.lastOrNull()
+        val catchUp = transcriptBottomCatchUpDelta(
+            itemCount = visibleTranscript.size,
+            lastVisibleIndex = lastVisible?.index ?: -1,
+            lastEdge = lastVisible?.let { it.offset + it.size } ?: 0,
+            viewportEnd = info.viewportEndOffset,
+        )
+        if (catchUp != 0) {
+            transcriptScrollGate.depth++
+            try {
+                if (catchUp == null) {
+                    listState.scrollToItem(visibleTranscript.lastIndex, Int.MAX_VALUE)
+                } else {
+                    listState.scroll { scrollBy(catchUp.toFloat()) }
+                }
+            } finally {
+                transcriptScrollGate.depth--
             }
-        } finally {
-            transcriptScrollGate.depth--
         }
         seenTranscriptTailId = last.id
     }
