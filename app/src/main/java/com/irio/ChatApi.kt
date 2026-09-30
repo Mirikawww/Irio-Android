@@ -89,6 +89,8 @@ data class ChatStreamUpdate(
     /** 工具调用之后的新一轮。UI 保留已输出正文，下一轮正文接在后面，不要清掉上一轮。 */
     val newRound: Boolean = false,
     val usage: TokenUsage? = null,
+    /** 进行中的工具输出快照。非 null 时刷新当前工具事件的内容，不结束它。 */
+    val toolOutput: String? = null,
 )
 
 data class ToolCallDelta(
@@ -1256,6 +1258,7 @@ internal object MemoryTool {
 
     fun liveLabel(name: String): String = when (name) {
         TimeTool.NAME -> tr("获取时间")
+        LinuxShellTool.NAME -> tr("运行命令中")
         WebFetchTool.NAME -> tr("浏览网页中")
         GET -> tr("读取记忆")
         UPDATE -> tr("写入记忆")
@@ -1264,6 +1267,7 @@ internal object MemoryTool {
 
     fun doneLabel(name: String): String = when (name) {
         TimeTool.NAME -> tr("已获取时间")
+        LinuxShellTool.NAME -> tr("已运行命令")
         WebFetchTool.NAME -> tr("已浏览网页")
         GET -> tr("已读取记忆")
         UPDATE -> tr("已写入记忆")

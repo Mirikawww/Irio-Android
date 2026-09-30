@@ -1,0 +1,15 @@
+{
+  "alpineVersion": "3.24.2",
+  "archives": [
+    {
+      "abi": "arm64-v8a",
+      "asset": "linux-sandbox/alpine-minirootfs-aarch64.bin",
+      "sha256": "9bf70a7f18ea44094cbb5f70c58f9af129c8214745743db0e68e5502cc2ce773"
+    },
+    {
+      "abi": "armeabi-v7a",
+      "asset": "linux-sandbox/alpine-minirootfs-armv7.bin",
+      "sha256": "5552f1ef2398cee46ef2cf733f8f1258f39a77ad065dfd47282fc0df9fe1976c"
+    }
+  ]
+}

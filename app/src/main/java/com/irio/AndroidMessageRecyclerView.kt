@@ -25,7 +25,7 @@ import kotlinx.coroutines.CoroutineScope
  */
 internal data class AndroidMessageCallbacks(
     val markdownScope: CoroutineScope,
-    val onOpenProcess: (ProcessEvent) -> Unit,
+    val onOpenProcess: (Long, ProcessEvent) -> Unit,
     val onOpenAttachment: (ChatAttachment) -> Unit,
     val onCopy: (ChatMessage) -> Unit,
     val onRetry: (ChatMessage) -> Unit,
@@ -365,7 +365,7 @@ private fun AndroidMessageRow(
 
 
             markdownScope = callbacks.markdownScope,
-            onOpenProcess = callbacks.onOpenProcess,
+            onOpenProcess = { event -> callbacks.onOpenProcess(message.id, event) },
             onOpenAttachment = callbacks.onOpenAttachment,
             onCopy = { callbacks.onCopy(message) },
             onRetry = { callbacks.onRetry(message) },

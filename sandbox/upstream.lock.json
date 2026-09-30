@@ -1,0 +1,72 @@
+{
+  "alpine": {
+    "version": "3.24.2",
+    "archives": [
+      {
+        "abi": "arm64-v8a",
+        "asset": "linux-sandbox/alpine-minirootfs-aarch64.tar.gz",
+        "sha256": "9bf70a7f18ea44094cbb5f70c58f9af129c8214745743db0e68e5502cc2ce773"
+      },
+      {
+        "abi": "armeabi-v7a",
+        "asset": "linux-sandbox/alpine-minirootfs-armv7.tar.gz",
+        "sha256": "5552f1ef2398cee46ef2cf733f8f1258f39a77ad065dfd47282fc0df9fe1976c"
+      }
+    ]
+  },
+  "proot": {
+    "arm64-v8a": {
+      "linker": "/system/bin/linker64",
+      "files": [
+        "libandroid-shmem.so",
+        "libproot-loader.so",
+        "libproot-loader32.so",
+        "libproot.so",
+        "libtalloc.so"
+      ],
+      "packages": {
+        "libandroid-shmem": {
+          "version": "0.7",
+          "filename": "pool/main/liba/libandroid-shmem/libandroid-shmem_0.7_aarch64.deb",
+          "sha256": "0da3a24d558b93c92bcf8d611e0826a99ff96e396b148e6cdf33b47c47c57ff6"
+        },
+        "libtalloc": {
+          "version": "2.4.3",
+          "filename": "pool/main/libt/libtalloc/libtalloc_2.4.3_aarch64.deb",
+          "sha256": "ac81ad623d74c209718b9f3acb2dd702cc8a88c431e820d212229910b4db29da"
+        },
+        "proot": {
+          "version": "5.1.107.95",
+          "filename": "pool/main/p/proot/proot_5.1.107.95_aarch64.deb",
+          "sha256": "0a1b3d0f6ef76436c5ed924cd8e8f5a6b7186e99e1650eb2d9bc734e218a74cb"
+        }
+      }
+    },
+    "armeabi-v7a": {
+      "linker": "/system/bin/linker",
+      "files": [
+        "libandroid-shmem.so",
+        "libproot-loader.so",
+        "libproot.so",
+        "libtalloc.so"
+      ],
+      "packages": {
+        "libandroid-shmem": {
+          "version": "0.7",
+          "filename": "pool/main/liba/libandroid-shmem/libandroid-shmem_0.7_arm.deb",
+          "sha256": "5832fd11dca9be2a288dd8fbc2b2799b289c812c7a8764f1f8234c425aa64ce5"
+        },
+        "libtalloc": {
+          "version": "2.4.3",
+          "filename": "pool/main/libt/libtalloc/libtalloc_2.4.3_arm.deb",
+          "sha256": "cd56f87007e487c8025fac2df2a27b2bc58102344040a527eaa6fa7527d18f9b"
+        },
+        "proot": {
+          "version": "5.1.107.95",
+          "filename": "pool/main/p/proot/proot_5.1.107.95_arm.deb",
+          "sha256": "111a29219568b0e3c72f6bd5383f1bebb86f2e5f38ee260b95c4254c9267049d"
+        }
+      }
+    }
+  }
+}

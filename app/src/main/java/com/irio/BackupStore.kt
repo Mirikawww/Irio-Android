@@ -58,7 +58,7 @@ object BackupStore {
                         providerSnapshot = zip.readBytes().toString(Charsets.UTF_8)
                     } else if (relative == "search_snapshot.json") {
                         searchSnapshot = zip.readBytes().toString(Charsets.UTF_8)
-                    } else if (!entry.isDirectory && !isAttachment(relative)) {
+                    } else if (!entry.isDirectory && !isAttachment(relative) && !isSandboxRootfs(relative)) {
                         val target = File(stage, relative)
                         target.parentFile?.mkdirs()
                         target.outputStream().use { zip.copyTo(it) }
@@ -70,7 +70,7 @@ object BackupStore {
             var conversationCount = 0
             stage.walkTopDown().filter { it.isFile }.forEach { staged ->
                 val relativePath = staged.relativeTo(stage).path.replace('\\', '/')
-                if (isAttachment(relativePath) || relativePath == "provider_snapshot.json" || relativePath == "search_snapshot.json") return@forEach
+                if (isAttachment(relativePath) || isSandboxRootfs(relativePath) || relativePath == "provider_snapshot.json" || relativePath == "search_snapshot.json") return@forEach
                 val target = File(context.dataDir, relativePath)
                 if (overwrite || !target.exists()) {
                     target.parentFile?.mkdirs()
@@ -101,7 +101,7 @@ object BackupStore {
     private fun addDirectory(zip: ZipOutputStream, root: File, relativeRoot: String) {
         root.listFiles()?.forEach { file ->
             val relative = if (relativeRoot.isEmpty()) file.name else "$relativeRoot/${file.name}"
-            if (relative == "cache" || relative == "code_cache" || isAttachment(relative)) return@forEach
+            if (relative == "cache" || relative == "code_cache" || isAttachment(relative) || isSandboxRootfs(relative)) return@forEach
             if (file.isDirectory) addDirectory(zip, file, relative)
             else {
                 zip.putNextEntry(ZipEntry(relative))
@@ -112,4 +112,9 @@ object BackupStore {
     }
 
     private fun isAttachment(path: String): Boolean = path == "files/attachments" || path.startsWith("files/attachments/")
+
+    private fun isSandboxRootfs(path: String): Boolean =
+        path == "files/linux-sandbox/rootfs" || path.startsWith("files/linux-sandbox/rootfs/") ||
+            path == "files/linux-sandbox/rootfs.partial" || path.startsWith("files/linux-sandbox/rootfs.partial/") ||
+            path == "files/linux-sandbox/rootfs.previous" || path.startsWith("files/linux-sandbox/rootfs.previous/")
 }

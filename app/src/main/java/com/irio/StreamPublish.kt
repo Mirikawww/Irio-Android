@@ -17,8 +17,9 @@ internal fun shouldPublishStreamUpdate(
     toolChanged: Boolean = false,
     userActivelyScrolling: Boolean = false,
     hasUsage: Boolean = false,
+    toolOutputChanged: Boolean = false,
 ): Boolean {
-    if (done || hasAttachments || searchingChanged || searchPagesDelta > 0 || toolChanged || hasUsage) return true
+    if (done || hasAttachments || searchingChanged || searchPagesDelta > 0 || toolChanged || hasUsage || toolOutputChanged) return true
     if (deltaLength > 0 && publishedBodyLength == 0) return true
     if (thinkingDeltaLength > 0 && !publishedThinking) return true
     if (deltaLength == 0 && thinkingDeltaLength == 0) return false

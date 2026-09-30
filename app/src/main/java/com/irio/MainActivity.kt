@@ -151,6 +151,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -246,7 +247,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    var processSheetEvent by remember { mutableStateOf<ProcessEvent?>(null) }
+    var processSheetMessageId by remember { mutableStateOf<Long?>(null) }
+    var processSheetEventId by remember { mutableStateOf<Long?>(null) }
     val processSheetState = rememberBottomSheetState()
     val message = rememberTextFieldState()
     // 抽屉列表只持轻量摘要（无正文）；正文按需从磁盘取并常驻缓存（见 [conversationContent]）。
@@ -1011,6 +1013,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 if (requestImageGenModel.isNotBlank()) add(ImageGenToolProvider())
                 add(TimeToolProvider())
                 if (MemoryStore.loadEnabled(context)) add(MemoryToolProvider())
+                if (LinuxSandboxPolicy.exposed(
+                        LinuxSandboxStore.loadEnabled(LinuxSandboxLayout.of(context.filesDir).stateFile),
+                        LinuxSandboxAccess.hasAllFiles(),
+                    )
+                ) {
+                    add(LinuxShellToolProvider())
+                }
             }
         )
         val requestCancellation = ChatRequestCancellation()
@@ -1130,6 +1139,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 if (update.searching == true && !cancelled) process.onSearchStarted()
                                 if (update.searching == false) process.onSearchFinished(update.searchPagesDelta, update.searchContent)
                                 if (update.toolActive == true && !cancelled) process.onToolStarted(update.toolName)
+                                if (update.toolOutput != null) process.onToolOutput(update.toolOutput)
                                 if (update.toolActive == false) process.onToolFinished(update.toolContent)
                                 if (update.done) process.finishAll()
                             }
@@ -1146,6 +1156,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 searchingChanged = update.searching != null,
                                 searchPagesDelta = update.searchPagesDelta,
                                 toolChanged = update.toolActive != null,
+                                toolOutputChanged = update.toolOutput != null,
                                 publishedBodyLength = publishedBodyLength,
                                 publishedThinking = publishedThinking,
                                 deferNonEssential = imeAnimating.get(),
@@ -1473,8 +1484,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
     val messageCallbacks = AndroidMessageCallbacks(
         markdownScope = scope,
-        onOpenProcess = { event ->
-            processSheetEvent = event
+        onOpenProcess = { messageId, event ->
+            processSheetMessageId = messageId
+            processSheetEventId = event.id
             processSheetState.targetDetent = BottomSheetDetent.FullyExpanded
         },
         onOpenAttachment = ::openAttachment,
@@ -2067,7 +2079,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             )
         }
         ProcessEventSheet(
-            event = processSheetEvent,
+            event = messages.firstOrNull { it.id == processSheetMessageId }
+                ?.process
+                ?.firstOrNull { it.id == processSheetEventId },
             state = processSheetState,
             onDismiss = {
                 processSheetState.targetDetent = BottomSheetDetent.Hidden
@@ -2589,7 +2603,8 @@ private fun ProcessEventRow(
     onOpen: (ProcessEvent) -> Unit,
 ) {
     val muted = Theme[colors][mutedColor]
-    val openable = !event.live && event.content.isNotBlank()
+    val terminal = event.kind == ProcessEventKind.TOOL && event.toolName == LinuxShellTool.NAME
+    val openable = terminal || (!event.live && event.content.isNotBlank())
     val label = when (event.kind) {
         ProcessEventKind.THINKING -> if (event.live) null else tr("已思考 %s").format(formatThinkingDuration(event.millis))
         ProcessEventKind.SEARCH -> if (event.live) null else tr("搜索了 %s 个网页").format(event.pages)
@@ -2597,6 +2612,21 @@ private fun ProcessEventRow(
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (event.live) {
+            if (terminal) {
+                Row(
+                    modifier = Modifier.clickable { onOpen(event) },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    StatusSweepText(MemoryTool.liveLabel(event.toolName))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = muted,
+                    )
+                }
+            } else {
             StatusSweepText(
                 when (event.kind) {
                     ProcessEventKind.THINKING -> tr("思考中")
@@ -2645,6 +2675,7 @@ private fun ProcessEventRow(
                     )
                 }
             }
+            }
         } else if (label != null) {
             Row(
                 modifier = Modifier
@@ -2683,6 +2714,10 @@ private fun ProcessEventSheet(
     state: BottomSheetState,
     onDismiss: () -> Unit,
 ) {
+    if (event?.kind == ProcessEventKind.TOOL && event.toolName == LinuxShellTool.NAME) {
+        TerminalCommandSheet(event, state, onDismiss)
+        return
+    }
     val content = Theme[colors][onPanelColor]
     BottomSheet(
         state = state,
@@ -2719,6 +2754,51 @@ private fun ProcessEventSheet(
                 if (body.isNotBlank()) {
                     Text(body, fontSize = 16.sp, color = content)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TerminalCommandSheet(
+    event: ProcessEvent,
+    state: BottomSheetState,
+    onDismiss: () -> Unit,
+) {
+    val textColor = Color(0xFFE8E8E8)
+    BottomSheet(
+        state = state,
+        onDismissRequest = onDismiss,
+        backgroundColor = Color.Black,
+        contentColor = textColor,
+        contentPadding = PaddingValues(start = 16.dp, top = 32.dp, end = 16.dp, bottom = 16.dp),
+    ) {
+        val minSheetHeight = with(LocalDensity.current) {
+            (LocalWindowInfo.current.containerSize.height * 0.32f).toDp()
+        }
+        val maxSheetHeight = with(LocalDensity.current) {
+            (LocalWindowInfo.current.containerSize.height * 0.85f).toDp()
+        }
+        val scroll = rememberScrollState()
+        val wasNearBottom = scroll.value >= scroll.maxValue - 48
+        LaunchedEffect(event.content, event.live) {
+            withFrameNanos { }
+            if (wasNearBottom) scroll.scrollTo(scroll.maxValue)
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = minSheetHeight, max = maxSheetHeight)
+                .verticalScroll(scroll),
+        ) {
+            SelectionContainer {
+                Text(
+                    event.content.ifBlank { "$" },
+                    color = textColor,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontFamily = FontFamily.Monospace,
+                )
             }
         }
     }

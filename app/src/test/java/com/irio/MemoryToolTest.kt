@@ -2,6 +2,7 @@ package com.irio
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,6 +18,24 @@ class MemoryToolTest {
         assertEquals("已浏览网页", MemoryTool.doneLabel(WebFetchTool.NAME))
         assertEquals("已读取记忆", MemoryTool.doneLabel(MemoryTool.GET))
         assertEquals("已写入记忆", MemoryTool.doneLabel(MemoryTool.UPDATE))
+    }
+
+    @Test
+    fun toolOutputReplacesTheLiveTranscriptUntilFinish() {
+        val tracker = ProcessTracker()
+        tracker.onToolStarted(LinuxShellTool.NAME)
+        tracker.onToolOutput("$ echo hi")
+        val live = tracker.snapshot().single()
+        assertEquals(LinuxShellTool.NAME, live.toolName)
+        assertTrue(live.live)
+        assertEquals("$ echo hi", live.content)
+        tracker.onToolOutput("$ echo hi\nhi")
+        assertEquals("$ echo hi\nhi", tracker.snapshot().single().content)
+        assertTrue(tracker.snapshot().single().live)
+        tracker.onToolFinished()
+        val done = tracker.snapshot().single()
+        assertFalse(done.live)
+        assertEquals("$ echo hi\nhi", done.content)
     }
 
     @Test

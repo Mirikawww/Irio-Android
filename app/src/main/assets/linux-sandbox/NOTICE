@@ -1,0 +1,15 @@
+Bundled Linux sandbox components
+
+Alpine minirootfs 3.24.2
+  Official archive from https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases
+  Packages inside the rootfs keep their own licenses.
+
+proot, libtalloc, and libandroid-shmem
+  Binaries from the Termux package repository (https://packages.termux.dev/apt/termux-main).
+  proot is GPL-2.0-or-later: https://github.com/termux/proot
+  libtalloc is the Samba talloc library shipped by Termux.
+  libandroid-shmem is the Termux Android System V shared-memory shim.
+  These programs are executed as separate processes. They are not linked into Irio.
+  The only modification is a packaging relocation: libtalloc.so.2 is renamed to
+  libtalloc.so in DT_NEEDED and DT_SONAME, and DT_RUNPATH is set to $ORIGIN so
+  Android can execute them from the app native-library directory.

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.SmartToy
+import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -124,6 +125,15 @@ private fun SettingsScreen(onBack: () -> Unit) {
                     icon = Icons.Rounded.Devices,
                     onClick = {
                         context.startActivity(Intent(context, LinkSettingsActivity::class.java))
+                    },
+                )
+                Spacer(Modifier.height(12.dp))
+                ListRowButton(
+                    label = tr("Linux 沙盒"),
+                    icon = Icons.Rounded.Terminal,
+                    experimental = true,
+                    onClick = {
+                        context.startActivity(Intent(context, LinuxSandboxSettingsActivity::class.java))
                     },
                 )
                 Spacer(Modifier.height(12.dp))

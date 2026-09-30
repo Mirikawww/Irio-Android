@@ -191,4 +191,23 @@ class StreamPublishTest {
             ),
         )
     }
+
+    @Test
+    fun toolOutputPublishesImmediately() {
+        assertTrue(
+            shouldPublishStreamUpdate(
+                nowMs = 11,
+                lastPublishAt = 10,
+                deltaLength = 0,
+                thinkingDeltaLength = 0,
+                hasAttachments = false,
+                done = false,
+                searchingChanged = false,
+                searchPagesDelta = 0,
+                publishedBodyLength = 4,
+                publishedThinking = false,
+                toolOutputChanged = true,
+            ),
+        )
+    }
 }
