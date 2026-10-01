@@ -578,7 +578,7 @@ object ProviderApi {
             if (status !in 200..299) {
                 ImageGenResult(error = apiError(body).ifBlank { tr("图片生成失败（HTTP %s）").format(status) })
             } else {
-                parseImageResponse(body)
+                parseImageResponse(body, config, cancellation)
                     ?: ImageGenResult(error = tr("图片端点没有返回图片"))
             }
         } catch (error: Exception) {
@@ -643,7 +643,7 @@ object ProviderApi {
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
             when {
-                status in 200..299 -> parseImageResponse(body)
+                status in 200..299 -> parseImageResponse(body, config, cancellation)
                     ?: ImageGenResult(error = tr("图片端点没有返回图片"))
                 // 端点不支持 edits（路由不存在/方法不允许/类型不收）→ 让调用方回落 generations
                 status == 404 || status == 405 || status == 415 -> null
@@ -674,33 +674,134 @@ object ProviderApi {
         return "$base/images/generations"
     }
 
-    private fun parseImageResponse(body: String): ImageGenResult? {
+    private fun parseImageResponse(
+        body: String,
+        config: ProviderConfig,
+        cancellation: ChatRequestCancellation?,
+    ): ImageGenResult? {
         val root = runCatching { JSONObject(body) }.getOrNull() ?: return null
         val data = root.optJSONArray("data") ?: return null
         for (index in 0 until data.length()) {
             val item = data.optJSONObject(index) ?: continue
+            val revised = item.optString("revised_prompt")
             val b64 = item.optString("b64_json")
             if (b64.isNotBlank()) {
-                val bytes = runCatching { Base64.getMimeDecoder().decode(b64) }.getOrNull() ?: continue
-                if (bytes.isEmpty()) continue
-                val mime = root.optString("mimeType").ifBlank { "image/png" }
-                val name = "image-${System.currentTimeMillis()}${imageExtensionFor(mime)}"
-                val file = File.createTempFile("irio-img-", imageExtensionFor(mime))
-                file.writeBytes(bytes)
-                return ImageGenResult(
-                    attachment = ChatAttachment(name = name, mimeType = mime, filePath = file.absolutePath),
-                    revisedPrompt = item.optString("revised_prompt"),
-                )
+                val bytes = runCatching { Base64.getMimeDecoder().decode(b64) }.getOrNull()
+                val saved = bytes?.let {
+                    saveGeneratedImage(it, root.optString("mimeType").ifBlank { "image/png" }, revised)
+                }
+                if (saved != null) return saved
             }
-            val url = item.optString("url")
-            if (url.isNotBlank()) return ImageGenResult(error = tr("图片端点只返回了 URL，请让提供商开启 b64_json 返回"))
+            val url = item.optString("url").ifBlank {
+                item.optJSONObject("image_url")?.optString("url").orEmpty()
+            }
+            if (url.isNotBlank()) return imageFromRemoteUrl(url, revised, config, cancellation)
         }
         return null
+    }
+
+    /** 部分图片端点只回 url（DALL·E 默认），不回 b64_json。下到本地，后续编辑才能读文件。 */
+    private fun imageFromRemoteUrl(
+        url: String,
+        revisedPrompt: String,
+        config: ProviderConfig,
+        cancellation: ChatRequestCancellation?,
+    ): ImageGenResult {
+        val trimmed = url.trim()
+        if (trimmed.startsWith("data:", ignoreCase = true)) {
+            val parsed = bytesFromDataUrl(trimmed) ?: return ImageGenResult(error = tr("图片地址无法下载"))
+            return saveGeneratedImage(parsed.second, parsed.first, revisedPrompt)
+                ?: ImageGenResult(error = tr("图片地址无法下载"))
+        }
+        if (!trimmed.startsWith("http://", ignoreCase = true) &&
+            !trimmed.startsWith("https://", ignoreCase = true)
+        ) {
+            return ImageGenResult(error = tr("图片地址无法下载"))
+        }
+        val connection = runCatching { URL(trimmed).openConnection() as HttpURLConnection }.getOrElse {
+            return ImageGenResult(error = tr("图片地址无法下载"))
+        }
+        cancellation?.attach(connection)
+        return try {
+            if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
+            connection.instanceFollowRedirects = true
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 60_000
+            connection.requestMethod = "GET"
+            if (sameHost(trimmed, config.endpointUrl)) applyAuth(connection, config)
+            val status = connection.responseCode
+            if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
+            if (status !in 200..299) return ImageGenResult(error = tr("图片地址无法下载"))
+            val mime = mimeForDownloadedImage(connection.contentType, trimmed)
+            val file = File.createTempFile("irio-img-", imageExtensionFor(mime))
+            connection.inputStream.use { input ->
+                file.outputStream().use { output -> input.copyTo(output) }
+            }
+            if (!file.exists() || file.length() <= 0L || file.length() > ChatApi.MAX_ATTACHMENT_BYTES_TOTAL) {
+                file.delete()
+                return ImageGenResult(error = tr("图片地址无法下载"))
+            }
+            val name = "image-${System.currentTimeMillis()}${imageExtensionFor(mime)}"
+            ImageGenResult(
+                attachment = ChatAttachment(name = name, mimeType = mime, filePath = file.absolutePath),
+                revisedPrompt = revisedPrompt,
+            )
+        } catch (_: Exception) {
+            if (cancellation?.isCancelled() == true) ImageGenResult(error = tr("图片生成已停止"))
+            else ImageGenResult(error = tr("图片地址无法下载"))
+        } finally {
+            cancellation?.detach(connection)
+            connection.disconnect()
+        }
+    }
+
+    private fun bytesFromDataUrl(value: String): Pair<String, ByteArray>? {
+        val comma = value.indexOf(',')
+        if (comma <= 5) return null
+        val mime = value.substring(5, comma).substringBefore(';').ifBlank { "image/png" }
+        val bytes = runCatching { Base64.getMimeDecoder().decode(value.substring(comma + 1)) }.getOrNull()
+            ?: return null
+        if (bytes.isEmpty()) return null
+        return mime to bytes
+    }
+
+    private fun saveGeneratedImage(bytes: ByteArray, mimeType: String, revisedPrompt: String): ImageGenResult? {
+        if (bytes.isEmpty()) return null
+        val mime = mimeType.ifBlank { "image/png" }
+        val file = File.createTempFile("irio-img-", imageExtensionFor(mime))
+        file.writeBytes(bytes)
+        return ImageGenResult(
+            attachment = ChatAttachment(
+                name = "image-${System.currentTimeMillis()}${imageExtensionFor(mime)}",
+                mimeType = mime,
+                filePath = file.absolutePath,
+            ),
+            revisedPrompt = revisedPrompt,
+        )
+    }
+
+    private fun sameHost(imageUrl: String, endpointUrl: String): Boolean {
+        val imageHost = runCatching { URL(imageUrl).host }.getOrNull()?.lowercase() ?: return false
+        val endpointHost = runCatching { URL(endpointUrl.trim()).host }.getOrNull()?.lowercase() ?: return false
+        return imageHost.isNotEmpty() && imageHost == endpointHost
+    }
+
+    private fun mimeForDownloadedImage(contentType: String?, url: String): String {
+        val header = contentType?.substringBefore(';')?.trim()?.lowercase().orEmpty()
+        if (header.startsWith("image/")) return header
+        val path = url.substringBefore('?').substringAfterLast('/').lowercase()
+        return when {
+            path.endsWith(".jpg") || path.endsWith(".jpeg") -> "image/jpeg"
+            path.endsWith(".webp") -> "image/webp"
+            path.endsWith(".gif") -> "image/gif"
+            else -> "image/png"
+        }
     }
 
     private fun imageExtensionFor(mimeType: String): String = when (mimeType.lowercase()) {
         "image/jpeg", "image/jpg" -> ".jpg"
         "image/webp" -> ".webp"
+        "image/gif" -> ".gif"
         else -> ".png"
     }
 }
