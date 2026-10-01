@@ -67,13 +67,48 @@ enum class AccentColor(val label: String, val stored: String, val color: Color) 
     }
 
     /** Pale solid tint for user bubbles. Not the raw accent. */
-    fun softened(): Color {
-        val mix = 0.22f
-        return Color(
-            red = color.red * mix + (1f - mix),
-            green = color.green * mix + (1f - mix),
-            blue = color.blue * mix + (1f - mix),
-        )
+    fun softened(): Color = color.softened()
+}
+
+internal fun Color.softened(mix: Float = 0.22f): Color = Color(
+    red = red * mix + (1f - mix),
+    green = green * mix + (1f - mix),
+    blue = blue * mix + (1f - mix),
+)
+
+/** [fraction] of this color over [base]. Used for dark user bubbles. */
+internal fun Color.mixOver(base: Color, fraction: Float): Color {
+    val keep = 1f - fraction
+    return Color(
+        red = red * fraction + base.red * keep,
+        green = green * fraction + base.green * keep,
+        blue = blue * fraction + base.blue * keep,
+    )
+}
+
+internal data class UserBubbleColors(val background: Color, val content: Color)
+
+/**
+ * Light non-black bubbles are a pale mix of the accent into white.
+ * Dark non-black bubbles mix that same accent into near-black — not a single navy/gray.
+ * Black accent stays neutral. [accentColor] is the resolved accent (Monet's dynamic primary).
+ */
+internal fun userBubbleColors(
+    dark: Boolean,
+    accent: AccentColor,
+    accentColor: Color,
+    panel: Color,
+    onPanel: Color,
+    editing: Boolean,
+): UserBubbleColors {
+    if (editing) return UserBubbleColors(accentColor.copy(alpha = 0.16f), accentColor)
+    if (accent == AccentColor.BLACK) {
+        return if (dark) UserBubbleColors(Color(0xFF2A2A2A), onPanel) else UserBubbleColors(panel, onPanel)
+    }
+    return if (dark) {
+        UserBubbleColors(accentColor.mixOver(Color(0xFF141414), 0.28f), onPanel)
+    } else {
+        UserBubbleColors(accentColor.softened(), Color(0xFF1A1A1A))
     }
 }
 

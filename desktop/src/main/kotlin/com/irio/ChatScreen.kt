@@ -2187,6 +2187,14 @@ private fun MessageRow(
                     }
                 }
                 if (chatMessage.text.isNotBlank()) {
+                    val bubble = userBubbleColors(
+                        dark = Theme[colors][backgroundColor].red < 0.5f,
+                        accent = ThemeStore.accent,
+                        accentColor = Theme[colors][primaryColor],
+                        panel = Theme[colors][panelColor],
+                        onPanel = Theme[colors][onPanelColor],
+                        editing = isEditing,
+                    )
                     BoxWithConstraints(
                         modifier = Modifier.fillMaxWidth(),
                         contentAlignment = Alignment.CenterEnd,
@@ -2196,13 +2204,7 @@ private fun MessageRow(
                             modifier = Modifier
                                 .widthIn(max = maxWidth * 0.85f)
                                 .background(
-                                    color = when {
-                                        isEditing -> Theme[colors][primaryColor].copy(alpha = 0.16f)
-                                        Theme[colors][backgroundColor].red < 0.5f && ThemeStore.accent == AccentColor.BLUE -> Color(0xFF16345C)
-                                        Theme[colors][backgroundColor].red < 0.5f -> Color(0xFF2A2A2A)
-                                        ThemeStore.accent != AccentColor.BLACK -> ThemeStore.accent.softened()
-                                        else -> Theme[colors][panelColor]
-                                    },
+                                    color = bubble.background,
                                     shape = RoundedCornerShape(16.dp),
                                 )
                                 .then(
@@ -2215,12 +2217,7 @@ private fun MessageRow(
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             fontSize = 16.sp,
                             lineHeight = 33.6.sp,
-                            color = when {
-                                isEditing -> Theme[colors][primaryColor]
-                                Theme[colors][backgroundColor].red < 0.5f -> Theme[colors][onPanelColor]
-                                ThemeStore.accent != AccentColor.BLACK -> Color(0xFF1A1A1A)
-                                else -> Theme[colors][onPanelColor]
-                            },
+                            color = bubble.content,
                         )
                     }
                 }
