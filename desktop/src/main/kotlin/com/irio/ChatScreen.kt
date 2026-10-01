@@ -59,6 +59,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Photo
@@ -253,6 +254,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     var mergeModels by remember { mutableStateOf(ProviderStore.loadMergeModels()) }
     var webSearchAvailable by remember { mutableStateOf(SearchStore.hasApiKey()) }
     var webSearchEnabled by remember { mutableStateOf(SearchStore.loadWebSearchEnabled()) }
+    var autoRead by remember { mutableStateOf(SpeechStore.loadAutoRead()) }
     var clearHistoryDialogOpen by remember { mutableStateOf(false) }
     var conversationAction by remember { mutableStateOf<ConversationSummary?>(null) }
     var viewingPhoto by remember { mutableStateOf<ChatAttachment?>(null) }
@@ -636,6 +638,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             drawerProgress = 0f
             return
         }
+        SpeechPlayer.stop()
         val requestToken = conversationLoadToken + 1
         conversationLoadToken = requestToken
         val previousId = currentConversation.id
@@ -665,6 +668,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     }
 
     fun newConversation(closeDrawer: Boolean = true) {
+        SpeechPlayer.stop()
         val previous = currentConversation
         val previousMessages = messages
         val keepPool = previous.id in generatingIds
@@ -800,6 +804,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         requestSource: List<ChatMessage>,
         reply: ChatMessage,
     ) {
+        SpeechPlayer.stop()
         val requestModel = selectedModel
         val requestEffort = reasoningEffort
         val requestFast = fastMode
@@ -1077,6 +1082,14 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                                 userText = requestSource.lastOrNull { it.fromUser }?.text.orEmpty(),
                                 assistantText = finalMessage.text,
                             )
+                            if (
+                                result.error == null && !result.stopped &&
+                                currentConversation.id == requestConversationId &&
+                                SpeechStore.loadAutoRead()
+                            ) {
+                                val spoken = speechPlainText(finalMessage.text)
+                                if (spoken.isNotBlank()) SpeechPlayer.speak(finalMessage.id, spoken)
+                            }
                         }
                     }
                     appliedFinal = true
@@ -1613,6 +1626,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     }
                 }
 
+                SpeechTransportBar()
                 val canSend = (editingMessageId != null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty())) ||
                     (!generatingThisChat && editingMessageId == null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty()))
                 ComposerField(
@@ -1760,6 +1774,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                             fastMode = fastMode,
                             webSearchAvailable = webSearchAvailable,
                             webSearchEnabled = webSearchEnabled,
+                            autoRead = autoRead,
                             expanded = modelMenuOpen,
                             onExpandedChange = { modelMenuOpen = it },
                             onSelectedModelChange = { model, providerId ->
@@ -1789,6 +1804,10 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                             onWebSearchChange = { enabled ->
                                 webSearchEnabled = enabled
                                 SearchStore.saveWebSearchEnabled(enabled)
+                            },
+                            onAutoReadChange = { enabled ->
+                                autoRead = enabled
+                                SpeechStore.saveAutoRead(enabled)
                             },
                             )
                         }
@@ -1869,12 +1888,14 @@ private fun ModelPicker(
     fastMode: Boolean,
     webSearchAvailable: Boolean,
     webSearchEnabled: Boolean,
+    autoRead: Boolean,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     onSelectedModelChange: (model: String, providerId: String) -> Unit,
     onReasoningChange: (ReasoningEffort) -> Unit,
     onFastModeChange: (Boolean) -> Unit,
     onWebSearchChange: (Boolean) -> Unit,
+    onAutoReadChange: (Boolean) -> Unit,
 ) {
     val content = Theme[colors][onBackgroundColor]
     val muted = Theme[colors][mutedColor]
@@ -2005,12 +2026,28 @@ private fun ModelPicker(
                     ) {
                         Text(tr("网络搜索"))
                     }
+                    DropdownMenuItem(
+                        onClick = { onAutoReadChange(!autoRead) },
+                        leading = {
+                            if (autoRead) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            } else {
+                                Spacer(Modifier.size(16.dp))
+                            }
+                        },
+                    ) {
+                        Text(tr("自动朗读"))
+                    }
                 }
                 DropdownMenuPanel(modifier = Modifier.width(200.dp)) {
                     LazyColumn(
                         modifier = Modifier
                             .width(200.dp)
-                            .heightIn(max = 520.dp)
+                            .heightIn(max = 600.dp)
                     ) {
                         items(
                             count = rows.size,
@@ -2116,6 +2153,8 @@ private fun MessageRow(
     onPrevEditVersion: (() -> Unit)? = null,
     onNextEditVersion: (() -> Unit)? = null,
 ) {
+    val spoken = remember(chatMessage.id, chatMessage.text) { speechPlainText(chatMessage.text) }
+    val speech = SpeechPlayer.playback
     val isNewUserMessage = chatMessage.fromUser && chatMessage.id == newUserMessageId
 
     val entranceProgress = remember(chatMessage.id) {
@@ -2257,6 +2296,12 @@ private fun MessageRow(
                 ) {
                     AssistantActions(
                         onCopy = onCopy,
+                        onSpeak = if (spoken.isNotBlank()) {
+                            { SpeechPlayer.speak(chatMessage.id, spoken) }
+                        } else {
+                            null
+                        },
+                        speaking = speech.active && speech.messageId == chatMessage.id,
                         onRetry = onRetry,
                         canRetry = canRetry,
                         finishedAt = chatMessage.finishedAt,
@@ -3179,6 +3224,8 @@ private fun UserEditVersionSwitcher(
 @Composable
 private fun AssistantActions(
     onCopy: () -> Unit,
+    onSpeak: (() -> Unit)?,
+    speaking: Boolean,
     onRetry: () -> Unit,
     canRetry: Boolean,
     finishedAt: Long,
@@ -3210,6 +3257,16 @@ private fun AssistantActions(
                     .size(18.dp)
                     .clickable(onClick = onRetry),
                 tint = muted,
+            )
+        }
+        if (onSpeak != null) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
+                contentDescription = tr("朗读"),
+                modifier = Modifier
+                    .size(18.dp)
+                    .clickable(onClick = onSpeak),
+                tint = if (speaking) Theme[colors][onBackgroundColor] else muted,
             )
         }
         if (clock.isNotEmpty()) {

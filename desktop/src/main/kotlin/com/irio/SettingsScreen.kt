@@ -16,6 +16,7 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.SmartToy
+import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -38,6 +39,7 @@ fun SettingsScreen(
     onProviders: () -> Unit,
     onLink: () -> Unit,
     onModel: () -> Unit,
+    onSpeech: () -> Unit,
     onAppearance: () -> Unit,
     onMemory: () -> Unit,
     onOther: () -> Unit,
@@ -77,6 +79,13 @@ fun SettingsScreen(
                     label = tr("模型"),
                     icon = Icons.Rounded.SmartToy,
                     onClick = onModel,
+                )
+                Spacer(Modifier.height(12.dp))
+                ListRowButton(
+                    label = "TTS/STT",
+                    icon = Icons.Rounded.RecordVoiceOver,
+                    experimental = true,
+                    onClick = onSpeech,
                 )
                 Spacer(Modifier.height(12.dp))
                 ListRowButton(

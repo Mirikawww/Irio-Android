@@ -39,6 +39,9 @@ object AppPaths {
     val systemPromptFile: File
         get() = File(root, "system_prompt.json")
 
+    val speechFile: File
+        get() = File(root, "speech.json")
+
     val linkFile: File
         get() = File(root, "link.json")
 

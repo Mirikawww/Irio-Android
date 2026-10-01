@@ -5,6 +5,7 @@ sealed class Screen {
     data object Settings : Screen()
     data object Link : Screen()
     data object Model : Screen()
+    data object Speech : Screen()
     data object SystemPrompt : Screen()
     data object Appearance : Screen()
     data object Memory : Screen()

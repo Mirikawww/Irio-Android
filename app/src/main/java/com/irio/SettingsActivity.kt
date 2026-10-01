@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.SmartToy
+import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -83,6 +84,15 @@ private fun SettingsScreen(onBack: () -> Unit) {
                     icon = Icons.Rounded.SmartToy,
                     onClick = {
                         context.startActivity(Intent(context, ModelSettingsActivity::class.java))
+                    },
+                )
+                Spacer(Modifier.height(12.dp))
+                ListRowButton(
+                    label = "TTS/STT",
+                    icon = Icons.Rounded.RecordVoiceOver,
+                    experimental = true,
+                    onClick = {
+                        context.startActivity(Intent(context, SpeechSettingsActivity::class.java))
                     },
                 )
                 Spacer(Modifier.height(12.dp))

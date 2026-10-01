@@ -5,11 +5,14 @@ import me.saket.telephoto.zoomable.rememberZoomableState
 import androidx.compose.material.icons.rounded.Download
 import android.content.Context
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.SharedPreferences
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -80,6 +83,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Photo
@@ -298,6 +302,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var modelsDevReasoning by remember { mutableStateOf(ProviderStore.loadModelsDevReasoning(context)) }
     var webSearchAvailable by remember { mutableStateOf(SearchStore.hasApiKey(context)) }
     var webSearchEnabled by remember { mutableStateOf(SearchStore.loadWebSearchEnabled(context)) }
+    var autoRead by remember { mutableStateOf(SpeechStore.loadAutoRead(context)) }
     var clearHistoryDialogOpen by remember { mutableStateOf(false) }
     var conversationAction by remember { mutableStateOf<ConversationSummary?>(null) }
     var viewingPhoto by remember { mutableStateOf<ChatAttachment?>(null) }
@@ -566,6 +571,19 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     val pickFiles = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris -> addAttachments(uris) }
+    val requestSpeechNotification = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) SpeechNotifications.sync(context, SpeechPlayer.playback)
+    }
+    fun ensureSpeechNotification() {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestSpeechNotification.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     DisposableEffect(context) {
         // SharedPreferences 监听：模型/思考等设置被外部（设置页）改动时刷新。
@@ -778,6 +796,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             drawerProgress = 0f
             return
         }
+        SpeechPlayer.stop()
         val requestToken = conversationLoadToken + 1
         conversationLoadToken = requestToken
         val previousId = currentConversation.id
@@ -807,6 +826,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     }
 
     fun newConversation(closeDrawer: Boolean = true) {
+        SpeechPlayer.stop()
         val previous = currentConversation
         val previousMessages = messages
         val keepPool = previous.id in generatingIds
@@ -977,6 +997,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         requestSource: List<ChatMessage>,
         reply: ChatMessage,
     ) {
+        SpeechPlayer.stop()
         val requestModel = selectedModel
         val effectiveReasoningInfo = if (ProviderStore.loadModelsDevReasoning(context)) {
             ModelCatalog.reasoningInfo(context, requestModel, useCatalog = true)
@@ -1286,6 +1307,17 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 userText = requestSource.lastOrNull { it.fromUser }?.text.orEmpty(),
                                 assistantText = finalMessage.text,
                             )
+                            if (
+                                result.error == null && !result.stopped &&
+                                currentConversation.id == requestConversationId &&
+                                SpeechStore.loadAutoRead(context)
+                            ) {
+                                val spoken = speechPlainText(finalMessage.text)
+                                if (spoken.isNotBlank()) {
+                                    ensureSpeechNotification()
+                                    SpeechPlayer.speak(context, finalMessage.id, spoken)
+                                }
+                            }
                         }
                     }
                     appliedFinal = true
@@ -1858,6 +1890,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     }
                 }
 
+                SpeechTransportBar()
                 val canSend = (editingMessageId != null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty())) ||
                     (!generatingThisChat && editingMessageId == null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty()))
                 ComposerField(
@@ -2010,6 +2043,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             fastMode = fastMode,
                             webSearchAvailable = webSearchAvailable,
                             webSearchEnabled = webSearchEnabled,
+                            autoRead = autoRead,
                             expanded = modelMenuOpen,
                             onExpandedChange = { modelMenuOpen = it },
                             onSelectedModelChange = { model, providerId ->
@@ -2042,6 +2076,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             onWebSearchChange = { enabled ->
                                 webSearchEnabled = enabled
                                 SearchStore.saveWebSearchEnabled(context, enabled)
+                            },
+                            onAutoReadChange = { enabled ->
+                                autoRead = enabled
+                                SpeechStore.saveAutoRead(context, enabled)
                             },
                             )
                         }
@@ -2135,12 +2173,14 @@ private fun ModelPicker(
     fastMode: Boolean,
     webSearchAvailable: Boolean,
     webSearchEnabled: Boolean,
+    autoRead: Boolean,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     onSelectedModelChange: (model: String, providerId: String) -> Unit,
     onReasoningChange: (ReasoningEffort) -> Unit,
     onFastModeChange: (Boolean) -> Unit,
     onWebSearchChange: (Boolean) -> Unit,
+    onAutoReadChange: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val content = Theme[colors][onBackgroundColor]
@@ -2230,7 +2270,7 @@ private fun ModelPicker(
         modifier = Modifier.wrapContentWidth(Alignment.End),
         alignment = DropdownMenuAlignment.End,
         panel = {
-            Row(modifier = Modifier.widthIn(max = 340.dp).heightIn(max = 520.dp)) {
+            Row(modifier = Modifier.widthIn(max = 340.dp).heightIn(max = 600.dp)) {
                 DropdownMenuPanel(modifier = Modifier.widthIn(min = 112.dp, max = 140.dp)) {
                     if (supportsThinking) {
                         ReasoningEffort.entries.forEach { option ->
@@ -2301,6 +2341,22 @@ private fun ModelPicker(
                     ) {
                         Text(tr("网络搜索"), fontSize = 15.5.sp)
                     }
+                    DropdownMenuItem(
+                        onClick = { onAutoReadChange(!autoRead) },
+                        leading = {
+                            if (autoRead) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            } else {
+                                Spacer(Modifier.size(16.dp))
+                            }
+                        },
+                    ) {
+                        Text(tr("自动朗读"), fontSize = 15.5.sp)
+                    }
                 }
                 DropdownMenuPanel(modifier = Modifier.width(200.dp)) {
                     AndroidComposeRecyclerList(
@@ -2308,7 +2364,7 @@ private fun ModelPicker(
                         key = { it.key },
                         modifier = Modifier
                             .width(200.dp)
-                            .heightIn(max = 520.dp),
+                            .heightIn(max = 600.dp),
                     ) {
                         when (val row = it) {
                             is ModelPickerRow.Gap -> Spacer(Modifier.height(10.dp))
@@ -2398,6 +2454,14 @@ internal fun MessageRow(
     onPrevEditVersion: (() -> Unit)? = null,
     onNextEditVersion: (() -> Unit)? = null,
 ) {
+    val context = LocalContext.current
+    val requestSpeechNotification = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) SpeechNotifications.sync(context, SpeechPlayer.playback)
+    }
+    val spoken = remember(chatMessage.id, chatMessage.text) { speechPlainText(chatMessage.text) }
+    val speech = SpeechPlayer.playback
     val isNewUserMessage = chatMessage.fromUser && chatMessage.id == newUserMessageId
 
     val entranceProgress = remember(chatMessage.id) {
@@ -2557,6 +2621,20 @@ internal fun MessageRow(
                 ) {
                     AssistantActions(
                         onCopy = onCopy,
+                        onSpeak = if (spoken.isNotBlank()) {
+                            {
+                                if (
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+                                    != PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    requestSpeechNotification.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                                SpeechPlayer.speak(context, chatMessage.id, spoken)
+                            }
+                        } else {
+                            null
+                        },
+                        speaking = speech.active && speech.messageId == chatMessage.id,
                         onRetry = onRetry,
                         canRetry = canRetry,
                         finishedAt = chatMessage.finishedAt,
@@ -3629,6 +3707,8 @@ private fun UserEditVersionSwitcher(
 @Composable
 private fun AssistantActions(
     onCopy: () -> Unit,
+    onSpeak: (() -> Unit)?,
+    speaking: Boolean,
     onRetry: () -> Unit,
     canRetry: Boolean,
     finishedAt: Long,
@@ -3660,6 +3740,16 @@ private fun AssistantActions(
                     .size(18.dp)
                     .clickable(onClick = onRetry),
                 tint = muted,
+            )
+        }
+        if (onSpeak != null) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
+                contentDescription = tr("朗读"),
+                modifier = Modifier
+                    .size(18.dp)
+                    .clickable(onClick = onSpeak),
+                tint = if (speaking) Theme[colors][onBackgroundColor] else muted,
             )
         }
         if (clock.isNotEmpty()) {

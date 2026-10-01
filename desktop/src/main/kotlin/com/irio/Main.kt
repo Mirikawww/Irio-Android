@@ -40,6 +40,7 @@ private fun IrioApp() {
                 onProviders = { screen = Screen.Providers },
                 onLink = { screen = Screen.Link },
                 onModel = { screen = Screen.Model },
+                onSpeech = { screen = Screen.Speech },
                 onAppearance = { screen = Screen.Appearance },
                 onMemory = { screen = Screen.Memory },
                 onOther = { screen = Screen.Other },
@@ -50,6 +51,9 @@ private fun IrioApp() {
             Screen.Model -> ModelSettingsScreen(
                 onBack = { screen = Screen.Settings },
                 onSystemPrompt = { screen = Screen.SystemPrompt },
+            )
+            Screen.Speech -> SpeechSettingsScreen(
+                onBack = { screen = Screen.Settings },
             )
             Screen.SystemPrompt -> SystemPromptSettingsScreen(
                 onBack = { screen = Screen.Model },
