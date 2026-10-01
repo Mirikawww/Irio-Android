@@ -773,7 +773,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         val opening = pendingConversationScroll == currentConversation.id
         // 发送时尾部是待回复占位，不是用户气泡。用 newUserMessageId 识别这次发送。
         val justSent = newUserMessageId != null && newUserMessageId != seenSentUserMessageId
-        val force = opening || justSent || (last.fromUser && last.id != seenTranscriptTailId)
+        val scrollToNewMessage = justSent && ThemeStore.newMessageScroll
+        val force = opening || scrollToNewMessage || (last.fromUser && last.id != seenTranscriptTailId)
         if (justSent) seenSentUserMessageId = newUserMessageId
         if (opening) pendingConversationScroll = null
         if (!shouldSnapTranscriptToBottom(
@@ -786,7 +787,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             return@LaunchedEffect
         }
         if (force) stickToBottom = true
-        if (justSent) {
+        if (scrollToNewMessage) {
             messageRecyclerController.revealTail()
         } else {
             messageRecyclerController.requestScrollToBottom()

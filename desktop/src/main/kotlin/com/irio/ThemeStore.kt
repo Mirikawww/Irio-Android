@@ -137,6 +137,7 @@ object ThemeStore {
     private const val CONTEXT_RING_KEY = "context_ring"
     private const val GLYPH_FADE_KEY = "glyph_fade"
     private const val MODEL_DIFF_KEY = "model_diff"
+    private const val NEW_MESSAGE_SCROLL_KEY = "new_message_scroll"
 
     private val initial = loadInitial()
     var preference by mutableStateOf(initial.preference)
@@ -153,6 +154,8 @@ object ThemeStore {
     var glyphFade by mutableStateOf(initial.glyphFade)
         private set
     var modelDiff by mutableStateOf(initial.modelDiff)
+        private set
+    var newMessageScroll by mutableStateOf(initial.newMessageScroll)
         private set
 
     fun save(value: ThemePreference) {
@@ -191,6 +194,12 @@ object ThemeStore {
         updateAppearance { it.put(MODEL_DIFF_KEY, enabled) }
     }
 
+    fun saveNewMessageScroll(enabled: Boolean) {
+        if (newMessageScroll == enabled) return
+        newMessageScroll = enabled
+        updateAppearance { it.put(NEW_MESSAGE_SCROLL_KEY, enabled) }
+    }
+
     fun saveContextRing(enabled: Boolean) {
         contextRing = false
         updateAppearance { it.put(CONTEXT_RING_KEY, false) }
@@ -211,8 +220,17 @@ object ThemeStore {
         val language = AppLanguage.fromStored(appearance?.optString(LANGUAGE_KEY)?.takeIf { it.isNotBlank() })
         val glyphFade = appearance?.optBoolean(GLYPH_FADE_KEY, true) ?: true
         val modelDiff = appearance?.optBoolean(MODEL_DIFF_KEY, true) ?: true
+        val newMessageScroll = appearance?.optBoolean(NEW_MESSAGE_SCROLL_KEY, true) ?: true
         if (fromAppearance != null) {
-            return LoadedAppearance(ThemePreference.fromStored(fromAppearance), autoAmoled, accent, language, glyphFade, modelDiff)
+            return LoadedAppearance(
+                ThemePreference.fromStored(fromAppearance),
+                autoAmoled,
+                accent,
+                language,
+                glyphFade,
+                modelDiff,
+                newMessageScroll,
+            )
         }
         val legacy = runCatching {
             JSONObject(AppPaths.providersFile.readText()).optString(KEY)
@@ -221,7 +239,7 @@ object ThemeStore {
         if (legacy != null) {
             updateAppearance { it.put(KEY, preference.stored) }
         }
-        return LoadedAppearance(preference, autoAmoled, accent, language, glyphFade, modelDiff)
+        return LoadedAppearance(preference, autoAmoled, accent, language, glyphFade, modelDiff, newMessageScroll)
     }
 
     private data class LoadedAppearance(
@@ -231,5 +249,6 @@ object ThemeStore {
         val language: AppLanguage,
         val glyphFade: Boolean,
         val modelDiff: Boolean,
+        val newMessageScroll: Boolean,
     )
 }

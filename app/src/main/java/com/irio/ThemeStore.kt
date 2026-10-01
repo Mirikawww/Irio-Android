@@ -138,6 +138,7 @@ object ThemeStore {
     private const val CONTEXT_RING_KEY = "context_ring"
     private const val GLYPH_FADE_KEY = "glyph_fade"
     private const val MODEL_DIFF_KEY = "model_diff"
+    private const val NEW_MESSAGE_SCROLL_KEY = "new_message_scroll"
     private const val LEGACY_PREFS = "provider_settings"
     private const val LEGACY_KEY = "theme_preference"
 
@@ -166,6 +167,10 @@ object ThemeStore {
     var modelDiff by mutableStateOf(true)
         private set
 
+    /** 发送新消息时用固定时长滑到底，并重新打开自动滚动。默认开。 */
+    var newMessageScroll by mutableStateOf(true)
+        private set
+
     @Volatile
     private var loaded = false
 
@@ -183,6 +188,7 @@ object ThemeStore {
             contextRing = false
             glyphFade = appearance.getBoolean(GLYPH_FADE_KEY, true)
             modelDiff = appearance.getBoolean(MODEL_DIFF_KEY, true)
+            newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, true)
             if (appearance.getString(KEY, null) == null && stored != null) {
                 appearance.edit().putString(KEY, stored).apply()
             }
@@ -247,6 +253,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(MODEL_DIFF_KEY, enabled)
+            .apply()
+    }
+
+    fun saveNewMessageScroll(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (newMessageScroll == enabled) return
+        newMessageScroll = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(NEW_MESSAGE_SCROLL_KEY, enabled)
             .apply()
     }
 
