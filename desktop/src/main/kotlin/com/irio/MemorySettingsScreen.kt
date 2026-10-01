@@ -113,7 +113,7 @@ fun MemorySettingsScreen(onBack: () -> Unit) {
             )
             TextField(
                 state = memory,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().then(rememberInputFieldBorder()),
                 accessibilityLabel = tr("记忆内容"),
                 placeholder = {
                     Text(

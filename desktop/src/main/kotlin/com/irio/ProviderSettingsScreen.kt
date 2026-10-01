@@ -245,7 +245,7 @@ internal fun ProviderField(
 ) {
     TextField(
         state = state,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(rememberInputFieldBorder()),
         readOnly = readOnly,
         accessibilityLabel = label,
         placeholder = {

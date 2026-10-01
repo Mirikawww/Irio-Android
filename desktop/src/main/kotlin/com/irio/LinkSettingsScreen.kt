@@ -40,7 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -197,6 +196,11 @@ fun LinkSettingsScreen(onBack: () -> Unit) {
                     state = codeState,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .then(
+                            rememberInputFieldBorder(
+                                errorColor = if (pairInvalid) irioErrorTextColor() else null,
+                            ),
+                        )
                         .offset { IntOffset(shake.value.toInt(), 0) },
                     accessibilityLabel = tr("输入配对码"),
                     placeholder = {
@@ -210,7 +214,6 @@ fun LinkSettingsScreen(onBack: () -> Unit) {
                     lineHeight = 16.sp,
                     fontSize = 16.sp,
                     shape = Theme[shapes][fieldShape],
-                    borderColor = if (pairInvalid) irioErrorTextColor() else Color.Unspecified,
                     contentPadding = PaddingValues(12.dp),
                     lineLimits = TextFieldLineLimits.SingleLine,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),

@@ -28,15 +28,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.border
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -47,11 +43,12 @@ import androidx.compose.ui.unit.sp
 import com.composables.ui.components.Text
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.defaultTextSelectionColors
+import com.composables.ui.theme.borderColor
 import com.composables.ui.theme.fieldColor
 import com.composables.ui.theme.fieldShape
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onFieldColor
-import com.composables.ui.theme.ringColor
+import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.shapes
 import com.composables.ui.theme.textSelectionColors
 import com.composeunstyled.theme.Theme
@@ -115,8 +112,7 @@ internal fun ComposerField(
                     }
                 )
                 .composerFocusRing(
-                    visible = focused,
-                    color = Theme[colors][ringColor],
+                    color = if (focused) Theme[colors][primaryColor] else Theme[colors][borderColor],
                     shape = shape,
                 )
                 .clip(shape)
@@ -182,44 +178,11 @@ internal fun ComposerField(
 }
 
 /**
- * Composables TextField 的焦点描边：2dp 宽、向外偏 2dp，画在 clip 之前所以不会被切掉，
- * 也不占用布局尺寸。focusRing API 对应用不可见，这里按同样几何手写。
+ * 输入框直接描边：空闲和激活状态使用不同颜色，但描边始终贴合输入框边界。
  */
 private fun Modifier.composerFocusRing(
-    visible: Boolean,
     color: Color,
     shape: Shape,
-    width: Dp = 2.dp,
-    offset: Dp = 2.dp,
 ): Modifier {
-    if (!visible) return this
-    return drawBehind {
-        val strokeWidth = width.toPx()
-        val gap = offset.toPx()
-        val inset = -(gap + strokeWidth / 2f)
-        when (val outline = shape.createOutline(size, layoutDirection, this)) {
-            is Outline.Rectangle -> {
-                drawRect(
-                    color = color,
-                    topLeft = Offset(inset, inset),
-                    size = Size(size.width - inset * 2, size.height - inset * 2),
-                    style = Stroke(strokeWidth),
-                )
-            }
-            is Outline.Rounded -> {
-                val corner = outline.roundRect.topLeftCornerRadius
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(inset, inset),
-                    size = Size(size.width - inset * 2, size.height - inset * 2),
-                    cornerRadius = CornerRadius(
-                        x = corner.x + gap + strokeWidth / 2f,
-                        y = corner.y + gap + strokeWidth / 2f,
-                    ),
-                    style = Stroke(strokeWidth),
-                )
-            }
-            is Outline.Generic -> Unit
-        }
-    }
+    return border(width = 1.dp, color = color, shape = shape)
 }

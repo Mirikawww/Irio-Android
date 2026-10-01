@@ -217,7 +217,9 @@ private val SurfaceOverride: ThemeComposable = buildTheme {
         fieldColor to if (amoled) Color(0xFF121212) else Theme[colors][fieldColor],
         onFieldColor to Theme[colors][onFieldColor],
         scrimColor to Theme[colors][scrimColor],
-        ringColor to Theme[colors][ringColor],
+        // Text fields draw their own direct border; suppress the library's
+        // outer focus ring so focused fields do not get a second outline.
+        ringColor to Color.Transparent,
     )
     properties[shapes] = mapOf(
         smallShape to Theme[shapes][smallShape],

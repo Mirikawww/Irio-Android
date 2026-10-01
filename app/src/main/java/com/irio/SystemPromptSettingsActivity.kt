@@ -75,7 +75,7 @@ private fun SystemPromptSettingsScreen(onBack: () -> Unit) {
         ) {
             TextField(
                 state = state,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().then(rememberInputFieldBorder()),
                 accessibilityLabel = tr("系统提示词"),
                 placeholder = { Text(tr("以系统身份注入每次对话的指令")) },
                 textStyle = FieldTextStyle,
