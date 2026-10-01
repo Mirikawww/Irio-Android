@@ -337,7 +337,22 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
     }
 
     fun updateMessages(next: List<ChatMessage>, onCommitted: (() -> Unit)? = null) {
-        messageAdapter.updateMessages(next, onCommitted)
+        val current = messageAdapter.currentList
+        var structural = current.size != next.size
+        if (!structural) {
+            for (index in next.indices) {
+                if (current[index].id != next[index].id) {
+                    structural = true
+                    break
+                }
+            }
+        }
+        messageAdapter.updateMessages(next) {
+            // 条目增删会改变「谁是第一条」。装饰间距按位置缓存，不标脏的话
+            // 新气泡会沿用上一条还是末尾时的 0 间距，直到整表重绑。
+            if (structural) invalidateItemDecorations()
+            onCommitted?.invoke()
+        }
     }
 
     fun isMessageUpdatePending(): Boolean = messageAdapter.isUpdatePending()
@@ -376,12 +391,15 @@ private class VerticalMessageSpacing(
         parent: RecyclerView,
         state: RecyclerView.State,
     ) {
-        val position = parent.getChildAdapterPosition(view)
-        outRect.bottom = if (position != RecyclerView.NO_POSITION && position < (parent.adapter?.itemCount ?: 0) - 1) {
-            spacing
+        // 间距放在这一条的顶上，而不是上一条的底下。末尾项的底边距会被
+        // RecyclerView 缓存；后面再插入时上一条不会重测，新气泡就会贴上去。
+        val adapterPosition = parent.getChildAdapterPosition(view)
+        val position = if (adapterPosition != RecyclerView.NO_POSITION) {
+            adapterPosition
         } else {
-            0
+            parent.getChildLayoutPosition(view)
         }
+        outRect.top = if (position > 0) spacing else 0
     }
 }
 
