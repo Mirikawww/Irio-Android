@@ -93,6 +93,9 @@ internal class MessageRecyclerController {
     private var recyclerView: MessageRecyclerView? = null
     private var scrollRequested = false
     private var alignScheduled = false
+    private var chasing = false
+    private var chasePosted = false
+    private var idleConfirms = 0
     private var programmaticPosts = 0
 
     fun attach(view: MessageRecyclerView) {
@@ -107,14 +110,13 @@ internal class MessageRecyclerController {
     fun isProgrammaticScroll(): Boolean = programmaticPosts > 0
 
     fun flushScrollToBottom() {
+        if (chasing || chasePosted || alignScheduled) return
         scheduleAlign(attempt = 0)
     }
 
     /**
-     * 最后一项已经在屏幕上时只 scrollBy 超出底边的距离。
-     * scrollToPosition 会把该项重新锚到视口顶部，下一帧再拉回底部，
-     * 贴底后再往下滚、或自动跟随途中再滚，都会抽一下。
-     * 高度可能晚一帧才跟上，所以贴住时再看一次；第二次仍没超出就当已经贴底。
+     * 最后一项已经在屏幕上时，每帧只滚一段超出底边的距离。
+     * 一次滚完会跳。高度可能晚一帧才跟上，所以贴住时再看一次；第二次仍没超出就当已经贴底。
      */
     private fun scheduleAlign(attempt: Int) {
         if (!scrollRequested || alignScheduled) return
@@ -137,8 +139,11 @@ internal class MessageRecyclerController {
             if (!scrollRequested) return@post
             val current = recyclerView ?: return@post
             if (current.scrollState != RecyclerView.SCROLL_STATE_IDLE) {
-                // 手指还在滚就丢掉这次。松手后如果仍贴底，effect 会再请求。
+                // 手指拖动或惯性还在走就丢掉这次。松手后如果仍贴底，effect 会再请求。
+                // 逐帧 scrollBy 不会离开 IDLE，所以不会把自己停掉。
                 scrollRequested = false
+                chasing = false
+                idleConfirms = 0
                 return@post
             }
             val count = current.itemCountValue()
@@ -156,24 +161,100 @@ internal class MessageRecyclerController {
             }
             if (child == null) {
                 scrollRequested = false
+                chasing = false
+                idleConfirms = 0
                 jumpToUnlaidTail(current, count)
                 return@post
             }
-            val catchUp = transcriptBottomCatchUpDelta(
-                itemCount = count,
-                lastVisibleIndex = count - 1,
-                lastEdge = child.bottom,
-                viewportEnd = current.height - current.paddingBottom,
-            )
+            chasing = true
+            stepChase(current)
+        }
+    }
+
+    /**
+     * 最后一项已经在屏幕上时，每帧只滚一段超出底边的距离。
+     * 一次 scrollBy 完全部会跳；smoothScrollBy 又会把滚动状态变成 SETTLING，
+     * 跟随会被当成手指在滚。这里用 scrollBy 逐帧追，滚动状态保持 IDLE。
+     */
+    private fun stepChase(current: MessageRecyclerView) {
+        if (!scrollRequested) {
+            chasing = false
+            return
+        }
+        if (current.scrollState != RecyclerView.SCROLL_STATE_IDLE) {
             scrollRequested = false
-            if (catchUp != null && catchUp > 0) {
-                programmaticPosts++
-                try {
-                    current.scrollBy(0, catchUp)
-                } finally {
-                    programmaticPosts--
-                }
+            chasing = false
+            idleConfirms = 0
+            return
+        }
+        if (current.isMessageUpdatePending()) {
+            postChase()
+            return
+        }
+        val count = current.itemCountValue()
+        if (count == 0) {
+            scrollRequested = false
+            chasing = false
+            return
+        }
+        val child = (current.layoutManager as? LinearLayoutManager)?.findViewByPosition(count - 1)
+        if (child == null) {
+            scrollRequested = false
+            chasing = false
+            idleConfirms = 0
+            jumpToUnlaidTail(current, count)
+            return
+        }
+        val catchUp = transcriptBottomCatchUpDelta(
+            itemCount = count,
+            lastVisibleIndex = count - 1,
+            lastEdge = child.bottom,
+            viewportEnd = current.height - current.paddingBottom,
+        )
+        if (catchUp == null || catchUp <= 0) {
+            if (idleConfirms < 1) {
+                idleConfirms++
+                postChase()
+                return
             }
+            idleConfirms = 0
+            scrollRequested = false
+            chasing = false
+            return
+        }
+        idleConfirms = 0
+        val step = smoothFollowStep(catchUp)
+        val beforeBottom = child.bottom
+        programmaticPosts++
+        try {
+            current.scrollBy(0, step)
+        } finally {
+            programmaticPosts--
+        }
+        val after = (current.layoutManager as? LinearLayoutManager)?.findViewByPosition(count - 1)
+        if (after == null || after.bottom == beforeBottom) {
+            scrollRequested = false
+            chasing = false
+            return
+        }
+        postChase()
+    }
+
+    private fun postChase() {
+        if (chasePosted) return
+        val view = recyclerView ?: run {
+            chasing = false
+            return
+        }
+        chasePosted = true
+        view.postOnAnimation {
+            chasePosted = false
+            val current = recyclerView
+            if (!scrollRequested || current == null) {
+                chasing = false
+                return@postOnAnimation
+            }
+            stepChase(current)
         }
     }
 

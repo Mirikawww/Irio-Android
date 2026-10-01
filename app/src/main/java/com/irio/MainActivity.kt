@@ -145,7 +145,11 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -2714,15 +2718,35 @@ private fun ProcessEventRow(
             )
             if (event.kind == ProcessEventKind.THINKING && event.content.isNotBlank()) {
                 val thinkingScrollState = rememberScrollState()
+                val thinkingFollowGate = remember { TranscriptScrollGate() }
+                val followThinkingBottom = remember { mutableStateOf(true) }
+                val thinkingFollowConnection = remember(thinkingScrollState, thinkingFollowGate) {
+                    object : NestedScrollConnection {
+                        override fun onPostScroll(
+                            consumed: Offset,
+                            available: Offset,
+                            source: NestedScrollSource,
+                        ): Offset {
+                            if (thinkingFollowGate.depth == 0 && source == NestedScrollSource.UserInput) {
+                                followThinkingBottom.value =
+                                    thinkingScrollState.value >= thinkingScrollState.maxValue - 48
+                            }
+                            return Offset.Zero
+                        }
+
+                        override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                            if (thinkingFollowGate.depth == 0) {
+                                followThinkingBottom.value =
+                                    thinkingScrollState.value >= thinkingScrollState.maxValue - 48
+                            }
+                            return Velocity.Zero
+                        }
+                    }
+                }
                 val hostView = LocalView.current
-                // Read this during the composition that contains the old text. Reading it
-                // inside LaunchedEffect can already see the newly measured maxValue, making a
-                // view that was at the bottom look like the user had scrolled away.
-                val wasNearBottom = thinkingScrollState.value >=
-                    thinkingScrollState.maxValue - 48
-                LaunchedEffect(event.content) {
-                    withFrameNanos { }
-                    if (wasNearBottom) thinkingScrollState.scrollTo(thinkingScrollState.maxValue)
+                LaunchedEffect(followThinkingBottom.value) {
+                    if (!followThinkingBottom.value) return@LaunchedEffect
+                    thinkingScrollState.smoothFollowBottom(thinkingFollowGate) { followThinkingBottom.value }
                 }
                 Box(
                     modifier = Modifier
@@ -2744,6 +2768,7 @@ private fun ProcessEventRow(
                                 else -> false
                             }
                         }
+                        .nestedScroll(thinkingFollowConnection)
                         .verticalScroll(thinkingScrollState),
                 ) {
                     Text(

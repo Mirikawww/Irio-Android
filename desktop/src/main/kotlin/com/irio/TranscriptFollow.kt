@@ -1,6 +1,10 @@
 package com.irio
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.flow.first
 
 /**
  * 贴在底部时，模型回复长高也要跟着落到尾部。
@@ -77,6 +81,61 @@ internal fun transcriptBottomCatchUpDelta(
     if (lastVisibleIndex < itemCount - 1) return null
     val overflow = lastEdge - viewportEnd
     return if (overflow > 0) overflow else 0
+}
+
+/** 每帧追尾的像素。按剩余距离取比例，远的有上限，所以是滑过去而不是一帧跳完。 */
+internal fun smoothFollowStep(
+    remainingPx: Int,
+    fraction: Float = 0.28f,
+    maxStepPx: Int = 96,
+): Int {
+    if (remainingPx <= 0 || fraction <= 0f || maxStepPx <= 0) return 0
+    val scaled = (remainingPx * fraction).toInt().coerceAtLeast(1)
+    return scaled.coerceAtMost(maxStepPx).coerceAtMost(remainingPx)
+}
+
+/**
+ * 贴底跟随。每帧只走一段剩余距离；人还在拖、[follow] 变 false 就停。
+ * 程序滚动包在 [gate] 里，嵌套滚动不会把这次跟随当成用户离开了底部。
+ * 已经贴住就挂起，等内容再变高，避免空转。
+ */
+internal suspend fun ScrollState.smoothFollowBottom(
+    gate: TranscriptScrollGate,
+    follow: () -> Boolean,
+) {
+    var idleConfirm = false
+    var stuck = false
+    while (follow()) {
+        val remaining = maxValue - value
+        if (remaining <= 0) {
+            if (idleConfirm) {
+                snapshotFlow { maxValue }.first { !follow() || maxValue - value > 0 }
+                if (!follow()) return
+                idleConfirm = false
+                continue
+            }
+            idleConfirm = true
+            withFrameNanos { }
+            continue
+        }
+        idleConfirm = false
+        val step = smoothFollowStep(remaining)
+        var consumed = 0f
+        gate.depth++
+        try {
+            scroll { consumed = scrollBy(step.toFloat()) }
+        } finally {
+            gate.depth--
+        }
+        if (consumed == 0f) {
+            if (stuck) return
+            stuck = true
+            withFrameNanos { }
+            continue
+        }
+        stuck = false
+        withFrameNanos { }
+    }
 }
 
 /** 程序滚动期间嵌套滚动回调不能清掉贴底锁。 */

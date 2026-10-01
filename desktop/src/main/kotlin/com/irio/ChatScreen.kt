@@ -198,6 +198,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.awaitAll
@@ -554,6 +555,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         }
     }
 
+    val transcriptFollowJob = remember { object { var job: Job? = null } }
     LaunchedEffect(
         currentConversation.id,
         visibleTranscript.size,
@@ -568,6 +570,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         }
         val last = visibleTranscript.lastOrNull()
         if (last == null) {
+            transcriptFollowJob.job?.cancel()
             seenTranscriptTailId = null
             stickToBottom = true
             return@LaunchedEffect
@@ -581,6 +584,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 force = force,
             )
         ) {
+            transcriptFollowJob.job?.cancel()
             seenTranscriptTailId = last.id
             return@LaunchedEffect
         }
@@ -594,6 +598,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 force = force,
             )
         ) {
+            transcriptFollowJob.job?.cancel()
             seenTranscriptTailId = last.id
             return@LaunchedEffect
         }
@@ -605,16 +610,65 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             lastEdge = lastVisible?.let { it.offset + it.size } ?: 0,
             viewportEnd = info.viewportEndOffset,
         )
-        if (catchUp != 0) {
+        if (catchUp == null) {
+            if (transcriptFollowJob.job?.isActive == true) {
+                seenTranscriptTailId = last.id
+                return@LaunchedEffect
+            }
+            transcriptFollowJob.job?.cancel()
             transcriptScrollGate.depth++
             try {
-                if (catchUp == null) {
-                    listState.scrollToItem(visibleTranscript.lastIndex, Int.MAX_VALUE)
-                } else {
-                    listState.scroll { scrollBy(catchUp.toFloat()) }
-                }
+                listState.scrollToItem(visibleTranscript.lastIndex, Int.MAX_VALUE)
             } finally {
                 transcriptScrollGate.depth--
+            }
+        } else if (catchUp > 0 && transcriptFollowJob.job?.isActive != true) {
+            transcriptFollowJob.job = scope.launch {
+                var idleConfirm = false
+                var stuck = false
+                while (isActive) {
+                    if (!shouldSnapTranscriptToBottom(
+                            stickToBottom = stickToBottomState.value,
+                            userScrollInProgress = userDrivingTranscriptState.value,
+                            force = false,
+                        )
+                    ) {
+                        break
+                    }
+                    val layout = listState.layoutInfo
+                    val visibleLast = layout.visibleItemsInfo.lastOrNull()
+                    val remaining = transcriptBottomCatchUpDelta(
+                        itemCount = layout.totalItemsCount,
+                        lastVisibleIndex = visibleLast?.index ?: -1,
+                        lastEdge = visibleLast?.let { it.offset + it.size } ?: 0,
+                        viewportEnd = layout.viewportEndOffset,
+                    )
+                    when {
+                        remaining == null || remaining <= 0 -> {
+                            if (idleConfirm || remaining == null) break
+                            idleConfirm = true
+                            withFrameNanos { }
+                        }
+                        else -> {
+                            idleConfirm = false
+                            val step = smoothFollowStep(remaining)
+                            var consumed = 0f
+                            transcriptScrollGate.depth++
+                            try {
+                                listState.scroll { consumed = scrollBy(step.toFloat()) }
+                            } finally {
+                                transcriptScrollGate.depth--
+                            }
+                            if (consumed == 0f) {
+                                if (stuck) break
+                                stuck = true
+                            } else {
+                                stuck = false
+                            }
+                            withFrameNanos { }
+                        }
+                    }
+                }
             }
         }
         seenTranscriptTailId = last.id
@@ -2365,16 +2419,40 @@ private fun ProcessEventRow(
             )
             if (event.kind == ProcessEventKind.THINKING && event.content.isNotBlank()) {
                 val thinkingScrollState = rememberScrollState()
-                val wasNearBottom = thinkingScrollState.value >=
-                    thinkingScrollState.maxValue - 48
-                LaunchedEffect(event.content) {
-                    withFrameNanos { }
-                    if (wasNearBottom) thinkingScrollState.scrollTo(thinkingScrollState.maxValue)
+                val thinkingFollowGate = remember { TranscriptScrollGate() }
+                val followThinkingBottom = remember { mutableStateOf(true) }
+                val thinkingFollowConnection = remember(thinkingScrollState, thinkingFollowGate) {
+                    object : NestedScrollConnection {
+                        override fun onPostScroll(
+                            consumed: Offset,
+                            available: Offset,
+                            source: NestedScrollSource,
+                        ): Offset {
+                            if (thinkingFollowGate.depth == 0 && source == NestedScrollSource.UserInput) {
+                                followThinkingBottom.value =
+                                    thinkingScrollState.value >= thinkingScrollState.maxValue - 48
+                            }
+                            return Offset.Zero
+                        }
+
+                        override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                            if (thinkingFollowGate.depth == 0) {
+                                followThinkingBottom.value =
+                                    thinkingScrollState.value >= thinkingScrollState.maxValue - 48
+                            }
+                            return Velocity.Zero
+                        }
+                    }
+                }
+                LaunchedEffect(followThinkingBottom.value) {
+                    if (!followThinkingBottom.value) return@LaunchedEffect
+                    thinkingScrollState.smoothFollowBottom(thinkingFollowGate) { followThinkingBottom.value }
                 }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(96.dp)
+                        .nestedScroll(thinkingFollowConnection)
                         .verticalScroll(thinkingScrollState),
                 ) {
                     Text(

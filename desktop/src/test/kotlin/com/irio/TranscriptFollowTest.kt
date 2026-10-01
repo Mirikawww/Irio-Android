@@ -113,4 +113,26 @@ class TranscriptFollowTest {
         assertNull(transcriptBottomCatchUpDelta(4, 2, 100, 100))
         assertNull(transcriptBottomCatchUpDelta(4, -1, 0, 100))
     }
+
+    @Test
+    fun smoothFollowStepsInsteadOfJumpingTheWholeDistance() {
+        assertEquals(0, smoothFollowStep(0))
+        assertEquals(0, smoothFollowStep(-8))
+        assertEquals(1, smoothFollowStep(1))
+        assertEquals(1, smoothFollowStep(3))
+        val step = smoothFollowStep(400)
+        assertTrue(step > 1)
+        assertTrue(step < 400)
+        assertTrue(smoothFollowStep(20_000) in 2..96)
+        var remaining = 500
+        var frames = 0
+        while (remaining > 0 && frames < 120) {
+            val next = smoothFollowStep(remaining)
+            assertTrue(next in 1..remaining)
+            remaining -= next
+            frames++
+        }
+        assertEquals(0, remaining)
+        assertTrue(frames > 1)
+    }
 }
