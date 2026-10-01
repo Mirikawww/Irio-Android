@@ -58,7 +58,7 @@ enum class AccentColor(val label: String, val stored: String, val color: Color) 
 
     companion object {
         fun fromStored(value: String?): AccentColor =
-            entries.firstOrNull { it.stored.equals(value, ignoreCase = true) } ?: BLACK
+            entries.firstOrNull { it.stored.equals(value, ignoreCase = true) } ?: BLUE
     }
 
     fun onContent(): Color {
@@ -148,7 +148,7 @@ object ThemeStore {
     var autoAmoled by mutableStateOf(false)
         private set
 
-    var accent by mutableStateOf(AccentColor.BLACK)
+    var accent by mutableStateOf(AccentColor.BLUE)
         private set
 
     var language by mutableStateOf(AppLanguage.ZH_CN)

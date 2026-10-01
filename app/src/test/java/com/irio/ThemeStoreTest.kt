@@ -25,6 +25,7 @@ class ThemeStoreTest {
     @Test
     fun parsesStoredThemeCaseInsensitivelyAndDefaultsToSystem() {
         assertEquals(ThemePreference.SYSTEM, ThemePreference.fromStored(null))
+        assertEquals(AccentColor.BLUE, AccentColor.fromStored(null))
         assertEquals(ThemePreference.SYSTEM, ThemePreference.fromStored("unknown"))
         assertEquals(ThemePreference.AMOLED, ThemePreference.fromStored("AMOLED"))
     }

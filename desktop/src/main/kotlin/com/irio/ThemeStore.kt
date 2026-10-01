@@ -66,7 +66,7 @@ enum class AccentColor(val label: String, val stored: String, val color: Color) 
 
     companion object {
         fun fromStored(value: String?): AccentColor =
-            entries.firstOrNull { it.stored.equals(value, ignoreCase = true) } ?: BLACK
+            entries.firstOrNull { it.stored.equals(value, ignoreCase = true) } ?: BLUE
     }
 }
 
