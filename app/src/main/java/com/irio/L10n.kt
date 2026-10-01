@@ -25,6 +25,7 @@ private val English = mapOf(
     "搜索已停止" to "Search stopped",
     "无法连接到端点" to "Can't connect to the endpoint",
     "未知设备" to "Unknown device",
+    "配置" to "Config",
     "模型" to "Model",
     "端点 URL" to "Endpoint URL",
     "端点 URL 无效" to "Invalid endpoint URL",
