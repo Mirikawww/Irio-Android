@@ -68,8 +68,8 @@ internal val ComposerTextStyle = TextStyle(
 /**
  * 主页输入框。自己组装装饰层，因为 com.composables:ui 的 TextField 在
  * lineLimits 非 SingleLine 时把整行按 Alignment.Top 对齐，单行状态下文本会
- * 相对 leading/trailing 按钮偏上。这里把文本区按 [minContentHeight] 垂直居中，
- * 单行时与按钮中线对齐，换行后文本区自然撑开、位置不变。
+ * 相对 leading/trailing 按钮偏上。文本区按 [minContentHeight] 垂直居中，
+ * 单行时与 32dp 按钮中线对齐；整行按底部对齐，换行后发送和附件留在最后一行。
  */
 @Composable
 internal fun ComposerField(
@@ -125,7 +125,7 @@ internal fun ComposerField(
                 Row(
                     modifier = Modifier.padding(contentPadding),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.Top,
+                    verticalAlignment = Alignment.Bottom,
                 ) {
                     if (leading != null) {
                         Box(
