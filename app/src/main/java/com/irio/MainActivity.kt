@@ -1018,7 +1018,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         LinuxSandboxAccess.hasAllFiles(),
                     )
                 ) {
-                    add(LinuxShellToolProvider())
+                    add(
+                        LinuxShellToolProvider(
+                            LinuxSandboxStore.loadCommandsPerCall(
+                                LinuxSandboxLayout.of(context.filesDir).stateFile,
+                            ),
+                        ),
+                    )
                 }
             }
         )

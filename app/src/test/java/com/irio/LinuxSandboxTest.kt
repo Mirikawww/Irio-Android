@@ -229,6 +229,53 @@ class LinuxSandboxTest {
         assertEquals("已运行命令", MemoryTool.doneLabel(LinuxShellTool.NAME))
         assertEquals("Linux sandbox", translate(AppLanguage.EN, "Linux 沙盒"))
         assertEquals("Running a command", translate(AppLanguage.EN, "运行命令中"))
+        assertEquals("Commands per call", translate(AppLanguage.EN, "单次命令数"))
+        assertEquals("Unlimited", translate(AppLanguage.EN, "无限"))
+    }
+
+    @Test
+    fun commandsPerCallDefaultsToUnlimitedAndDoesNotClearTheSwitch() {
+        val root = Files.createTempDirectory("irio-sandbox-cap").toFile()
+        val layout = LinuxSandboxLayout.of(root)
+        assertEquals(LinuxSandboxStore.COMMANDS_UNLIMITED, LinuxSandboxStore.loadCommandsPerCall(layout.stateFile))
+        LinuxSandboxStore.saveEnabled(layout.stateFile, true)
+        LinuxSandboxStore.saveCommandsPerCall(layout.stateFile, 12)
+        assertEquals(12, LinuxSandboxStore.loadCommandsPerCall(layout.stateFile))
+        assertTrue(LinuxSandboxStore.loadEnabled(layout.stateFile))
+        LinuxSandboxStore.saveCommandsPerCall(layout.stateFile, 500)
+        assertEquals(LinuxSandboxStore.COMMANDS_MAX, LinuxSandboxStore.loadCommandsPerCall(layout.stateFile))
+        LinuxSandboxStore.saveEnabled(layout.stateFile, false)
+        assertEquals(LinuxSandboxStore.COMMANDS_MAX, LinuxSandboxStore.loadCommandsPerCall(layout.stateFile))
+        assertFalse(LinuxSandboxStore.loadEnabled(layout.stateFile))
+    }
+
+    @Test
+    fun oneToolCallRunsEveryCommandUntilTheSliderLimit() {
+        val all = linuxSandboxSelectCommands("""{"commands":[" echo a ","","echo b","echo c"]}""", 0)
+        assertEquals(listOf(" echo a ", "echo b", "echo c"), all.commands)
+        assertEquals(0, all.skipped)
+        val capped = linuxSandboxSelectCommands("""{"commands":["echo a","echo b","echo c"]}""", 2)
+        assertEquals(listOf("echo a", "echo b"), capped.commands)
+        assertEquals(1, capped.skipped)
+        val legacy = linuxSandboxSelectCommands("""{"command":"echo hi"}""", 1)
+        assertEquals(listOf("echo hi"), legacy.commands)
+        assertEquals(0, legacy.skipped)
+        assertEquals(0, linuxSandboxClampCommandsPerCall(-4))
+        assertEquals(100, linuxSandboxClampCommandsPerCall(101))
+        ProviderProtocol.entries.forEach { protocol ->
+            assertFalse(commandItems(protocol, 4).has("minItems"))
+            assertFalse(commandItems(protocol, 4).has("maxItems"))
+        }
+        assertFalse(LinuxShellTool.descriptionFor(0).contains("At most"))
+        assertTrue(LinuxShellTool.descriptionFor(4).contains("At most 4"))
+        assertEquals(
+            "The per-call command limit was reached. 3 more were not run.",
+            translate(AppLanguage.EN, "已达到单次命令上限，其余 %s 条未运行。").format(3),
+        )
+        assertEquals(
+            listOf("echo a", "echo b"),
+            linuxSandboxSelectCommands("""{"command":["echo a","echo b"]}""", 0).commands,
+        )
     }
 
     @Test
@@ -240,6 +287,16 @@ class LinuxSandboxTest {
         )
         assertEquals("abc", catalog.archives.getValue("arm64-v8a").sha256)
         assertFalse(linuxSandboxSha256("no".toByteArray()).equals("abc", ignoreCase = true))
+    }
+
+    private fun commandItems(protocol: ProviderProtocol, limit: Int): org.json.JSONObject {
+        val schema = LinuxShellTool.schemaFor(protocol, limit)
+        val parameters = when (protocol) {
+            ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
+            ProviderProtocol.ANTHROPIC -> schema.getJSONObject("input_schema")
+            else -> schema.getJSONObject("parameters")
+        }
+        return parameters.getJSONObject("properties").getJSONObject("commands")
     }
 
     private fun status(

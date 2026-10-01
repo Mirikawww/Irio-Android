@@ -73,6 +73,9 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
     var prepareError by remember { mutableStateOf<String?>(null) }
     var revision by remember { mutableIntStateOf(0) }
     var offerRebuild by remember { mutableStateOf(false) }
+    var commandsPerCall by remember {
+        mutableIntStateOf(LinuxSandboxStore.loadCommandsPerCall(layout.stateFile))
+    }
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -219,6 +222,26 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
             }
             if (offerRebuild) {
                 ListRowButton(label = tr("用安装包里的版本重新准备"), onClick = { confirmRebuild = true })
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+            ) {
+                SettingsSlider(
+                    label = tr("单次命令数"),
+                    value = commandsPerCall,
+                    valueRange = LinuxSandboxStore.COMMANDS_UNLIMITED..LinuxSandboxStore.COMMANDS_MAX,
+                    valueLabel = { count ->
+                        if (count == LinuxSandboxStore.COMMANDS_UNLIMITED) tr("无限") else "$count"
+                    },
+                    onValueChange = { next ->
+                        val clamped = linuxSandboxClampCommandsPerCall(next)
+                        commandsPerCall = clamped
+                        LinuxSandboxStore.saveCommandsPerCall(layout.stateFile, clamped)
+                    },
+                )
             }
         }
     }

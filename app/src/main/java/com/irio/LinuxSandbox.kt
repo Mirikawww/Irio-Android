@@ -60,6 +60,10 @@ internal class LinuxSandboxLayout(val root: File) {
 }
 
 internal object LinuxSandboxStore {
+    /** 0 表示单次工具调用不限制命令条数。滑杆最左是这个值，最右是 [COMMANDS_MAX]。 */
+    const val COMMANDS_UNLIMITED = 0
+    const val COMMANDS_MAX = 100
+
     /** 缺省关闭。关闭只改这个标记。 */
     fun loadEnabled(file: File): Boolean {
         if (!file.isFile) return false
@@ -67,13 +71,30 @@ internal object LinuxSandboxStore {
     }
 
     fun saveEnabled(file: File, enabled: Boolean) {
+        update(file) { it.put("enabled", enabled) }
+    }
+
+    /** 缺省无限。旧文件没有这个字段时也是无限。 */
+    fun loadCommandsPerCall(file: File): Int {
+        if (!file.isFile) return COMMANDS_UNLIMITED
+        val raw = runCatching {
+            JSONObject(file.readText()).optInt("commandsPerCall", COMMANDS_UNLIMITED)
+        }.getOrDefault(COMMANDS_UNLIMITED)
+        return linuxSandboxClampCommandsPerCall(raw)
+    }
+
+    fun saveCommandsPerCall(file: File, commandsPerCall: Int) {
+        update(file) { it.put("commandsPerCall", linuxSandboxClampCommandsPerCall(commandsPerCall)) }
+    }
+
+    private fun update(file: File, mutate: (JSONObject) -> Unit) {
         file.parentFile?.mkdirs()
         val root = if (file.isFile) {
             runCatching { JSONObject(file.readText()) }.getOrDefault(JSONObject())
         } else {
             JSONObject()
         }
-        root.put("enabled", enabled)
+        mutate(root)
         val tmp = File(file.parentFile, "${file.name}.tmp")
         tmp.writeText(root.toString())
         if (!tmp.renameTo(file)) {
@@ -161,6 +182,52 @@ internal fun linuxSandboxNormalizeCommand(raw: String): String? {
     if (command.isEmpty() || command.length > 8_000) return null
     return command
 }
+
+internal fun linuxSandboxClampCommandsPerCall(raw: Int): Int =
+    raw.coerceIn(LinuxSandboxStore.COMMANDS_UNLIMITED, LinuxSandboxStore.COMMANDS_MAX)
+
+internal data class LinuxSandboxCommandSelection(
+    val commands: List<String>,
+    val skipped: Int,
+)
+
+/** 一次工具调用里的命令。`commands` 优先；没有时才接受单条 `command`。超出上限的只计数，不执行。 */
+internal fun linuxSandboxSelectCommands(arguments: String, limit: Int): LinuxSandboxCommandSelection {
+    val parsed = runCatching { JSONObject(arguments) }.getOrNull()
+    val raw = ArrayList<String>()
+    if (parsed != null) {
+        when (val commands = parsed.opt("commands")) {
+            is org.json.JSONArray -> {
+                for (index in 0 until commands.length()) {
+                    val text = commands.optString(index)
+                    if (text.isNotBlank()) raw += text
+                }
+            }
+            is String -> if (commands.isNotBlank()) raw += commands
+        }
+        if (raw.isEmpty()) {
+            when (val single = parsed.opt("command")) {
+                is org.json.JSONArray -> {
+                    for (index in 0 until single.length()) {
+                        val text = single.optString(index)
+                        if (text.isNotBlank()) raw += text
+                    }
+                }
+                is String -> if (single.isNotBlank()) raw += single
+            }
+        }
+    } else if (arguments.isNotBlank()) {
+        raw += arguments.trim()
+    }
+    val cap = linuxSandboxClampCommandsPerCall(limit)
+    if (cap == LinuxSandboxStore.COMMANDS_UNLIMITED || raw.size <= cap) {
+        return LinuxSandboxCommandSelection(raw, skipped = 0)
+    }
+    return LinuxSandboxCommandSelection(raw.take(cap), skipped = raw.size - cap)
+}
+
+internal fun linuxSandboxJoinSections(parts: List<String>): String =
+    parts.map { it.trimEnd() }.filter { it.isNotEmpty() }.joinToString("\n\n")
 
 internal fun linuxSandboxProotArguments(
     proot: String,
