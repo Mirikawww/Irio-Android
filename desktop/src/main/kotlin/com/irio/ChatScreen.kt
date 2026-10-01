@@ -1218,52 +1218,23 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         val target = messages[targetIndex]
         val text = message.text.toString().trim()
         if (text.isEmpty() && pendingAttachments.isEmpty()) return
-        val version = target.copy(
-            id = MessageIds.next(),
+        val committed = commitEditedTurn(
+            messages = messages,
+            target = target,
+            targetIndex = targetIndex,
+            versionId = MessageIds.next(),
+            replyId = MessageIds.next(),
             text = text,
             attachments = pendingAttachments,
-            process = emptyList(),
-            isError = false,
-            isPending = false,
-            isStreaming = false,
-            editGroup = target.userGroupId,
-            selected = true,
         )
-        val replyGroupId = replyGroupForUserVersion(messages, target)
-        val history = buildList {
-            addAll(visibleMessages(messages.subList(0, targetIndex)).filterNot { it.isError || it.isPending })
-            add(version)
-        }
-        val reply = replyGroupId?.let { groupId ->
-            ChatMessage(
-                id = MessageIds.next(),
-                text = "",
-                fromUser = false,
-                isPending = true,
-                retryGroup = groupId,
-                selected = true,
-                responseToUserId = version.id,
-            )
-        }
-        messages = buildList {
-            messages.forEachIndexed { index, msg ->
-                when {
-                    msg.fromUser && msg.userGroupId == target.userGroupId -> add(msg.copy(selected = false))
-                    reply != null && !msg.fromUser && msg.groupId == replyGroupId -> add(msg.copy(selected = false))
-                    else -> add(msg)
-                }
-                if (index == targetIndex) add(version)
-            }
-            if (reply != null) add(reply)
-        }
+        newUserMessageId = committed.history.last().id
+        messages = committed.messages
         persistCurrent(messages)
         message.clearText()
         pendingAttachments = emptyList()
         editingMessageId = null
         focusManager.clearFocus()
-        if (reply != null) {
-            startGeneration(currentConversation.id, history, reply)
-        }
+        startGeneration(currentConversation.id, committed.history, committed.reply)
     }
 
     /**

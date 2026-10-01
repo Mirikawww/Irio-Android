@@ -1414,58 +1414,24 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         val target = messages[targetIndex]
         val text = message.text.toString().trim()
         if (text.isEmpty() && pendingAttachments.isEmpty()) return
-        val version = target.copy(
-            id = MessageIds.next(),
+        val committed = commitEditedTurn(
+            messages = messages,
+            target = target,
+            targetIndex = targetIndex,
+            versionId = MessageIds.next(),
+            replyId = MessageIds.next(),
             text = text,
             attachments = pendingAttachments,
-            process = emptyList(),
-            isError = false,
-            isPending = false,
-            isStreaming = false,
-            editGroup = target.userGroupId,
-            selected = true,
         )
-        // 原用户消息的回复组（紧随 target 之后的 assistant 消息的 groupId）
-        val replyGroupId = replyGroupForUserVersion(messages, target)
-        // history = 新版本之前可见消息（含新版本本身，等同新发送）
-        val history = buildList {
-            addAll(visibleMessages(messages.subList(0, targetIndex)).filterNot { it.isError || it.isPending })
-            add(version)
-        }
-        val reply = replyGroupId?.let { groupId ->
-            ChatMessage(
-                id = MessageIds.next(),
-                text = "",
-                fromUser = false,
-                isPending = true,
-                retryGroup = groupId,
-                selected = true,
-                responseToUserId = version.id,
-            )
-        }
-        messages = buildList {
-            messages.forEachIndexed { index, message ->
-                when {
-                    // 旧编辑版本取消选中
-                    message.fromUser && message.userGroupId == target.userGroupId -> add(message.copy(selected = false))
-                    // 原回复组取消选中（没有回复则跳过）
-                    reply != null && !message.fromUser && message.groupId == replyGroupId -> add(message.copy(selected = false))
-                    else -> add(message)
-                }
-                // 新版本插在原位置之后
-                if (index == targetIndex) add(version)
-            }
-            if (reply != null) add(reply)
-        }
+        newUserMessageId = committed.history.last().id
+        messages = committed.messages
         persistCurrent(messages)
         message.clearText()
         pendingAttachments = emptyList()
         editingMessageId = null
         keyboardController?.hide()
         focusManager.clearFocus()
-        if (reply != null) {
-            startGeneration(currentConversation.id, history, reply)
-        }
+        startGeneration(currentConversation.id, committed.history, committed.reply)
     }
 
     /**

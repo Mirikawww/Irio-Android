@@ -102,6 +102,65 @@ internal fun selectRetryVersion(messages: List<ChatMessage>, target: ChatMessage
     }
 }
 
+internal data class CommittedEdit(
+    val messages: List<ChatMessage>,
+    val history: List<ChatMessage>,
+    val reply: ChatMessage,
+)
+
+/**
+ * 编辑版本插回原位，并挂上一条待生成的回复。
+ * 立即停止会丢掉还没内容的占位回复，这时没有回复组，也要新开一条，否则重发不会发请求。
+ */
+internal fun commitEditedTurn(
+    messages: List<ChatMessage>,
+    target: ChatMessage,
+    targetIndex: Int,
+    versionId: Long,
+    replyId: Long,
+    text: String,
+    attachments: List<ChatAttachment>,
+): CommittedEdit {
+    val version = target.copy(
+        id = versionId,
+        text = text,
+        attachments = attachments,
+        process = emptyList(),
+        isError = false,
+        isPending = false,
+        isStreaming = false,
+        editGroup = target.userGroupId,
+        selected = true,
+    )
+    val replyGroupId = replyGroupForUserVersion(messages, target)
+    val reply = ChatMessage(
+        id = replyId,
+        text = "",
+        fromUser = false,
+        isPending = true,
+        retryGroup = replyGroupId ?: 0L,
+        selected = true,
+        responseToUserId = version.id,
+    )
+    val history = buildList {
+        addAll(visibleMessages(messages.subList(0, targetIndex)).filterNot { it.isError || it.isPending })
+        add(version)
+    }
+    val updated = buildList {
+        messages.forEachIndexed { index, message ->
+            when {
+                message.fromUser && message.userGroupId == target.userGroupId -> add(message.copy(selected = false))
+                replyGroupId != null && !message.fromUser && message.groupId == replyGroupId ->
+                    add(message.copy(selected = false))
+                else -> add(message)
+            }
+            if (index == targetIndex) add(version)
+        }
+        add(reply)
+    }
+    return CommittedEdit(updated, history, reply)
+}
+
 internal fun selectEditVersion(messages: List<ChatMessage>, target: ChatMessage): List<ChatMessage> {
     val groupId = target.userGroupId
     return messages.map { message ->

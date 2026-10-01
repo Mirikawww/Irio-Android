@@ -101,4 +101,41 @@ class TranscriptTest {
 
         assertEquals(listOf(edited.id, newReply.id), visibleMessages(allMessages).map { it.id })
     }
+
+    @Test
+    fun editAfterStoppedReplyWasDiscardedStillOpensARequest() {
+        val user = ChatMessage(id = 1, text = "first", fromUser = true)
+        val committed = commitEditedTurn(
+            messages = listOf(user),
+            target = user,
+            targetIndex = 0,
+            versionId = 4,
+            replyId = 5,
+            text = "second",
+            attachments = emptyList(),
+        )
+        assertEquals(listOf(1L, 4L, 5L), committed.messages.map { it.id })
+        assertEquals(listOf(4L), committed.history.map { it.id })
+        assertEquals(true, committed.reply.isPending)
+        assertEquals(4L, committed.reply.responseToUserId)
+        assertEquals(listOf(4L, 5L), visibleMessages(committed.messages).map { it.id })
+    }
+
+    @Test
+    fun editKeepsTheExistingReplyGroup() {
+        val user = ChatMessage(id = 1, text = "first", fromUser = true)
+        val reply = ChatMessage(id = 2, text = "partial", fromUser = false, responseToUserId = 1)
+        val committed = commitEditedTurn(
+            messages = listOf(user, reply),
+            target = user,
+            targetIndex = 0,
+            versionId = 4,
+            replyId = 5,
+            text = "second",
+            attachments = emptyList(),
+        )
+        assertEquals(2L, committed.reply.groupId)
+        assertEquals(false, committed.messages.first { it.id == 2L }.selected)
+        assertEquals(listOf(4L), committed.history.map { it.id })
+    }
 }
