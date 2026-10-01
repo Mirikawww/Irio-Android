@@ -1,8 +1,6 @@
 package com.irio
 
 import androidx.compose.foundation.Canvas
-import com.composables.ui.theme.ColorScheme
-import com.composables.ui.theme.LocalColorScheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -100,7 +98,7 @@ internal fun IrioMarkdown(
     glyphFade: Boolean = false,
 ) {
     val onBg = Theme[colors][onBackgroundColor]
-    val dark = LocalColorScheme.current == ColorScheme.Dark
+    val dark = LocalResolvedTheme.current.isDark
     val highlightsBuilder = remember(dark) {
         Highlights.Builder().theme(SyntaxThemes.atom(darkMode = dark))
     }

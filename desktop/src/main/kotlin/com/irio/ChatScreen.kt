@@ -2816,6 +2816,7 @@ private fun AssistantMarkdown(
                 }
         }
     }
+    observeIrioTheme()
     val contentColor = Theme[colors][onBackgroundColor]
     var texScale by remember { mutableStateOf(ProviderStore.loadTexScale()) }
     DisposableEffect(Unit) {

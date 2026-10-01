@@ -3333,6 +3333,7 @@ private fun AssistantMarkdown(
                 }
         }
     }
+    observeIrioTheme()
     val contentColor = Theme[colors][onBackgroundColor]
     val context = LocalContext.current
     // texScale 只在进入组合时读一次：不再监听 ProviderStore 全局变化——
