@@ -130,7 +130,7 @@ private val English = mapOf(
     "标题生成模型" to "Title model",
     "根据以下对话为这个会话生成一个简短的中文标题，不超过12个字，" to "Write a short English title for this conversation, no more than 8 words,",
     "正在同步" to "Syncing",
-    "正在编辑消息。" to "Editing message.",
+    "正在编辑消息" to "Editing message",
     "正在获取局域网地址" to "Getting the LAN address",
     "没有可写入的内容。" to "Nothing to save.",
     "没有搜索结果" to "No search results",

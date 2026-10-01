@@ -157,6 +157,7 @@ import com.composables.ui.theme.destructiveColor
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPanelColor
+import com.composables.ui.theme.onPrimaryColor
 import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.primaryColor
 import com.composeunstyled.ProvideTextStyle
@@ -1640,15 +1641,16 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
 
                 // 编辑模式提示条：正在编辑某条用户消息
                 if (editingMessageId != null) {
-                    val editAccent = if (
-                        ThemeStore.accent == AccentColor.BLACK && Theme[colors][backgroundColor].red < 0.5f
-                    ) Theme[colors][onBackgroundColor] else Theme[colors][primaryColor]
+                    val dark = LocalResolvedTheme.current.isDark
+                    val blackOnDark = ThemeStore.accent == AccentColor.BLACK && dark
+                    val editFill = if (blackOnDark) Theme[colors][onBackgroundColor] else Theme[colors][primaryColor]
+                    val editContent = if (blackOnDark) Theme[colors][backgroundColor] else Theme[colors][onPrimaryColor]
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp)
                             .background(
-                                color = editAccent.copy(alpha = 0.12f),
+                                color = editFill,
                                 shape = RoundedCornerShape(10.dp),
                             )
                             .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -1659,12 +1661,12 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                             imageVector = Icons.Rounded.Edit,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = editAccent,
+                            tint = editContent,
                         )
                         Text(
-                            tr("正在编辑消息。"),
+                            tr("正在编辑消息"),
                             modifier = Modifier.weight(1f),
-                            color = editAccent,
+                            color = editContent,
                             fontSize = 13.sp,
                         )
                         Icon(
@@ -1673,7 +1675,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                             modifier = Modifier
                                 .size(16.dp)
                                 .clickable(onClick = { cancelEdit() }),
-                            tint = editAccent,
+                            tint = editContent,
                         )
                     }
                 }
