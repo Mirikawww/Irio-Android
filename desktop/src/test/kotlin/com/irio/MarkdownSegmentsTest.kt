@@ -3,6 +3,7 @@ package com.irio
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import com.mikepenz.markdown.annotator.DefaultAnnotatorSettings
@@ -140,6 +141,31 @@ class MarkdownSegmentsTest {
     }
 
     @Test
+    fun atxHeadingKeepsItsTitle() {
+        val src = "# 可见标题\n\n## 收尾 ##\n\n### **粗标题**\n"
+        val headings = MarkdownParser(GFMFlavourDescriptor()).buildMarkdownTreeFromString(src)
+            .children
+            .filter { it.type.name.startsWith("ATX_") }
+        assertEquals(3, headings.size)
+        assertFalse(annotateNode(src, headings[0]).text.contains("可见标题"))
+        assertEquals("可见标题", annotateNode(src, headingInlineNode(headings[0])).text.trim())
+        assertEquals("收尾", annotateNode(src, headingInlineNode(headings[1])).text.trim())
+        val bold = annotateNode(src, headingInlineNode(headings[2]))
+        assertTrue(bold.text.contains("粗标题"))
+        assertFalse(bold.text.contains("#"))
+        assertTrue(bold.spanStyles.any { it.item.fontWeight == FontWeight.Bold })
+
+        val setextSrc = "Setext\n======\n"
+        val setext = MarkdownParser(GFMFlavourDescriptor()).buildMarkdownTreeFromString(setextSrc)
+            .children
+            .first { it.type == MarkdownElementTypes.SETEXT_1 }
+        assertEquals(
+            "Setext",
+            annotateNode(setextSrc, headingInlineNode(setext, MarkdownTokenTypes.SETEXT_CONTENT)).text.trim(),
+        )
+    }
+
+    @Test
     fun tableSeparatorAlignments() {
         val aligns = parseTableAlignments("|:---|:---:|---:|")
         assertEquals(
@@ -157,6 +183,16 @@ class MarkdownSegmentsTest {
         val tree = MarkdownParser(flavour).buildMarkdownTreeFromString(src)
         return HtmlGenerator(src, tree, flavour, false).generateHtml()
     }
+
+    private fun annotateNode(src: String, node: ASTNode) = buildAnnotatedString {
+        buildMarkdownAnnotatedString(content = src, node = node, annotatorSettings = annotatorSettings())
+    }
+
+    private fun annotatorSettings() = DefaultAnnotatorSettings(
+        linkTextSpanStyle = TextLinkStyles(style = SpanStyle()),
+        codeSpanStyle = SpanStyle(),
+        annotator = markdownAnnotator(),
+    )
 
     private fun annotate(src: String) = src.buildMarkdownAnnotatedString(
         style = TextStyle(),

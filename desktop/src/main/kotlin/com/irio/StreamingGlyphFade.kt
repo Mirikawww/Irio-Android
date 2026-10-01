@@ -27,6 +27,7 @@ import com.mikepenz.markdown.compose.elements.MarkdownText
 import com.mikepenz.markdown.utils.codeSpanStyle
 import kotlinx.coroutines.delay
 import org.intellij.markdown.IElementType
+import org.intellij.markdown.MarkdownTokenTypes
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.findChildOfType
 import kotlin.math.min
@@ -320,16 +321,26 @@ internal fun FadingMarkdownParagraph(model: MarkdownComponentModel) {
     )
 }
 
+/**
+ * mikepenz only walks known element types. An ATX heading's title lives in
+ * [MarkdownTokenTypes.ATX_CONTENT], which that walk drops, so annotating the
+ * heading node itself draws a blank line. [com.mikepenz.markdown.compose.elements.MarkdownHeader]
+ * defaults to the same child.
+ */
+internal fun headingInlineNode(
+    node: ASTNode,
+    contentChildType: IElementType = MarkdownTokenTypes.ATX_CONTENT,
+): ASTNode = node.findChildOfType(contentChildType) ?: node
+
 @Composable
 internal fun FadingMarkdownHeading(
     model: MarkdownComponentModel,
     style: TextStyle,
-    contentChildType: IElementType? = null,
+    contentChildType: IElementType = MarkdownTokenTypes.ATX_CONTENT,
 ) {
     FadingMarkdownAnnotated(
         content = model.content,
-        node = model.node,
+        node = headingInlineNode(model.node, contentChildType),
         style = style,
-        contentChildType = contentChildType,
     )
 }
