@@ -69,8 +69,12 @@ internal class ProcessTracker {
     /** 本地工具调用开始：锚在当前正文长度上，后续正文排在它后面，而不是整段的最下面。 */
     fun onToolStarted(name: String = "") {
         finishThinking()
-        finishLiveTool()
-        if (liveToolId != null) return
+        liveToolId?.let { id ->
+            // toolOutput snapshots may carry toolActive=true as well. They update the
+            // existing event; they must not create one completed row per output refresh.
+            if (events.firstOrNull { it.id == id }?.toolName == name) return
+            finishLiveTool()
+        }
         val id = nextId++
         liveToolId = id
         events += ProcessEvent(

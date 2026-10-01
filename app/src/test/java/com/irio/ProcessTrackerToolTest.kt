@@ -71,6 +71,20 @@ class ProcessTrackerToolTest {
     }
 
     @Test
+    fun repeatedSameToolStartsUpdateOneEventInsteadOfAddingRows() {
+        val tracker = ProcessTracker()
+        tracker.onToolStarted(LinuxShellTool.NAME)
+        tracker.onToolOutput("$ echo a")
+        tracker.onToolStarted(LinuxShellTool.NAME)
+        tracker.onToolOutput("$ echo a\na\n\n$ echo b")
+        tracker.onToolFinished("$ echo a\na\n\n$ echo b\nb")
+
+        assertEquals(1, tracker.snapshot().size)
+        assertEquals("$ echo a\na\n\n$ echo b\nb", tracker.snapshot().single().content)
+        assertFalse(tracker.snapshot().single().live)
+    }
+
+    @Test
     fun webFetchToolEventKeepsFetchedContentForDetails() {
         val tracker = ProcessTracker()
         tracker.onToolStarted(WebFetchTool.NAME)
