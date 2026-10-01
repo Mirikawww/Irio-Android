@@ -38,9 +38,9 @@ object ToolStore {
         preferences(context).edit().putString(TITLE_MODEL, model).apply()
     }
 
-    /** 是否在发给模型的用户消息前加上发送时间。默认开启，保持现有行为。 */
+    /** 是否在发给模型的用户消息前加上发送时间。默认关闭。 */
     fun loadMessageTimestamps(context: Context): Boolean =
-        preferences(context).getBoolean(MESSAGE_TIMESTAMPS, true)
+        preferences(context).getBoolean(MESSAGE_TIMESTAMPS, false)
 
     fun saveMessageTimestamps(context: Context, enabled: Boolean) {
         preferences(context).edit().putBoolean(MESSAGE_TIMESTAMPS, enabled).apply()

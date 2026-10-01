@@ -218,9 +218,9 @@ object ThemeStore {
         val autoAmoled = appearance?.optBoolean(AUTO_AMOLED_KEY, false) ?: false
         val accent = AccentColor.fromStored(appearance?.optString(ACCENT_KEY)?.takeIf { it.isNotBlank() })
         val language = AppLanguage.fromStored(appearance?.optString(LANGUAGE_KEY)?.takeIf { it.isNotBlank() })
-        val glyphFade = appearance?.optBoolean(GLYPH_FADE_KEY, true) ?: true
-        val modelDiff = appearance?.optBoolean(MODEL_DIFF_KEY, true) ?: true
-        val newMessageScroll = appearance?.optBoolean(NEW_MESSAGE_SCROLL_KEY, true) ?: true
+        val glyphFade = appearance?.optBoolean(GLYPH_FADE_KEY, false) ?: false
+        val modelDiff = appearance?.optBoolean(MODEL_DIFF_KEY, false) ?: false
+        val newMessageScroll = appearance?.optBoolean(NEW_MESSAGE_SCROLL_KEY, false) ?: false
         if (fromAppearance != null) {
             return LoadedAppearance(
                 ThemePreference.fromStored(fromAppearance),

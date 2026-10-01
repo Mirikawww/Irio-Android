@@ -98,7 +98,7 @@ object SearchStore {
     fun hasApiKey(context: Context): Boolean = loadApiKey(context).isNotBlank()
 
     fun loadWebSearchEnabled(context: Context): Boolean =
-        preferences(context).getBoolean(WEB_SEARCH, true)
+        preferences(context).getBoolean(WEB_SEARCH, false)
 
     fun saveWebSearchEnabled(context: Context, enabled: Boolean) {
         preferences(context).edit().putBoolean(WEB_SEARCH, enabled).apply()

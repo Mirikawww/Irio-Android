@@ -14,7 +14,7 @@ object MemoryStore {
 
     private const val FILE = "memory.json"
 
-    fun loadEnabled(): Boolean = loadRoot().optBoolean("enabled", true)
+    fun loadEnabled(): Boolean = loadRoot().optBoolean("enabled", false)
 
     fun saveEnabled(enabled: Boolean) {
         val root = loadRoot()
@@ -74,12 +74,12 @@ object MemoryStore {
 
     private fun loadRoot(): JSONObject {
         val file = AppPaths.memoryFile
-        if (!file.exists()) return JSONObject().put("enabled", true)
-        return runCatching { JSONObject(file.readText()) }.getOrDefault(JSONObject().put("enabled", true))
+        if (!file.exists()) return JSONObject().put("enabled", false)
+        return runCatching { JSONObject(file.readText()) }.getOrDefault(JSONObject().put("enabled", false))
     }
 
     private fun writeRoot(root: JSONObject) {
-        if (!root.has("enabled")) root.put("enabled", true)
+        if (!root.has("enabled")) root.put("enabled", false)
         AppPaths.memoryFile.writeText(root.toString())
     }
 }

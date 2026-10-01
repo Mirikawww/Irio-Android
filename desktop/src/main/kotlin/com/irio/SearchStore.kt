@@ -84,7 +84,7 @@ object SearchStore {
 
     fun hasApiKey(): Boolean = loadApiKey().isNotBlank()
 
-    fun loadWebSearchEnabled(): Boolean = loadRoot().optBoolean(WEB_SEARCH, true)
+    fun loadWebSearchEnabled(): Boolean = loadRoot().optBoolean(WEB_SEARCH, false)
 
     fun saveWebSearchEnabled(enabled: Boolean) {
         val root = loadRoot()

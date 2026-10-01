@@ -15,7 +15,7 @@ object MemoryStore {
 
     private const val FILE = "memory.json"
 
-    fun loadEnabled(context: Context): Boolean = loadRoot(context).optBoolean("enabled", true)
+    fun loadEnabled(context: Context): Boolean = loadRoot(context).optBoolean("enabled", false)
 
     fun saveEnabled(context: Context, enabled: Boolean) {
         val root = loadRoot(context)
@@ -75,12 +75,12 @@ object MemoryStore {
 
     private fun loadRoot(context: Context): JSONObject {
         val file = File(context.filesDir, FILE)
-        if (!file.exists()) return JSONObject().put("enabled", true)
-        return runCatching { JSONObject(file.readText()) }.getOrDefault(JSONObject().put("enabled", true))
+        if (!file.exists()) return JSONObject().put("enabled", false)
+        return runCatching { JSONObject(file.readText()) }.getOrDefault(JSONObject().put("enabled", false))
     }
 
     private fun writeRoot(context: Context, root: JSONObject) {
-        if (!root.has("enabled")) root.put("enabled", true)
+        if (!root.has("enabled")) root.put("enabled", false)
         File(context.filesDir, FILE).writeText(root.toString())
     }
 }

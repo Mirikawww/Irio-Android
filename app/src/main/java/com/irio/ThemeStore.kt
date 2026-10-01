@@ -159,16 +159,16 @@ object ThemeStore {
         private set
     val contextRingEnabled: Boolean = false
 
-    /** 流式回复的新字淡入。默认开。 */
-    var glyphFade by mutableStateOf(true)
+    /** 流式回复的新字淡入。默认关。 */
+    var glyphFade by mutableStateOf(false)
         private set
 
-    /** 提供商详情里新增/移除模型的绿红底。默认开。 */
-    var modelDiff by mutableStateOf(true)
+    /** 提供商详情里新增/移除模型的绿红底。默认关。 */
+    var modelDiff by mutableStateOf(false)
         private set
 
-    /** 发送新消息时用固定时长滑到底，并重新打开自动滚动。默认开。 */
-    var newMessageScroll by mutableStateOf(true)
+    /** 发送新消息时用固定时长滑到底，并重新打开自动滚动。默认关。 */
+    var newMessageScroll by mutableStateOf(false)
         private set
 
     @Volatile
@@ -186,9 +186,9 @@ object ThemeStore {
             accent = AccentColor.fromStored(appearance.getString(ACCENT_KEY, null))
             language = AppLanguage.fromStored(appearance.getString(LANGUAGE_KEY, null))
             contextRing = false
-            glyphFade = appearance.getBoolean(GLYPH_FADE_KEY, true)
-            modelDiff = appearance.getBoolean(MODEL_DIFF_KEY, true)
-            newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, true)
+            glyphFade = appearance.getBoolean(GLYPH_FADE_KEY, false)
+            modelDiff = appearance.getBoolean(MODEL_DIFF_KEY, false)
+            newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, false)
             if (appearance.getString(KEY, null) == null && stored != null) {
                 appearance.edit().putString(KEY, stored).apply()
             }

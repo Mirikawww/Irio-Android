@@ -43,9 +43,9 @@ object ToolStore {
         AppPaths.toolsFile.writeText(root.toString())
     }
 
-    /** 是否在发给模型的用户消息前加上发送时间。默认开启，保持现有行为。 */
+    /** 是否在发给模型的用户消息前加上发送时间。默认关闭。 */
     fun loadMessageTimestamps(): Boolean =
-        loadRoot().optBoolean(MESSAGE_TIMESTAMPS, true)
+        loadRoot().optBoolean(MESSAGE_TIMESTAMPS, false)
 
     fun saveMessageTimestamps(enabled: Boolean) {
         val root = loadRoot()
