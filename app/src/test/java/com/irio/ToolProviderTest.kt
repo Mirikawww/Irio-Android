@@ -84,11 +84,18 @@ class ToolProviderTest {
         )
         assertTrue(disabledSearch.text.contains("当前不可用"))
 
+        val imageEvents = mutableListOf<ChatStreamUpdate>()
         val disabledImage = registry.execute(
             ChatToolCall("image", ImageGenTool.NAME, "{\"prompt\":\"cat\"}"),
-            ToolExecutionContext(provider = provider, model = "model"),
+            ToolExecutionContext(provider = provider, model = "model", onUpdate = { imageEvents += it }),
         )
         assertTrue(disabledImage.text.contains("当前不可用"))
+        assertEquals(listOf(true, false), imageEvents.mapNotNull { it.toolActive })
+        assertEquals(ImageGenTool.STATUS_FAILED, imageEvents.last().toolContent)
+        assertEquals("图片生成中", MemoryTool.liveLabel(ImageGenTool.NAME))
+        assertEquals("已生成图片", MemoryTool.doneLabel(ImageGenTool.NAME, ImageGenTool.STATUS_OK))
+        assertEquals("生成图片失败", MemoryTool.doneLabel(ImageGenTool.NAME, ImageGenTool.STATUS_FAILED))
+        assertEquals("图片生成已停止", MemoryTool.doneLabel(ImageGenTool.NAME))
     }
 
     @Test

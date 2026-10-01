@@ -1087,7 +1087,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 var streamedUsage: TokenUsage? = null
                 // 对话模型本身是生图模型：聊天请求整条改走 /images/generations
                 // （gpt-image 等纯生图模型在 chat/completions 上游必拒），
-                // 最后一条用户消息当 prompt，结果图片作为回复附件回流。非流式，无工具/思考。
+                // 最后一条用户消息当 prompt，结果图片作为回复附件回流。非流式，过程行只报生成状态。
                 val result = if (provider == null) {
                     ChatCompletionResult(error = tr("请先在设置中添加提供商"))
                 } else if (ModelCatalog.isImageModel(context, requestModel)) {
@@ -1095,7 +1095,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     val prompt = requestSource.getOrNull(lastUserIndex)?.text.orEmpty().ifBlank { tr("图片") }
                     // Images API 无状态：多轮要回传上轮 prompt + 生成图。
                     // 上轮 = 本条用户消息之前最近的一次生图往返（上轮用户 prompt + 其后模型产出的图）。
-                    val context = if (lastUserIndex > 0) {
+                    val imageContext = if (lastUserIndex > 0) {
                         val previousUserPrompt = requestSource.subList(0, lastUserIndex)
                             .lastOrNull { it.fromUser }?.text.orEmpty()
                         val previousImages = requestSource.subList(0, lastUserIndex)
@@ -1105,28 +1105,39 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             ProviderApi.ImageGenContext(previousUserPrompt, previousImages.takeLast(3))
                         } else null
                     } else null
+                    process.onToolStarted(ImageGenTool.NAME)
+                    replaceInConversation(
+                        requestConversationId,
+                        reply.id,
+                        reply.copy(
+                            process = process.snapshot(),
+                            isPending = false,
+                            isStreaming = true,
+                        ),
+                    )
                     val imageProvider = provider
-                    withContext(Dispatchers.IO) {
-                        val genResult = ProviderApi.generateImage(
+                    val genResult = withContext(Dispatchers.IO) {
+                        ProviderApi.generateImage(
                             imageProvider,
                             requestModel,
                             prompt,
-                            context,
+                            imageContext,
                             cancellation = requestCancellation,
                         )
-                        if (requestCancellation.isCancelled()) {
-                            ChatCompletionResult(stopped = true)
-                        } else if (genResult.attachment != null) {
-                            // 图片本身就是回复，不加成功文案。
-                            ChatCompletionResult(
-                                attachments = listOf(genResult.attachment),
-                                model = requestModel,
-                            )
-                        } else if (requestCancellation.isCancelled() || genResult.error == tr("图片生成已停止")) {
-                            ChatCompletionResult(stopped = true)
-                        } else {
-                            ChatCompletionResult(error = genResult.error ?: tr("图片生成失败"))
-                        }
+                    }
+                    val stopped = requestCancellation.isCancelled() || genResult.error == tr("图片生成已停止")
+                    if (!stopped) {
+                        process.onToolFinished(
+                            if (genResult.attachment != null) ImageGenTool.STATUS_OK else ImageGenTool.STATUS_FAILED,
+                        )
+                    }
+                    when {
+                        stopped -> ChatCompletionResult(stopped = true)
+                        genResult.attachment != null -> ChatCompletionResult(
+                            attachments = listOf(genResult.attachment),
+                            model = requestModel,
+                        )
+                        else -> ChatCompletionResult(error = genResult.error ?: tr("图片生成失败"))
                     }
                 } else if (requestModel.isBlank()) {
                     ChatCompletionResult(error = tr("请先选择一个可用模型"))
@@ -2664,11 +2675,12 @@ private fun ProcessEventRow(
 ) {
     val muted = Theme[colors][mutedColor]
     val terminal = event.kind == ProcessEventKind.TOOL && event.toolName == LinuxShellTool.NAME
-    val openable = terminal || (!event.live && event.content.isNotBlank())
+    val openable = event.toolName != ImageGenTool.NAME &&
+        (terminal || (!event.live && event.content.isNotBlank()))
     val label = when (event.kind) {
         ProcessEventKind.THINKING -> if (event.live) null else tr("已思考 %s").format(formatThinkingDuration(event.millis))
         ProcessEventKind.SEARCH -> if (event.live) null else tr("搜索了 %s 个网页").format(event.pages)
-        ProcessEventKind.TOOL -> if (event.live) null else MemoryTool.doneLabel(event.toolName)
+        ProcessEventKind.TOOL -> if (event.live) null else MemoryTool.doneLabel(event.toolName, event.content)
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (event.live) {

@@ -229,29 +229,54 @@ internal class ImageGenToolProvider : ToolProvider {
         context: ToolExecutionContext,
     ): ToolExecutionResult = withContext(Dispatchers.IO) {
         if (context.imageGenModel.isBlank()) {
+            context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = ImageGenTool.NAME))
+            context.onUpdate(
+                ChatStreamUpdate(
+                    toolActive = false,
+                    toolName = ImageGenTool.NAME,
+                    toolContent = ImageGenTool.STATUS_FAILED,
+                ),
+            )
             return@withContext ToolExecutionResult(tr("图片生成工具当前不可用：请先配置图片生成模型。"))
         }
         if (context.cancellation.isCancelled()) return@withContext ToolExecutionResult(tr("图片生成已停止"))
-        val prompt = ToolArguments.value(call.arguments, "prompt")
-        // Images API 无状态：把最近一轮生成图和 prompt 作为编辑参考传回端点。
-        val imageContext = imageContext(context.history)
-        val result = ProviderApi.generateImage(
-            config = context.provider,
-            model = context.imageGenModel,
-            prompt = prompt,
-            context = imageContext,
-            cancellation = context.cancellation,
-        )
-        if (result.attachment != null) {
-            context.onUpdate(ChatStreamUpdate(attachments = listOf(result.attachment)))
-            val message = if (result.revisedPrompt.isNotBlank()) {
-                tr("图片已生成并发送给用户（改写后的提示词：%s）。不要重复描述图片内容，直接继续回答。").format(result.revisedPrompt)
+        context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = ImageGenTool.NAME))
+        var status = ""
+        return@withContext try {
+            val prompt = ToolArguments.value(call.arguments, "prompt")
+            // Images API 无状态：把最近一轮生成图和 prompt 作为编辑参考传回端点。
+            val imageContext = imageContext(context.history)
+            val result = ProviderApi.generateImage(
+                config = context.provider,
+                model = context.imageGenModel,
+                prompt = prompt,
+                context = imageContext,
+                cancellation = context.cancellation,
+            )
+            val stopped = context.cancellation.isCancelled() || result.error == tr("图片生成已停止")
+            if (result.attachment != null) {
+                status = ImageGenTool.STATUS_OK
+                context.onUpdate(ChatStreamUpdate(attachments = listOf(result.attachment)))
+                val message = if (result.revisedPrompt.isNotBlank()) {
+                    tr("图片已生成并发送给用户（改写后的提示词：%s）。不要重复描述图片内容，直接继续回答。").format(result.revisedPrompt)
+                } else {
+                    tr("图片已生成并发送给用户。不要重复描述图片内容，直接继续回答。")
+                }
+                ToolExecutionResult(message)
+            } else if (stopped) {
+                ToolExecutionResult(tr("图片生成已停止"))
             } else {
-                tr("图片已生成并发送给用户。不要重复描述图片内容，直接继续回答。")
+                status = ImageGenTool.STATUS_FAILED
+                ToolExecutionResult(tr("图片生成失败：%s").format(result.error ?: tr("未知错误")))
             }
-            ToolExecutionResult(message)
-        } else {
-            ToolExecutionResult(tr("图片生成失败：%s").format(result.error ?: tr("未知错误")))
+        } finally {
+            context.onUpdate(
+                ChatStreamUpdate(
+                    toolActive = false,
+                    toolName = ImageGenTool.NAME,
+                    toolContent = status,
+                ),
+            )
         }
     }
 

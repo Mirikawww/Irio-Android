@@ -1140,6 +1140,9 @@ internal object WebFetchTool {
 
 internal object ImageGenTool {
     const val NAME = "generate_image"
+    /** 过程行内容标记，不是展示文案。空内容表示用户停止。 */
+    const val STATUS_OK = "ok"
+    const val STATUS_FAILED = "failed"
     const val DESCRIPTION =
         "Generate an image from a text prompt and deliver it to the user. " +
             "Call with {\"prompt\":\"detailed image description in English\"}. " +
@@ -1253,6 +1256,7 @@ internal object MemoryTool {
             "Call with {\"content\":\"one concise fact in the user's language\"}."
 
     fun liveLabel(name: String): String = when (name) {
+        ImageGenTool.NAME -> tr("图片生成中")
         TimeTool.NAME -> tr("获取时间")
         WebFetchTool.NAME -> tr("浏览网页中")
         GET -> tr("读取记忆")
@@ -1260,7 +1264,12 @@ internal object MemoryTool {
         else -> tr("调用工具")
     }
 
-    fun doneLabel(name: String): String = when (name) {
+    fun doneLabel(name: String, content: String = ""): String = when (name) {
+        ImageGenTool.NAME -> when (content) {
+            ImageGenTool.STATUS_OK -> tr("已生成图片")
+            ImageGenTool.STATUS_FAILED -> tr("生成图片失败")
+            else -> tr("图片生成已停止")
+        }
         TimeTool.NAME -> tr("已获取时间")
         WebFetchTool.NAME -> tr("已浏览网页")
         GET -> tr("已读取记忆")
