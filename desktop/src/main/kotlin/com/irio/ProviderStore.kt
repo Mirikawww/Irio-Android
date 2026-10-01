@@ -78,14 +78,22 @@ fun modelRefreshDiff(previous: List<String>, next: List<String>): ModelRefreshDi
 }
 
 /** 新增保持拉取顺序并排到最前，未变的留在中间，消失的保持原顺序排到最后。 */
-fun modelDiffRows(current: List<String>, diff: ModelRefreshDiff): List<ModelDiffEntry> {
+fun modelDiffRows(
+    current: List<String>,
+    diff: ModelRefreshDiff,
+    showRemoved: Boolean = true,
+): List<ModelDiffEntry> {
     val added = ArrayList<ModelDiffEntry>(diff.added.size)
     val unchanged = ArrayList<ModelDiffEntry>(current.size)
     for (model in current) {
         if (model in diff.added) added += ModelDiffEntry(model, ModelDiffKind.Added)
         else unchanged += ModelDiffEntry(model, ModelDiffKind.Unchanged)
     }
-    return added + unchanged + diff.removed.map { ModelDiffEntry(it, ModelDiffKind.Removed) }
+    return added + unchanged + if (showRemoved) {
+        diff.removed.map { ModelDiffEntry(it, ModelDiffKind.Removed) }
+    } else {
+        emptyList()
+    }
 }
 
 object ProviderStore {

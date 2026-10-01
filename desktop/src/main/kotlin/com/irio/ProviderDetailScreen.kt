@@ -181,10 +181,11 @@ fun ProviderDetailScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (provider!!.models.isEmpty() && refreshDiff.removed.isEmpty()) {
+                    val showRemoved = ThemeStore.modelDiff
+                    if (provider!!.models.isEmpty() && (!showRemoved || refreshDiff.removed.isEmpty())) {
                         Text(tr("还没有模型"))
                     } else {
-                        modelDiffRows(provider!!.models, refreshDiff).forEach { entry ->
+                        modelDiffRows(provider!!.models, refreshDiff, showRemoved).forEach { entry ->
                             val removed = entry.kind == ModelDiffKind.Removed
                             ModelEnabledRow(
                                 model = entry.model,

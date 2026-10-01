@@ -49,4 +49,14 @@ class ModelRefreshDiffTest {
             modelDiffRows(emptyList(), diff),
         )
     }
+
+    @Test
+    fun disablingModelDiffHidesRemovedRows() {
+        val diff = modelRefreshDiff(listOf("old", "kept"), listOf("kept"))
+
+        assertEquals(
+            listOf(ModelDiffEntry("kept", ModelDiffKind.Unchanged)),
+            modelDiffRows(listOf("kept"), diff, showRemoved = false),
+        )
+    }
 }
