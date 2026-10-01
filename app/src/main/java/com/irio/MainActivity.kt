@@ -1810,7 +1810,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     Text(
                         composerStatus!!,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        color = Theme[colors][destructiveColor],
+                        color = irioErrorTextColor(),
                         fontSize = 12.sp,
                     )
                 }
@@ -2496,7 +2496,7 @@ internal fun MessageRow(
                             SelectionContainer {
                                 Text(
                                     chatMessage.text,
-                                    color = Theme[colors][destructiveColor],
+                                    color = irioErrorTextColor(),
                                     fontSize = 17.sp,
                                     lineHeight = 26.sp,
                                 )

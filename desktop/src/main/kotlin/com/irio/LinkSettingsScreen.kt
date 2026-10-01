@@ -210,7 +210,7 @@ fun LinkSettingsScreen(onBack: () -> Unit) {
                     lineHeight = 16.sp,
                     fontSize = 16.sp,
                     shape = Theme[shapes][fieldShape],
-                    borderColor = if (pairInvalid) Theme[colors][destructiveColor] else Color.Unspecified,
+                    borderColor = if (pairInvalid) irioErrorTextColor() else Color.Unspecified,
                     contentPadding = PaddingValues(12.dp),
                     lineLimits = TextFieldLineLimits.SingleLine,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
@@ -313,7 +313,7 @@ fun LinkSettingsScreen(onBack: () -> Unit) {
                 }
             }
             state.status?.let { message ->
-                Text(message, color = Theme[colors][destructiveColor], fontSize = 13.sp)
+                Text(message, color = irioErrorTextColor(), fontSize = 13.sp)
             }
         }
     }

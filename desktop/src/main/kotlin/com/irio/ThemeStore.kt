@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import org.json.JSONObject
+import kotlin.math.pow
 
 enum class ResolvedTheme {
     LIGHT,
@@ -74,6 +75,23 @@ enum class AccentColor(val label: String, val stored: String, val color: Color) 
         fun fromStored(value: String?): AccentColor =
             entries.firstOrNull { it.stored.equals(value, ignoreCase = true) } ?: BLACK
     }
+}
+
+/** Dark destructive buttons keep white text at WCAG AA contrast (4.5:1 or higher). */
+internal val darkDestructiveButtonColor = Color(0xFFD32F2F)
+internal val darkDestructiveButtonContentColor = Color.White
+internal val darkErrorTextColor = Color(0xFFEF5350)
+
+internal fun wcagContrastRatio(first: Color, second: Color): Float {
+    fun relativeLuminance(color: Color): Float {
+        fun linear(channel: Float): Float =
+            if (channel <= 0.04045f) channel / 12.92f else ((channel + 0.055f) / 1.055f).pow(2.4f)
+        return 0.2126f * linear(color.red) + 0.7152f * linear(color.green) + 0.0722f * linear(color.blue)
+    }
+    val firstLuminance = relativeLuminance(first)
+    val secondLuminance = relativeLuminance(second)
+    return (maxOf(firstLuminance, secondLuminance) + 0.05f) /
+        (minOf(firstLuminance, secondLuminance) + 0.05f)
 }
 
 object ThemeStore {

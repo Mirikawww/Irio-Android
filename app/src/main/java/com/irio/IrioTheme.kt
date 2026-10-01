@@ -151,6 +151,10 @@ fun AppTheme(content: @Composable () -> Unit) {
 private val LocalAmoledTheme = staticCompositionLocalOf { false }
 private val LocalDynamicAccent = staticCompositionLocalOf<DynamicAccent?> { null }
 
+@Composable
+internal fun irioErrorTextColor(): Color =
+    if (LocalColorScheme.current == ColorScheme.Dark) darkErrorTextColor else Theme[colors][destructiveColor]
+
 private data class DynamicAccent(
     val primary: Color,
     val onPrimary: Color,
@@ -206,9 +210,9 @@ private val SurfaceOverride: ThemeComposable = buildTheme {
         switchThumbColor to if (darkTheme) Color.White else Theme[colors][switchThumbColor],
         selectedControlColor to if (amoled) Color(0xFF222222) else Theme[colors][selectedControlColor],
         onSelectedControlColor to Theme[colors][onSelectedControlColor],
-        // Use a softer red in dark mode that's visible but not harsh.
-        destructiveColor to if (darkTheme) Color(0xFFEF5350) else Theme[colors][destructiveColor],
-        onDestructiveColor to if (amoled) Color.Black else Theme[colors][onDestructiveColor],
+        // White destructive-button text is 4.98:1 against #D32F2F in dark and AMOLED modes.
+        destructiveColor to if (darkTheme) darkDestructiveButtonColor else Theme[colors][destructiveColor],
+        onDestructiveColor to if (darkTheme) darkDestructiveButtonContentColor else Theme[colors][onDestructiveColor],
         borderColor to if (amoled) Color(0xFF2A2A2A) else Theme[colors][borderColor],
         fieldColor to if (amoled) Color(0xFF121212) else Theme[colors][fieldColor],
         onFieldColor to Theme[colors][onFieldColor],

@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import androidx.compose.ui.graphics.Color
 
 class ThemeStoreTest {
     @Test
@@ -52,5 +53,13 @@ class ThemeStoreTest {
         assertEquals("Experimental", translate(AppLanguage.EN, "实验性"))
         assertEquals("外观", translate(AppLanguage.ZH_CN, "外观"))
         assertEquals("New chat", translate(AppLanguage.EN, "新对话"))
+    }
+
+    @Test
+    fun darkDestructiveButtonUsesWhiteTextWithWcagAaContrast() {
+        assertEquals(Color.White, darkDestructiveButtonContentColor)
+        assertTrue(
+            wcagContrastRatio(darkDestructiveButtonContentColor, darkDestructiveButtonColor) >= 4.5f,
+        )
     }
 }
