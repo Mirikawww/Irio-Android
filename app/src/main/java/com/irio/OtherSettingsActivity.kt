@@ -71,7 +71,7 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var showClearHistoryDialog by remember { mutableStateOf(false) }
     var importDialogOpen by remember { mutableStateOf(false) }
-    var importOverwrite by remember { mutableStateOf(false) }
+    var importOverwrite by remember { mutableStateOf(true) }
     var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var importing by remember { mutableStateOf(false) }
     var importResult by remember { mutableStateOf<BackupImportResult?>(null) }
