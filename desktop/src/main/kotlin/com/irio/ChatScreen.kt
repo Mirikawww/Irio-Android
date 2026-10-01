@@ -2153,6 +2153,7 @@ private fun MessageRow(
     onPrevEditVersion: (() -> Unit)? = null,
     onNextEditVersion: (() -> Unit)? = null,
 ) {
+    observeIrioTheme()
     val spoken = remember(chatMessage.id, chatMessage.text) { speechPlainText(chatMessage.text) }
     val speech = SpeechPlayer.playback
     val isNewUserMessage = chatMessage.fromUser && chatMessage.id == newUserMessageId
@@ -2187,14 +2188,7 @@ private fun MessageRow(
                     }
                 }
                 if (chatMessage.text.isNotBlank()) {
-                    val bubble = userBubbleColors(
-                        dark = Theme[colors][backgroundColor].red < 0.5f,
-                        accent = ThemeStore.accent,
-                        accentColor = Theme[colors][primaryColor],
-                        panel = Theme[colors][panelColor],
-                        onPanel = Theme[colors][onPanelColor],
-                        editing = isEditing,
-                    )
+                    val bubble = currentUserBubbleColors(isEditing)
                     BoxWithConstraints(
                         modifier = Modifier.fillMaxWidth(),
                         contentAlignment = Alignment.CenterEnd,

@@ -2454,6 +2454,7 @@ internal fun MessageRow(
     onPrevEditVersion: (() -> Unit)? = null,
     onNextEditVersion: (() -> Unit)? = null,
 ) {
+    observeIrioTheme()
     val context = LocalContext.current
     val requestSpeechNotification = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -2494,14 +2495,7 @@ internal fun MessageRow(
                     }
                 }
                 if (chatMessage.text.isNotBlank()) {
-                    val bubble = userBubbleColors(
-                        dark = Theme[colors][backgroundColor].red < 0.5f,
-                        accent = ThemeStore.accent,
-                        accentColor = Theme[colors][primaryColor],
-                        panel = Theme[colors][panelColor],
-                        onPanel = Theme[colors][onPanelColor],
-                        editing = isEditing,
-                    )
+                    val bubble = currentUserBubbleColors(isEditing)
                     BoxWithConstraints(
                         modifier = Modifier.fillMaxWidth(),
                         contentAlignment = Alignment.CenterEnd,

@@ -3,6 +3,7 @@ package com.irio
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import com.composables.ui.theme.ColorScheme
@@ -71,6 +72,7 @@ fun AppTheme(content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalColorScheme provides colorScheme,
         LocalAmoledTheme provides (resolvedTheme == ResolvedTheme.AMOLED),
+        LocalResolvedTheme provides resolvedTheme,
     ) {
         ComposablesTheme {
             SurfaceOverride(content)
@@ -80,9 +82,36 @@ fun AppTheme(content: @Composable () -> Unit) {
 
 private val LocalAmoledTheme = staticCompositionLocalOf { false }
 
+/**
+ * Dynamic, unlike [LocalColorScheme]. A static color scheme does not invalidate
+ * skipped message rows, so bubbles and reply text keep the previous theme.
+ */
+internal val LocalResolvedTheme = compositionLocalOf { ResolvedTheme.LIGHT }
+
+@Composable
+internal fun observeIrioTheme() {
+    LocalResolvedTheme.current
+    ThemeStore.preference
+    ThemeStore.autoAmoled
+    ThemeStore.accent
+}
+
+@Composable
+internal fun currentUserBubbleColors(editing: Boolean): UserBubbleColors {
+    val resolved = LocalResolvedTheme.current
+    return userBubbleColors(
+        dark = resolved.isDark,
+        accent = ThemeStore.accent,
+        accentColor = Theme[colors][primaryColor],
+        panel = Theme[colors][panelColor],
+        onPanel = Theme[colors][onPanelColor],
+        editing = editing,
+    )
+}
+
 @Composable
 internal fun irioErrorTextColor(): Color =
-    if (LocalColorScheme.current == ColorScheme.Dark) darkErrorTextColor else Theme[colors][destructiveColor]
+    if (LocalResolvedTheme.current.isDark) darkErrorTextColor else Theme[colors][destructiveColor]
 
 @Composable
 internal fun accentDisplayColor(accent: AccentColor): Color = accent.color
