@@ -52,6 +52,26 @@ internal fun transcriptViewportPinned(
     return lastEdge <= viewportEnd + slackPx
 }
 
+internal fun lazyDistanceToBottom(state: LazyListState): Int {
+    val info = state.layoutInfo
+    val count = info.totalItemsCount
+    if (count <= 0) return 0
+    val last = info.visibleItemsInfo.lastOrNull()
+    val catchUp = transcriptBottomCatchUpDelta(
+        itemCount = count,
+        lastVisibleIndex = last?.index ?: -1,
+        lastEdge = last?.let { it.offset + it.size } ?: 0,
+        viewportEnd = info.viewportEndOffset,
+    )
+    if (catchUp != null) return catchUp
+    if (last == null || info.visibleItemsInfo.isEmpty()) {
+        return (info.viewportEndOffset - info.viewportStartOffset).coerceAtLeast(1)
+    }
+    val average = info.visibleItemsInfo.sumOf { it.size } / info.visibleItemsInfo.size
+    val itemsBelow = count - 1 - last.index
+    return (itemsBelow * average.coerceAtLeast(1)).coerceAtLeast(1)
+}
+
 internal fun lazyTranscriptPinnedToBottom(state: LazyListState, slackPx: Int): Boolean? {
     val info = state.layoutInfo
     val last = info.visibleItemsInfo.lastOrNull()
@@ -135,6 +155,81 @@ internal suspend fun ScrollState.smoothFollowBottom(
         }
         stuck = false
         withFrameNanos { }
+    }
+}
+
+/** 发送消息时滑到底的时长。按时间走，不按距离，离得远也不会滑很久。 */
+internal const val SendScrollDurationMillis = 300
+
+/** 先快后慢，固定时长结束时进度为 1。 */
+internal fun sendScrollEase(t: Float): Float {
+    val x = t.coerceIn(0f, 1f)
+    val inv = 1f - x
+    return 1f - inv * inv * inv
+}
+
+/**
+ * 这一帧该消化的剩余距离比例。
+ * 进度到 1 时吃掉全部剩余，所以总时长固定，不随距离变长。
+ */
+internal fun fixedDurationSlice(previousProgress: Float, progress: Float): Float {
+    if (progress >= 1f) return 1f
+    val span = 1f - previousProgress
+    if (span <= 0.0001f) return 1f
+    return ((progress - previousProgress) / span).coerceIn(0f, 1f)
+}
+
+internal fun fixedDurationScrollStep(remainingPx: Int, previousProgress: Float, progress: Float): Int {
+    if (remainingPx <= 0) return 0
+    val slice = fixedDurationSlice(previousProgress, progress)
+    if (slice <= 0f) return 0
+    return (remainingPx * slice).toInt().coerceAtLeast(1).coerceAtMost(remainingPx)
+}
+
+/**
+ * 固定时长滑到当前尾部。每帧按时间进度吃掉当时的剩余距离，
+ * 远近都在 [durationMillis] 内到；到点后若布局又长出一截，再补一次。
+ */
+internal suspend fun glideTranscriptToBottom(
+    durationMillis: Int = SendScrollDurationMillis,
+    gate: TranscriptScrollGate,
+    follow: () -> Boolean,
+    remainingPx: () -> Int,
+    scrollByPx: suspend (Int) -> Unit,
+) {
+    var previous = 0f
+    var clockStart = 0L
+    while (follow()) {
+        val frame = withFrameNanos { it }
+        if (clockStart == 0L) {
+            clockStart = frame
+            continue
+        }
+        val elapsedMs = (frame - clockStart) / 1_000_000f
+        val t = (elapsedMs / durationMillis).coerceIn(0f, 1f)
+        val progress = sendScrollEase(t)
+        val step = fixedDurationScrollStep(remainingPx(), previous, progress)
+        previous = progress
+        if (step > 0) {
+            gate.depth++
+            try {
+                scrollByPx(step)
+            } finally {
+                gate.depth--
+            }
+        }
+        if (t >= 1f) {
+            val rest = remainingPx()
+            if (rest > 0) {
+                gate.depth++
+                try {
+                    scrollByPx(rest)
+                } finally {
+                    gate.depth--
+                }
+            }
+            return
+        }
     }
 }
 

@@ -138,6 +138,34 @@ internal suspend fun ScrollState.smoothFollowBottom(
     }
 }
 
+/** 发送消息时滑到底的时长。按时间走，不按距离，离得远也不会滑很久。 */
+internal const val SendScrollDurationMillis = 300
+
+/** 先快后慢，固定时长结束时进度为 1。 */
+internal fun sendScrollEase(t: Float): Float {
+    val x = t.coerceIn(0f, 1f)
+    val inv = 1f - x
+    return 1f - inv * inv * inv
+}
+
+/**
+ * 这一帧该消化的剩余距离比例。
+ * 进度到 1 时吃掉全部剩余，所以总时长固定，不随距离变长。
+ */
+internal fun fixedDurationSlice(previousProgress: Float, progress: Float): Float {
+    if (progress >= 1f) return 1f
+    val span = 1f - previousProgress
+    if (span <= 0.0001f) return 1f
+    return ((progress - previousProgress) / span).coerceIn(0f, 1f)
+}
+
+internal fun fixedDurationScrollStep(remainingPx: Int, previousProgress: Float, progress: Float): Int {
+    if (remainingPx <= 0) return 0
+    val slice = fixedDurationSlice(previousProgress, progress)
+    if (slice <= 0f) return 0
+    return (remainingPx * slice).toInt().coerceAtLeast(1).coerceAtMost(remainingPx)
+}
+
 /** 程序滚动期间嵌套滚动回调不能清掉贴底锁。 */
 internal class TranscriptScrollGate {
     var depth: Int = 0

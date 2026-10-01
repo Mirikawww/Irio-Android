@@ -2,6 +2,7 @@ package com.irio
 
 import android.content.Context
 import android.graphics.Rect
+import android.os.SystemClock
 import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -95,6 +96,11 @@ internal class MessageRecyclerController {
     private var alignScheduled = false
     private var chasing = false
     private var chasePosted = false
+    private var gliding = false
+    private var glidePosted = false
+    private var glideClockStarted = false
+    private var glideStartUptime = 0L
+    private var glidePreviousProgress = 0f
     private var idleConfirms = 0
     private var programmaticPosts = 0
 
@@ -107,10 +113,28 @@ internal class MessageRecyclerController {
         flushScrollToBottom()
     }
 
+    /** 发送消息：固定时长滑到新尾部，并让之后的流式输出继续贴底。 */
+    fun revealTail() {
+        val view = recyclerView ?: return
+        scrollRequested = true
+        chasing = false
+        idleConfirms = 0
+        gliding = true
+        glideClockStarted = false
+        glidePreviousProgress = 0f
+        programmaticPosts++
+        try {
+            view.stopScroll()
+        } finally {
+            programmaticPosts--
+        }
+        if (!glidePosted) postGlide()
+    }
+
     fun isProgrammaticScroll(): Boolean = programmaticPosts > 0
 
     fun flushScrollToBottom() {
-        if (chasing || chasePosted || alignScheduled) return
+        if (gliding || chasing || chasePosted || alignScheduled) return
         scheduleAlign(attempt = 0)
     }
 
@@ -177,6 +201,10 @@ internal class MessageRecyclerController {
      * 跟随会被当成手指在滚。这里用 scrollBy 逐帧追，滚动状态保持 IDLE。
      */
     private fun stepChase(current: MessageRecyclerView) {
+        if (gliding) {
+            chasing = false
+            return
+        }
         if (!scrollRequested) {
             chasing = false
             return
@@ -256,6 +284,94 @@ internal class MessageRecyclerController {
             }
             stepChase(current)
         }
+    }
+
+    private fun postGlide() {
+        if (glidePosted) return
+        val view = recyclerView ?: run {
+            gliding = false
+            return
+        }
+        glidePosted = true
+        view.postOnAnimation {
+            glidePosted = false
+            val current = recyclerView
+            if (!gliding || !scrollRequested || current == null) {
+                gliding = false
+                return@postOnAnimation
+            }
+            stepGlide(current)
+        }
+    }
+
+    /**
+     * 固定时长内滑到尾部。尾部还没铺开时用滚动范围估计剩余距离，
+     * 每帧按时间进度重测，所以远近都在同一段时间里到。
+     */
+    private fun stepGlide(current: MessageRecyclerView) {
+        if (!gliding || !scrollRequested) {
+            gliding = false
+            return
+        }
+        if (current.scrollState != RecyclerView.SCROLL_STATE_IDLE) {
+            gliding = false
+            scrollRequested = false
+            return
+        }
+        if (current.isMessageUpdatePending()) {
+            postGlide()
+            return
+        }
+        if (!glideClockStarted) {
+            glideClockStarted = true
+            glideStartUptime = SystemClock.uptimeMillis()
+            glidePreviousProgress = 0f
+            postGlide()
+            return
+        }
+        val elapsed = SystemClock.uptimeMillis() - glideStartUptime
+        val t = (elapsed.toFloat() / SendScrollDurationMillis).coerceIn(0f, 1f)
+        val progress = sendScrollEase(t)
+        val remaining = distanceToBottom(current)
+        val step = fixedDurationScrollStep(remaining, glidePreviousProgress, progress)
+        glidePreviousProgress = progress
+        if (step > 0) {
+            programmaticPosts++
+            try {
+                current.scrollBy(0, step)
+            } finally {
+                programmaticPosts--
+            }
+        }
+        if (t < 1f) {
+            postGlide()
+            return
+        }
+        val rest = distanceToBottom(current)
+        if (rest > 0) {
+            programmaticPosts++
+            try {
+                current.scrollBy(0, rest)
+            } finally {
+                programmaticPosts--
+            }
+        }
+        gliding = false
+        scrollRequested = false
+    }
+
+    private fun distanceToBottom(view: MessageRecyclerView): Int {
+        val count = view.itemCountValue()
+        if (count <= 0) return 0
+        val child = (view.layoutManager as? LinearLayoutManager)?.findViewByPosition(count - 1)
+        if (child != null) {
+            return (child.bottom - (view.height - view.paddingBottom)).coerceAtLeast(0)
+        }
+        val estimated = view.computeVerticalScrollRange() -
+            view.computeVerticalScrollOffset() -
+            view.computeVerticalScrollExtent()
+        if (estimated > 0) return estimated
+        return (view.height - view.paddingTop - view.paddingBottom).coerceAtLeast(1)
     }
 
     private fun jumpToUnlaidTail(view: MessageRecyclerView, count: Int) {

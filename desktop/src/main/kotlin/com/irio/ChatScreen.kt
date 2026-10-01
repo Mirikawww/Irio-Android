@@ -269,6 +269,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     var userDrivingTranscript by userDrivingTranscriptState
     var seenTranscriptConversationId by remember { mutableStateOf<String?>(null) }
     var seenTranscriptTailId by remember { mutableStateOf<Long?>(null) }
+    var seenSentUserMessageId by remember { mutableStateOf<Long?>(null) }
     val transcriptScrollGate = remember { TranscriptScrollGate() }
     val transcriptBottomSlackPx = with(LocalDensity.current) { 24.dp.toPx().roundToInt() }
     val transcriptFollowConnection = remember(listState, transcriptBottomSlackPx) {
@@ -560,6 +561,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         currentConversation.id,
         visibleTranscript.size,
         visibleTranscript.lastOrNull()?.let(::transcriptTailFollowKey),
+        newUserMessageId,
         stickToBottom,
         userDrivingTranscript,
     ) {
@@ -576,7 +578,10 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             return@LaunchedEffect
         }
         val opening = pendingConversationScroll == currentConversation.id
-        val force = opening || (last.fromUser && last.id != seenTranscriptTailId)
+        // 发送时尾部是待回复占位，不是用户气泡。用 newUserMessageId 识别这次发送。
+        val justSent = newUserMessageId != null && newUserMessageId != seenSentUserMessageId
+        val force = opening || justSent || (last.fromUser && last.id != seenTranscriptTailId)
+        if (justSent) seenSentUserMessageId = newUserMessageId
         if (opening) pendingConversationScroll = null
         if (!shouldSnapTranscriptToBottom(
                 stickToBottom = stickToBottom,
@@ -589,6 +594,27 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             return@LaunchedEffect
         }
         if (force) stickToBottom = true
+        if (justSent) {
+            transcriptFollowJob.job?.cancel()
+            transcriptFollowJob.job = scope.launch {
+                glideTranscriptToBottom(
+                    gate = transcriptScrollGate,
+                    follow = {
+                        shouldSnapTranscriptToBottom(
+                            stickToBottom = stickToBottomState.value,
+                            userScrollInProgress = userDrivingTranscriptState.value,
+                            force = false,
+                        )
+                    },
+                    remainingPx = { lazyDistanceToBottom(listState) },
+                    scrollByPx = { step ->
+                        listState.scroll { scrollBy(step.toFloat()) }
+                    },
+                )
+            }
+            seenTranscriptTailId = last.id
+            return@LaunchedEffect
+        }
         // 等这一帧把长高的尾部量完再决定滚多少。已经贴住底边就不要滚：
         // scrollToItem(Int.MAX_VALUE) 会把最后一项重新锚到视口起点，下一帧拉回来，就是抽一下。
         withFrameNanos { }

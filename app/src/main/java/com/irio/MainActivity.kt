@@ -323,6 +323,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var stickToBottom by remember { mutableStateOf(true) }
     var seenTranscriptConversationId by remember { mutableStateOf<String?>(null) }
     var seenTranscriptTailId by remember { mutableStateOf<Long?>(null) }
+    var seenSentUserMessageId by remember { mutableStateOf<Long?>(null) }
     var composerBarHeightPx by remember { mutableIntStateOf(0) }
     val composerBarHeight = with(LocalDensity.current) { composerBarHeightPx.toDp() }
     var toolbarHeightPx by remember { mutableIntStateOf(0) }
@@ -754,6 +755,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         currentConversation.id,
         visibleTranscript.size,
         visibleTranscript.lastOrNull()?.let(::transcriptTailFollowKey),
+        newUserMessageId,
         stickToBottom,
         recyclerScrolling,
     ) {
@@ -769,7 +771,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             return@LaunchedEffect
         }
         val opening = pendingConversationScroll == currentConversation.id
-        val force = opening || (last.fromUser && last.id != seenTranscriptTailId)
+        // 发送时尾部是待回复占位，不是用户气泡。用 newUserMessageId 识别这次发送。
+        val justSent = newUserMessageId != null && newUserMessageId != seenSentUserMessageId
+        val force = opening || justSent || (last.fromUser && last.id != seenTranscriptTailId)
+        if (justSent) seenSentUserMessageId = newUserMessageId
         if (opening) pendingConversationScroll = null
         if (!shouldSnapTranscriptToBottom(
                 stickToBottom = stickToBottom,
@@ -781,7 +786,11 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             return@LaunchedEffect
         }
         if (force) stickToBottom = true
-        messageRecyclerController.requestScrollToBottom()
+        if (justSent) {
+            messageRecyclerController.revealTail()
+        } else {
+            messageRecyclerController.requestScrollToBottom()
+        }
         seenTranscriptTailId = last.id
     }
 

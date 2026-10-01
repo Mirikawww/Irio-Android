@@ -135,4 +135,16 @@ class TranscriptFollowTest {
         assertEquals(0, remaining)
         assertTrue(frames > 1)
     }
+
+    @Test
+    fun sendScrollFinishesInFixedProgressRegardlessOfDistance() {
+        assertEquals(0f, sendScrollEase(0f), 0.001f)
+        assertEquals(1f, sendScrollEase(1f), 0.001f)
+        assertTrue(sendScrollEase(0.5f) > 0.5f)
+        assertEquals(0, fixedDurationScrollStep(20_000, 0f, 0f))
+        assertEquals(20_000, fixedDurationScrollStep(20_000, 0.2f, 1f))
+        val halfway = fixedDurationScrollStep(20_000, 0f, sendScrollEase(0.5f))
+        assertTrue(halfway > 10_000)
+        assertTrue(halfway < 20_000)
+    }
 }
