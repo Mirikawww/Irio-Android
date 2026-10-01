@@ -1929,7 +1929,7 @@ private fun ModelPicker(
                         ModelPickerRow.Model(
                             key = "${provider.id}/$base",
                             providerId = provider.id,
-                            display = base.replace("-", " "),
+                            display = ModelCatalog.displayName(base),
                             target = if (mergeModels) {
                                 variants.firstOrNull { it.endsWith("-thinking") }
                                     ?: variants.firstOrNull { it.endsWith("-fast") }

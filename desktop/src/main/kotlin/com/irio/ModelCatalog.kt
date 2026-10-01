@@ -11,6 +11,11 @@ import org.json.JSONObject
  */
 object ModelCatalog {
 
+    private val prettifyOverrides = mapOf(
+        "gpt-5.6" to "GPT-5.6",
+        "gpt-5.3-codex-spark" to "GPT-5.3-Codex-Spark",
+    )
+
     @Volatile
     private var imageModels: Set<String>? = null
 
@@ -72,5 +77,11 @@ object ModelCatalog {
         return modelId in catalog ||
             modelId.lowercase() in catalog ||
             (tail != modelId && (tail in catalog || tail.lowercase() in catalog))
+    }
+
+    fun displayName(modelId: String): String {
+        val cleaned = modelId.substringAfterLast('/')
+        prettifyOverrides[cleaned.lowercase()]?.let { return it }
+        return cleaned.replace('-', ' ').replace('_', ' ')
     }
 }
