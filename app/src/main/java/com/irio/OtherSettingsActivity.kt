@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -113,31 +115,17 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
             }
         }
     }
-    val background = Theme[colors][backgroundColor]
-    val content = Theme[colors][onBackgroundColor]
-
-    Scaffold(
-        containerColor = background,
-        contentWindowInsets = irioSystemUiInsets(),
-        topBar = {
-            IrioToolbar(
-                title = { Text(tr("其他")) },
-                backgroundColor = background,
-                contentColor = content,
-                leading = {
-                    IconButton(onClick = onBack, style = ButtonStyle.Ghost) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = tr("返回"),
-                            tint = content,
-                        )
-                    }
-                },
-            )
-        },
-    ) { padding ->
+    SettingsHazeScaffold(
+        title = tr("其他"),
+        onBack = onBack,
+    ) { topInset, bottomInset ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = bottomInset)
+                .verticalScroll(rememberScrollState())
+                .padding(top = topInset)
+                .padding(16.dp),
         ) {
             ListRowButton(
                 label = tr("删除所有历史"),

@@ -54,38 +54,20 @@ private fun SettingsScreen(onBack: () -> Unit) {
     val content = Theme[colors][onBackgroundColor]
     val softwareInfo = remember { androidSoftwareInfo(context) }
 
-    Scaffold(
-        containerColor = background,
-        contentWindowInsets = irioSystemUiInsets(),
-        topBar = {
-            IrioToolbar(
-                title = { Text(tr("设置")) },
-                backgroundColor = background,
-                contentColor = content,
-                leading = {
-                    IconButton(
-                        onClick = onBack,
-                        style = ButtonStyle.Ghost,
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = tr("返回"),
-                            tint = content,
-                        )
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    SettingsHazeScaffold(
+        title = tr("设置"),
+        onBack = onBack,
+    ) { topInset, bottomInset ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(bottom = bottomInset),
         ) {
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
+                    .padding(top = topInset)
                     .padding(horizontal = 16.dp, vertical = 16.dp),
             ) {
                 ListRowButton(

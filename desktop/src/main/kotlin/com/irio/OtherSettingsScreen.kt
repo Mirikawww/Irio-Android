@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DeleteSweep
@@ -31,14 +33,9 @@ import com.composeunstyled.theme.Theme
 @Composable
 fun OtherSettingsScreen(onBack: () -> Unit) {
     var showClearHistoryDialog by remember { mutableStateOf(false) }
-    val background = Theme[colors][backgroundColor]
-    val content = Theme[colors][onBackgroundColor]
-
     SettingsPageScaffold(
         title = tr("其他"),
         onBack = onBack,
-        background = background,
-        content = content,
     ) {
         ListRowButton(
             label = tr("删除所有历史"),
@@ -97,29 +94,16 @@ fun OtherSettingsScreen(onBack: () -> Unit) {
 private fun SettingsPageScaffold(
     title: String,
     onBack: () -> Unit,
-    background: androidx.compose.ui.graphics.Color,
-    content: androidx.compose.ui.graphics.Color,
     body: @Composable () -> Unit,
 ) {
-    androidx.compose.material3.Scaffold(
-        containerColor = background,
-        topBar = {
-            IrioToolbar(
-                title = { Text(title) },
-                backgroundColor = background,
-                contentColor = content,
-                leading = {
-                    IconButton(onClick = onBack, style = ButtonStyle.Ghost) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = tr("返回"),
-                            tint = content,
-                        )
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) { body() }
+    SettingsHazeScaffold(title = title, onBack = onBack) { topInset, bottomInset ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(bottom = bottomInset)
+                .verticalScroll(rememberScrollState())
+                .padding(top = topInset)
+                .padding(16.dp),
+        ) { body() }
     }
 }

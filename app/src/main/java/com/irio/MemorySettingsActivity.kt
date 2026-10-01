@@ -89,35 +89,17 @@ private fun MemorySettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    Scaffold(
-        containerColor = background,
-        contentWindowInsets = irioSystemUiInsets(),
-        topBar = {
-            IrioToolbar(
-                title = { Text(tr("记忆")) },
-                backgroundColor = background,
-                contentColor = content,
-                leading = {
-                    IconButton(
-                        onClick = onBack,
-                        style = ButtonStyle.Ghost,
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = tr("返回"),
-                            tint = content,
-                        )
-                    }
-                },
-            )
-        },
-    ) { padding ->
+    SettingsHazeScaffold(
+        title = tr("记忆"),
+        onBack = onBack,
+    ) { topInset, bottomInset ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(bottom = bottomInset)
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
+                .padding(top = topInset)
                 .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

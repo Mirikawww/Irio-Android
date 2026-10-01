@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
@@ -81,32 +83,16 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
     var accentMenuOpen by remember { mutableStateOf(false) }
     var languageMenuOpen by remember { mutableStateOf(false) }
 
-    Scaffold(
-        containerColor = background,
-        topBar = {
-            IrioToolbar(
-                title = { Text(tr("外观")) },
-                backgroundColor = background,
-                contentColor = content,
-                leading = {
-                    IconButton(
-                        onClick = onBack,
-                        style = ButtonStyle.Ghost,
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = tr("返回"),
-                            tint = content,
-                        )
-                    }
-                },
-            )
-        },
-    ) { padding ->
+    SettingsHazeScaffold(
+        title = tr("外观"),
+        onBack = onBack,
+    ) { topInset, bottomInset ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(bottom = bottomInset)
+                .verticalScroll(rememberScrollState())
+                .padding(top = topInset)
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

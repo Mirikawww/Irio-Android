@@ -48,29 +48,17 @@ private fun SystemPromptSettingsScreen(onBack: () -> Unit) {
     val state = rememberTextFieldState(SystemPromptStore.load(context))
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
-    Scaffold(
-        containerColor = background,
-        contentWindowInsets = irioSystemUiInsets(),
-        topBar = {
-            IrioToolbar(
-                title = { Text(tr("系统提示词")) },
-                backgroundColor = background,
-                contentColor = content,
-                leading = {
-                    IconButton(onClick = onBack, style = ButtonStyle.Ghost) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = tr("返回"),
-                            tint = content,
-                        )
-                    }
-                },
-            )
-        },
-    ) { padding ->
+    SettingsHazeScaffold(
+        title = tr("系统提示词"),
+        onBack = onBack,
+    ) { topInset, bottomInset ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)
-                .verticalScroll(rememberScrollState()),
+            Modifier
+                .fillMaxSize()
+                .padding(bottom = bottomInset)
+                .verticalScroll(rememberScrollState())
+                .padding(top = topInset)
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TextField(

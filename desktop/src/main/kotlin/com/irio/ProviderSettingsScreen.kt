@@ -111,34 +111,17 @@ fun ProviderSettingsScreen(
         protocolMenuOpen = false
     }
 
-    Scaffold(
-        containerColor = background,
-        topBar = {
-            IrioToolbar(
-                title = { Text(tr("提供商")) },
-                backgroundColor = background,
-                contentColor = content,
-                leading = {
-                    IconButton(
-                        onClick = onBack,
-                        style = ButtonStyle.Ghost,
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = tr("返回"),
-                            tint = content,
-                        )
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    SettingsHazeScaffold(
+        title = tr("提供商"),
+        onBack = onBack,
+    ) { topInset, bottomInset ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(bottom = bottomInset)
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
+                .padding(top = topInset)
                 .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {

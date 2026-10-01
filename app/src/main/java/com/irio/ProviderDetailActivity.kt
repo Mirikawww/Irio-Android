@@ -20,6 +20,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -139,40 +140,16 @@ private fun ProviderDetailScreen(
     var tabOverlayHeightPx by remember { mutableIntStateOf(0) }
     val tabContentPadding = with(LocalDensity.current) { tabOverlayHeightPx.toDp() }
 
-    Scaffold(
-        containerColor = background,
-        contentWindowInsets = irioSystemUiInsets(),
-        topBar = {
-            IrioToolbar(
-                title = { Text(provider?.name ?: tr("提供商")) },
-                backgroundColor = background,
-                contentColor = content,
-                leading = {
-                    IconButton(
-                        onClick = onBack,
-                        style = ButtonStyle.Ghost,
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = tr("返回"),
-                            tint = content,
-                        )
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    val capsulePx = remember { mutableIntStateOf(0) }
+    val capsuleHeight = with(LocalDensity.current) { capsulePx.intValue.toDp() }
+    Box(Modifier.fillMaxSize().background(background)) {
         if (provider == null) {
             Text(
                 tr("找不到这个提供商"),
-                modifier = Modifier.padding(padding).padding(16.dp),
+                modifier = Modifier.padding(top = capsuleHeight).padding(16.dp),
             )
         } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = padding.calculateTopPadding()),
-            ) {
+            Box(Modifier.fillMaxSize()) {
                 AnimatedContent(
                     targetState = page,
                     modifier = Modifier
@@ -234,6 +211,7 @@ private fun ProviderDetailScreen(
                                 onDelete = { deleteDialogOpen = true },
                                 scroll = configScroll,
                                 hazeState = hazeState,
+                                capsuleHeight = capsuleHeight,
                                 contentPaddingBottom = tabContentPadding,
                             )
                             ProviderDetailPage.Models -> ProviderModelsPage(
@@ -279,6 +257,7 @@ private fun ProviderDetailScreen(
                                 },
                                 scroll = modelScroll,
                                 hazeState = hazeState,
+                                capsuleHeight = capsuleHeight,
                                 contentPaddingBottom = tabContentPadding,
                             )
                         }
@@ -313,6 +292,14 @@ private fun ProviderDetailScreen(
                 }
             }
         }
+        SettingsTitleCapsule(
+            title = provider?.name ?: tr("提供商"),
+            onBack = onBack,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .zIndex(2f),
+            onHeightChanged = { capsulePx.intValue = it },
+        )
     }
 
     IrioAlertDialog(
@@ -346,6 +333,7 @@ private enum class ProviderDetailPage(val label: String) {
 }
 
 private const val ProviderPageAnimMillis = 320
+private val RefreshModelGap = 8.dp
 
 @Composable
 private fun ProviderConfigPage(
@@ -362,44 +350,51 @@ private fun ProviderConfigPage(
     onDelete: () -> Unit,
     scroll: ScrollState,
     hazeState: HazeState,
+    capsuleHeight: Dp,
     contentPaddingBottom: Dp,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .hazeSource(hazeState)
-            .verticalScroll(scroll)
-            .padding(bottom = contentPaddingBottom)
-            .padding(horizontal = 16.dp)
-            .padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        ProviderField(tr("名称"), name, KeyboardType.Text, trailingSpace = false)
-        ProtocolPicker(
-            protocol = protocol,
-            expanded = protocolMenuOpen,
-            onExpandedChange = onProtocolMenuExpanded,
-            onSelect = onProtocol,
-        )
-        ProviderField(tr("端点 URL"), endpoint, KeyboardType.Uri, trailingSpace = false)
-        ProviderField(tr("密钥"), apiKey, KeyboardType.Password, mask = true, trailingSpace = false)
-        if (formError != null) {
-            Text(formError)
-        }
-        Button(
-            onClick = onSave,
-            enabled = !saving,
-            modifier = Modifier.fillMaxWidth(),
-            style = ButtonStyle.Primary,
+    var hazePx by remember { mutableIntStateOf(0) }
+    val topInset = with(LocalDensity.current) { hazePx.toDp() }
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .hazeSource(hazeState)
+                .verticalScroll(scroll)
+                .padding(top = topInset, bottom = contentPaddingBottom)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(if (saving) tr("保存中") else tr("保存"))
+            ProviderField(tr("名称"), name, KeyboardType.Text, trailingSpace = false)
+            ProtocolPicker(
+                protocol = protocol,
+                expanded = protocolMenuOpen,
+                onExpandedChange = onProtocolMenuExpanded,
+                onSelect = onProtocol,
+            )
+            ProviderField(tr("端点 URL"), endpoint, KeyboardType.Uri, trailingSpace = false)
+            ProviderField(tr("密钥"), apiKey, KeyboardType.Password, mask = true, trailingSpace = false)
+            if (formError != null) {
+                Text(formError)
+            }
+            Button(
+                onClick = onSave,
+                enabled = !saving,
+                modifier = Modifier.fillMaxWidth(),
+                style = ButtonStyle.Primary,
+            ) {
+                Text(if (saving) tr("保存中") else tr("保存"))
+            }
+            Button(
+                onClick = onDelete,
+                modifier = Modifier.fillMaxWidth(),
+                style = ButtonStyle.Destructive,
+            ) {
+                Text(tr("删除提供商"))
+            }
         }
-        Button(
-            onClick = onDelete,
-            modifier = Modifier.fillMaxWidth(),
-            style = ButtonStyle.Destructive,
-        ) {
-            Text(tr("删除提供商"))
+        ProviderTopHaze(hazeState, onHeightChanged = { hazePx = it }) {
+            Spacer(Modifier.height(capsuleHeight))
         }
     }
 }
@@ -414,18 +409,20 @@ private fun ProviderModelsPage(
     onModelCheckedChange: (String, Boolean) -> Unit,
     scroll: ScrollState,
     hazeState: HazeState,
+    capsuleHeight: Dp,
     contentPaddingBottom: Dp,
 ) {
     val showRemoved = ThemeStore.modelDiff
-    var refreshOverlayHeightPx by remember { mutableIntStateOf(0) }
-    val refreshContentPadding = with(LocalDensity.current) { refreshOverlayHeightPx.toDp() }
+    var hazePx by remember { mutableIntStateOf(0) }
+    val hazeHeight = with(LocalDensity.current) { hazePx.toDp() }
+    val listTop = (hazeHeight - ChatToolbarHazeBleed + RefreshModelGap).coerceAtLeast(0.dp)
     Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .hazeSource(hazeState)
                 .verticalScroll(scroll)
-                .padding(top = refreshContentPadding, bottom = contentPaddingBottom)
+                .padding(top = listTop, bottom = contentPaddingBottom)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -449,30 +446,41 @@ private fun ProviderModelsPage(
                 }
             }
         }
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .zIndex(1f)
-                .onSizeChanged { refreshOverlayHeightPx = it.height }
-                .hazeBlur(
-                    input = HazeInput.Sources(hazeState),
-                    style = chatToolbarHazeStyle(),
-                ),
-        ) {
+        ProviderTopHaze(hazeState, onHeightChanged = { hazePx = it }) {
+            Spacer(Modifier.height(capsuleHeight))
             Button(
                 onClick = onRefresh,
                 enabled = !refreshing,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .padding(top = 8.dp),
+                    .padding(top = RefreshModelGap),
                 style = ButtonStyle.Secondary,
             ) {
                 Text(if (refreshing) tr("刷新中") else tr("刷新模型"))
             }
-            Spacer(Modifier.height(ChatToolbarHazeBleed))
         }
+    }
+}
+
+@Composable
+private fun ProviderTopHaze(
+    hazeState: HazeState,
+    onHeightChanged: (Int) -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .zIndex(1f)
+            .onSizeChanged { onHeightChanged(it.height) }
+            .hazeBlur(
+                input = HazeInput.Sources(hazeState),
+                style = chatToolbarHazeStyle(),
+            ),
+    ) {
+        content()
+        Spacer(Modifier.height(ChatToolbarHazeBleed))
     }
 }
 

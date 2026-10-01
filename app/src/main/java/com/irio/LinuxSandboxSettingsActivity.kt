@@ -152,36 +152,18 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    Scaffold(
-        containerColor = background,
-        contentWindowInsets = irioSystemUiInsets(),
-        topBar = {
-            IrioToolbar(
-                title = {
-                    Text(tr("Linux 沙盒"))
-                    Spacer(Modifier.width(8.dp))
-                    ExperimentalBadge()
-                },
-                backgroundColor = background,
-                contentColor = content,
-                leading = {
-                    IconButton(onClick = onBack, style = ButtonStyle.Ghost) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = tr("返回"),
-                            tint = content,
-                        )
-                    }
-                },
-            )
-        },
-    ) { padding ->
+    SettingsHazeScaffold(
+        title = tr("Linux 沙盒"),
+        onBack = onBack,
+        titleTrailing = { ExperimentalBadge() },
+    ) { topInset, bottomInset ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(bottom = bottomInset)
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
+                .padding(top = topInset)
                 .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
