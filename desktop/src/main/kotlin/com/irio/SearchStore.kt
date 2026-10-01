@@ -29,7 +29,7 @@ enum class SearchProvider(
 
     companion object {
         fun fromId(id: String?): SearchProvider =
-            entries.firstOrNull { it.id.equals(id, ignoreCase = true) } ?: TAVILY
+            entries.firstOrNull { it.id.equals(id, ignoreCase = true) } ?: EXA
     }
 }
 
