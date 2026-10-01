@@ -974,9 +974,8 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     }
                     val stopped = requestCancellation.isCancelled() || genResult.error == tr("图片生成已停止")
                     if (!stopped) {
-                        process.onToolFinished(
-                            if (genResult.attachment != null) ImageGenTool.STATUS_OK else ImageGenTool.STATUS_FAILED,
-                        )
+                        if (genResult.attachment != null) process.dropLiveTool()
+                        else process.onToolFinished(ImageGenTool.STATUS_FAILED)
                     }
                     when {
                         stopped -> ChatCompletionResult(stopped = true)
@@ -1041,7 +1040,13 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                                 if (update.searching == true && !cancelled) process.onSearchStarted()
                                 if (update.searching == false) process.onSearchFinished(update.searchPagesDelta, update.searchContent)
                                 if (update.toolActive == true && !cancelled) process.onToolStarted(update.toolName)
-                                if (update.toolActive == false) process.onToolFinished(update.toolContent)
+                                if (update.toolActive == false) {
+                                    if (update.toolName == ImageGenTool.NAME && update.toolContent == ImageGenTool.STATUS_OK) {
+                                        process.dropLiveTool()
+                                    } else {
+                                        process.onToolFinished(update.toolContent)
+                                    }
+                                }
                                 if (update.done) process.finishAll()
                             }
                             // 停止后不再把普通增量绘制到 UI；上面的终止事件仍用于闭合过程状态。
@@ -2412,6 +2417,13 @@ private fun ProcessEventRow(
     event: ProcessEvent,
     onOpen: (ProcessEvent) -> Unit,
 ) {
+    if (
+        !event.live &&
+        event.toolName == ImageGenTool.NAME &&
+        event.content == ImageGenTool.STATUS_OK
+    ) {
+        return
+    }
     val muted = Theme[colors][mutedColor]
     val openable = event.toolName != ImageGenTool.NAME && !event.live && event.content.isNotBlank()
     val label = when (event.kind) {

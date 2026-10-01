@@ -121,6 +121,14 @@ class ProcessTrackerToolTest {
         assertEquals("先说\n\n", appendAssistantRoundBreak("先说\n\n"))
     }
 
+    @Test
+    fun successfulImageGenerationDropsTheStatusRow() {
+        val tracker = ProcessTracker()
+        tracker.onToolStarted(ImageGenTool.NAME)
+        tracker.dropLiveTool()
+        assertTrue(tracker.snapshot().isEmpty())
+    }
+
     private fun transcriptLabels(pieces: List<TranscriptPiece>): List<String> = pieces.map { piece ->
         when (piece) {
             is TranscriptPiece.Text -> "text:${piece.text}"

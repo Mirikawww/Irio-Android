@@ -93,6 +93,13 @@ internal class ProcessTracker {
         finishLiveTool(content)
     }
 
+    /** 成功出图不留过程行，图片本身就是结果。 */
+    fun dropLiveTool() {
+        val id = liveToolId ?: return
+        events.removeAll { it.id == id }
+        liveToolId = null
+    }
+
     /** 替换进行中工具的展示内容，保持 live。传完整快照，不是增量。 */
     fun onToolOutput(content: String) {
         val id = liveToolId ?: return

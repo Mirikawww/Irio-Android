@@ -1266,7 +1266,6 @@ internal object MemoryTool {
 
     fun doneLabel(name: String, content: String = ""): String = when (name) {
         ImageGenTool.NAME -> when (content) {
-            ImageGenTool.STATUS_OK -> tr("已生成图片")
             ImageGenTool.STATUS_FAILED -> tr("生成图片失败")
             else -> tr("图片生成已停止")
         }

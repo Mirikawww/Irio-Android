@@ -82,7 +82,6 @@ private val English = mapOf(
     "图片生成失败" to "Image generation failed",
     "图片生成中" to "Generating an image",
     "生成图片失败" to "Couldn't generate an image",
-    "已生成图片" to "Generated an image",
     "图片生成工具当前不可用：请先配置图片生成模型。" to "Image generation is unavailable. Choose an image model first.",
     "图片生成模型" to "Image model",
     "图片端点只返回了 URL，请让提供商开启 b64_json 返回" to "The image endpoint returned only a URL. Ask the provider to enable b64_json.",

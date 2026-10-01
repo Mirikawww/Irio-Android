@@ -93,7 +93,6 @@ class ToolProviderTest {
         assertEquals(listOf(true, false), imageEvents.mapNotNull { it.toolActive })
         assertEquals(ImageGenTool.STATUS_FAILED, imageEvents.last().toolContent)
         assertEquals("图片生成中", MemoryTool.liveLabel(ImageGenTool.NAME))
-        assertEquals("已生成图片", MemoryTool.doneLabel(ImageGenTool.NAME, ImageGenTool.STATUS_OK))
         assertEquals("生成图片失败", MemoryTool.doneLabel(ImageGenTool.NAME, ImageGenTool.STATUS_FAILED))
         assertEquals("图片生成已停止", MemoryTool.doneLabel(ImageGenTool.NAME))
     }

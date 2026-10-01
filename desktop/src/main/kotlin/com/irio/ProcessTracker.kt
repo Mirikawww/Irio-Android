@@ -89,6 +89,13 @@ internal class ProcessTracker {
         finishLiveTool(content)
     }
 
+    /** 成功出图不留过程行，图片本身就是结果。 */
+    fun dropLiveTool() {
+        val id = liveToolId ?: return
+        events.removeAll { it.id == id }
+        liveToolId = null
+    }
+
     /** Number of events still in progress: callers use this to tell whether the batch is closed. */
     fun liveCount(): Int = listOfNotNull(liveThinkingId, liveSearchId, liveToolId).size
 
