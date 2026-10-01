@@ -712,6 +712,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> {
+                    // 设置页是独立 Activity；返回时主动重读，确保名称开关无需重启主页即可生效。
+                    modelsDevCatalog = ProviderStore.loadModelsDevCatalog(context)
+                    modelsDevReasoning = ProviderStore.loadModelsDevReasoning(context)
                     val provider = currentProviders.firstOrNull { it.id == currentActiveId }
                     val scopeId = currentConversationId
                     if (EndpointWarmup.shouldWarm(provider, currentConversationBusy)) {
