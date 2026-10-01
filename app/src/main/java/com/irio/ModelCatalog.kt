@@ -4,10 +4,10 @@ import android.content.Context
 import org.json.JSONObject
 
 /**
- * Models.dev 目录：显示名（assets/model-names.json）与思考能力（assets/model-reasoning.json）。
+ * OpenRouter 目录：显示名（assets/model-names.json）；思考能力仍来自离线能力数据。
  *
- * 两个文件均由 https://models.dev/api.json 离线生成：
- *   model-names.json     id -> 官方名
+ * 文件由 scripts/generate-catalog.py 从 OpenRouter 模型列表离线生成：
+ *   model-names.json     id -> OpenRouter name（去掉 provider 前缀）
  *   model-reasoning.json id -> {supports, options(可省略)}
  * options 存在且含 "none" 表示思考可关闭；存在但为空数组表示支持思考且不可关闭；缺失即未知。
  */
@@ -138,7 +138,7 @@ object ModelCatalog {
         }.getOrDefault(emptyMap())
     }
 
-    /** 官方显示名；Models.dev 关闭或没有数据时回退到格式化后的原始 id。 */
+    /** OpenRouter 显示名；开关关闭或没有数据时回退到格式化后的原始 id。 */
     fun displayName(context: Context, modelId: String, useCatalog: Boolean = true): String {
         if (modelId.isBlank()) return modelId
         if (useCatalog) {
@@ -171,8 +171,14 @@ object ModelCatalog {
         "gpt", "oss", "glm", "moe", "lora", "sdxl", "abab",
     )
 
+    private val prettifyOverrides = mapOf(
+        "gpt-5.6" to "GPT-5.6",
+        "gpt-5.3-codex-spark" to "GPT-5.3-Codex-Spark",
+    )
+
     private fun prettify(modelId: String): String {
         val cleaned = modelId.substringAfterLast('/')
+        prettifyOverrides[cleaned.lowercase()]?.let { return it }
         // 纯数字段之间的 '-' 视为版本号点（4-20 -> 4.20），右侧限 1~2 位（0309、8b 这类不算版本）
         val versionJoined = Regex("(?<=\\d)-(?=\\d\\d?(?!\\w))").replace(cleaned, ".")
         return versionJoined.split('-', '_').joinToString(" ") { part ->

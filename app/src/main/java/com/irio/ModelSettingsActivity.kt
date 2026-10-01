@@ -286,14 +286,31 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                         ProviderStore.saveMergeModels(context, it)
                     },
                 )
-                SettingsSwitchRow(
-                    label = tr("使用 Models.dev 命名"),
-                    checked = modelsDevCatalog,
-                    onCheckedChange = {
-                        modelsDevCatalog = it
-                        ProviderStore.saveModelsDevCatalog(context, it)
-                    },
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            tr("使用 OpenRouter 格式化模型名称"),
+                            modifier = Modifier.weight(1f),
+                            color = Theme[colors][onBackgroundColor],
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        ExperimentalBadge()
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = modelsDevCatalog,
+                        onCheckedChange = {
+                            modelsDevCatalog = it
+                            ProviderStore.saveModelsDevCatalog(context, it)
+                        },
+                    )
+                }
                 SettingsSwitchRow(
                     label = tr("使用 Models.dev 思考数据"),
                     checked = modelsDevReasoning,

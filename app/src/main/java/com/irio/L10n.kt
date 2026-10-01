@@ -202,7 +202,7 @@ private val English = mapOf(
     "高" to "High",
     "黑色" to "Black",
     "不支持思考" to "Thinking isn't supported",
-    "使用 Models.dev 命名" to "Use Models.dev names",
+    "使用 OpenRouter 格式化模型名称" to "Use OpenRouter-formatted model names",
     "使用 Models.dev 思考数据" to "Use Models.dev thinking data",
     "保存图片" to "Save image",
     "只能导入 .irio 格式的备份文件" to "Only .irio backup files can be imported",
