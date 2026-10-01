@@ -254,7 +254,7 @@ object ProviderStore {
     fun loadReasoningEffort(context: Context): ReasoningEffort {
         val saved = preferences(context).getString(REASONING_EFFORT, null)
         return saved?.let { runCatching { ReasoningEffort.valueOf(it) }.getOrNull() }
-            ?: ReasoningEffort.AUTO
+            ?: ReasoningEffort.OFF
     }
 
     fun saveReasoningEffort(context: Context, effort: ReasoningEffort) {

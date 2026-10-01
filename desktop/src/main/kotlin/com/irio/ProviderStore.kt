@@ -239,7 +239,7 @@ object ProviderStore {
     fun loadReasoningEffort(): ReasoningEffort {
         val saved = loadRoot().optString(REASONING_EFFORT).takeIf { it.isNotBlank() }
         return saved?.let { runCatching { ReasoningEffort.valueOf(it) }.getOrNull() }
-            ?: ReasoningEffort.AUTO
+            ?: ReasoningEffort.OFF
     }
 
     fun saveReasoningEffort(effort: ReasoningEffort) {
