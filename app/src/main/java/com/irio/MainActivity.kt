@@ -858,6 +858,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     }
 
     val processSheetOpen = processSheetState.targetDetent != BottomSheetDetent.Hidden
+    DismissComposerFocusWhenImeHides()
     NavigationBackHandler(
         viewingPhoto = viewingPhoto != null,
         processSheetOpen = processSheetOpen,
@@ -3147,6 +3148,30 @@ private fun splitSheetChunks(text: String): List<String> {
     }
     flush()
     return chunks
+}
+
+/**
+ * 导航栏下箭头、或被输入法自己吃掉的返回，都不会进 [NavigationBackHandler]，
+ * 消息框会一直保持聚焦。只在输入法从可见落到收起时清焦点；弹起和首帧不碰，
+ * 否则一点消息框键盘就会被立刻关掉。
+ */
+@Composable
+private fun DismissComposerFocusWhenImeHides() {
+    val focusManager by rememberUpdatedState(LocalFocusManager.current)
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    var imeWasVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(imeVisible) {
+        if (imeVisible) {
+            imeWasVisible = true
+            return@LaunchedEffect
+        }
+        if (!imeWasVisible) return@LaunchedEffect
+        // 动画过程中 inset 可能空一帧。等它稳定再清，否则聚焦消息框会立刻失焦。
+        delay(48)
+        focusManager.clearFocus(force = true)
+        imeWasVisible = false
+    }
 }
 
 @Composable
