@@ -123,6 +123,58 @@ class ChatApiOkHttpTest {
         assertTrue(!thirdInput.contains("alpha-phrase"))
     }
 
+    @Test
+    fun http2StreamResetBeforeTokensRetriesOnHttp1() = runBlocking {
+        server.enqueue(sse("hi"))
+        var attempts = 0
+        IrioHttp.resetForTests(
+            IrioHttp.defaultClient().newBuilder()
+                .addInterceptor { chain ->
+                    attempts++
+                    if (attempts == 1) throw java.io.IOException("stream was reset: PROTOCOL_ERROR")
+                    chain.proceed(chain.request())
+                }
+                .build(),
+        )
+        val provider = ProviderConfig(
+            id = "p", name = "t",
+            endpointUrl = server.url("/v1").toString().trimEnd('/'),
+            apiKey = "k",
+            protocol = ProviderProtocol.CHAT_COMPLETIONS,
+        )
+        val result = chat(provider, "conv-reset", "hello")
+        assertEquals(null, result.error)
+        assertEquals("hi", result.content)
+        assertEquals(2, attempts)
+        assertEquals(1, server.requestCount)
+        assertEquals(listOf(okhttp3.Protocol.HTTP_1_1), IrioHttp.clientFor("conv-reset").protocols)
+    }
+
+    @Test
+    fun otherIoFailureIsNotRetried() = runBlocking {
+        server.enqueue(sse("hi"))
+        var attempts = 0
+        IrioHttp.resetForTests(
+            IrioHttp.defaultClient().newBuilder()
+                .addInterceptor { chain ->
+                    attempts++
+                    if (attempts == 1) throw java.io.IOException("connection reset")
+                    chain.proceed(chain.request())
+                }
+                .build(),
+        )
+        val provider = ProviderConfig(
+            id = "p", name = "t",
+            endpointUrl = server.url("/v1").toString().trimEnd('/'),
+            apiKey = "k",
+            protocol = ProviderProtocol.CHAT_COMPLETIONS,
+        )
+        val result = chat(provider, "conv-reset", "hello")
+        assertEquals("connection reset", result.error)
+        assertEquals(1, attempts)
+        assertEquals(0, server.requestCount)
+    }
+
     private fun sse(text: String) = MockResponse()
         .setHeader("Content-Type", "text/event-stream")
         .setBody(

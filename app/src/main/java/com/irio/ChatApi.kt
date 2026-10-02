@@ -367,7 +367,20 @@ object ChatApi {
         connectionScope: String,
         cancellation: ChatRequestCancellation,
         onUpdate: suspend (ChatStreamUpdate) -> Unit,
+        http1Retried: Boolean = false,
     ): ChatCompletionResult {
+        var delivered = false
+        val publish: suspend (ChatStreamUpdate) -> Unit = { update ->
+            if (
+                update.delta.isNotEmpty() ||
+                update.thinkingDelta.isNotEmpty() ||
+                update.toolCallDeltas.isNotEmpty() ||
+                update.attachments.isNotEmpty()
+            ) {
+                delivered = true
+            }
+            onUpdate(update)
+        }
         val bodyBytes = requestBody(
             provider.protocol, model, messages, reasoningEffort, fastMode, systemPrompt, toolRegistry,
             conversationId = connectionScope,
@@ -450,7 +463,7 @@ object ChatApi {
                     if (shouldEnd) terminalUpdateSent = true
                     // 单轮 SSE 结束不等于整个请求结束：工具调用后还会继续下一轮。
                     // 只有没有已完成工具调用时，done 才能让 UI 进入最终完成态。
-                    onUpdate(
+                    publish(
                         update.copy(
                             model = update.model.ifBlank { responseModel },
                             done = update.done && completedToolCount == 0,
@@ -476,7 +489,7 @@ object ChatApi {
                     }
                 }
                 if (eventData.isNotEmpty()) flush()
-                if (!terminalUpdateSent) onUpdate(ChatStreamUpdate(done = true, model = responseModel, usage = lastUsage))
+                if (!terminalUpdateSent) publish(ChatStreamUpdate(done = true, model = responseModel, usage = lastUsage))
             }
             if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
             val completedTools = ChatProtocol.completedToolCalls(toolCalls)
@@ -515,6 +528,21 @@ object ChatApi {
         } catch (error: Exception) {
             if (cancellation.isCancelled() || currentCoroutineContext()[Job]?.isCancelled == true) {
                 ChatCompletionResult(stopped = true)
+            } else if (!http1Retried && !delivered && isHttp2StreamReset(error)) {
+                IrioHttp.downgradeToHttp1(connectionScope)
+                streamOnce(
+                    provider = provider,
+                    model = model,
+                    messages = messages,
+                    reasoningEffort = reasoningEffort,
+                    fastMode = fastMode,
+                    systemPrompt = systemPrompt,
+                    toolRegistry = toolRegistry,
+                    connectionScope = connectionScope,
+                    cancellation = cancellation,
+                    onUpdate = onUpdate,
+                    http1Retried = true,
+                )
             } else {
                 ChatCompletionResult(error = error.message ?: tr("无法连接到端点"))
             }
@@ -522,6 +550,15 @@ object ChatApi {
             cancellation.detach(call)
             response?.close()
         }
+    }
+
+    private fun isHttp2StreamReset(error: Throwable): Boolean {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current.message?.contains("stream was reset") == true) return true
+            current = current.cause
+        }
+        return false
     }
 
     private fun parseSse(

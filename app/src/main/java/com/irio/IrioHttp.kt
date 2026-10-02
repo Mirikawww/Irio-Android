@@ -3,6 +3,7 @@ package com.irio
 import okhttp3.ConnectionPool
 import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import java.security.KeyStore
 import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
@@ -31,6 +32,8 @@ internal object IrioHttp {
     private var baseClient: OkHttpClient = defaultClient()
 
     private val scoped = ConcurrentHashMap<String, OkHttpClient>()
+    private val http1Scopes = ConcurrentHashMap.newKeySet<String>()
+    @Volatile private var baseHttp1 = false
 
     // evictAll 会写 TLS close_notify。Android 主线程上做这件事会触发 NetworkOnMainThreadException。
     private val evictThread = Executors.newSingleThreadExecutor { runnable ->
@@ -49,17 +52,37 @@ internal object IrioHttp {
      */
     fun clientFor(scope: String): OkHttpClient {
         if (scope.isEmpty()) return baseClient
-        return scoped.computeIfAbsent(scope) { newScopeClient() }
+        val http1 = scope in http1Scopes
+        return scoped.computeIfAbsent(scope) { newScopeClient(http1) }
     }
 
-    private fun newScopeClient(): OkHttpClient {
+    /**
+     * 上游用 HTTP/2 RST_STREAM(PROTOCOL_ERROR) 掐掉还没吐出正文的流时，这条连接不能再复用。
+     * 下次 [clientFor] 只协商 HTTP/1.1。
+     */
+    fun downgradeToHttp1(scope: String) {
+        if (scope.isEmpty()) {
+            if (baseHttp1) return
+            baseHttp1 = true
+            val previous = baseClient
+            baseClient = previous.newBuilder().protocols(listOf(Protocol.HTTP_1_1)).build()
+            closeLater(listOf(previous))
+            return
+        }
+        if (!http1Scopes.add(scope)) return
+        val previous = scoped.remove(scope)
+        if (previous != null) closeLater(listOf(previous))
+    }
+
+    private fun newScopeClient(http1: Boolean): OkHttpClient {
         val trustManager = systemTrustManager()
         val sslContext = SSLContext.getInstance("TLS")
         sslContext.init(null, arrayOf<TrustManager>(trustManager), SecureRandom())
-        return baseClient.newBuilder()
+        val builder = baseClient.newBuilder()
             .connectionPool(ConnectionPool(IDLE_CONNECTIONS, KEEP_ALIVE_MINUTES, TimeUnit.MINUTES))
             .sslSocketFactory(sslContext.socketFactory, trustManager)
-            .build()
+        if (http1) builder.protocols(listOf(Protocol.HTTP_1_1))
+        return builder.build()
     }
 
     private fun systemTrustManager(): X509TrustManager {
@@ -95,6 +118,8 @@ internal object IrioHttp {
     }
 
     fun resetForTests(client: OkHttpClient = defaultClient()) {
+        http1Scopes.clear()
+        baseHttp1 = false
         val previous = scoped.values.toList()
         scoped.clear()
         previous.forEach { it.connectionPool.evictAll() }
