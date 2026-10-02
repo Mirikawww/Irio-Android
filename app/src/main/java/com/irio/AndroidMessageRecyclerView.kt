@@ -9,6 +9,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.viewinterop.AndroidView
@@ -93,6 +95,10 @@ internal fun AndroidMessageList(
 internal class MessageRecyclerController {
     private var recyclerView: MessageRecyclerView? = null
     private var scrollRequested = false
+        set(value) {
+            field = value
+            if (!value) recyclerView?.tailPrefetch = false
+        }
     private var alignScheduled = false
     private var chasing = false
     private var chasePosted = false
@@ -101,6 +107,9 @@ internal class MessageRecyclerController {
     private var glideClockStarted = false
     private var glideStartUptime = 0L
     private var glidePreviousProgress = 0f
+    private var glideDeferred = false
+    private var glideUnmeasuredWaits = 0
+    private var unlaidWaits = 0
     private var idleConfirms = 0
     private var programmaticPosts = 0
 
@@ -110,6 +119,7 @@ internal class MessageRecyclerController {
 
     fun requestScrollToBottom() {
         scrollRequested = true
+        recyclerView?.tailPrefetch = true
         flushScrollToBottom()
     }
 
@@ -122,6 +132,10 @@ internal class MessageRecyclerController {
         gliding = true
         glideClockStarted = false
         glidePreviousProgress = 0f
+        glideDeferred = false
+        glideUnmeasuredWaits = 0
+        unlaidWaits = 0
+        view.tailPrefetch = true
         programmaticPosts++
         try {
             view.stopScroll()
@@ -160,7 +174,7 @@ internal class MessageRecyclerController {
         alignScheduled = true
         view.post {
             alignScheduled = false
-            if (!scrollRequested) return@post
+            if (!scrollRequested || gliding) return@post
             val current = recyclerView ?: return@post
             if (current.scrollState != RecyclerView.SCROLL_STATE_IDLE) {
                 // 手指拖动或惯性还在走就丢掉这次。松手后如果仍贴底，effect 会再请求。
@@ -179,15 +193,13 @@ internal class MessageRecyclerController {
                 ?.findViewByPosition(count - 1)
             // 这一帖在本帧 layout 之前跑，底边还是旧高度。先等布局，再决定滚不滚。
             if (attempt == 0) {
-                if (child != null) current.requestLayout()
+                current.requestLayout()
                 scheduleAlign(attempt = 1)
                 return@post
             }
             if (child == null) {
-                scrollRequested = false
-                chasing = false
                 idleConfirms = 0
-                jumpToUnlaidTail(current, count)
+                bringUnlaidTail(current)
                 return@post
             }
             chasing = true
@@ -226,11 +238,10 @@ internal class MessageRecyclerController {
             return
         }
         val child = (current.layoutManager as? LinearLayoutManager)?.findViewByPosition(count - 1)
-        if (child == null) {
-            scrollRequested = false
-            chasing = false
+        val sample = current.tailSample()
+        if (child == null || !sample.ready) {
             idleConfirms = 0
-            jumpToUnlaidTail(current, count)
+            bringUnlaidTail(current)
             return
         }
         val catchUp = transcriptBottomCatchUpDelta(
@@ -305,12 +316,13 @@ internal class MessageRecyclerController {
     }
 
     /**
-     * 固定时长内滑到尾部。尾部还没铺开时用滚动范围估计剩余距离，
-     * 每帧按时间进度重测，所以远近都在同一段时间里到。
+     * 固定时长滑到已经量准的尾部。高度还没量准时不按滚动范围估，
+     * 免得滚过了再被拉回来。量准后先空一帧，再按真实超出像素走。
      */
     private fun stepGlide(current: MessageRecyclerView) {
         if (!gliding || !scrollRequested) {
             gliding = false
+            current.tailPrefetch = false
             return
         }
         if (current.scrollState != RecyclerView.SCROLL_STATE_IDLE) {
@@ -322,7 +334,48 @@ internal class MessageRecyclerController {
             postGlide()
             return
         }
+        current.tailPrefetch = true
+        val sample = current.tailSample()
+        val overflow = measuredTailOverflow(
+            itemCount = sample.itemCount,
+            lastVisibleIndex = sample.lastIndex,
+            lastSize = sample.lastSize,
+            lastEdge = sample.lastEdge,
+            viewportEnd = sample.viewportEnd,
+            measurementReady = sample.ready,
+        )
         if (!glideClockStarted) {
+            if (overflow == null) {
+                if (glideUnmeasuredWaits++ >= 24) {
+                    gliding = false
+                    scrollRequested = false
+                    return
+                }
+                scrollByProgrammatic(
+                    current,
+                    unmeasuredTailPrepareStep(
+                        itemCount = sample.itemCount,
+                        lastVisibleIndex = sample.lastIndex,
+                        lastSize = sample.lastSize,
+                        lastEdge = sample.lastEdge,
+                        viewportEnd = sample.viewportEnd,
+                        lastMeasuredIsTrustworthy = sample.ready,
+                    ),
+                )
+                current.requestLayout()
+                postGlide()
+                return
+            }
+            if (!glideDeferred) {
+                glideDeferred = true
+                postGlide()
+                return
+            }
+            if (overflow == 0) {
+                gliding = false
+                scrollRequested = false
+                return
+            }
             glideClockStarted = true
             glideStartUptime = SystemClock.uptimeMillis()
             glidePreviousProgress = 0f
@@ -332,64 +385,87 @@ internal class MessageRecyclerController {
         val elapsed = SystemClock.uptimeMillis() - glideStartUptime
         val t = (elapsed.toFloat() / SendScrollDurationMillis).coerceIn(0f, 1f)
         val progress = sendScrollEase(t)
-        val remaining = distanceToBottom(current)
-        val step = fixedDurationScrollStep(remaining, glidePreviousProgress, progress)
+        val step = fixedDurationScrollStep(overflow ?: 0, glidePreviousProgress, progress)
         glidePreviousProgress = progress
-        if (step > 0) {
-            programmaticPosts++
-            try {
-                current.scrollBy(0, step)
-            } finally {
-                programmaticPosts--
-            }
-        }
+        scrollByProgrammatic(current, step)
         if (t < 1f) {
             postGlide()
             return
         }
-        val rest = distanceToBottom(current)
-        if (rest > 0) {
-            programmaticPosts++
-            try {
-                current.scrollBy(0, rest)
-            } finally {
-                programmaticPosts--
-            }
-        }
+        val restSample = current.tailSample()
+        val rest = measuredTailOverflow(
+            itemCount = restSample.itemCount,
+            lastVisibleIndex = restSample.lastIndex,
+            lastSize = restSample.lastSize,
+            lastEdge = restSample.lastEdge,
+            viewportEnd = restSample.viewportEnd,
+            measurementReady = restSample.ready,
+        ) ?: 0
+        scrollByProgrammatic(current, rest)
         gliding = false
         scrollRequested = false
     }
 
-    private fun distanceToBottom(view: MessageRecyclerView): Int {
-        val count = view.itemCountValue()
-        if (count <= 0) return 0
-        val child = (view.layoutManager as? LinearLayoutManager)?.findViewByPosition(count - 1)
-        if (child != null) {
-            return (child.bottom - (view.height - view.paddingBottom)).coerceAtLeast(0)
-        }
-        val estimated = view.computeVerticalScrollRange() -
-            view.computeVerticalScrollOffset() -
-            view.computeVerticalScrollExtent()
-        if (estimated > 0) return estimated
-        return (view.height - view.paddingTop - view.paddingBottom).coerceAtLeast(1)
-    }
-
-    private fun jumpToUnlaidTail(view: MessageRecyclerView, count: Int) {
+    private fun scrollByProgrammatic(view: MessageRecyclerView, dy: Int) {
+        if (dy <= 0) return
         programmaticPosts++
         try {
-            view.scrollToPosition(count - 1)
-            programmaticPosts++
-            view.post {
-                try {
-                    val laidOut = view.layoutManager?.findViewByPosition(count - 1) ?: return@post
-                    val overflow = laidOut.bottom - (view.height - view.paddingBottom)
-                    if (overflow != 0) view.scrollBy(0, overflow)
-                } finally {
-                    programmaticPosts--
-                }
-            }
+            view.scrollBy(0, dy)
         } finally {
             programmaticPosts--
+        }
+    }
+
+    /**
+     * 新尾部还没量准时不要按滚动范围滚。视图还不可信就等着；
+     * 已经量准的只滚真实超出像素。scrollToPosition 会把最后一项锚到视口顶上。
+     */
+    private fun bringUnlaidTail(view: MessageRecyclerView) {
+        if (gliding) return
+        view.tailPrefetch = true
+        val sample = view.tailSample()
+        val overflow = measuredTailOverflow(
+            itemCount = sample.itemCount,
+            lastVisibleIndex = sample.lastIndex,
+            lastSize = sample.lastSize,
+            lastEdge = sample.lastEdge,
+            viewportEnd = sample.viewportEnd,
+            measurementReady = sample.ready,
+        )
+        if (overflow != null) {
+            if (overflow <= 0) {
+                scrollRequested = false
+                chasing = false
+                return
+            }
+            unlaidWaits = 0
+            scrollByProgrammatic(view, smoothFollowStep(overflow))
+            scrollRequested = true
+            chasing = true
+            postChase()
+            return
+        }
+        if (unlaidWaits++ >= 24) {
+            unlaidWaits = 0
+            scrollRequested = false
+            chasing = false
+            return
+        }
+        scrollByProgrammatic(
+            view,
+            unmeasuredTailPrepareStep(
+                itemCount = sample.itemCount,
+                lastVisibleIndex = sample.lastIndex,
+                lastSize = sample.lastSize,
+                lastEdge = sample.lastEdge,
+                viewportEnd = sample.viewportEnd,
+                lastMeasuredIsTrustworthy = sample.ready,
+            ),
+        )
+        view.requestLayout()
+        view.postOnAnimation {
+            if (recyclerView !== view || gliding) return@postOnAnimation
+            bringUnlaidTail(view)
         }
     }
 
@@ -420,11 +496,25 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
     var onVisibleRangeChanged: ((first: Int, last: Int) -> Unit)? = null
     var onScrollStateChanged: ((scrollState: Int) -> Unit)? = null
     var onUserScrollSample: (() -> Unit)? = null
+    var tailPrefetch: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+        }
     private var lastNotifiedFirst = RecyclerView.NO_POSITION
     private var lastNotifiedLast = RecyclerView.NO_POSITION
 
     init {
-        layoutManager = LinearLayoutManager(context).apply {
+        layoutManager = object : LinearLayoutManager(context) {
+            override fun calculateExtraLayoutSpace(state: RecyclerView.State, extraLayoutSpace: IntArray) {
+                super.calculateExtraLayoutSpace(state, extraLayoutSpace)
+                if (tailPrefetch) {
+                    val extra = this@MessageRecyclerView.height
+                    if (extra > 0) extraLayoutSpace[1] = maxOf(extraLayoutSpace[1], extra)
+                }
+            }
+        }.apply {
             stackFromEnd = false
         }
         adapter = messageAdapter
@@ -473,6 +563,45 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
 
     fun isMessageUpdatePending(): Boolean = messageAdapter.isUpdatePending()
 
+    fun tailSample(): TailSample {
+        val count = itemCountValue()
+        val viewportEnd = height - paddingBottom
+        if (count <= 0) return TailSample(0, -1, 0, 0, viewportEnd, true)
+        val manager = layoutManager as? LinearLayoutManager
+            ?: return TailSample(count, -1, 0, 0, viewportEnd, false)
+        val tail = manager.findViewByPosition(count - 1)
+        if (tail == null) {
+            val position = manager.findLastVisibleItemPosition()
+            if (position == RecyclerView.NO_POSITION) {
+                return TailSample(count, -1, 0, 0, viewportEnd, false)
+            }
+            val child = manager.findViewByPosition(position)
+                ?: return TailSample(count, -1, 0, 0, viewportEnd, false)
+            return TailSample(
+                count,
+                position,
+                child.height,
+                child.bottom,
+                viewportEnd,
+                childIsReady(child, position),
+            )
+        }
+        val ready = childIsReady(tail, count - 1) && neighborReady(count - 2)
+        return TailSample(count, count - 1, tail.height, tail.bottom, viewportEnd, ready)
+    }
+
+    private fun neighborReady(position: Int): Boolean {
+        if (position < 0) return true
+        val child = (layoutManager as? LinearLayoutManager)?.findViewByPosition(position) ?: return true
+        return childIsReady(child, position)
+    }
+
+    private fun childIsReady(child: View, position: Int): Boolean {
+        val holder = getChildViewHolder(child) as? AndroidMessageViewHolder ?: return false
+        val id = adapter?.getItemId(position) ?: return false
+        return holder.readyMessageId == id && child.height > 0
+    }
+
     fun itemCountValue(): Int = messageAdapter.itemCount
 
     fun setTranscriptPadding(top: Int, bottom: Int) {
@@ -494,6 +623,15 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
         }
     }
 }
+
+internal data class TailSample(
+    val itemCount: Int,
+    val lastIndex: Int,
+    val lastSize: Int,
+    val lastEdge: Int,
+    val viewportEnd: Int,
+    val ready: Boolean,
+)
 
 private class VerticalMessageSpacing(
     context: Context,
@@ -604,6 +742,8 @@ private class AndroidMessageViewHolder(
     private val callbacks: androidx.compose.runtime.MutableState<AndroidMessageCallbacks?>,
 ) : RecyclerView.ViewHolder(composeView) {
     private var message by mutableStateOf<ChatMessage?>(null)
+    var readyMessageId: Long = Long.MIN_VALUE
+        private set
 
     init {
         composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
@@ -611,17 +751,28 @@ private class AndroidMessageViewHolder(
             val currentMessage = message
             val currentCallbacks = callbacks.value
             if (currentMessage != null && currentCallbacks != null) {
-                AndroidMessageRow(currentMessage, currentCallbacks)
+                Box(
+                    Modifier.onSizeChanged { size ->
+                        val shown = message
+                        if (size.height > 0 && shown?.id == currentMessage.id) {
+                            readyMessageId = shown.id
+                        }
+                    },
+                ) {
+                    AndroidMessageRow(currentMessage, currentCallbacks)
+                }
             }
         }
     }
 
     fun bind(nextMessage: ChatMessage) {
+        if (message?.id != nextMessage.id) readyMessageId = Long.MIN_VALUE
         message = nextMessage
     }
 
     fun clear() {
         message = null
+        readyMessageId = Long.MIN_VALUE
     }
 }
 

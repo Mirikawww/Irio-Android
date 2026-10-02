@@ -788,7 +788,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             return@LaunchedEffect
         }
         if (force) stickToBottom = true
-        if (scrollToNewMessage) {
+        // 贴底发送要滑过去。新行还没排进屏幕时 scrollToPosition 会先锚到视口顶上，列表就抽一下。
+        if (justSent && stickToBottom) {
             messageRecyclerController.revealTail()
         } else {
             messageRecyclerController.requestScrollToBottom()

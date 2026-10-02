@@ -596,7 +596,8 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             return@LaunchedEffect
         }
         if (force) stickToBottom = true
-        if (scrollToNewMessage) {
+        // 贴底发送要滑过去。新行还没排进屏幕时 scrollToItem 会先锚到视口顶上，列表就抽一下。
+        if (justSent && stickToBottom) {
             transcriptFollowJob.job?.cancel()
             transcriptFollowJob.job = scope.launch {
                 glideTranscriptToBottom(
@@ -608,7 +609,8 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                             force = false,
                         )
                     },
-                    remainingPx = { lazyDistanceToBottom(listState) },
+                    remainingPx = { lazyMeasuredTailOverflow(listState) },
+                    preparePx = { lazyUnmeasuredTailPrepareStep(listState) },
                     scrollByPx = { step ->
                         listState.scroll { scrollBy(step.toFloat()) }
                     },
@@ -617,8 +619,8 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             seenTranscriptTailId = last.id
             return@LaunchedEffect
         }
-        // 等这一帧把长高的尾部量完再决定滚多少。已经贴住底边就不要滚：
-        // scrollToItem(Int.MAX_VALUE) 会把最后一项重新锚到视口起点，下一帧拉回来，就是抽一下。
+        // 等这一帧把长高的尾部量完再决定滚多少。已经贴住底边就不要滚。
+        // 尾部还没进布局时按估算距离逐帧走，不要 scrollToItem：那会先锚到视口顶上再拉回来。
         withFrameNanos { }
         if (!shouldSnapTranscriptToBottom(
                 stickToBottom = stickToBottom,
@@ -638,22 +640,16 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             lastEdge = lastVisible?.let { it.offset + it.size } ?: 0,
             viewportEnd = info.viewportEndOffset,
         )
-        if (catchUp == null) {
-            if (transcriptFollowJob.job?.isActive == true) {
-                seenTranscriptTailId = last.id
-                return@LaunchedEffect
-            }
+        if (catchUp == null && transcriptFollowJob.job?.isActive == true) {
+            seenTranscriptTailId = last.id
+            return@LaunchedEffect
+        }
+        if ((catchUp == null || catchUp > 0) && transcriptFollowJob.job?.isActive != true) {
             transcriptFollowJob.job?.cancel()
-            transcriptScrollGate.depth++
-            try {
-                listState.scrollToItem(visibleTranscript.lastIndex, Int.MAX_VALUE)
-            } finally {
-                transcriptScrollGate.depth--
-            }
-        } else if (catchUp > 0 && transcriptFollowJob.job?.isActive != true) {
             transcriptFollowJob.job = scope.launch {
                 var idleConfirm = false
                 var stuck = false
+                var unlaidFrames = 0
                 while (isActive) {
                     if (!shouldSnapTranscriptToBottom(
                             stickToBottom = stickToBottomState.value,
@@ -672,12 +668,32 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         viewportEnd = layout.viewportEndOffset,
                     )
                     when {
-                        remaining == null || remaining <= 0 -> {
-                            if (idleConfirm || remaining == null) break
+                        remaining == null -> {
+                            if (unlaidFrames++ >= 24) break
+                            val step = lazyUnmeasuredTailPrepareStep(listState)
+                            if (step <= 0) break
+                            var consumed = 0f
+                            transcriptScrollGate.depth++
+                            try {
+                                listState.scroll { consumed = scrollBy(step.toFloat()) }
+                            } finally {
+                                transcriptScrollGate.depth--
+                            }
+                            if (consumed == 0f) {
+                                if (stuck) break
+                                stuck = true
+                            } else {
+                                stuck = false
+                            }
+                            withFrameNanos { }
+                        }
+                        remaining <= 0 -> {
+                            if (idleConfirm) break
                             idleConfirm = true
                             withFrameNanos { }
                         }
                         else -> {
+                            unlaidFrames = 0
                             idleConfirm = false
                             val step = smoothFollowStep(remaining)
                             var consumed = 0f

@@ -147,4 +147,22 @@ class TranscriptFollowTest {
         assertTrue(halfway > 10_000)
         assertTrue(halfway < 20_000)
     }
+
+    @Test
+    fun sendScrollsOnlyAMeasuredTail() {
+        assertNull(measuredTailOverflow(4, 2, 80, 180, 100, measurementReady = true))
+        assertNull(measuredTailOverflow(4, 3, 800, 900, 100, measurementReady = false))
+        assertNull(measuredTailOverflow(4, 3, 0, 100, 100, measurementReady = true))
+        assertEquals(80, measuredTailOverflow(4, 3, 120, 180, 100, measurementReady = true))
+        assertEquals(0, measuredTailOverflow(4, 3, 40, 90, 100, measurementReady = true))
+    }
+
+    @Test
+    fun unmeasuredTailDoesNotScrollAStaleOrEstimatedHeight() {
+        assertEquals(0, unmeasuredTailPrepareStep(4, 3, 800, 900, 100, lastMeasuredIsTrustworthy = false))
+        assertEquals(1, unmeasuredTailPrepareStep(4, 2, 400, 100, 100, lastMeasuredIsTrustworthy = false))
+        assertEquals(1, unmeasuredTailPrepareStep(4, 2, 40, 100, 100, lastMeasuredIsTrustworthy = true))
+        val step = unmeasuredTailPrepareStep(4, 2, 400, 500, 100, lastMeasuredIsTrustworthy = true)
+        assertTrue(step in 1..96)
+    }
 }

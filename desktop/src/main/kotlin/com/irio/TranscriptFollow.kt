@@ -52,24 +52,30 @@ internal fun transcriptViewportPinned(
     return lastEdge <= viewportEnd + slackPx
 }
 
-internal fun lazyDistanceToBottom(state: LazyListState): Int {
+internal fun lazyMeasuredTailOverflow(state: LazyListState): Int? {
     val info = state.layoutInfo
-    val count = info.totalItemsCount
-    if (count <= 0) return 0
     val last = info.visibleItemsInfo.lastOrNull()
-    val catchUp = transcriptBottomCatchUpDelta(
-        itemCount = count,
+    return measuredTailOverflow(
+        itemCount = info.totalItemsCount,
         lastVisibleIndex = last?.index ?: -1,
+        lastSize = last?.size ?: 0,
         lastEdge = last?.let { it.offset + it.size } ?: 0,
         viewportEnd = info.viewportEndOffset,
+        measurementReady = true,
     )
-    if (catchUp != null) return catchUp
-    if (last == null || info.visibleItemsInfo.isEmpty()) {
-        return (info.viewportEndOffset - info.viewportStartOffset).coerceAtLeast(1)
-    }
-    val average = info.visibleItemsInfo.sumOf { it.size } / info.visibleItemsInfo.size
-    val itemsBelow = count - 1 - last.index
-    return (itemsBelow * average.coerceAtLeast(1)).coerceAtLeast(1)
+}
+
+internal fun lazyUnmeasuredTailPrepareStep(state: LazyListState): Int {
+    val info = state.layoutInfo
+    val last = info.visibleItemsInfo.lastOrNull()
+    return unmeasuredTailPrepareStep(
+        itemCount = info.totalItemsCount,
+        lastVisibleIndex = last?.index ?: -1,
+        lastSize = last?.size ?: 0,
+        lastEdge = last?.let { it.offset + it.size } ?: 0,
+        viewportEnd = info.viewportEndOffset,
+        lastMeasuredIsTrustworthy = last != null && last.size > 0,
+    )
 }
 
 internal fun lazyTranscriptPinnedToBottom(state: LazyListState, slackPx: Int): Boolean? {
@@ -89,7 +95,7 @@ internal fun lazyTranscriptPinnedToBottom(state: LazyListState, slackPx: Int): B
  * 最后一项已经在布局里时，只补它超出视口底边的像素。
  * 正数才往下滚；0 表示已经贴住或还在底边之上（继续往下拉也算），不要再滚。
  * 已经贴底时 scrollToItem(Int.MAX_VALUE) / scrollToPosition 会把最后一项重新锚到视口起点，
- * 下一帧再拉回来，就是抽一下。最后一项还没进布局时返回 null，那时才跳过去。
+ * 下一帧再拉回来，就是抽一下。最后一项还没量准时返回 null，不要改用滚动范围或平均行高去滚。
  */
 internal fun transcriptBottomCatchUpDelta(
     itemCount: Int,
@@ -112,6 +118,45 @@ internal fun smoothFollowStep(
     if (remainingPx <= 0 || fraction <= 0f || maxStepPx <= 0) return 0
     val scaled = (remainingPx * fraction).toInt().coerceAtLeast(1)
     return scaled.coerceAtMost(maxStepPx).coerceAtMost(remainingPx)
+}
+
+/**
+ * 尾部这一项已经用当前内容量完时，返回它超出视口底边的像素。
+ * 0 表示已经贴住。还没量到（不在布局里、高度为 0、或还是回收来的旧高度）返回 null。
+ * 不要改用滚动范围或平均行高：那两个数和新气泡的真高对不上，滚完会被拉回来。
+ */
+internal fun measuredTailOverflow(
+    itemCount: Int,
+    lastVisibleIndex: Int,
+    lastSize: Int,
+    lastEdge: Int,
+    viewportEnd: Int,
+    measurementReady: Boolean,
+): Int? {
+    if (itemCount <= 0) return 0
+    if (!measurementReady || lastVisibleIndex != itemCount - 1 || lastSize <= 0) return null
+    return (lastEdge - viewportEnd).coerceAtLeast(0)
+}
+
+/**
+ * 尾部还没量到时，这一帧可以安全滚动的像素。
+ * 尾部视图已经在了但高度还不可信：别动，等这一帧的内容量完。
+ * 还没排到尾部时，只滚已经量准的最后一项超出底边的一段；它已经贴住就只探 1px，把下一项排进来。
+ * 高度不可信时也只探 1px，不要按回收行的旧高度滚。
+ */
+internal fun unmeasuredTailPrepareStep(
+    itemCount: Int,
+    lastVisibleIndex: Int,
+    lastSize: Int,
+    lastEdge: Int,
+    viewportEnd: Int,
+    lastMeasuredIsTrustworthy: Boolean,
+): Int {
+    if (itemCount <= 0) return 0
+    if (lastVisibleIndex >= itemCount - 1 && lastVisibleIndex >= 0) return 0
+    if (lastVisibleIndex < 0 || lastSize <= 0 || !lastMeasuredIsTrustworthy) return 1
+    val overflow = lastEdge - viewportEnd
+    return if (overflow > 0) smoothFollowStep(overflow) else 1
 }
 
 /**
@@ -187,28 +232,53 @@ internal fun fixedDurationScrollStep(remainingPx: Int, previousProgress: Float, 
 }
 
 /**
- * 固定时长滑到当前尾部。每帧按时间进度吃掉当时的剩余距离，
- * 远近都在 [durationMillis] 内到；到点后若布局又长出一截，再补一次。
+ * 固定时长滑到已经量准的尾部。尾部还没量到时只走 [preparePx] 的安全距离，时钟先不开，
+ * 避免把估算高度滚出去再被拉回来。量准后再空一帧，躲开回收行刚报上来的旧高度。
+ * 到点后若布局又长出一截，再补一次真实剩余。
  */
 internal suspend fun glideTranscriptToBottom(
     durationMillis: Int = SendScrollDurationMillis,
     gate: TranscriptScrollGate,
     follow: () -> Boolean,
-    remainingPx: () -> Int,
+    remainingPx: () -> Int?,
+    preparePx: () -> Int = { 1 },
     scrollByPx: suspend (Int) -> Unit,
 ) {
     var previous = 0f
     var clockStart = 0L
+    var deferred = false
+    var waits = 0
     while (follow()) {
         val frame = withFrameNanos { it }
+        val remaining = remainingPx()
         if (clockStart == 0L) {
+            if (remaining == null) {
+                deferred = false
+                if (++waits > 24) return
+                val step = preparePx()
+                if (step > 0) {
+                    gate.depth++
+                    try {
+                        scrollByPx(step)
+                    } finally {
+                        gate.depth--
+                    }
+                }
+                continue
+            }
+            waits = 0
+            if (!deferred) {
+                deferred = true
+                continue
+            }
+            if (remaining == 0) return
             clockStart = frame
             continue
         }
         val elapsedMs = (frame - clockStart) / 1_000_000f
         val t = (elapsedMs / durationMillis).coerceIn(0f, 1f)
         val progress = sendScrollEase(t)
-        val step = fixedDurationScrollStep(remainingPx(), previous, progress)
+        val step = fixedDurationScrollStep(remaining ?: 0, previous, progress)
         previous = progress
         if (step > 0) {
             gate.depth++
@@ -219,7 +289,7 @@ internal suspend fun glideTranscriptToBottom(
             }
         }
         if (t >= 1f) {
-            val rest = remainingPx()
+            val rest = remainingPx() ?: 0
             if (rest > 0) {
                 gate.depth++
                 try {

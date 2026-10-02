@@ -69,7 +69,7 @@ internal fun lazyTranscriptPinnedToBottom(state: LazyListState, slackPx: Int): B
  * 最后一项已经在布局里时，只补它超出视口底边的像素。
  * 正数才往下滚；0 表示已经贴住或还在底边之上（继续往下拉也算），不要再滚。
  * 已经贴底时 scrollToItem(Int.MAX_VALUE) / scrollToPosition 会把最后一项重新锚到视口起点，
- * 下一帧再拉回来，就是抽一下。最后一项还没进布局时返回 null，那时才跳过去。
+ * 下一帧再拉回来，就是抽一下。最后一项还没量准时返回 null，不要改用滚动范围或平均行高去滚。
  */
 internal fun transcriptBottomCatchUpDelta(
     itemCount: Int,
@@ -92,6 +92,45 @@ internal fun smoothFollowStep(
     if (remainingPx <= 0 || fraction <= 0f || maxStepPx <= 0) return 0
     val scaled = (remainingPx * fraction).toInt().coerceAtLeast(1)
     return scaled.coerceAtMost(maxStepPx).coerceAtMost(remainingPx)
+}
+
+/**
+ * 尾部这一项已经用当前内容量完时，返回它超出视口底边的像素。
+ * 0 表示已经贴住。还没量到（不在布局里、高度为 0、或还是回收来的旧高度）返回 null。
+ * 不要改用滚动范围或平均行高：那两个数和新气泡的真高对不上，滚完会被拉回来。
+ */
+internal fun measuredTailOverflow(
+    itemCount: Int,
+    lastVisibleIndex: Int,
+    lastSize: Int,
+    lastEdge: Int,
+    viewportEnd: Int,
+    measurementReady: Boolean,
+): Int? {
+    if (itemCount <= 0) return 0
+    if (!measurementReady || lastVisibleIndex != itemCount - 1 || lastSize <= 0) return null
+    return (lastEdge - viewportEnd).coerceAtLeast(0)
+}
+
+/**
+ * 尾部还没量到时，这一帧可以安全滚动的像素。
+ * 尾部视图已经在了但高度还不可信：别动，等这一帧的内容量完。
+ * 还没排到尾部时，只滚已经量准的最后一项超出底边的一段；它已经贴住就只探 1px，把下一项排进来。
+ * 高度不可信时也只探 1px，不要按回收行的旧高度滚。
+ */
+internal fun unmeasuredTailPrepareStep(
+    itemCount: Int,
+    lastVisibleIndex: Int,
+    lastSize: Int,
+    lastEdge: Int,
+    viewportEnd: Int,
+    lastMeasuredIsTrustworthy: Boolean,
+): Int {
+    if (itemCount <= 0) return 0
+    if (lastVisibleIndex >= itemCount - 1 && lastVisibleIndex >= 0) return 0
+    if (lastVisibleIndex < 0 || lastSize <= 0 || !lastMeasuredIsTrustworthy) return 1
+    val overflow = lastEdge - viewportEnd
+    return if (overflow > 0) smoothFollowStep(overflow) else 1
 }
 
 /**
