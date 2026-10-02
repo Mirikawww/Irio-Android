@@ -1521,7 +1521,17 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         return VersionInfo(index + 1, versions.size)
     }
 
-    val messageCallbacks = AndroidMessageCallbacks(
+    // 模型选单开关会重组这一页。callbacks 若每次都是新对象，可见消息行会全部重绘，
+    // 毛玻璃源跟着失效。只在行上真能看见的状态变化时才换一份。
+    val editAnchorId = visibleTranscript.lastOrNull { it.fromUser }?.id
+    val messageCallbacks = remember(
+        newUserMessageId,
+        editingMessageId,
+        editAnchorId,
+        retryGroups,
+        editGroups,
+    ) {
+        AndroidMessageCallbacks(
         markdownScope = scope,
         onOpenProcess = { messageId, event ->
             processSheetMessageId = messageId
@@ -1564,9 +1574,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         versionInfo = ::retryVersionInfo,
         editVersionInfo = ::editVersionInfo,
         newUserMessageId = newUserMessageId,
-
-
-    )
+        )
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -2358,45 +2367,50 @@ private fun ModelPicker(
                     }
                 }
                 DropdownMenuPanel(modifier = Modifier.width(200.dp)) {
-                    AndroidComposeRecyclerList(
-                        items = rows,
-                        key = { it.key },
+                    // 面板会做 IntrinsicSize.Max：LazyColumn 会崩。逐行 ComposeView 又会在
+                    // 展开那一帧建起来，把 120ms 的缩放动画吃掉。这里只要一棵可滚动 Column。
+                    Column(
                         modifier = Modifier
                             .width(200.dp)
-                            .heightIn(max = 600.dp),
+                            .heightIn(max = 600.dp)
+                            .verticalScroll(rememberScrollState()),
                     ) {
-                        when (val row = it) {
-                            is ModelPickerRow.Gap -> Spacer(Modifier.height(10.dp))
-                            is ModelPickerRow.GroupLabel -> Text(
-                                // 提供商分组小字：与下方条目文本左对齐，与上一组之间留出空隙
-                                row.text,
-                                modifier = Modifier
-                                    .padding(start = 36.dp)
-                                    .padding(top = 6.dp, bottom = 2.dp),
-                                color = Theme[colors][mutedColor],
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            is ModelPickerRow.Model -> {
-                                val active = row.providerId == activeProviderId && selectedModel in row.variants
-                                DropdownMenuItem(
-                                    onClick = { onSelectedModelChange(row.target, row.providerId) },
-                                    leading = {
-                                        if (active) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        } else {
-                                            Spacer(Modifier.size(16.dp))
-                                        }
-                                    },
-                                ) {
-                                    Text(
-                                        row.display,
-                                        fontSize = 15.5.sp,
+                        rows.forEach { row ->
+                            key(row.key) {
+                                when (row) {
+                                    is ModelPickerRow.Gap -> Spacer(Modifier.height(10.dp))
+                                    is ModelPickerRow.GroupLabel -> Text(
+                                        // 提供商分组小字：与下方条目文本左对齐，与上一组之间留出空隙
+                                        row.text,
+                                        modifier = Modifier
+                                            .padding(start = 36.dp)
+                                            .padding(top = 6.dp, bottom = 2.dp),
+                                        color = Theme[colors][mutedColor],
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
                                     )
+                                    is ModelPickerRow.Model -> {
+                                        val active = row.providerId == activeProviderId && selectedModel in row.variants
+                                        DropdownMenuItem(
+                                            onClick = { onSelectedModelChange(row.target, row.providerId) },
+                                            leading = {
+                                                if (active) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.Check,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(16.dp),
+                                                    )
+                                                } else {
+                                                    Spacer(Modifier.size(16.dp))
+                                                }
+                                            },
+                                        ) {
+                                            Text(
+                                                row.display,
+                                                fontSize = 15.5.sp,
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

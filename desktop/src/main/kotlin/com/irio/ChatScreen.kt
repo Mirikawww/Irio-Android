@@ -2114,51 +2114,45 @@ private fun ModelPicker(
                     }
                 }
                 DropdownMenuPanel(modifier = Modifier.width(200.dp)) {
-                    LazyColumn(
+                    // 面板会做 IntrinsicSize.Max，LazyColumn 在展开时直接崩。一棵可滚动 Column 即可。
+                    Column(
                         modifier = Modifier
                             .width(200.dp)
                             .heightIn(max = 600.dp)
+                            .verticalScroll(rememberScrollState()),
                     ) {
-                        items(
-                            count = rows.size,
-                            key = { rows[it].key },
-                            contentType = { index ->
-                                when (rows[index]) {
-                                    is ModelPickerRow.Gap -> "gap"
-                                    is ModelPickerRow.GroupLabel -> "label"
-                                    is ModelPickerRow.Model -> "model"
-                                }
-                            },
-                        ) { index ->
-                            when (val row = rows[index]) {
-                                is ModelPickerRow.Gap -> Spacer(Modifier.height(10.dp))
-                                is ModelPickerRow.GroupLabel -> Text(
-                                    // 提供商分组小字：与下方条目文本左对齐，与上一组之间留出空隙
-                                    row.text,
-                                    modifier = Modifier
-                                        .padding(start = 36.dp)
-                                        .padding(top = 6.dp, bottom = 2.dp),
-                                    color = Theme[colors][mutedColor],
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                is ModelPickerRow.Model -> {
-                                    val active = row.providerId == activeProviderId && selectedModel in row.variants
-                                    DropdownMenuItem(
-                                        onClick = { onSelectedModelChange(row.target, row.providerId) },
-                                        leading = {
-                                            if (active) {
-                                                Icon(
-                                                    imageVector = Icons.Rounded.Check,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(16.dp),
-                                                )
-                                            } else {
-                                                Spacer(Modifier.size(16.dp))
-                                            }
-                                        },
-                                    ) {
-                                        Text(row.display)
+                        rows.forEach { row ->
+                            key(row.key) {
+                                when (row) {
+                                    is ModelPickerRow.Gap -> Spacer(Modifier.height(10.dp))
+                                    is ModelPickerRow.GroupLabel -> Text(
+                                        // 提供商分组小字：与下方条目文本左对齐，与上一组之间留出空隙
+                                        row.text,
+                                        modifier = Modifier
+                                            .padding(start = 36.dp)
+                                            .padding(top = 6.dp, bottom = 2.dp),
+                                        color = Theme[colors][mutedColor],
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    is ModelPickerRow.Model -> {
+                                        val active = row.providerId == activeProviderId && selectedModel in row.variants
+                                        DropdownMenuItem(
+                                            onClick = { onSelectedModelChange(row.target, row.providerId) },
+                                            leading = {
+                                                if (active) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.Check,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(16.dp),
+                                                    )
+                                                } else {
+                                                    Spacer(Modifier.size(16.dp))
+                                                }
+                                            },
+                                        ) {
+                                            Text(row.display)
+                                        }
                                     }
                                 }
                             }
