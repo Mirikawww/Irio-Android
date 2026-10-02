@@ -17,7 +17,7 @@ import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.primaryColor
 import com.composeunstyled.theme.Theme
 
-/** 只读进度环：用量来自接口 usage，窗口来自 models.dev `limit.context`。暂不可点。 */
+/** 只读进度环：用量来自接口 usage，窗口来自 OpenRouter `context_length`。暂不可点。 */
 @Composable
 fun ContextUsageRing(
     usedTokens: Int,

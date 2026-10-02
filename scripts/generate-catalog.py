@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Regenerate app assets and Windows desktop resources.
+
+Names and context windows come from OpenRouter /api/v1/models
+(`name`, model-level `context_length` — not `top_provider.context_length`).
+Reasoning and image flags still come from https://models.dev/api.json.
 Run from the Irio repo root."""
 import json, urllib.request
 
@@ -48,30 +52,35 @@ for provider in data.values():
             image.setdefault(mid, True)
             if tail != mid:
                 image.setdefault(tail, True)
-        lim = m.get("limit")
-        window = lim.get("context") if isinstance(lim, dict) else None
-        if isinstance(window, (int, float)) and window > 0:
-            value = int(window)
-            prev = context.get(mid)
-            if prev is None or value > prev:
-                context[mid] = value
-            if tail != mid:
-                prev_tail = context.get(tail)
-                if prev_tail is None or value > prev_tail:
-                    context[tail] = value
 
-# OpenRouter 的 name 是模型显示名的来源；去掉其 provider 前缀，保留官方 GPT 连字符写法。
-# OpenRouter 未收录的 OpenAI Responses compact 别名由下方人工映射补充。
+# OpenRouter 的 name / context_length 是显示名和上下文窗口的来源。
+# 去掉 name 的 provider 前缀。窗口用模型级 context_length，不用 top_provider。
+# OpenRouter 未收录的别名只在下方补显示名，不编造窗口。
 for model in openrouter_data.get("data", []):
     if not isinstance(model, dict):
         continue
     mid, name = model.get("id"), model.get("name")
-    if not isinstance(mid, str) or not isinstance(name, str) or not name:
+    if not isinstance(mid, str) or not mid:
         continue
-    display = name.split(": ", 1)[-1]
-    names[mid] = display
     tail = mid.split("/")[-1]
-    names[tail] = display
+    if isinstance(name, str) and name:
+        display = name.split(": ", 1)[-1]
+        names[mid] = display
+        names[tail] = display
+    window = model.get("context_length")
+    if isinstance(window, (int, float)) and not isinstance(window, bool) and window > 0:
+        context[mid] = int(window)
+
+# 裸 id 只在它本身不是另一条 OpenRouter 模型时写入；同一尾段取较大窗口。
+tails = {}
+for mid, value in context.items():
+    tail = mid.split("/")[-1]
+    if tail == mid or tail in context:
+        continue
+    prev = tails.get(tail)
+    if prev is None or value > prev:
+        tails[tail] = value
+context.update(tails)
 
 # OpenRouter 未收录的网关自定义生图模型（models.dev 也未收录）在此补充，避免目录命中失败：
 # 例：gpt-image-2.5（api.yjs.im Image 组，无上游记录）。

@@ -4,10 +4,11 @@ import android.content.Context
 import org.json.JSONObject
 
 /**
- * OpenRouter 目录：显示名（assets/model-names.json）；思考能力仍来自离线能力数据。
+ * OpenRouter 目录：显示名与上下文窗口；思考能力仍来自离线能力数据。
  *
- * 文件由 scripts/generate-catalog.py 从 OpenRouter 模型列表离线生成：
+ * 文件由 scripts/generate-catalog.py 离线生成：
  *   model-names.json     id -> OpenRouter name（去掉 provider 前缀）
+ *   model-context.json   id -> OpenRouter context_length
  *   model-reasoning.json id -> {supports, options(可省略)}
  * options 存在且含 "none" 表示思考可关闭；存在但为空数组表示支持思考且不可关闭；缺失即未知。
  */
@@ -99,7 +100,7 @@ object ModelCatalog {
         }
     }
 
-    /** models.dev `limit.context`；目录未收录返回 0。 */
+    /** OpenRouter `context_length`；目录未收录返回 0。 */
     fun contextWindow(context: Context, modelId: String): Int {
         if (modelId.isBlank()) return 0
         val catalog = loadContextWindows(context)

@@ -3,11 +3,10 @@ package com.irio
 import org.json.JSONObject
 
 /**
- * Models.dev 目录（desktop）：图片生成模型判定（resources/model-image.json）。
+ * Desktop 目录：图片生成模型判定（resources/model-image.json，models.dev）
+ * 与上下文窗口（resources/model-context.json，OpenRouter `context_length`）。
  *
- * 文件由 scripts 的目录生成流程从 https://models.dev/api.json 离线生成：
- *   model-image.json   id 集合（modalities.output 含 image 的模型）
- * 命中规则与 app 端 ModelCatalog.isImageModel 一致：精确 id → 全小写 → 去 vendor 前缀的尾段。
+ * 命中规则与 app 端 ModelCatalog 一致：精确 id → 全小写 → 去 vendor 前缀的尾段。
  */
 object ModelCatalog {
 
@@ -60,7 +59,7 @@ object ModelCatalog {
         }
     }
 
-    /** models.dev `limit.context`；目录未收录返回 0。 */
+    /** OpenRouter `context_length`；目录未收录返回 0。 */
     fun contextWindow(modelId: String): Int {
         if (modelId.isBlank()) return 0
         val catalog = loadContextWindows()
