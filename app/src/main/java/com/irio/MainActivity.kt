@@ -1,7 +1,14 @@
 package com.irio
 
-import me.saket.telephoto.zoomable.zoomable
+import me.saket.telephoto.subsamplingimage.SubSamplingImage
+import me.saket.telephoto.subsamplingimage.SubSamplingImageErrorReporter
+import me.saket.telephoto.subsamplingimage.SubSamplingImageSource
+import me.saket.telephoto.subsamplingimage.rememberSubSamplingImageState
+import me.saket.telephoto.zoomable.ZoomableContentLocation
+import me.saket.telephoto.zoomable.ZoomableState
 import me.saket.telephoto.zoomable.rememberZoomableState
+import me.saket.telephoto.zoomable.zoomable
+import okio.Path.Companion.toPath
 import androidx.compose.material.icons.rounded.Download
 import android.content.Context
 import android.content.Intent
@@ -117,6 +124,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
@@ -129,6 +137,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -162,6 +171,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.ui.components.AlertDialog
@@ -221,6 +232,7 @@ import org.scilab.forge.jlatexmath.TeXFormula
 import ru.noties.jlatexmath.awt.AndroidGraphics2D
 import ru.noties.jlatexmath.awt.Color as TexColor
 import java.io.File
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -3027,16 +3039,21 @@ private fun AttachmentPreview(
 ) {
     // Decode off the main thread: scrolled-off items are disposed, and a
     // synchronous `remember { decodePreview() }` re-decoded on every scroll-back.
-    var preview by remember(attachment.filePath) {
+    // 槽位最大 360×280dp。解码长边不能低于这块的物理像素，否则会被放大成缩略图。
+    val previewMaxPx = with(LocalDensity.current) {
+        maxOf(360.dp.roundToPx(), 280.dp.roundToPx())
+    }
+    val cacheKey = "${attachment.filePath}#$previewMaxPx"
+    var preview by remember(cacheKey) {
         mutableStateOf(
-            if (attachment.isImage) AttachmentPreviewCache.get(attachment.filePath) else null,
+            if (attachment.isImage) AttachmentPreviewCache.get(cacheKey) else null,
         )
     }
     if (attachment.isImage && preview == null) {
-        LaunchedEffect(attachment.filePath) {
+        LaunchedEffect(cacheKey) {
             preview = withContext(Dispatchers.IO) {
-                AttachmentPreviewCache.getOrDecode(attachment.filePath) {
-                    decodePreview(attachment.filePath)
+                AttachmentPreviewCache.getOrDecode(cacheKey) {
+                    decodePreview(attachment.filePath, maxPx = previewMaxPx)
                 }
             }
         }
@@ -3121,10 +3138,18 @@ private fun decodePreview(path: String, maxPx: Int = 720): androidx.compose.ui.g
     BitmapFactory.decodeFile(path, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
     var sample = 1
-    while (bounds.outWidth / sample > maxPx || bounds.outHeight / sample > maxPx) {
+    // 停在仍能盖住目标的那一档。再缩一档就会小于槽位，显示时被放大。
+    while (
+        bounds.outWidth / (sample * 2) >= maxPx ||
+        bounds.outHeight / (sample * 2) >= maxPx
+    ) {
         sample *= 2
     }
-    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = sample
+        inScaled = false
+        inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+    }
     return BitmapFactory.decodeFile(path, options)?.asImageBitmap()
 }
 
@@ -3893,11 +3918,16 @@ private fun PhotoViewer(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    val preview = remember(attachment.filePath) {
-        decodePreview(attachment.filePath, maxPx = 2048)
-    }
     val zoomState = rememberZoomableState()
     var saved by remember(attachment.filePath) { mutableStateOf(false) }
+    var regionDecodeFailed by remember(attachment.filePath) { mutableStateOf(false) }
+    val errorReporter = remember(attachment.filePath) {
+        object : SubSamplingImageErrorReporter {
+            override fun onImageLoadingFailed(e: IOException, imageSource: SubSamplingImageSource) {
+                regionDecodeFailed = true
+            }
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -3905,9 +3935,15 @@ private fun PhotoViewer(
             .background(Color.Black.copy(alpha = 0.92f)),
         contentAlignment = Alignment.Center,
     ) {
-        if (preview != null) {
-            Image(
-                bitmap = preview,
+        if (!regionDecodeFailed) {
+            // 按当前缩放从原文件切块，而不是先压成屏幕大小的位图再放大。
+            val imageState = rememberSubSamplingImageState(
+                imageSource = SubSamplingImageSource.file(attachment.filePath.toPath()),
+                zoomableState = zoomState,
+                errorReporter = errorReporter,
+            )
+            SubSamplingImage(
+                state = imageState,
                 contentDescription = attachment.name,
                 modifier = Modifier
                     // 整个屏幕都是图片手势区：双击缩放、双指缩放/平移。
@@ -3915,10 +3951,9 @@ private fun PhotoViewer(
                     // 关闭走返回键（NavigationBackHandler）。
                     .fillMaxSize()
                     .zoomable(zoomState),
-                contentScale = ContentScale.Fit,
             )
         } else {
-            Text(attachment.name, color = Color.White)
+            ZoomableDecodedImage(attachment, zoomState)
         }
         // 右下角下载按钮：保存到系统下载（相册可见）
         IconButton(
@@ -3960,6 +3995,70 @@ private fun PhotoViewer(
             }
         }
     }
+}
+
+@Composable
+private fun ZoomableDecodedImage(
+    attachment: ChatAttachment,
+    zoomState: ZoomableState,
+) {
+    var bitmap by remember(attachment.filePath) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(attachment.filePath) {
+        bitmap = withContext(Dispatchers.IO) { decodeOriginal(attachment.filePath) }
+    }
+    val image = bitmap
+    DisposableEffect(zoomState) {
+        val previous = zoomState.autoApplyTransformations
+        zoomState.autoApplyTransformations = false
+        onDispose { zoomState.autoApplyTransformations = previous }
+    }
+    if (image != null) {
+        zoomState.setContentLocation(
+            ZoomableContentLocation.unscaledAndTopLeftAligned(
+                Size(image.width.toFloat(), image.height.toFloat()),
+            ),
+        )
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .zoomable(zoomState)
+            .drawBehind {
+                val current = image ?: return@drawBehind
+                val transformation = zoomState.contentTransformation
+                if (!transformation.isSpecified) return@drawBehind
+                val scale = transformation.scale
+                drawImage(
+                    image = current,
+                    dstOffset = IntOffset(
+                        transformation.offset.x.roundToInt(),
+                        transformation.offset.y.roundToInt(),
+                    ),
+                    dstSize = IntSize(
+                        (current.width * scale.scaleX).roundToInt().coerceAtLeast(1),
+                        (current.height * scale.scaleY).roundToInt().coerceAtLeast(1),
+                    ),
+                    filterQuality = FilterQuality.High,
+                )
+            },
+    )
+}
+
+private fun decodeOriginal(path: String): ImageBitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    val maxPixels = 24_000_000L
+    var sample = 1
+    while ((bounds.outWidth / sample).toLong() * (bounds.outHeight / sample) > maxPixels) {
+        sample *= 2
+    }
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = sample
+        inScaled = false
+        inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+    }
+    return BitmapFactory.decodeFile(path, options)?.asImageBitmap()
 }
 
 @Composable

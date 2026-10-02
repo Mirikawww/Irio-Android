@@ -1,7 +1,9 @@
 package com.irio
 
-import me.saket.telephoto.zoomable.zoomable
+import me.saket.telephoto.zoomable.ZoomableContentLocation
+import me.saket.telephoto.zoomable.ZoomableState
 import me.saket.telephoto.zoomable.rememberZoomableState
+import me.saket.telephoto.zoomable.zoomable
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -88,6 +90,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
@@ -125,6 +128,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -176,6 +181,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.ColorPainter
@@ -3449,12 +3455,59 @@ private fun AssistantActions(
 }
 
 @Composable
+private fun ZoomableOriginalImage(
+    image: ImageBitmap,
+    zoomState: ZoomableState,
+) {
+    // zoomable 默认用 graphicsLayer 放大屏幕大小的图层，放大后就是糊的。
+    // 关掉自动变换，按缩放把原图像素直接画进视口。
+    DisposableEffect(zoomState) {
+        val previous = zoomState.autoApplyTransformations
+        zoomState.autoApplyTransformations = false
+        onDispose { zoomState.autoApplyTransformations = previous }
+    }
+    zoomState.setContentLocation(
+        ZoomableContentLocation.unscaledAndTopLeftAligned(
+            Size(image.width.toFloat(), image.height.toFloat()),
+        ),
+    )
+    Box(
+        Modifier
+            // 整个屏幕都是图片手势区：双击缩放、双指缩放/平移。
+            // 不设 onClick：tap 判定要等 double-tap 超时窗口（~300ms），关闭有可感延迟；
+            // 关闭走 Esc（PhotoViewer 的 onPreviewKeyEvent）。
+            .fillMaxSize()
+            .zoomable(zoomState)
+            .drawBehind {
+                val transformation = zoomState.contentTransformation
+                if (!transformation.isSpecified) return@drawBehind
+                val scale = transformation.scale
+                drawImage(
+                    image = image,
+                    dstOffset = IntOffset(
+                        transformation.offset.x.roundToInt(),
+                        transformation.offset.y.roundToInt(),
+                    ),
+                    dstSize = IntSize(
+                        (image.width * scale.scaleX).roundToInt().coerceAtLeast(1),
+                        (image.height * scale.scaleY).roundToInt().coerceAtLeast(1),
+                    ),
+                    filterQuality = FilterQuality.High,
+                )
+            },
+    )
+}
+
+@Composable
 private fun PhotoViewer(
     attachment: ChatAttachment,
     onDismiss: () -> Unit,
 ) {
-    val preview = remember(attachment.filePath) {
-        decodePreview(attachment.filePath)
+    var bitmap by remember(attachment.filePath) { mutableStateOf<ImageBitmap?>(null) }
+    var loaded by remember(attachment.filePath) { mutableStateOf(false) }
+    LaunchedEffect(attachment.filePath) {
+        bitmap = withContext(Dispatchers.IO) { decodePreview(attachment.filePath) }
+        loaded = true
     }
     val zoomState = rememberZoomableState()
     var saved by remember(attachment.filePath) { mutableStateOf(false) }
@@ -3474,19 +3527,10 @@ private fun PhotoViewer(
             },
         contentAlignment = Alignment.Center,
     ) {
-        if (preview != null) {
-            Image(
-                bitmap = preview,
-                contentDescription = attachment.name,
-                modifier = Modifier
-                    // 整个屏幕都是图片手势区：双击缩放、双指缩放/平移。
-                    // 不设 onClick：tap 判定要等 double-tap 超时窗口（~300ms），关闭有可感延迟；
-                    // 关闭走 Esc（下方 onPreviewKeyEvent）。
-                    .fillMaxSize()
-                    .zoomable(zoomState),
-                contentScale = ContentScale.Fit,
-            )
-        } else {
+        val image = bitmap
+        if (image != null) {
+            ZoomableOriginalImage(image, zoomState)
+        } else if (loaded) {
             Text(attachment.name, color = Color.White)
         }
         // 右下角下载按钮：系统保存对话框

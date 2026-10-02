@@ -125,8 +125,9 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.0")
     implementation("com.squareup.okhttp3:okhttp:${libs.versions.okhttp.get()}")
 
-    // 图片预览：双击/双指缩放（PhotoViewer）
+    // 图片预览：双击/双指缩放，全屏按原图分块采样（PhotoViewer）
     implementation("me.saket.telephoto:zoomable:0.19.0")
+    implementation("me.saket.telephoto:sub-sampling-image:0.19.0")
 
     // LaTeX — rikkahub fork of jlatexmath-android (JitPack)
     implementation("com.github.rikkahub.jlatexmath-android:jlatexmath:1.5")
