@@ -2040,7 +2040,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         }
                     },
                     trailing = {
-                        val showContextRing = ThemeStore.contextRingEnabled && ThemeStore.contextRing
+                        val showContextRing = ThemeStore.contextRing
                         val contextUsage = currentConversation.tokenUsage
                             ?: messages.lastOrNull { !it.fromUser && it.usage != null }?.usage
                         if (showContextRing) {

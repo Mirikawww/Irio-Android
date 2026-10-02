@@ -148,9 +148,9 @@ object ThemeStore {
         private set
     var language by mutableStateOf(initial.language)
         private set
-    var contextRing by mutableStateOf(false)
+    /** 工具栏上的上下文占用圆环。默认关。 */
+    var contextRing by mutableStateOf(initial.contextRing)
         private set
-    val contextRingEnabled: Boolean = false
     var glyphFade by mutableStateOf(initial.glyphFade)
         private set
     var modelDiff by mutableStateOf(initial.modelDiff)
@@ -201,8 +201,9 @@ object ThemeStore {
     }
 
     fun saveContextRing(enabled: Boolean) {
-        contextRing = false
-        updateAppearance { it.put(CONTEXT_RING_KEY, false) }
+        if (contextRing == enabled) return
+        contextRing = enabled
+        updateAppearance { it.put(CONTEXT_RING_KEY, enabled) }
     }
 
     private fun updateAppearance(update: (JSONObject) -> Unit) {
@@ -218,6 +219,7 @@ object ThemeStore {
         val autoAmoled = appearance?.optBoolean(AUTO_AMOLED_KEY, false) ?: false
         val accent = AccentColor.fromStored(appearance?.optString(ACCENT_KEY)?.takeIf { it.isNotBlank() })
         val language = AppLanguage.fromStored(appearance?.optString(LANGUAGE_KEY)?.takeIf { it.isNotBlank() })
+        val contextRing = appearance?.optBoolean(CONTEXT_RING_KEY, false) ?: false
         val glyphFade = appearance?.optBoolean(GLYPH_FADE_KEY, false) ?: false
         val modelDiff = appearance?.optBoolean(MODEL_DIFF_KEY, false) ?: false
         val newMessageScroll = appearance?.optBoolean(NEW_MESSAGE_SCROLL_KEY, false) ?: false
@@ -230,6 +232,7 @@ object ThemeStore {
                 glyphFade,
                 modelDiff,
                 newMessageScroll,
+                contextRing,
             )
         }
         val legacy = runCatching {
@@ -239,7 +242,16 @@ object ThemeStore {
         if (legacy != null) {
             updateAppearance { it.put(KEY, preference.stored) }
         }
-        return LoadedAppearance(preference, autoAmoled, accent, language, glyphFade, modelDiff, newMessageScroll)
+        return LoadedAppearance(
+            preference,
+            autoAmoled,
+            accent,
+            language,
+            glyphFade,
+            modelDiff,
+            newMessageScroll,
+            contextRing,
+        )
     }
 
     private data class LoadedAppearance(
@@ -250,5 +262,6 @@ object ThemeStore {
         val glyphFade: Boolean,
         val modelDiff: Boolean,
         val newMessageScroll: Boolean,
+        val contextRing: Boolean,
     )
 }

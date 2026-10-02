@@ -154,10 +154,9 @@ object ThemeStore {
     var language by mutableStateOf(AppLanguage.ZH_CN)
         private set
 
-    /** 圆环暂未开放：始终关。 */
+    /** 工具栏上的上下文占用圆环。默认关。 */
     var contextRing by mutableStateOf(false)
         private set
-    val contextRingEnabled: Boolean = false
 
     /** 流式回复的新字淡入。默认关。 */
     var glyphFade by mutableStateOf(false)
@@ -185,7 +184,7 @@ object ThemeStore {
             autoAmoled = appearance.getBoolean(AUTO_AMOLED_KEY, false)
             accent = AccentColor.fromStored(appearance.getString(ACCENT_KEY, null))
             language = AppLanguage.fromStored(appearance.getString(LANGUAGE_KEY, null))
-            contextRing = false
+            contextRing = appearance.getBoolean(CONTEXT_RING_KEY, false)
             glyphFade = appearance.getBoolean(GLYPH_FADE_KEY, false)
             modelDiff = appearance.getBoolean(MODEL_DIFF_KEY, false)
             newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, false)
@@ -268,10 +267,11 @@ object ThemeStore {
 
     fun saveContextRing(context: Context, enabled: Boolean) {
         ensureLoaded(context)
-        contextRing = false
+        if (contextRing == enabled) return
+        contextRing = enabled
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
-            .putBoolean(CONTEXT_RING_KEY, false)
+            .putBoolean(CONTEXT_RING_KEY, enabled)
             .apply()
     }
 }

@@ -390,13 +390,19 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(tr("上下文圆环"), color = Theme[colors][mutedColor])
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(tr("上下文圆环"), color = Theme[colors][onPanelColor])
+                        Spacer(Modifier.width(8.dp))
+                        ExperimentalBadge()
                     }
                     Switch(
-                        checked = false,
-                        onCheckedChange = {},
-                        enabled = false,
+                        checked = ThemeStore.contextRing,
+                        onCheckedChange = { enabled ->
+                            ThemeStore.saveContextRing(enabled)
+                        },
                     )
                 }
             }
