@@ -2263,9 +2263,13 @@ private fun MessageRow(
         ) {
             if (chatMessage.fromUser) {
                 if (chatMessage.attachments.isNotEmpty()) {
-                    chatMessage.attachments.forEach { attachment ->
-                        AttachmentPreview(attachment, boxed = true, onOpen = { onOpenAttachment(attachment) })
-                    }
+                    SentAttachmentRow(
+                        attachments = chatMessage.attachments,
+                        boxed = true,
+                        alignEnd = true,
+                        scrollKey = chatMessage.id,
+                        onOpen = onOpenAttachment,
+                    )
                 }
                 if (chatMessage.text.isNotBlank()) {
                     val bubble = currentUserBubbleColors(isEditing)
@@ -2306,9 +2310,13 @@ private fun MessageRow(
                 }
             } else {
                 if (chatMessage.attachments.isNotEmpty()) {
-                    chatMessage.attachments.forEach { attachment ->
-                        AttachmentPreview(attachment, boxed = false, onOpen = { onOpenAttachment(attachment) })
-                    }
+                    SentAttachmentRow(
+                        attachments = chatMessage.attachments,
+                        boxed = false,
+                        alignEnd = false,
+                        scrollKey = chatMessage.id,
+                        onOpen = onOpenAttachment,
+                    )
                 }
                 if (chatMessage.isError && chatMessage.text.isNotBlank()) {
                     chatMessage.process.forEach { event ->
@@ -2569,6 +2577,36 @@ private fun ProcessEventSheet(
                 if (body.isNotBlank()) {
                     Text(body, fontSize = 16.sp, color = content)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SentAttachmentRow(
+    attachments: List<ChatAttachment>,
+    boxed: Boolean,
+    alignEnd: Boolean,
+    scrollKey: Any,
+    onOpen: (ChatAttachment) -> Unit,
+) {
+    // 行宽随内容，短于视口时仍由消息列贴右或贴左。超出后才横向滚动。
+    // 用户消息反向滚动，0 停在末尾，条带继续贴着气泡一侧。
+    key(scrollKey) {
+        Row(
+            modifier = Modifier.horizontalScroll(
+                rememberScrollState(),
+                reverseScrolling = alignEnd,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            attachments.forEach { attachment ->
+                AttachmentPreview(
+                    attachment,
+                    boxed = boxed,
+                    onOpen = { onOpen(attachment) },
+                )
             }
         }
     }
