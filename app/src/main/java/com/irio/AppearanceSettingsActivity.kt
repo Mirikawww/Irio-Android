@@ -87,6 +87,8 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
     val content = Theme[colors][onBackgroundColor]
     val context = LocalContext.current
     var texScalePercent by remember { mutableIntStateOf((ProviderStore.loadTexScale(context) * 100).toInt()) }
+    var mergeModels by remember { mutableStateOf(ProviderStore.loadMergeModels(context)) }
+    var openRouterNames by remember { mutableStateOf(ProviderStore.loadModelsDevCatalog(context)) }
     val themePreference = ThemeStore.preference
     val accent = ThemeStore.accent
     val language = ThemeStore.language
@@ -414,6 +416,56 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         checked = ThemeStore.contextRing,
                         onCheckedChange = { enabled ->
                             ThemeStore.saveContextRing(context, enabled)
+                        },
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("合并模型显示"),
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][onPanelColor],
+                    )
+                    Switch(
+                        checked = mergeModels,
+                        onCheckedChange = {
+                            mergeModels = it
+                            ProviderStore.saveMergeModels(context, it)
+                        },
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            tr("使用 OpenRouter 格式化模型名称"),
+                            modifier = Modifier.weight(1f),
+                            color = Theme[colors][onPanelColor],
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        ExperimentalBadge()
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = openRouterNames,
+                        onCheckedChange = {
+                            openRouterNames = it
+                            ProviderStore.saveModelsDevCatalog(context, it)
                         },
                     )
                 }

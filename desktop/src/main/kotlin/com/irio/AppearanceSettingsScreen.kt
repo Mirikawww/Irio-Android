@@ -75,6 +75,7 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
     val content = Theme[colors][onBackgroundColor]
 
     var texScalePercent by remember { mutableIntStateOf((ProviderStore.loadTexScale() * 100).toInt()) }
+    var mergeModels by remember { mutableStateOf(ProviderStore.loadMergeModels()) }
     val themePreference = ThemeStore.preference
     val accent = ThemeStore.accent
     val language = ThemeStore.language
@@ -402,6 +403,31 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         checked = ThemeStore.contextRing,
                         onCheckedChange = { enabled ->
                             ThemeStore.saveContextRing(enabled)
+                        },
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("合并模型显示"),
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][onPanelColor],
+                    )
+                    Switch(
+                        checked = mergeModels,
+                        onCheckedChange = {
+                            mergeModels = it
+                            ProviderStore.saveMergeModels(it)
                         },
                     )
                 }

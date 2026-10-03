@@ -94,8 +94,6 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
     val apiKey = rememberTextFieldState(SearchStore.loadApiKey(context, provider))
     var maxResults by remember { mutableIntStateOf(SearchStore.loadMaxResults(context, provider)) }
     var maxRounds by remember { mutableIntStateOf(ToolStore.loadMaxRounds(context)) }
-    var mergeModels by remember { mutableStateOf(ProviderStore.loadMergeModels(context)) }
-    var modelsDevCatalog by remember { mutableStateOf(ProviderStore.loadModelsDevCatalog(context)) }
     var modelsDevReasoning by remember { mutableStateOf(ProviderStore.loadModelsDevReasoning(context)) }
     var imageGenModel by remember { mutableStateOf(ToolStore.loadImageGenModel(context)) }
     var imageGenMenuOpen by remember { mutableStateOf(false) }
@@ -105,8 +103,6 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
     val currentProvider by rememberUpdatedState(provider)
     val currentMaxResults by rememberUpdatedState(maxResults)
     val currentMaxRounds by rememberUpdatedState(maxRounds)
-    val currentMergeModels by rememberUpdatedState(mergeModels)
-    val currentModelsDevCatalog by rememberUpdatedState(modelsDevCatalog)
     val currentMessageTimestamps by rememberUpdatedState(messageTimestamps)
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -114,8 +110,6 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
         SearchStore.saveApiKey(context, apiKey.text.toString(), currentProvider)
         SearchStore.saveMaxResults(context, currentMaxResults, currentProvider)
         SearchStore.saveProvider(context, currentProvider)
-        ProviderStore.saveMergeModels(context, currentMergeModels)
-        ProviderStore.saveModelsDevCatalog(context, currentModelsDevCatalog)
         ToolStore.saveMaxRounds(context, currentMaxRounds)
         ToolStore.saveMessageTimestamps(context, currentMessageTimestamps)
     }
@@ -261,39 +255,6 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
             }
             SettingsSectionCard {
                 SettingsSwitchRow(
-                    label = tr("合并模型显示"),
-                    checked = mergeModels,
-                    onCheckedChange = {
-                        mergeModels = it
-                        ProviderStore.saveMergeModels(context, it)
-                    },
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            tr("使用 OpenRouter 格式化模型名称"),
-                            modifier = Modifier.weight(1f),
-                            color = Theme[colors][onBackgroundColor],
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        ExperimentalBadge()
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Switch(
-                        checked = modelsDevCatalog,
-                        onCheckedChange = {
-                            modelsDevCatalog = it
-                            ProviderStore.saveModelsDevCatalog(context, it)
-                        },
-                    )
-                }
-                SettingsSwitchRow(
                     label = tr("使用 Models.dev 思考数据"),
                     checked = modelsDevReasoning,
                     onCheckedChange = {
@@ -302,7 +263,6 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                     },
                     enabled = false,
                 )
-
             }
         }
     }

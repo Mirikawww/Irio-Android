@@ -76,7 +76,6 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
     val apiKey = rememberTextFieldState(SearchStore.loadApiKey(provider))
     var maxResults by remember { mutableIntStateOf(SearchStore.loadMaxResults(provider)) }
     var maxRounds by remember { mutableIntStateOf(ToolStore.loadMaxRounds()) }
-    var mergeModels by remember { mutableStateOf(ProviderStore.loadMergeModels()) }
     var imageGenModel by remember { mutableStateOf(ToolStore.loadImageGenModel()) }
     var titleModel by remember { mutableStateOf(ToolStore.loadTitleModel()) }
     var messageTimestamps by remember { mutableStateOf(ToolStore.loadMessageTimestamps()) }
@@ -84,13 +83,11 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
     val currentProvider by rememberUpdatedState(provider)
     val currentMaxResults by rememberUpdatedState(maxResults)
     val currentMaxRounds by rememberUpdatedState(maxRounds)
-    val currentMergeModels by rememberUpdatedState(mergeModels)
     val currentMessageTimestamps by rememberUpdatedState(messageTimestamps)
 
     fun persistCurrent() {
         SearchStore.saveApiKey(apiKey.text.toString(), currentProvider)
         SearchStore.saveMaxResults(currentMaxResults, currentProvider)
-        ProviderStore.saveMergeModels(currentMergeModels)
         SearchStore.saveProvider(currentProvider)
         ToolStore.saveMaxRounds(currentMaxRounds)
         ToolStore.saveMessageTimestamps(currentMessageTimestamps)
@@ -227,20 +224,6 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
                     Switch(
                         checked = messageTimestamps,
                         onCheckedChange = { messageTimestamps = it },
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                ) {
-                    Text(
-                        tr("合并模型显示"),
-                        modifier = Modifier.weight(1f),
-                        color = Theme[colors][onBackgroundColor],
-                    )
-                    Switch(
-                        checked = mergeModels,
-                        onCheckedChange = { mergeModels = it },
                     )
                 }
             }
