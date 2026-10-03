@@ -188,8 +188,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                         maxLines = 1,
                         autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 28.sp),
                     )
-                }
-                TextField(
+                    TextField(
                     state = codeState,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -220,7 +219,8 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     style = ButtonStyle.Secondary,
                 ) { Text(tr("配对")) }
-
+                }
+                LinkCard {
                 DropdownMenu(
                     expanded = modeMenuOpen,
                     onExpandedChange = { modeMenuOpen = it },
@@ -274,7 +274,6 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                         }
                     }
                 }
-                LinkCard {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -285,7 +284,6 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                             onCheckedChange = { LinkRuntime.setAutoSync(it) },
                         )
                     }
-                }
 
                 Button(
                     onClick = { LinkRuntime.syncNow() },
@@ -297,6 +295,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                         progress = state.syncProgress.coerceIn(0f, 1f),
                         modifier = Modifier.fillMaxWidth(),
                     )
+                }
                 }
 
                 Text(tr("已配对设备"), color = muted, fontSize = 12.sp)
