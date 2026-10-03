@@ -225,6 +225,8 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                     valueRange = ToolStore.MAX_ROUNDS_MIN..ToolStore.MAX_ROUNDS_MAX,
                     onValueChange = { maxRounds = it },
                 )
+            }
+            SettingsSectionCard {
                 ImageGenModelPicker(
                     selected = imageGenModel,
                     onSelect = { model ->
@@ -239,11 +241,15 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                         ToolStore.saveTitleModel(context, model)
                     },
                 )
+            }
+            SettingsSectionCard {
                 SystemPromptRow(
                     onClick = {
                         context.startActivity(Intent(context, SystemPromptSettingsActivity::class.java))
                     },
                 )
+            }
+            SettingsSectionCard {
                 SettingsSwitchRow(
                     label = tr("消息时间戳"),
                     checked = messageTimestamps,
