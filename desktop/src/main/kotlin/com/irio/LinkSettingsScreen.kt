@@ -68,7 +68,6 @@ import com.composables.ui.components.TextField
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.destructiveColor
-import com.composables.ui.theme.fieldColor
 import com.composables.ui.theme.fieldShape
 import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.mutedColor
@@ -235,13 +234,11 @@ fun LinkSettingsScreen(onBack: () -> Unit) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Theme[colors][fieldColor], Theme[shapes][fieldShape])
                             .clickable(
                                 interactionSource = interactionSource,
                                 indication = null,
                                 onClick = { modeMenuOpen = !modeMenuOpen },
-                            )
-                            .padding(start = 12.dp, top = 8.dp, end = 4.dp, bottom = 8.dp),
+                            ),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
