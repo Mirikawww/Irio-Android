@@ -109,10 +109,7 @@ object LinkProtocol {
     fun portCandidates(current: Int, span: Int = 20): List<Int> {
         val last = PORT + span
         val avoid = if (current in PORT..last) current else PORT
-        return (1..span).map { step ->
-            val port = avoid + step
-            if (port > last) PORT + (port - last - 1) else port
-        }
+        return (PORT..last).filter { it != avoid }.shuffled()
     }
 
     fun bindFresh(current: Int): ServerSocket {

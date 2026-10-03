@@ -41,10 +41,11 @@ class LinkCodecTest {
     }
 
     @Test
-    fun refreshPortSkipsTheCurrentPortAndWraps() {
-        assertEquals((17433..17452).toList(), LinkProtocol.portCandidates(17432))
-        assertEquals(17432, LinkProtocol.portCandidates(17452).first())
-        assertEquals(false, LinkProtocol.portCandidates(17440).contains(17440))
-        assertEquals(17433, LinkProtocol.portCandidates(80).first())
+    fun refreshPortSkipsTheCurrentPort() {
+        assertEquals((17433..17452).toSet(), LinkProtocol.portCandidates(17432).toSet())
+        val fromMiddle = LinkProtocol.portCandidates(17440)
+        assertEquals((17432..17452).filter { it != 17440 }.toSet(), fromMiddle.toSet())
+        assertEquals(false, fromMiddle.contains(17440))
+        assertEquals((17433..17452).toSet(), LinkProtocol.portCandidates(80).toSet())
     }
 }
