@@ -203,12 +203,12 @@ fun LinkSettingsScreen(onBack: () -> Unit) {
                 Button(
                     onClick = { LinkRuntime.pairWithCode(codeState.text.toString()) },
                     modifier = Modifier.fillMaxWidth(),
-                    style = ButtonStyle.Secondary,
+                    style = ButtonStyle.Primary,
                 ) { Text(tr("配对")) }
                     Button(
                         onClick = { LinkRuntime.refreshPort() },
                         modifier = Modifier.fillMaxWidth(),
-                        style = ButtonStyle.Secondary,
+                        style = ButtonStyle.Primary,
                     ) { Text(tr("刷新端口")) }
                 }
                 LinkCard {
@@ -280,6 +280,7 @@ fun LinkSettingsScreen(onBack: () -> Unit) {
                     onClick = { LinkRuntime.syncNow() },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !state.syncing,
+                    style = ButtonStyle.Primary,
                 ) { Text(if (state.syncing) tr("正在同步") else tr("立即同步")) }
                 if (state.syncing) {
                     ProgressIndicator(
