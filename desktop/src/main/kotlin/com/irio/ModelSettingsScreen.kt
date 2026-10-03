@@ -197,8 +197,6 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
                     valueRange = ToolStore.MAX_ROUNDS_MIN..ToolStore.MAX_ROUNDS_MAX,
                     onValueChange = { maxRounds = it },
                 )
-            }
-            SettingsSectionCard {
                 ImageGenModelPicker(
                     selected = imageGenModel,
                     onSelect = { model ->
@@ -216,8 +214,6 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
             }
             SettingsSectionCard {
                 SystemPromptRow(onClick = onSystemPrompt)
-            }
-            SettingsSectionCard {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,

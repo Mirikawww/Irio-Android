@@ -343,6 +343,14 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         },
                     )
                 }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -419,14 +427,18 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         },
                     )
                 }
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+                SettingsSlider(
+                    label = tr("公式大小"),
+                    value = texScalePercent,
+                    valueRange = 60..160,
+                    onValueChange = { percent ->
+                        texScalePercent = percent
+                    },
+                    valueLabel = { "$it%" },
+                    onValueChangeFinished = {
+                        ProviderStore.saveTexScale(context, texScalePercent / 100f)
+                    },
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -469,26 +481,6 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         },
                     )
                 }
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                SettingsSlider(
-                    label = tr("公式大小"),
-                    value = texScalePercent,
-                    valueRange = 60..160,
-                    onValueChange = { percent ->
-                        texScalePercent = percent
-                    },
-                    valueLabel = { "$it%" },
-                    onValueChangeFinished = {
-                        ProviderStore.saveTexScale(context, texScalePercent / 100f)
-                    },
-                )
             }
         }
     }
