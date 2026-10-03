@@ -105,6 +105,27 @@ object LinkProtocol {
         server.bind(InetSocketAddress(port))
         return server
     }
+
+    fun portCandidates(current: Int, span: Int = 20): List<Int> {
+        val last = PORT + span
+        val avoid = if (current in PORT..last) current else PORT
+        return (1..span).map { step ->
+            val port = avoid + step
+            if (port > last) PORT + (port - last - 1) else port
+        }
+    }
+
+    fun bindFresh(current: Int): ServerSocket {
+        var error: Exception? = null
+        for (port in portCandidates(current)) {
+            try {
+                return bind(port)
+            } catch (e: Exception) {
+                error = e
+            }
+        }
+        throw error ?: IllegalStateException("no port")
+    }
 }
 
 object LinkCodec {
@@ -133,6 +154,7 @@ object LinkCodec {
         put("syncMode", settings.syncMode.name)
         put("deviceId", settings.deviceId)
         put("deviceName", settings.deviceName)
+        put("listenPort", settings.listenPort)
         put(
             "peers",
             JSONArray().apply { settings.peers.forEach { put(peerJson(it)) } },
@@ -154,6 +176,9 @@ object LinkCodec {
                 .getOrDefault(LinkSyncMode.COEXIST),
             deviceId = json.optString("deviceId"),
             deviceName = json.optString("deviceName"),
+            listenPort = json.optInt("listenPort", LinkProtocol.PORT).let { port ->
+                if (port in 1..65535) port else LinkProtocol.PORT
+            },
             peers = peers,
         )
     }

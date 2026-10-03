@@ -53,6 +53,7 @@ class ThemeStoreTest {
         assertEquals("Model diff", translate(AppLanguage.EN, "模型差异"))
         assertEquals("New message scroll", translate(AppLanguage.EN, "新消息滚动"))
         assertEquals("Experimental", translate(AppLanguage.EN, "实验性"))
+        assertEquals("Refresh port", translate(AppLanguage.EN, "刷新端口"))
         assertEquals("外观", translate(AppLanguage.ZH_CN, "外观"))
         assertEquals("New chat", translate(AppLanguage.EN, "新对话"))
     }

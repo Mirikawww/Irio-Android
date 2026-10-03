@@ -216,6 +216,7 @@ private val English = mapOf(
     "选择模型" to "Model",
     "选择语言" to "Language",
     "配对" to "Pair",
+    "刷新端口" to "Refresh port",
     "配对失败" to "Pairing failed",
     "配对码无效或已刷新" to "The code is invalid or was refreshed",
     "重试" to "Retry",

@@ -219,6 +219,11 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     style = ButtonStyle.Secondary,
                 ) { Text(tr("配对")) }
+                    Button(
+                        onClick = { LinkRuntime.refreshPort() },
+                        modifier = Modifier.fillMaxWidth(),
+                        style = ButtonStyle.Secondary,
+                    ) { Text(tr("刷新端口")) }
                 }
                 LinkCard {
                 DropdownMenu(

@@ -51,7 +51,7 @@ object LinkRuntime {
             it.copy(
                 pairingCode = pairingCode,
                 pairingHost = host,
-                pairingPort = LinkProtocol.PORT,
+                pairingPort = normalizedListenPort(LinkStore.load(context).listenPort),
                 settings = LinkStore.load(context),
             )
         }
@@ -116,6 +116,20 @@ object LinkRuntime {
         scope.launch { syncConnected(context) }
     }
 
+    fun refreshPort() {
+        val context = appContext ?: return
+        if (!itEnabled()) return
+        val avoid = listeningPort()
+        stopServer()
+        serverJob = scope.launch {
+            val bound = runCatching { LinkProtocol.bindFresh(avoid) }.getOrElse {
+                _state.update { it.copy(status = tr("无法在局域网端口 %s 监听").format(avoid)) }
+                return@launch
+            }
+            acceptClients(context, bound)
+        }
+    }
+
     fun forget(peerId: String) {
         val context = appContext ?: return
         val settings = LinkStore.forget(context, peerId)
@@ -154,18 +168,36 @@ object LinkRuntime {
 
     private fun startServerLocked(context: Context, settings: LinkSettings) {
         if (!settings.enabled) return
-        if (server?.isClosed == false) return
+        val port = normalizedListenPort(settings.listenPort)
+        if (server?.isClosed == false && server?.localPort == port) return
         stopServer()
         serverJob = scope.launch {
-            val bound = runCatching { LinkProtocol.bind() }.getOrElse {
-                _state.update { it.copy(status = tr("无法在局域网端口 %s 监听").format(LinkProtocol.PORT)) }
+            val bound = runCatching { LinkProtocol.bind(port) }.getOrElse {
+                _state.update { it.copy(status = tr("无法在局域网端口 %s 监听").format(port)) }
                 return@launch
             }
-            server = bound
-            while (isActive && !bound.isClosed) {
-                val socket = runCatching { bound.accept() }.getOrNull() ?: continue
-                launch { handleClient(context, socket) }
-            }
+            acceptClients(context, bound)
+        }
+    }
+
+    private fun listeningPort(): Int {
+        val live = server?.takeIf { !it.isClosed }?.localPort
+        if (live != null && live > 0) return live
+        return normalizedListenPort(_state.value.settings.listenPort)
+    }
+
+    private fun normalizedListenPort(port: Int): Int = if (port in 1..65535) port else LinkProtocol.PORT
+
+    private fun advertisedPort(): Int = listeningPort()
+
+    private suspend fun CoroutineScope.acceptClients(context: Context, bound: ServerSocket) {
+        server = bound
+        val saved = LinkStore.load(context).copy(listenPort = bound.localPort)
+        LinkStore.save(context, saved)
+        _state.update { it.copy(settings = saved, pairingPort = bound.localPort, status = null) }
+        while (isActive && !bound.isClosed) {
+            val socket = runCatching { bound.accept() }.getOrNull() ?: continue
+            launch { handleClient(context, socket) }
         }
     }
 
@@ -232,7 +264,7 @@ object LinkRuntime {
                 .put("name", settings.deviceName)
                 .put("platform", LinkPlatform.PHONE.name)
                 .put("token", peerToken)
-                .put("port", LinkProtocol.PORT)
+                .put("port", advertisedPort())
                 .put("host", LinkProtocol.lanIpv4().orEmpty()),
         )
         if (next.autoSync) {
@@ -296,7 +328,7 @@ object LinkRuntime {
                         .put("deviceId", settings.deviceId)
                         .put("name", settings.deviceName)
                         .put("platform", LinkPlatform.PHONE.name)
-                        .put("port", LinkProtocol.PORT)
+                        .put("port", advertisedPort())
                         .put("host", LinkProtocol.lanIpv4().orEmpty())
                         .put("token", token.orEmpty())
                         .put("pairingCode", pairingCode.orEmpty()),

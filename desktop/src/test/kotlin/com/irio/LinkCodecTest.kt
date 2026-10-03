@@ -39,4 +39,12 @@ class LinkCodecTest {
         val restored = LinkCodec.settingsFrom(JSONObject(LinkCodec.settingsJson(settings).toString()))
         assertEquals("未知设备", restored.peers.single().name)
     }
+
+    @Test
+    fun refreshPortSkipsTheCurrentPortAndWraps() {
+        assertEquals((17433..17452).toList(), LinkProtocol.portCandidates(17432))
+        assertEquals(17432, LinkProtocol.portCandidates(17452).first())
+        assertEquals(false, LinkProtocol.portCandidates(17440).contains(17440))
+        assertEquals(17433, LinkProtocol.portCandidates(80).first())
+    }
 }

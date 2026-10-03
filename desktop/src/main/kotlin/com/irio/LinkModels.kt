@@ -31,6 +31,7 @@ data class LinkSettings(
     val syncMode: LinkSyncMode = LinkSyncMode.COEXIST,
     val deviceId: String = "",
     val deviceName: String = "",
+    val listenPort: Int = LinkProtocol.PORT,
     val peers: List<LinkedPeer> = emptyList(),
 )
 
