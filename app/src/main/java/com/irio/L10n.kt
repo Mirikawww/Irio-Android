@@ -38,6 +38,8 @@ private val English = mapOf(
     "上一版本" to "Previous version",
     "上下文圆环" to "Context ring",
     "上下文用量未知" to "Context usage unknown",
+    "共计" to "Total",
+    "已使用" to "Used",
     "下一个回复" to "Next reply",
     "下一版本" to "Next version",
     "下载图片" to "Download image",

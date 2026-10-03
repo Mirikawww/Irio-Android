@@ -311,6 +311,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var providers by remember { mutableStateOf(ProviderStore.loadProviders(context)) }
     var activeProviderId by remember { mutableStateOf(ProviderStore.loadActiveProviderId(context)) }
     var modelMenuOpen by remember { mutableStateOf(false) }
+    var contextRingOpen by remember { mutableStateOf(false) }
     var attachMenuOpen by remember { mutableStateOf(false) }
     var reasoningEffort by remember { mutableStateOf(ProviderStore.loadReasoningEffort(context)) }
     var fastMode by remember { mutableStateOf(ProviderStore.loadFastMode(context)) }
@@ -2048,7 +2049,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 ContextUsageRing(
                                     usedTokens = contextUsage?.usedTokens ?: 0,
                                     windowTokens = ModelCatalog.contextWindow(context, selectedModel),
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                                    expanded = contextRingOpen,
+                                    onExpandedChange = { contextRingOpen = it },
                                 )
                             }
                         }

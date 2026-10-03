@@ -256,6 +256,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     var providers by remember { mutableStateOf(ProviderStore.loadProviders()) }
     var activeProviderId by remember { mutableStateOf(ProviderStore.loadActiveProviderId()) }
     var modelMenuOpen by remember { mutableStateOf(false) }
+    var contextRingOpen by remember { mutableStateOf(false) }
     var attachMenuOpen by remember { mutableStateOf(false) }
     var reasoningEffort by remember { mutableStateOf(ProviderStore.loadReasoningEffort()) }
     var fastMode by remember { mutableStateOf(ProviderStore.loadFastMode()) }
@@ -1852,7 +1853,8 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                                 ContextUsageRing(
                                     usedTokens = contextUsage?.usedTokens ?: 0,
                                     windowTokens = ModelCatalog.contextWindow(selectedModel),
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                                    expanded = contextRingOpen,
+                                    onExpandedChange = { contextRingOpen = it },
                                 )
                             }
                         }

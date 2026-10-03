@@ -1,30 +1,91 @@
 package com.irio
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.IntrinsicMeasurable
+import androidx.compose.ui.layout.IntrinsicMeasureScope
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasurePolicy
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.composables.ui.components.DropdownMenu
+import com.composables.ui.components.DropdownMenuAlignment
+import com.composables.ui.components.DropdownMenuPanel
+import com.composables.ui.components.Text
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
+import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.primaryColor
 import com.composeunstyled.theme.Theme
 
-/** 只读进度环：用量来自接口 usage，窗口来自 OpenRouter `context_length`。暂不可点。 */
+/** 用量来自接口 usage，窗口来自 OpenRouter `context_length`。点击弹出共计与已使用。 */
 @Composable
 fun ContextUsageRing(
     usedTokens: Int,
     windowTokens: Int,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     size: Dp = 18.dp,
     strokeWidth: Dp = 2.dp,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onExpandedChange = onExpandedChange,
+        modifier = modifier.wrapContentWidth(Alignment.End),
+        alignment = DropdownMenuAlignment.End,
+        panel = {
+            DropdownMenuPanel(minWidth = 0.dp) {
+                ContextStatTable(
+                    total = contextWindowLabel(windowTokens),
+                    used = formatContextCount(usedTokens),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                )
+            }
+        },
+    ) {
+        ContextRingCanvas(
+            usedTokens = usedTokens,
+            windowTokens = windowTokens,
+            size = size,
+            strokeWidth = strokeWidth,
+            modifier = Modifier
+                .clickable(role = Role.Button) { onExpandedChange(!expanded) }
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+        )
+    }
+}
+
+@Composable
+private fun ContextRingCanvas(
+    usedTokens: Int,
+    windowTokens: Int,
+    size: Dp,
+    strokeWidth: Dp,
+    modifier: Modifier = Modifier,
 ) {
     val track = Theme[colors][mutedColor].copy(alpha = 0.28f)
     val fill = Theme[colors][primaryColor]
@@ -33,12 +94,17 @@ fun ContextUsageRing(
     } else {
         0f
     }
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+        label = "contextRingProgress",
+    )
     Canvas(
         modifier = modifier
             .size(size)
             .semantics {
                 contentDescription = if (windowTokens > 0) {
-                    tr("上下文 %s / %s").format(usedTokens, windowTokens)
+                    tr("上下文 %s / %s").format(formatContextCount(usedTokens), formatContextCount(windowTokens))
                 } else {
                     tr("上下文用量未知")
                 }
@@ -57,11 +123,11 @@ fun ContextUsageRing(
             size = arcSize,
             style = stroke,
         )
-        if (progress > 0f) {
+        if (animatedProgress > 0f) {
             drawArc(
                 color = fill,
                 startAngle = -90f,
-                sweepAngle = 360f * progress,
+                sweepAngle = 360f * animatedProgress,
                 useCenter = false,
                 topLeft = topLeft,
                 size = arcSize,
@@ -70,3 +136,115 @@ fun ContextUsageRing(
         }
     }
 }
+
+@Composable
+private fun ContextStatTable(total: String, used: String, modifier: Modifier = Modifier) {
+    val measurePolicy = remember { contextStatMeasurePolicy() }
+    Layout(
+        content = {
+            ContextStatText(tr("共计"))
+            ContextStatText(total)
+            ContextStatText(tr("已使用"))
+            ContextStatText(used)
+        },
+        modifier = modifier,
+        measurePolicy = measurePolicy,
+    )
+}
+
+@Composable
+private fun ContextStatText(text: String) {
+    Text(
+        text,
+        color = Theme[colors][onPanelColor],
+        fontSize = 15.sp,
+        maxLines = 1,
+    )
+}
+
+private fun contextStatMeasurePolicy(): MeasurePolicy = object : MeasurePolicy {
+    override fun MeasureScope.measure(
+        measurables: List<Measurable>,
+        constraints: Constraints,
+    ): MeasureResult {
+        val gap = 16.dp.roundToPx()
+        val rowGap = 8.dp.roundToPx()
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val placeables = measurables.map { it.measure(loose) }
+        val contentWidth = statTableWidth(placeables.map { it.width }, gap)
+        val width = if (
+            constraints.hasBoundedWidth &&
+            constraints.maxWidth >= contentWidth &&
+            constraints.maxWidth - contentWidth <= 2
+        ) {
+            constraints.maxWidth
+        } else {
+            contentWidth
+        }.coerceAtLeast(constraints.minWidth).let { wanted ->
+            if (constraints.hasBoundedWidth) wanted.coerceAtMost(constraints.maxWidth) else wanted
+        }
+        val rowHeight = placeables.maxOfOrNull { it.height } ?: 0
+        val rows = placeables.size / 2
+        val height = if (rows == 0) 0 else rowHeight * rows + rowGap * (rows - 1)
+        return layout(width, height) {
+            for (index in 0 until rows) {
+                val label = placeables[index * 2]
+                val value = placeables[index * 2 + 1]
+                val y = index * (rowHeight + rowGap)
+                label.placeRelative(0, y + (rowHeight - label.height) / 2)
+                value.placeRelative(width - value.width, y + (rowHeight - value.height) / 2)
+            }
+        }
+    }
+
+    override fun IntrinsicMeasureScope.maxIntrinsicWidth(
+        measurables: List<IntrinsicMeasurable>,
+        height: Int,
+    ): Int {
+        val gap = 16.dp.roundToPx()
+        return statTableWidth(
+            measurables.map { it.maxIntrinsicWidth(height) },
+            gap,
+        )
+    }
+
+    override fun IntrinsicMeasureScope.minIntrinsicWidth(
+        measurables: List<IntrinsicMeasurable>,
+        height: Int,
+    ): Int = maxIntrinsicWidth(measurables, height)
+
+    override fun IntrinsicMeasureScope.maxIntrinsicHeight(
+        measurables: List<IntrinsicMeasurable>,
+        width: Int,
+    ): Int {
+        val rowGap = 8.dp.roundToPx()
+        val rows = measurables.size / 2
+        if (rows == 0) return 0
+        val rowHeight = measurables.maxOf { it.maxIntrinsicHeight(width) }
+        return rowHeight * rows + rowGap * (rows - 1)
+    }
+
+    override fun IntrinsicMeasureScope.minIntrinsicHeight(
+        measurables: List<IntrinsicMeasurable>,
+        width: Int,
+    ): Int = maxIntrinsicHeight(measurables, width)
+}
+
+private fun statTableWidth(widths: List<Int>, gap: Int): Int {
+    var width = 0
+    for (index in widths.indices step 2) {
+        val label = widths[index]
+        val value = widths.getOrNull(index + 1) ?: 0
+        width = maxOf(width, label + gap + value)
+    }
+    return width
+}
+
+internal fun formatContextCount(count: Int): String {
+    val sign = if (count < 0) "-" else ""
+    val digits = kotlin.math.abs(count.toLong()).toString()
+    return sign + digits.reversed().chunked(3).joinToString(",").reversed()
+}
+
+internal fun contextWindowLabel(windowTokens: Int): String =
+    if (windowTokens > 0) formatContextCount(windowTokens) else "—"
