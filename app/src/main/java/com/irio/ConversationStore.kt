@@ -26,6 +26,10 @@ data class ChatMessage(
     val usage: TokenUsage? = null,
     /** 模型完成这条回复的时刻。0 表示还没完成，或旧数据没有记录。不要用 createdAt 代替，那是开始生成的时间。 */
     val finishedAt: Long = 0L,
+    /** 摘要卡片。NONE 是普通消息；只有 SUCCESS 会截断之后的发送。 */
+    val summaryState: SummaryState = SummaryState.NONE,
+    /** 这张卡片覆盖到的最后一条原文。 */
+    val summaryUntilId: Long = 0L,
     /** 只发给模型，不出现在对话里。 */
     val hidden: Boolean = false,
 ) {
@@ -230,6 +234,10 @@ object ConversationStore {
                             put("fromUser", message.fromUser)
                             put("createdAt", message.createdAt)
                             if (message.finishedAt > 0L) put("finishedAt", message.finishedAt)
+                            if (message.summaryState != SummaryState.NONE) {
+                                put("summaryState", message.summaryState.name)
+                                if (message.summaryUntilId != 0L) put("summaryUntilId", message.summaryUntilId)
+                            }
                             put("isError", message.isError)
                             put("retryGroup", message.groupId)
                             put("selected", message.selected)
@@ -313,6 +321,8 @@ object ConversationStore {
                         fromUser = item.optBoolean("fromUser"),
                         createdAt = item.optLong("createdAt").takeIf { it > 0L } ?: System.currentTimeMillis(),
                         finishedAt = item.optLong("finishedAt"),
+                        summaryState = summaryStateFrom(item),
+                        summaryUntilId = item.optLong("summaryUntilId"),
                         attachments = attachments,
                         process = processEventsFrom(item),
                         isError = item.optBoolean("isError"),
@@ -339,6 +349,12 @@ object ConversationStore {
                 ?: messages.lastOrNull { !it.fromUser && it.usage != null }?.usage,
         )
     }
+}
+
+internal fun summaryStateFrom(item: JSONObject): SummaryState {
+    val raw = item.optString("summaryState")
+    if (raw.isBlank()) return SummaryState.NONE
+    return runCatching { SummaryState.valueOf(raw) }.getOrDefault(SummaryState.NONE)
 }
 
 internal fun tokenUsageFrom(json: JSONObject?): TokenUsage? {

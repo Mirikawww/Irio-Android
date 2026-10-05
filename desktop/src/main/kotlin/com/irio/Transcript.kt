@@ -15,7 +15,9 @@ internal fun buildTranscriptPresentation(
     val retryGroups = retryVersionsForSelectedUsers(messages)
     val editGroups = editVersionsByGroup(messages)
     val selected = messages.filter { message ->
-        if (message.fromUser) {
+        if (message.summaryState != SummaryState.NONE) {
+            message.selected
+        } else if (message.fromUser) {
             message.selected
         } else {
             val ownerId = responseOwnerId(messages, message)
@@ -41,7 +43,7 @@ private fun responseOwnerId(messages: List<ChatMessage>, reply: ChatMessage): Lo
 internal fun retryVersionsByGroup(messages: List<ChatMessage>): Map<Long, List<ChatMessage>> {
     val groups = LinkedHashMap<Long, MutableList<ChatMessage>>()
     messages.forEach { message ->
-        if (!message.fromUser) {
+        if (!message.fromUser && message.summaryState == SummaryState.NONE) {
             groups.getOrPut(message.groupId) { mutableListOf() }.add(message)
         }
     }

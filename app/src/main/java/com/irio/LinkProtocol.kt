@@ -236,6 +236,10 @@ object LinkConversationJson {
                                 put("selected", message.selected)
                                 if (message.hidden) put("hidden", true)
                                 if (message.finishedAt > 0L) put("finishedAt", message.finishedAt)
+                                if (message.summaryState != SummaryState.NONE) {
+                                    put("summaryState", message.summaryState.name)
+                                    if (message.summaryUntilId != 0L) put("summaryUntilId", message.summaryUntilId)
+                                }
                                 message.responseToUserId?.let { put("responseToUserId", it) }
                                 message.usage?.let { usage ->
                                     put(
@@ -289,6 +293,8 @@ object LinkConversationJson {
                         retryGroup = item.optLong("retryGroup").takeIf { it != 0L } ?: item.optLong("id"),
                         selected = if (item.has("selected")) item.optBoolean("selected") else true,
                         finishedAt = item.optLong("finishedAt"),
+                        summaryState = summaryStateFrom(item),
+                        summaryUntilId = item.optLong("summaryUntilId"),
                         responseToUserId = item.optLong("responseToUserId").takeIf { it != 0L },
                         usage = tokenUsageFrom(item.optJSONObject("usage")),
                         hidden = item.optBoolean("hidden"),
