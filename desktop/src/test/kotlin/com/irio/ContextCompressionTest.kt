@@ -1,11 +1,84 @@
 package com.irio
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ContextCompressionTest {
+    @Test
+    fun planCompressesEverythingAfterTheLastBoundary() {
+        val history = (1L..4L).map { msg(it, "m$it", fromUser = it % 2L == 1L) }
+        val plan = planCompression(history)
+        assertEquals(listOf(1L, 2L, 3L, 4L), plan!!.summarize.map { it.id })
+        assertEquals(4L, plan.untilId)
+        assertNull(plan.priorSummary)
+    }
+
+    @Test
+    fun nothingNewAfterASuccessfulBoundaryIsNotCompressedAgain() {
+        val history = listOf(
+            msg(1, "old", fromUser = true),
+            msg(2, "已经压过", fromUser = false, state = SummaryState.SUCCESS),
+        )
+        assertNull(planCompression(history))
+    }
+
+    @Test
+    fun aLaterSegmentIncludesThePreviousSummaryInTheCompressionInput() {
+        val history = listOf(
+            msg(1, "上一份", fromUser = false, state = SummaryState.SUCCESS),
+            msg(2, "新问题", fromUser = true),
+            msg(3, "新回答", fromUser = false),
+        )
+        val plan = planCompression(history)
+        assertEquals(listOf(2L, 3L), plan!!.summarize.map { it.id })
+        assertEquals("上一份", plan.priorSummary)
+        val turns = summaryTurns(plan)
+        assertEquals("上一份", turns.first().text)
+        assertEquals("user", turns[1].role)
+        assertEquals("assistant", turns[2].role)
+        assertTrue(turns.last().text.contains("<app_control>"))
+    }
+
+    @Test
+    fun requestStartsAFreshConversationFromTheSummary() {
+        val success = msg(4, "交接记录", fromUser = false, state = SummaryState.SUCCESS)
+        val later = msg(5, "继续", fromUser = true)
+        val messages = listOf(msg(1, "很早"), msg(2, "也很早", fromUser = false), success, later)
+        val request = modelRequestMessages(messages)
+        assertEquals(listOf("交接记录", CONTINUATION_PROMPT, "继续"), request.map { it.text })
+        assertEquals(listOf("user", "user", "user"), request.map { it.role })
+        assertEquals("chat#4", modelConversationScope("chat", messages))
+        assertEquals("chat", modelConversationScope("chat", listOf(msg(1, "很早"))))
+    }
+
+    @Test
+    fun aFailedBoundaryDoesNotCutTheHistory() {
+        val messages = listOf(
+            msg(1, "before"),
+            msg(2, "失败", fromUser = false, state = SummaryState.FAILED),
+            msg(3, "after", fromUser = false),
+        )
+        assertEquals(listOf("before", "after"), modelRequestMessages(messages).map { it.text })
+    }
+
+    @Test
+    fun compressionPromptStatesTheTarget() {
+        val prompt = summarySystemPrompt(targetPercent = 10, budgetTokens = 8_000)
+        assertTrue(prompt.contains("10%"))
+        assertTrue(prompt.contains("8000"))
+        assertTrue(summarySystemPrompt(10, 0).contains("10%"))
+        assertFalse(summarySystemPrompt(10, 0).contains("token"))
+    }
+
+    @Test
+    fun budgetIsTheTargetSliceOfTheWindow() {
+        assertEquals(10_000, summaryBudgetTokens(windowTokens = 100_000, targetPercent = 10))
+        assertEquals(0, summaryBudgetTokens(windowTokens = 0, targetPercent = 10))
+    }
+
     @Test
     fun estimatorCountsText() {
         assertTrue(TokenEstimator.count("hello") > 0)
@@ -47,10 +120,43 @@ class ContextCompressionTest {
     }
 
     @Test
+    fun storedThinkingIsPartOfTheNextRequestEstimate() {
+        val plain = msg(1, "答案", fromUser = false)
+        val thought = plain.copy(
+            process = listOf(
+                ProcessEvent(id = 1, kind = ProcessEventKind.THINKING, content = "想了很久才决定怎么回答"),
+            ),
+        )
+        assertTrue(
+            estimateRequestTokens(modelRequestMessages(listOf(thought))) >
+                estimateRequestTokens(modelRequestMessages(listOf(plain))),
+        )
+    }
+
+    @Test
     fun compressionStatusIsATranscriptLabel() {
         assertEquals("上下文压缩中", compressionStatusLabel(SummaryState.RUNNING))
         assertEquals("已压缩上下文", compressionStatusLabel(SummaryState.SUCCESS))
         assertEquals("上下文压缩失败", compressionStatusLabel(SummaryState.FAILED))
         assertNull(compressionStatusLabel(SummaryState.NONE))
     }
+
+    @Test
+    fun modelWrapperIsStrippedBeforeTheRecordIsStored() {
+        assertEquals("用户要改设置。", stripContextSummary("<context_summary>\n用户要改设置。\n</context_summary>"))
+        assertEquals("只有记录", stripContextSummary("只有记录"))
+    }
+
+    private fun msg(
+        id: Long,
+        text: String,
+        fromUser: Boolean = true,
+        state: SummaryState = SummaryState.NONE,
+    ): ChatMessage = ChatMessage(
+        id = id,
+        text = text,
+        fromUser = fromUser,
+        summaryState = state,
+        summaryUntilId = if (state == SummaryState.SUCCESS) id else 0L,
+    )
 }
