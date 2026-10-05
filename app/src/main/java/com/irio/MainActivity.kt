@@ -44,6 +44,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -1591,18 +1592,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         )
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(background)
-                .drawWithContent {
-                    drawContent()
-                    if (pageDim > 0.001f) {
-                        drawRect(Color.Black.copy(alpha = pageDim))
-                    }
-                },
-        )
+    // 抽屉、输入栏、顶栏各自是独立组合函数：MainScreen 本体曾用到 259 个寄存器，
+    // 超过 ART 单方法 256 的上限，打开就会 VerifyError。
+    @Composable
+    fun ConversationDrawer() {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
@@ -1739,92 +1732,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 }
             }
         }
+    }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .zIndex(0f),
-        ) {
-            Scaffold(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .drawWithContent {
-                        drawContent()
-                        if (pageDim > 0.001f) {
-                            drawRect(Color.Black.copy(alpha = pageDim))
-                        }
-                    }
-                    .drawerSwipe(
-                        drawerWidthPx = drawerWidthPx,
-                        openDirection = true,
-                        allowTapToClose = false,
-                        progress = { drawerProgressState.value },
-                        onStart = {
-                            drawerDragging = true
-                            drawerStartProgress = drawerProgressState.value
-                        },
-                        onDrag = { drawerProgress = it },
-                        onSettle = { settleDrawer(drawerProgressState.value) },
-                        onTapClose = {},
-                    ),
-            containerColor = background,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        ) { paddingValues ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .imePadding()
-            ) {
-                AndroidMessageList(
-                    messages = visibleTranscript,
-                    controller = messageRecyclerController,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .hazeSource(chatHazeState)
-                        .padding(horizontal = 16.dp),
-                    contentPaddingTop = toolbarContentPaddingPx,
-                    contentPaddingBottom = composerContentPaddingPx,
-                    callbacks = messageCallbacks,
-                    onVisibleRangeChanged = { first, last ->
-                        val snapshot = visibleTranscript
-                        val conversationId = currentConversation.id
-                        val candidates = listOf(first - 1, last + 1)
-                            .filter { it in snapshot.indices }
-                            .distinct()
-                        transcriptPrewarmJob.value?.cancel()
-                        transcriptPrewarmJob.value = if (candidates.isEmpty()) {
-                            null
-                        } else {
-                            scope.launch {
-                                // 先让当前可见行完成首帧和自身渲染，再预热邻居。
-                                withFrameNanos { }
-                                delay(180)
-                                if (currentConversation.id != conversationId) return@launch
-                                candidates.forEach { index ->
-                                    prepareFinishedMessage(
-                                        snapshot[index], renderContentArgb, renderPxPerPt, renderTexScale, scope,
-                                    )
-                                }
-                            }
-                        }
-                    },
-                    onScrollStateChanged = { state ->
-                        val scrolling = state != RecyclerView.SCROLL_STATE_IDLE
-                        recyclerScrolling = scrolling
-                        if (scrolling && generatingIds.isNotEmpty()) {
-                            streamingDeferActive.set(true)
-                        }
-                    },
-                    onUserScrollSample = {
-                        if (!messageRecyclerController.isProgrammaticScroll()) {
-                            messageRecyclerController.isPinnedToBottom(transcriptBottomSlackPx)?.let { pinned ->
-                                stickToBottom = pinned
-                            }
-                        }
-                    },
-                )
-
+    @Composable
+    fun BoxScope.ChatComposerBar() {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -2006,7 +1917,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 )
                 }
                 }
+    }
 
+    @Composable
+    fun BoxScope.ChatToolbar() {
                 Column(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
@@ -2110,6 +2024,110 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 )
                     Spacer(Modifier.height(ChatToolbarHazeBleed))
                 }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(background)
+                .drawWithContent {
+                    drawContent()
+                    if (pageDim > 0.001f) {
+                        drawRect(Color.Black.copy(alpha = pageDim))
+                    }
+                },
+        )
+        ConversationDrawer()
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(0f),
+        ) {
+            Scaffold(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        drawContent()
+                        if (pageDim > 0.001f) {
+                            drawRect(Color.Black.copy(alpha = pageDim))
+                        }
+                    }
+                    .drawerSwipe(
+                        drawerWidthPx = drawerWidthPx,
+                        openDirection = true,
+                        allowTapToClose = false,
+                        progress = { drawerProgressState.value },
+                        onStart = {
+                            drawerDragging = true
+                            drawerStartProgress = drawerProgressState.value
+                        },
+                        onDrag = { drawerProgress = it },
+                        onSettle = { settleDrawer(drawerProgressState.value) },
+                        onTapClose = {},
+                    ),
+            containerColor = background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .imePadding()
+            ) {
+                AndroidMessageList(
+                    messages = visibleTranscript,
+                    controller = messageRecyclerController,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .hazeSource(chatHazeState)
+                        .padding(horizontal = 16.dp),
+                    contentPaddingTop = toolbarContentPaddingPx,
+                    contentPaddingBottom = composerContentPaddingPx,
+                    callbacks = messageCallbacks,
+                    onVisibleRangeChanged = { first, last ->
+                        val snapshot = visibleTranscript
+                        val conversationId = currentConversation.id
+                        val candidates = listOf(first - 1, last + 1)
+                            .filter { it in snapshot.indices }
+                            .distinct()
+                        transcriptPrewarmJob.value?.cancel()
+                        transcriptPrewarmJob.value = if (candidates.isEmpty()) {
+                            null
+                        } else {
+                            scope.launch {
+                                // 先让当前可见行完成首帧和自身渲染，再预热邻居。
+                                withFrameNanos { }
+                                delay(180)
+                                if (currentConversation.id != conversationId) return@launch
+                                candidates.forEach { index ->
+                                    prepareFinishedMessage(
+                                        snapshot[index], renderContentArgb, renderPxPerPt, renderTexScale, scope,
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    onScrollStateChanged = { state ->
+                        val scrolling = state != RecyclerView.SCROLL_STATE_IDLE
+                        recyclerScrolling = scrolling
+                        if (scrolling && generatingIds.isNotEmpty()) {
+                            streamingDeferActive.set(true)
+                        }
+                    },
+                    onUserScrollSample = {
+                        if (!messageRecyclerController.isProgrammaticScroll()) {
+                            messageRecyclerController.isPinnedToBottom(transcriptBottomSlackPx)?.let { pinned ->
+                                stickToBottom = pinned
+                            }
+                        }
+                    },
+                )
+
+                ChatComposerBar()
+
+                ChatToolbar()
             }
 
         }
