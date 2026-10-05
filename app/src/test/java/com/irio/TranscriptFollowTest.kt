@@ -115,6 +115,14 @@ class TranscriptFollowTest {
     }
 
     @Test
+    fun openingAConversationJumpsTheWholeDistanceInOneStep() {
+        assertEquals(1_800, tailFollowStep(1_800, instant = true))
+        assertEquals(0, tailFollowStep(-5, instant = true))
+        assertEquals(smoothFollowStep(1_800), tailFollowStep(1_800, instant = false))
+        assertTrue(tailFollowStep(1_800, instant = false) < 1_800)
+    }
+
+    @Test
     fun smoothFollowStepsInsteadOfJumpingTheWholeDistance() {
         assertEquals(0, smoothFollowStep(0))
         assertEquals(0, smoothFollowStep(-8))

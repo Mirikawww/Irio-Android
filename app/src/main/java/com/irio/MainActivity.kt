@@ -805,6 +805,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         // 贴底发送要滑过去。新行还没排进屏幕时 scrollToPosition 会先锚到视口顶上，列表就抽一下。
         if (justSent && stickToBottom) {
             messageRecyclerController.revealTail()
+        } else if (opening) {
+            // 切换/恢复会话：直接落在底部，不要从顶上滚下来。
+            messageRecyclerController.openAtBottom()
         } else {
             messageRecyclerController.requestScrollToBottom()
         }

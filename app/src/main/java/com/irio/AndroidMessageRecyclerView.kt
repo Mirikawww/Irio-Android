@@ -97,8 +97,15 @@ internal class MessageRecyclerController {
     private var scrollRequested = false
         set(value) {
             field = value
-            if (!value) recyclerView?.tailPrefetch = false
+            if (!value) {
+                recyclerView?.tailPrefetch = false
+                finishOpen()
+            }
         }
+    // 打开会话：列表先隐藏，直接跳到尾部再淡入，不让用户看到从顶上滚下来。
+    private var instantOpen = false
+    private var openJumpPending = false
+    private var openHidden = false
     private var alignScheduled = false
     private var chasing = false
     private var chasePosted = false
@@ -113,8 +120,58 @@ internal class MessageRecyclerController {
     private var idleConfirms = 0
     private var programmaticPosts = 0
 
+    private val layoutListener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+        onViewLayoutPass()
+    }
+
+    // 打开会话后的一小段时间内，尾部因异步渲染（Markdown/TeX/图片）长高时继续贴底。
+    private var openPinUntil = 0L
+    private var pinPosted = false
+
     fun attach(view: MessageRecyclerView) {
+        if (recyclerView === view) return
+        recyclerView?.removeOnLayoutChangeListener(layoutListener)
         recyclerView = view
+        view.addOnLayoutChangeListener(layoutListener)
+    }
+
+    private fun onViewLayoutPass() {
+        if (openPinUntil == 0L || pinPosted) return
+        val view = recyclerView ?: return
+        pinPosted = true
+        view.postOnAnimation {
+            pinPosted = false
+            pinOpenTail()
+        }
+    }
+
+    /** 窗口内：尾部不在布局里就重新跳过去；在布局里但超出底边就立刻补齐。用户一碰列表就撤销。 */
+    private fun pinOpenTail() {
+        val view = recyclerView ?: return
+        if (openPinUntil == 0L) return
+        if (SystemClock.uptimeMillis() > openPinUntil ||
+            view.scrollState != RecyclerView.SCROLL_STATE_IDLE
+        ) {
+            openPinUntil = 0L
+            return
+        }
+        if (gliding || view.isMessageUpdatePending()) return
+        val manager = view.layoutManager as? LinearLayoutManager ?: return
+        val count = view.itemCountValue()
+        if (count == 0) return
+        val tail = manager.findViewByPosition(count - 1)
+        if (tail == null) {
+            programmaticPosts++
+            try {
+                manager.scrollToPositionWithOffset(count - 1, 0)
+            } finally {
+                programmaticPosts--
+            }
+            view.requestLayout()
+            return
+        }
+        val overflow = tail.bottom - (view.height - view.paddingBottom)
+        if (overflow > 0) scrollByProgrammatic(view, overflow)
     }
 
     fun requestScrollToBottom() {
@@ -123,9 +180,63 @@ internal class MessageRecyclerController {
         flushScrollToBottom()
     }
 
+    /** 切换/恢复会话：不做滚动动画，直接落在底部。量准之前列表保持透明，落稳后 alpha 淡入。 */
+    fun openAtBottom() {
+        val view = recyclerView ?: return
+        scrollRequested = true
+        instantOpen = true
+        openJumpPending = true
+        chasing = false
+        gliding = false
+        idleConfirms = 0
+        unlaidWaits = 0
+        view.tailPrefetch = true
+        programmaticPosts++
+        try {
+            view.stopScroll()
+        } finally {
+            programmaticPosts--
+        }
+        view.animate().cancel()
+        view.alpha = 0f
+        openHidden = true
+        openPinUntil = SystemClock.uptimeMillis() + OpenPinWindowMillis
+        // 兜底：无论对齐是否收尾，都不让列表一直透明。
+        view.postDelayed({ if (recyclerView === view) finishOpen() }, OpenRevealTimeoutMillis)
+        flushScrollToBottom()
+    }
+
+    private fun finishOpen() {
+        instantOpen = false
+        openJumpPending = false
+        if (!openHidden) return
+        openHidden = false
+        val view = recyclerView ?: return
+        view.animate().cancel()
+        view.animate().alpha(1f).setDuration(OpenRevealFadeMillis).start()
+    }
+
+    /** 直接把最后一项排进布局（贴视口顶），之后由追尾一次性补齐超出底边的像素。 */
+    private fun applyOpenJump(view: MessageRecyclerView): Boolean {
+        if (!openJumpPending) return false
+        val count = view.itemCountValue()
+        if (count == 0) return false
+        openJumpPending = false
+        val manager = view.layoutManager as? LinearLayoutManager ?: return false
+        programmaticPosts++
+        try {
+            manager.scrollToPositionWithOffset(count - 1, 0)
+        } finally {
+            programmaticPosts--
+        }
+        view.requestLayout()
+        return true
+    }
+
     /** 发送消息：固定时长滑到新尾部，并让之后的流式输出继续贴底。 */
     fun revealTail() {
         val view = recyclerView ?: return
+        openPinUntil = 0L
         scrollRequested = true
         chasing = false
         idleConfirms = 0
@@ -184,6 +295,10 @@ internal class MessageRecyclerController {
                 idleConfirms = 0
                 return@post
             }
+            if (applyOpenJump(current)) {
+                scheduleAlign(attempt = 1)
+                return@post
+            }
             val count = current.itemCountValue()
             if (count == 0) {
                 scrollRequested = false
@@ -231,6 +346,10 @@ internal class MessageRecyclerController {
             postChase()
             return
         }
+        if (applyOpenJump(current)) {
+            postChase()
+            return
+        }
         val count = current.itemCountValue()
         if (count == 0) {
             scrollRequested = false
@@ -262,7 +381,7 @@ internal class MessageRecyclerController {
             return
         }
         idleConfirms = 0
-        val step = smoothFollowStep(catchUp)
+        val step = tailFollowStep(catchUp, instantOpen)
         val beforeBottom = child.bottom
         programmaticPosts++
         try {
@@ -439,7 +558,7 @@ internal class MessageRecyclerController {
                 return
             }
             unlaidWaits = 0
-            scrollByProgrammatic(view, smoothFollowStep(overflow))
+            scrollByProgrammatic(view, tailFollowStep(overflow, instantOpen))
             scrollRequested = true
             chasing = true
             postChase()
