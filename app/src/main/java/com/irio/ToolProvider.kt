@@ -24,6 +24,7 @@ data class ToolExecutionContext(
     val cancellation: ChatRequestCancellation = ChatRequestCancellation(),
     val onUpdate: suspend (ChatStreamUpdate) -> Unit = {},
     val appContext: android.content.Context? = null,
+    val conversationId: String = "",
 )
 
 /** Provider-neutral result that can be appended to the next model turn. */

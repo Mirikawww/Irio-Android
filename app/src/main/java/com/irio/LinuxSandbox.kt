@@ -87,6 +87,16 @@ internal object LinuxSandboxStore {
         update(file) { it.put("commandsPerCall", linuxSandboxClampCommandsPerCall(commandsPerCall)) }
     }
 
+    /** 缺省关闭。关闭后模型不能再把命令留在后台，已经在跑的由调用方停掉。 */
+    fun loadBackgroundEnabled(file: File): Boolean {
+        if (!file.isFile) return false
+        return runCatching { JSONObject(file.readText()).optBoolean("backgroundCommands", false) }.getOrDefault(false)
+    }
+
+    fun saveBackgroundEnabled(file: File, enabled: Boolean) {
+        update(file) { it.put("backgroundCommands", enabled) }
+    }
+
     private fun update(file: File, mutate: (JSONObject) -> Unit) {
         file.parentFile?.mkdirs()
         val root = if (file.isFile) {
@@ -189,41 +199,55 @@ internal fun linuxSandboxClampCommandsPerCall(raw: Int): Int =
 internal data class LinuxSandboxCommandSelection(
     val commands: List<String>,
     val skipped: Int,
+    val background: List<String> = emptyList(),
+    val backgroundIgnored: Int = 0,
 )
 
-/** 一次工具调用里的命令。`commands` 优先；没有时才接受单条 `command`。超出上限的只计数，不执行。 */
-internal fun linuxSandboxSelectCommands(arguments: String, limit: Int): LinuxSandboxCommandSelection {
+/**
+ * 一次工具调用里的命令。`commands` 会等到结束；只有模型放进 `background` 的才留下。
+ * 开关关闭时后者不执行，也不算进已运行。上限先扣前台，再扣后台。
+ */
+internal fun linuxSandboxSelectCommands(
+    arguments: String,
+    limit: Int,
+    backgroundEnabled: Boolean = false,
+): LinuxSandboxCommandSelection {
     val parsed = runCatching { JSONObject(arguments) }.getOrNull()
     val raw = ArrayList<String>()
     if (parsed != null) {
-        when (val commands = parsed.opt("commands")) {
-            is org.json.JSONArray -> {
-                for (index in 0 until commands.length()) {
-                    val text = commands.optString(index)
-                    if (text.isNotBlank()) raw += text
-                }
-            }
-            is String -> if (commands.isNotBlank()) raw += commands
-        }
-        if (raw.isEmpty()) {
-            when (val single = parsed.opt("command")) {
-                is org.json.JSONArray -> {
-                    for (index in 0 until single.length()) {
-                        val text = single.optString(index)
-                        if (text.isNotBlank()) raw += text
-                    }
-                }
-                is String -> if (single.isNotBlank()) raw += single
-            }
-        }
+        raw += linuxSandboxCommandList(parsed.opt("commands"))
+        if (raw.isEmpty()) raw += linuxSandboxCommandList(parsed.opt("command"))
     } else if (arguments.isNotBlank()) {
         raw += arguments.trim()
     }
+    val backgroundRequested = if (parsed != null) linuxSandboxCommandList(parsed.opt("background")) else emptyList()
     val cap = linuxSandboxClampCommandsPerCall(limit)
-    if (cap == LinuxSandboxStore.COMMANDS_UNLIMITED || raw.size <= cap) {
-        return LinuxSandboxCommandSelection(raw, skipped = 0)
+    if (!backgroundEnabled) {
+        val kept = if (cap == LinuxSandboxStore.COMMANDS_UNLIMITED || raw.size <= cap) raw else raw.take(cap)
+        val skipped = if (cap == LinuxSandboxStore.COMMANDS_UNLIMITED || raw.size <= cap) 0 else raw.size - cap
+        return LinuxSandboxCommandSelection(kept, skipped, backgroundIgnored = backgroundRequested.size)
     }
-    return LinuxSandboxCommandSelection(raw.take(cap), skipped = raw.size - cap)
+    if (cap == LinuxSandboxStore.COMMANDS_UNLIMITED) {
+        return LinuxSandboxCommandSelection(raw, skipped = 0, background = backgroundRequested)
+    }
+    val commands = raw.take(cap)
+    val background = backgroundRequested.take(cap - commands.size)
+    val skipped = (raw.size - commands.size) + (backgroundRequested.size - background.size)
+    return LinuxSandboxCommandSelection(commands, skipped, background)
+}
+
+private fun linuxSandboxCommandList(value: Any?): List<String> {
+    val raw = ArrayList<String>()
+    when (value) {
+        is org.json.JSONArray -> {
+            for (index in 0 until value.length()) {
+                val text = value.optString(index)
+                if (text.isNotBlank()) raw += text
+            }
+        }
+        is String -> if (value.isNotBlank()) raw += value
+    }
+    return raw
 }
 
 internal fun linuxSandboxJoinSections(parts: List<String>): String =

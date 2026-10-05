@@ -48,6 +48,7 @@ internal object LinuxSandboxSession {
         private set
 
     fun kick(context: Context, rebuild: Boolean = false) {
+        if (rebuild) LinuxBackgroundJobs.stopAll()
         if (!rebuild && job?.isActive == true) return
         val app = context.applicationContext
         preparing = true
@@ -86,6 +87,30 @@ internal object LinuxSandboxSession {
             execLocked(context, normalized, cancellation, onProgress)
         }
     }
+
+    /** 启动后立刻返回。进程不跟这次工具调用一起结束。 */
+    suspend fun startBackground(context: Context, command: String, conversationId: String = ""): LinuxBackgroundStart =
+        withContext(Dispatchers.IO) {
+            val normalized = linuxSandboxNormalizeCommand(command)
+                ?: return@withContext LinuxBackgroundStart(
+                    error = if (command.trim().isEmpty()) tr("命令为空") else tr("命令太长"),
+                )
+            mutex.withLock {
+                val installed = installLocked(context, rebuild = false)
+                if (!installed.ok) return@withLock LinuxBackgroundStart(error = installed.message)
+                val process = try {
+                    openProcess(context, normalized)
+                } catch (error: Exception) {
+                    if (error is CancellationException) throw error
+                    return@withLock LinuxBackgroundStart(
+                        error = error.message?.takeIf { it.isNotBlank() } ?: tr("无法启动后台命令。"),
+                    )
+                } ?: return@withLock LinuxBackgroundStart(error = tr("安装包里没有 Linux 运行时。"))
+                val id = LinuxBackgroundJobs.track(normalized, conversationId) { stopProcess(process) }
+                jobs.launch { drain(process, id) }
+                LinuxBackgroundStart(id = id)
+            }
+        }
 
     private fun installLocked(context: Context, rebuild: Boolean): LinuxSandboxInstallResult {
         val catalog = loadLinuxSandboxCatalog(context)
@@ -128,10 +153,15 @@ internal object LinuxSandboxSession {
         cancellation: ChatRequestCancellation,
         onProgress: suspend (LinuxSandboxCommandProgress) -> Unit,
     ): String {
+        val process = openProcess(context, command) ?: return tr("安装包里没有 Linux 运行时。")
+        return readProcess(process, cancellation, onProgress)
+    }
+
+    private fun openProcess(context: Context, command: String): Process? {
         val nativeDir = File(context.applicationInfo.nativeLibraryDir)
         val proot = File(nativeDir, LinuxSandboxHost.PROOT)
         val loader = File(nativeDir, LinuxSandboxHost.LOADER)
-        if (!proot.isFile || !loader.isFile) return tr("安装包里没有 Linux 运行时。")
+        if (!proot.isFile || !loader.isFile) return null
         val loader32 = File(nativeDir, LinuxSandboxHost.LOADER32).takeIf { it.isFile }
         val layout = LinuxSandboxLayout.of(context.filesDir)
         val storage = android.os.Environment.getExternalStorageDirectory().takeIf { it.isDirectory }?.absolutePath
@@ -139,7 +169,7 @@ internal object LinuxSandboxSession {
         listOf(proot, loader, loader32).forEach { file ->
             if (file != null) runCatching { android.system.Os.chmod(file.absolutePath, 493) }
         }
-        val process = ProcessBuilder(
+        return ProcessBuilder(
             linuxSandboxProotArguments(
                 proot = proot.absolutePath,
                 rootfs = layout.rootfs.absolutePath,
@@ -158,7 +188,58 @@ internal object LinuxSandboxSession {
                 ),
             )
         }.start()
-        return readProcess(process, cancellation, onProgress)
+    }
+
+    private fun stopProcess(process: Process) {
+        val root = processPid(process)
+        if (root > 0) killProcessTree(root, mutableSetOf())
+        runCatching { process.destroyForcibly() }
+    }
+
+    private fun processPid(process: Process): Int {
+        val field = runCatching { process.javaClass.getDeclaredField("pid") }.getOrNull()
+            ?: process.javaClass.superclass?.let { type ->
+                runCatching { type.getDeclaredField("pid") }.getOrNull()
+            }
+            ?: return 0
+        field.isAccessible = true
+        return when (val value = field.get(process)) {
+            is Int -> value
+            is Long -> value.toInt()
+            else -> 0
+        }
+    }
+
+    /** destroy 只打到 proot 自己。guest 里的命令要沿着 /proc 子进程树一起杀，否则停了还在跑。 */
+    private fun killProcessTree(pid: Int, seen: MutableSet<Int>) {
+        if (pid <= 0 || !seen.add(pid)) return
+        val children = runCatching { File("/proc/$pid/task/$pid/children").readText() }.getOrDefault("")
+        children.split(Regex("\\s+")).forEach { token ->
+            token.toIntOrNull()?.let { killProcessTree(it, seen) }
+        }
+        android.os.Process.sendSignal(pid, 15)
+        android.os.Process.sendSignal(pid, 9)
+    }
+
+    /** 标准输出结束不等于进程结束，这里只等待退出，不主动杀掉。 */
+    private fun drain(process: Process, id: Long) {
+        val buffer = ByteArray(4096)
+        try {
+            val stream = process.inputStream
+            while (true) {
+                val count = try {
+                    stream.read(buffer)
+                } catch (_: Exception) {
+                    break
+                }
+                if (count < 0) break
+                LinuxBackgroundJobs.append(id, buffer, count)
+            }
+        } finally {
+            runCatching { process.waitFor() }
+            val code = runCatching { process.exitValue() }.getOrDefault(-1)
+            LinuxBackgroundJobs.finish(id, code)
+        }
     }
 
     private suspend fun readProcess(

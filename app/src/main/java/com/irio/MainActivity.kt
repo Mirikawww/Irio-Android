@@ -1089,6 +1089,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             LinuxSandboxStore.loadCommandsPerCall(
                                 LinuxSandboxLayout.of(context.filesDir).stateFile,
                             ),
+                            LinuxSandboxStore.loadBackgroundEnabled(
+                                LinuxSandboxLayout.of(context.filesDir).stateFile,
+                            ),
                         ),
                     )
                 }
@@ -1187,6 +1190,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         imageGenModel = requestImageGenModel,
                         toolRegistry = requestRegistry,
                         connectionScope = modelConversationScope(requestConversationId, requestSource),
+                        conversationId = requestConversationId,
                         cancellation = requestCancellation,
                         appContext = context,
                         onUpdate = update@{ update ->

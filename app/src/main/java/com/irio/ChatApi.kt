@@ -160,6 +160,7 @@ object ChatApi {
         imageGenModel: String = "",
         toolRegistry: ToolRegistry = ToolRegistry.default(),
         connectionScope: String = "",
+        conversationId: String = "",
         cancellation: ChatRequestCancellation,
         onUpdate: suspend (ChatStreamUpdate) -> Unit,
         appContext: android.content.Context? = null,
@@ -182,6 +183,7 @@ object ChatApi {
             cancellation = cancellation,
             onUpdate = onUpdate,
             appContext = appContext,
+            conversationId = conversationId,
         )
         repeat(rounds) { roundIndex ->
             if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
@@ -1378,6 +1380,7 @@ internal object MemoryTool {
         ImageGenTool.NAME -> tr("图片生成中")
         TimeTool.NAME -> tr("获取时间")
         LinuxShellTool.NAME -> tr("运行命令中")
+        LinuxBackgroundTool.NAME -> tr("处理后台命令")
         WebFetchTool.NAME -> tr("浏览网页中")
         GET -> tr("读取记忆")
         UPDATE -> tr("写入记忆")
@@ -1391,6 +1394,7 @@ internal object MemoryTool {
         }
         TimeTool.NAME -> tr("已获取时间")
         LinuxShellTool.NAME -> tr("已运行命令")
+        LinuxBackgroundTool.NAME -> tr("已处理后台命令")
         WebFetchTool.NAME -> tr("已浏览网页")
         GET -> tr("已读取记忆")
         UPDATE -> tr("已写入记忆")

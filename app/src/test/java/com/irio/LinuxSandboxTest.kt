@@ -2,6 +2,7 @@ package com.irio
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -277,6 +278,133 @@ class LinuxSandboxTest {
             linuxSandboxSelectCommands("""{"command":["echo a","echo b"]}""", 0).commands,
         )
     }
+
+    @Test
+    fun backgroundCommandsStayOptInUntilTheModelAsks() {
+        val root = Files.createTempDirectory("irio-bg").toFile()
+        val layout = LinuxSandboxLayout.of(root)
+        assertFalse(LinuxSandboxStore.loadBackgroundEnabled(layout.stateFile))
+        LinuxSandboxStore.saveEnabled(layout.stateFile, true)
+        LinuxSandboxStore.saveCommandsPerCall(layout.stateFile, 3)
+        LinuxSandboxStore.saveBackgroundEnabled(layout.stateFile, true)
+        assertTrue(LinuxSandboxStore.loadEnabled(layout.stateFile))
+        assertEquals(3, LinuxSandboxStore.loadCommandsPerCall(layout.stateFile))
+        LinuxSandboxStore.saveEnabled(layout.stateFile, false)
+        assertTrue(LinuxSandboxStore.loadBackgroundEnabled(layout.stateFile))
+        LinuxSandboxStore.saveBackgroundEnabled(layout.stateFile, false)
+        assertFalse(LinuxSandboxStore.loadEnabled(layout.stateFile))
+
+        val plain = """{"commands":["echo a","sleep 5 &"],"background":["python3 -m http.server"]}"""
+        val off = linuxSandboxSelectCommands(plain, 10, backgroundEnabled = false)
+        assertEquals(listOf("echo a", "sleep 5 &"), off.commands)
+        assertTrue(off.background.isEmpty())
+        assertEquals(1, off.backgroundIgnored)
+        assertEquals(0, off.skipped)
+
+        val on = linuxSandboxSelectCommands(plain, 10, backgroundEnabled = true)
+        assertEquals(listOf("echo a", "sleep 5 &"), on.commands)
+        assertEquals(listOf("python3 -m http.server"), on.background)
+        assertEquals(0, on.backgroundIgnored)
+
+        val capped = linuxSandboxSelectCommands(plain, 1, backgroundEnabled = true)
+        assertEquals(listOf("echo a"), capped.commands)
+        assertTrue(capped.background.isEmpty())
+        assertEquals(2, capped.skipped)
+
+        val onlyBackground = linuxSandboxSelectCommands("""{"background":["sleep 30"]}""", 0, true)
+        assertTrue(onlyBackground.commands.isEmpty())
+        assertEquals(listOf("sleep 30"), onlyBackground.background)
+        assertEquals(0, onlyBackground.skipped)
+
+        ProviderProtocol.entries.forEach { protocol ->
+            val hidden = parametersOf(LinuxShellTool.schemaFor(protocol, 0, false), protocol)
+            val shown = parametersOf(LinuxShellTool.schemaFor(protocol, 0, true), protocol)
+            assertFalse(hidden.getJSONObject("properties").has("background"))
+            assertTrue(shown.getJSONObject("properties").has("background"))
+            val required = shown.getJSONArray("required")
+            assertTrue((0 until required.length()).any { required.getString(it) == "background" })
+            val backgroundTool = LinuxBackgroundTool.schemaFor(protocol)
+            val name = when (protocol) {
+                ProviderProtocol.CHAT_COMPLETIONS -> backgroundTool.getJSONObject("function").getString("name")
+                else -> backgroundTool.getString("name")
+            }
+            assertEquals(LinuxBackgroundTool.NAME, name)
+        }
+        val quiet = LinuxShellToolProvider()
+        val loud = LinuxShellToolProvider(backgroundEnabled = true)
+        assertTrue(quiet.handles(LinuxShellTool.NAME))
+        assertFalse(quiet.handles(LinuxBackgroundTool.NAME))
+        assertEquals(1, quiet.definitions(ProviderProtocol.CHAT_COMPLETIONS).size)
+        assertTrue(loud.handles(LinuxBackgroundTool.NAME))
+        assertEquals(2, loud.definitions(ProviderProtocol.CHAT_COMPLETIONS).size)
+        assertFalse(LinuxShellTool.descriptionFor(0).contains("linux_background"))
+        assertTrue(LinuxShellTool.descriptionFor(0, true).contains("linux_background"))
+        assertTrue(LinuxShellTool.descriptionFor(4, true).contains("At most 4"))
+        assertTrue(LinuxShellTool.descriptionFor(4, true).contains("together"))
+        assertEquals("Background commands", translate(AppLanguage.EN, "后台命令"))
+        assertEquals("Stop", translate(AppLanguage.EN, "停止"))
+        assertEquals("2 background commands", translate(AppLanguage.EN, "%s 个后台命令").format(2))
+        assertEquals("Checking background commands", translate(AppLanguage.EN, "处理后台命令"))
+        assertEquals("Checked background commands", translate(AppLanguage.EN, "已处理后台命令"))
+        assertEquals("Running in the background as 4", translate(AppLanguage.EN, "已在后台运行，编号 %s").format(4))
+        assertEquals("Background commands are off.", translate(AppLanguage.EN, "后台命令已关闭。"))
+    }
+
+    @Test
+    fun backgroundBoardKeepsOnlyExplicitJobsAndCanStopOne() {
+        val board = LinuxBackgroundBoard(outputLimit = 4, finishedLimit = 2)
+        val first = board.add("echo a") {}
+        val second = board.add("python3 -m http.server") {}
+        assertEquals(listOf(first, second), board.running().map { it.id })
+        board.append(second, "hello!".toByteArray(), 6)
+        val live = board.find(second.toString())!!
+        assertEquals("hell", live.output)
+        assertTrue(live.truncated)
+        assertTrue(linuxBackgroundFormatStatus(live).contains("python3 -m http.server"))
+        assertTrue(linuxBackgroundFormatStatus(live).contains("输出已截断"))
+        assertEquals("没有后台命令。", linuxBackgroundFormatList(emptyList()))
+        assertTrue(linuxBackgroundFormatList(board.tracked()).startsWith("运行中 2 条"))
+        assertEquals("未知操作", linuxBackgroundHandle("""{"action":"nope","id":""}""", board))
+        assertEquals("没有这条后台命令。", linuxBackgroundHandle("""{"action":"stop","id":"99"}""", board))
+        assertEquals(
+            "已停止后台命令 $second。",
+            linuxBackgroundHandle("""{"action":"stop","id":"$second"}""", board),
+        )
+        assertTrue(board.running().none { it.id == second })
+        assertEquals(true, board.find(second.toString())?.stopped)
+        assertEquals(
+            "后台命令 $second 已经结束。",
+            linuxBackgroundHandle("""{"action":"stop","id":"$second"}""", board),
+        )
+        board.finish(second, 9)
+        assertEquals(9, board.find(second.toString())?.exitCode)
+        assertTrue(board.find(second.toString())?.stopped == true)
+        val third = board.add("sleep 1") {}
+        board.finish(first, 0)
+        board.finish(third, 0)
+        assertNull(board.find(second.toString()))
+        assertNotNull(board.find(first.toString()))
+        assertEquals(0, board.running().size)
+
+        var notices = 0
+        val watched = LinuxBackgroundBoard()
+        watched.subscribe { notices++ }
+        val id = watched.add("sleep 5") {}
+        assertEquals(1, notices)
+        watched.append(id, "x".toByteArray(), 1)
+        assertEquals(1, notices)
+        assertTrue(watched.stop(id))
+        assertEquals(2, notices)
+        assertFalse(watched.stop(id))
+        assertEquals("list", linuxBackgroundParseRequest("""{"id":"1"}""").action)
+    }
+
+    private fun parametersOf(schema: org.json.JSONObject, protocol: ProviderProtocol): org.json.JSONObject =
+        when (protocol) {
+            ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
+            ProviderProtocol.ANTHROPIC -> schema.getJSONObject("input_schema")
+            else -> schema.getJSONObject("parameters")
+        }
 
     @Test
     fun catalogKeepsThePinnedChecksum() {

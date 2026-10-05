@@ -76,6 +76,9 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
     var commandsPerCall by remember {
         mutableIntStateOf(LinuxSandboxStore.loadCommandsPerCall(layout.stateFile))
     }
+    var backgroundCommands by remember {
+        mutableStateOf(LinuxSandboxStore.loadBackgroundEnabled(layout.stateFile))
+    }
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -181,6 +184,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                         if (!want) {
                             LinuxSandboxStore.saveEnabled(layout.stateFile, false)
                             enabled = false
+                            LinuxBackgroundJobs.stopAll()
                             refresh()
                             return@Switch
                         }
@@ -222,6 +226,23 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                         val clamped = linuxSandboxClampCommandsPerCall(next)
                         commandsPerCall = clamped
                         LinuxSandboxStore.saveCommandsPerCall(layout.stateFile, clamped)
+                    },
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .settingsRow()
+                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(tr("后台命令"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
+                Switch(
+                    checked = backgroundCommands,
+                    onCheckedChange = { want ->
+                        LinuxSandboxStore.saveBackgroundEnabled(layout.stateFile, want)
+                        backgroundCommands = want
+                        if (!want) LinuxBackgroundJobs.stopAll()
                     },
                 )
             }
