@@ -76,3 +76,7 @@ compose.desktop {
         mainClass = "com.irio.MainKt"
     }
 }
+
+tasks.test {
+    environment("IRIO_HOME", layout.buildDirectory.dir("tmp/test-home").get().asFile.absolutePath)
+}

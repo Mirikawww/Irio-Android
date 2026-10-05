@@ -55,6 +55,22 @@ data class ModelFetchResult(
 /** 提供商详情里关掉的模型不进任何模型菜单。缺省集合表示全部开启。 */
 fun ProviderConfig.enabledModels(): List<String> = models.filter { it !in disabledModels }
 
+/** 更新列表不代表选择模型；仅唯一且开启的当前提供商允许补选被删除的模型。 */
+internal fun selectedModelAfterProviderSave(
+    providers: List<ProviderConfig>,
+    activeProviderId: String,
+    config: ProviderConfig,
+): String {
+    if (config.selectedModel.isNotBlank() && config.selectedModel in config.models) return config.selectedModel
+    val previous = providers.firstOrNull { it.id == config.id }
+    val initialSelection = previous == null && config.enabled
+    val removedActiveSelection = providers.size == 1 && config.enabled && activeProviderId == config.id &&
+        previous != null && previous.selectedModel.isNotBlank() &&
+        config.selectedModel == previous.selectedModel && previous.selectedModel in previous.models &&
+        previous.selectedModel !in config.models
+    return if (initialSelection || removedActiveSelection) config.enabledModels().firstOrNull().orEmpty() else ""
+}
+
 enum class ModelDiffKind { Added, Unchanged, Removed }
 
 data class ModelDiffEntry(
@@ -133,8 +149,7 @@ object ProviderStore {
                 }.getOrDefault(ProviderProtocol.CHAT_COMPLETIONS)
                 val models = stringList(item.optJSONArray("models"))
                 val disabled = stringList(item.optJSONArray("disabled_models")).filter { it in models }.toSet()
-                val selected = item.optString("selected_model").takeIf { it in models }
-                    ?: models.firstOrNull().orEmpty()
+                val selected = item.optString("selected_model").takeIf { it in models }.orEmpty()
                 add(
                     ProviderConfig(
                         id = item.optString("id").ifBlank { UUID.randomUUID().toString() },
@@ -181,13 +196,13 @@ object ProviderStore {
 
     fun saveProvider(config: ProviderConfig) {
         val providers = loadProviders().toMutableList()
+        val activeId = loadActiveProviderId()
         val index = providers.indexOfFirst { it.id == config.id }
-        val selected = config.selectedModel.takeIf { it in config.models }
-            ?: config.models.firstOrNull().orEmpty()
+        val selected = selectedModelAfterProviderSave(providers, activeId, config)
         val disabled = config.disabledModels.intersect(config.models.toSet())
         val stored = config.copy(selectedModel = selected, disabledModels = disabled)
         if (index >= 0) providers[index] = stored else providers.add(stored)
-        persist(providers, stored.id)
+        persist(providers, activeId)
     }
 
     fun saveDisabledModels(providerId: String, disabled: Set<String>) {
@@ -366,8 +381,7 @@ object ProviderStore {
                 }.getOrDefault(ProviderProtocol.CHAT_COMPLETIONS)
                 val models = stringList(item.optJSONArray("models"))
                 val disabled = stringList(item.optJSONArray("disabled_models")).filter { it in models }.toSet()
-                val selected = item.optString("selected_model").takeIf { it in models }
-                    ?: models.firstOrNull().orEmpty()
+                val selected = item.optString("selected_model").takeIf { it in models }.orEmpty()
                 add(
                     ProviderConfig(
                         id = item.optString("id").ifBlank { UUID.randomUUID().toString() },

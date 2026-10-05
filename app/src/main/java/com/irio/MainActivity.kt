@@ -770,7 +770,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     LaunchedEffect(providers, activeProviderId) {
         val activeModels = providers.firstOrNull { it.id == activeProviderId }?.models.orEmpty()
         if (selectedModel !in activeModels) {
-            selectedModel = activeModels.firstOrNull().orEmpty()
+            selectedModel = ""
         }
         if (providers.none { it.models.isNotEmpty() }) modelMenuOpen = false
     }
