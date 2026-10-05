@@ -115,7 +115,12 @@ internal object ChatProtocol {
         }
     }
 
-    fun putReasoning(target: JSONObject, protocol: ProviderProtocol, effort: ReasoningEffort) {
+    fun putReasoning(
+        target: JSONObject,
+        protocol: ProviderProtocol,
+        effort: ReasoningEffort,
+        model: String = "",
+    ) {
         when (protocol) {
             ProviderProtocol.CHAT_COMPLETIONS -> {
                 val value = effort.apiValue ?: return
@@ -127,6 +132,10 @@ internal object ChatProtocol {
                 target.put("reasoning", JSONObject().put("effort", value))
             }
             ProviderProtocol.ANTHROPIC -> {
+                if (requiresAdaptiveThinking(model)) {
+                    putAdaptiveThinking(target, effort)
+                    return
+                }
                 when (effort) {
                     ReasoningEffort.OFF -> target.put("thinking", JSONObject().put("type", "disabled"))
                     ReasoningEffort.AUTO -> Unit
@@ -149,6 +158,32 @@ internal object ChatProtocol {
                 }
             }
         }
+    }
+
+    private val claudeVersion = Regex("(opus|sonnet|haiku|fable)-(\\d+)(?:[-.](\\d{1,2})(?!\\d))?")
+
+    /** Claude 新模型（Opus 4.7+、Sonnet/Haiku/Opus 5+、Fable）拒绝 `thinking.type=enabled`，只接受 adaptive。 */
+    fun requiresAdaptiveThinking(model: String): Boolean {
+        val match = claudeVersion.find(model.lowercase()) ?: return false
+        val family = match.groupValues[1]
+        val major = match.groupValues[2].toIntOrNull() ?: return false
+        val minor = match.groupValues[3].toIntOrNull() ?: 0
+        return family == "fable" || major >= 5 || (family == "opus" && major == 4 && minor >= 7)
+    }
+
+    private fun putAdaptiveThinking(target: JSONObject, effort: ReasoningEffort) {
+        // OFF / AUTO: 省略 thinking，由服务端默认处理。
+        val level = when (effort) {
+            ReasoningEffort.OFF, ReasoningEffort.AUTO -> return
+            ReasoningEffort.MINIMAL, ReasoningEffort.LOW -> "low"
+            ReasoningEffort.MEDIUM -> "medium"
+            ReasoningEffort.HIGH -> "high"
+            ReasoningEffort.XHIGH -> "xhigh"
+            ReasoningEffort.MAX -> "max"
+        }
+        // display=summarized：不带时响应不返回思考内容，应用的思考面板会是空的。
+        target.put("thinking", JSONObject().put("type", "adaptive").put("display", "summarized"))
+        target.put("output_config", JSONObject().put("effort", level))
     }
 
     fun presentString(value: Any?): String = when (value) {

@@ -134,6 +134,37 @@ class ChatProtocolTest {
     }
 
     @Test
+    fun anthropicNewClaudeModelsUseAdaptiveThinking() {
+        val high = JSONObject()
+        ChatProtocol.putReasoning(high, ProviderProtocol.ANTHROPIC, ReasoningEffort.HIGH, "claude-sonnet-5-5")
+        assertEquals("adaptive", high.getJSONObject("thinking").getString("type"))
+        assertEquals("summarized", high.getJSONObject("thinking").getString("display"))
+        assertFalse(high.getJSONObject("thinking").has("budget_tokens"))
+        assertEquals("high", high.getJSONObject("output_config").getString("effort"))
+
+        val off = JSONObject()
+        ChatProtocol.putReasoning(off, ProviderProtocol.ANTHROPIC, ReasoningEffort.OFF, "claude-sonnet-5-5")
+        assertFalse(off.has("thinking"))
+        assertFalse(off.has("output_config"))
+
+        val legacy = JSONObject()
+        ChatProtocol.putReasoning(legacy, ProviderProtocol.ANTHROPIC, ReasoningEffort.HIGH, "claude-sonnet-4-5")
+        assertEquals("enabled", legacy.getJSONObject("thinking").getString("type"))
+    }
+
+    @Test
+    fun adaptiveThinkingModelDetection() {
+        listOf(
+            "claude-sonnet-5-5", "claude-sonnet-5", "claude-opus-5", "anthropic.claude-opus-5-5",
+            "us.anthropic.claude-sonnet-5", "claude-opus-4-7", "claude-opus-4.8", "claude-fable-5-1",
+        ).forEach { assertTrue(it, ChatProtocol.requiresAdaptiveThinking(it)) }
+        listOf(
+            "claude-sonnet-4-5", "claude-sonnet-4-6", "claude-opus-4-6", "claude-opus-4-1-20250805",
+            "claude-haiku-4-5-20251001", "claude-3-7-sonnet", "gpt-5.5", "",
+        ).forEach { assertFalse(it, ChatProtocol.requiresAdaptiveThinking(it)) }
+    }
+
+    @Test
     fun chatCompletionsParsesUsageFromStreamChunk() {
         val update = ChatProtocol.parseChatCompletions(
             """{"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":120,"completion_tokens":40,"total_tokens":160}}""",

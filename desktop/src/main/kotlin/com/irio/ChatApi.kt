@@ -779,7 +779,7 @@ object ChatApi {
             put("model", model)
             put("stream", true)
             put("max_tokens", anthropicMaxTokens(reasoningEffort))
-            ChatProtocol.putReasoning(this, ProviderProtocol.ANTHROPIC, reasoningEffort)
+            ChatProtocol.putReasoning(this, ProviderProtocol.ANTHROPIC, reasoningEffort, model)
             toolsArray()?.let { put("tools", it) }
             if (!systemPrompt.isNullOrBlank()) put("system", systemPrompt)
             put("messages", JSONArray().apply {
