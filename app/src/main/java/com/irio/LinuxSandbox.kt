@@ -97,6 +97,18 @@ internal object LinuxSandboxStore {
         update(file) { it.put("backgroundCommands", enabled) }
     }
 
+    /** 删除环境，但保留命令设置和应用的其他数据。 */
+    fun delete(layout: LinuxSandboxLayout, hostTmp: File) {
+        saveEnabled(layout.stateFile, false)
+        listOf(
+            layout.rootfs,
+            layout.partial,
+            File(layout.root, "rootfs.previous"),
+            layout.versionFile,
+            hostTmp,
+        ).forEach { linuxSandboxDeleteTree(it) }
+    }
+
     private fun update(file: File, mutate: (JSONObject) -> Unit) {
         file.parentFile?.mkdirs()
         val root = if (file.isFile) {
@@ -116,6 +128,9 @@ internal object LinuxSandboxStore {
 
 internal object LinuxSandboxPolicy {
     fun exposed(enabled: Boolean, allFiles: Boolean): Boolean = enabled && allFiles
+
+    fun canDelete(installed: Boolean, preparing: Boolean, deleting: Boolean): Boolean =
+        installed && !preparing && !deleting
 }
 
 /**

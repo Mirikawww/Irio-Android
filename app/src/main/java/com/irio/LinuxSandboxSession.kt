@@ -9,7 +9,9 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -40,6 +42,12 @@ internal object LinuxSandboxSession {
     private var job: Job? = null
 
     @Volatile
+    private var deleting = false
+
+    @Volatile
+    private var foregroundProcess: Process? = null
+
+    @Volatile
     var preparing: Boolean = false
         private set
 
@@ -48,6 +56,7 @@ internal object LinuxSandboxSession {
         private set
 
     fun kick(context: Context, rebuild: Boolean = false) {
+        if (deleting || !LinuxSandboxStore.loadEnabled(LinuxSandboxLayout.of(context.filesDir).stateFile)) return
         if (rebuild) LinuxBackgroundJobs.stopAll()
         if (!rebuild && job?.isActive == true) return
         val app = context.applicationContext
@@ -57,6 +66,9 @@ internal object LinuxSandboxSession {
             val outcome = runCatching {
                 mutex.withLock {
                     val layout = LinuxSandboxLayout.of(app.filesDir)
+                    if (deleting || !LinuxSandboxStore.loadEnabled(layout.stateFile)) {
+                        return@withLock LinuxSandboxInstallResult(true, "")
+                    }
                     if (!rebuild && layout.installedVersion() != null && layout.shellPresent()) {
                         return@withLock LinuxSandboxInstallResult(true, "")
                     }
@@ -73,6 +85,27 @@ internal object LinuxSandboxSession {
         }
     }
 
+    /** 与安装/前台命令串行，防止排队中的工具在删除后又把环境解压回来。 */
+    suspend fun delete(context: Context) {
+        deleting = true
+        withContext(NonCancellable + Dispatchers.IO) {
+            try {
+                val layout = LinuxSandboxLayout.of(context.filesDir)
+                LinuxSandboxStore.saveEnabled(layout.stateFile, false)
+                foregroundProcess?.let { stopProcess(it) }
+                job?.cancelAndJoin()
+                mutex.withLock {
+                    LinuxBackgroundJobs.running().forEach { LinuxBackgroundJobs.stop(it.id, notify = false) }
+                    LinuxSandboxStore.delete(layout, File(context.cacheDir, "linux-sandbox-tmp"))
+                    lastError = null
+                }
+            } finally {
+                preparing = false
+                deleting = false
+            }
+        }
+    }
+
     suspend fun runCommand(
         context: Context,
         command: String,
@@ -82,6 +115,9 @@ internal object LinuxSandboxSession {
         val normalized = linuxSandboxNormalizeCommand(command)
             ?: return@withContext if (command.trim().isEmpty()) tr("命令为空") else tr("命令太长")
         mutex.withLock {
+            if (deleting || !LinuxSandboxStore.loadEnabled(LinuxSandboxLayout.of(context.filesDir).stateFile)) {
+                return@withLock tr("Linux 沙盒已关闭。")
+            }
             val installed = installLocked(context, rebuild = false)
             if (!installed.ok) return@withLock installed.message
             execLocked(context, normalized, cancellation, onProgress)
@@ -96,6 +132,9 @@ internal object LinuxSandboxSession {
                     error = if (command.trim().isEmpty()) tr("命令为空") else tr("命令太长"),
                 )
             mutex.withLock {
+                if (deleting || !LinuxSandboxStore.loadEnabled(LinuxSandboxLayout.of(context.filesDir).stateFile)) {
+                    return@withLock LinuxBackgroundStart(error = tr("Linux 沙盒已关闭。"))
+                }
                 val installed = installLocked(context, rebuild = false)
                 if (!installed.ok) return@withLock LinuxBackgroundStart(error = installed.message)
                 val process = try {
@@ -154,7 +193,16 @@ internal object LinuxSandboxSession {
         onProgress: suspend (LinuxSandboxCommandProgress) -> Unit,
     ): String {
         val process = openProcess(context, command) ?: return tr("安装包里没有 Linux 运行时。")
-        return readProcess(process, cancellation, onProgress)
+        foregroundProcess = process
+        try {
+            if (deleting) {
+                stopProcess(process)
+                return tr("Linux 沙盒已关闭。")
+            }
+            return readProcess(process, cancellation, onProgress)
+        } finally {
+            foregroundProcess = null
+        }
     }
 
     private fun openProcess(context: Context, command: String): Process? {

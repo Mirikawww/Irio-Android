@@ -21,6 +21,14 @@ class LinuxSandboxTest {
     }
 
     @Test
+    fun deleteIsOnlyAvailableForAnInstalledSandboxWhileIdle() {
+        assertFalse(LinuxSandboxPolicy.canDelete(installed = false, preparing = false, deleting = false))
+        assertTrue(LinuxSandboxPolicy.canDelete(installed = true, preparing = false, deleting = false))
+        assertFalse(LinuxSandboxPolicy.canDelete(installed = true, preparing = true, deleting = false))
+        assertFalse(LinuxSandboxPolicy.canDelete(installed = true, preparing = false, deleting = true))
+    }
+
+    @Test
     fun disablingKeepsTheRootfsAndDefaultsToOff() {
         val root = Files.createTempDirectory("irio-sandbox").toFile()
         val layout = LinuxSandboxLayout.of(root)
@@ -170,6 +178,55 @@ class LinuxSandboxTest {
         linuxSandboxDeleteTree(tree)
         assertFalse(tree.exists())
         assertEquals("{\"enabled\":true}", sibling.readText())
+    }
+
+    @Test
+    fun deletingTheSandboxDisablesItAndPreservesOtherSettingsAndAppData() {
+        val filesDir = Files.createTempDirectory("irio-remove-sandbox").toFile()
+        val layout = LinuxSandboxLayout.of(filesDir)
+        val hostTmp = File(filesDir, "cache/linux-sandbox-tmp")
+        val sharedFile = File(filesDir, "shared/keep.txt").apply { parentFile?.mkdirs(); writeText("keep") }
+        val conversation = File(filesDir, "conversations/keep.json").apply { parentFile?.mkdirs(); writeText("keep") }
+        LinuxSandboxStore.saveEnabled(layout.stateFile, true)
+        LinuxSandboxStore.saveCommandsPerCall(layout.stateFile, 12)
+        LinuxSandboxStore.saveBackgroundEnabled(layout.stateFile, true)
+        listOf(layout.rootfs, layout.partial, File(layout.root, "rootfs.previous"), hostTmp).forEach {
+            it.mkdirs()
+            File(it, "remove.txt").writeText("remove")
+        }
+        layout.versionFile.writeText("3.24.2")
+
+        LinuxSandboxStore.delete(layout, hostTmp)
+
+        assertFalse(LinuxSandboxStore.loadEnabled(layout.stateFile))
+        assertEquals(12, LinuxSandboxStore.loadCommandsPerCall(layout.stateFile))
+        assertTrue(LinuxSandboxStore.loadBackgroundEnabled(layout.stateFile))
+        assertFalse(layout.rootfs.exists())
+        assertFalse(layout.partial.exists())
+        assertFalse(File(layout.root, "rootfs.previous").exists())
+        assertFalse(hostTmp.exists())
+        assertNull(layout.installedVersion())
+        assertEquals("keep", sharedFile.readText())
+        assertEquals("keep", conversation.readText())
+    }
+
+    @Test
+    fun deletingTheSandboxDoesNotFollowLinksIntoSharedStorageAndCanBeRepeated() {
+        val filesDir = Files.createTempDirectory("irio-remove-sandbox-links").toFile()
+        val layout = LinuxSandboxLayout.of(filesDir)
+        val shared = File(filesDir, "shared").apply { mkdirs() }
+        val sharedFile = File(shared, "keep.txt").apply { writeText("keep") }
+        layout.rootfs.mkdirs()
+        Files.createSymbolicLink(File(layout.rootfs, "sdcard").toPath(), shared.toPath())
+        Files.createSymbolicLink(File(layout.rootfs, "dangling").toPath(), File(shared, "missing").toPath())
+        val hostTmp = File(filesDir, "cache/linux-sandbox-tmp")
+
+        repeat(2) { LinuxSandboxStore.delete(layout, hostTmp) }
+
+        assertFalse(layout.rootfs.exists())
+        assertFalse(LinuxSandboxStore.loadEnabled(layout.stateFile))
+        assertEquals("keep", sharedFile.readText())
+        assertTrue(linuxSandboxShouldExtract(layout.installedVersion(), layout.rootfs.exists(), rebuild = false))
     }
 
     @Test

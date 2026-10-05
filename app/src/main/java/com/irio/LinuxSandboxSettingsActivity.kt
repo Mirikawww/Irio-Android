@@ -66,9 +66,15 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val layout = remember { LinuxSandboxLayout.of(context.filesDir) }
     var enabled by remember { mutableStateOf(LinuxSandboxStore.loadEnabled(layout.stateFile)) }
+    var installed by remember {
+        mutableStateOf(layout.rootfs.isDirectory && layout.installedVersion() != null)
+    }
     var allFiles by remember { mutableStateOf(LinuxSandboxAccess.hasAllFiles()) }
     var awaitingPermission by remember { mutableStateOf(false) }
     var confirmRebuild by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
     var showPrepare by remember { mutableStateOf(false) }
     var prepareError by remember { mutableStateOf<String?>(null) }
     var revision by remember { mutableIntStateOf(0) }
@@ -85,7 +91,9 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
 
     fun refresh() {
         val bundled = runCatching { loadLinuxSandboxCatalog(context).alpineVersion }.getOrNull()
-        offerRebuild = linuxSandboxOfferRebuild(layout.installedVersion(), bundled, layout.shellPresent())
+        val installedVersion = layout.installedVersion()
+        installed = layout.rootfs.isDirectory && installedVersion != null
+        offerRebuild = linuxSandboxOfferRebuild(installedVersion, bundled, layout.shellPresent())
     }
 
     fun beginPrepare(rebuild: Boolean) {
@@ -155,6 +163,22 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
         }
     }
 
+    LaunchedEffect(deleting) {
+        if (!deleting) return@LaunchedEffect
+        enabled = false
+        awaitingPermission = false
+        try {
+            LinuxSandboxSession.delete(context)
+        } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            deleteError = error.message?.takeIf { it.isNotBlank() } ?: tr("删除失败")
+        } finally {
+            enabled = LinuxSandboxStore.loadEnabled(layout.stateFile)
+            deleting = false
+            refresh()
+        }
+    }
+
     SettingsHazeScaffold(
         title = tr("Linux 沙盒"),
         onBack = onBack,
@@ -180,6 +204,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                 Text(tr("启用 Linux 沙盒"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
                 Switch(
                     checked = enabled,
+                    enabled = !deleting,
                     onCheckedChange = { want ->
                         if (!want) {
                             LinuxSandboxStore.saveEnabled(layout.stateFile, false)
@@ -245,6 +270,55 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                         if (!want) LinuxBackgroundJobs.stopAll()
                     },
                 )
+            }
+            Button(
+                onClick = { confirmDelete = true },
+                enabled = LinuxSandboxPolicy.canDelete(installed, preparing = showPrepare, deleting = deleting),
+                modifier = Modifier.fillMaxWidth(),
+                style = ButtonStyle.Destructive,
+            ) { Text(tr("删除 Linux 沙盒")) }
+        }
+    }
+
+    IrioAlertDialog(
+        visible = confirmDelete,
+        onDismissRequest = { confirmDelete = false },
+    ) {
+        Column {
+            DialogTitle(tr("删除 Linux 沙盒"))
+            Spacer(Modifier.height(12.dp))
+            Text(tr("确定要删除 Linux 沙盒吗？沙盒内的软件包和文件将被永久删除，正在运行的命令会停止。设备共享存储里的文件不会删除。此操作无法撤销，再次启用会重新准备环境。"))
+            Spacer(Modifier.height(16.dp))
+            DialogButtonRow(
+                confirmLabel = tr("删除"),
+                confirmEnabled = LinuxSandboxPolicy.canDelete(installed, preparing = showPrepare, deleting = deleting),
+                onConfirm = {
+                    confirmDelete = false
+                    deleteError = null
+                    deleting = true
+                },
+                onCancel = { confirmDelete = false },
+                confirmStyle = ButtonStyle.Destructive,
+            )
+        }
+    }
+
+    IrioAlertDialog(
+        visible = deleting || deleteError != null,
+        onDismissRequest = { if (!deleting) deleteError = null },
+    ) {
+        Column {
+            DialogTitle(if (deleting) tr("正在删除 Linux 沙盒") else tr("删除失败"))
+            Spacer(Modifier.height(16.dp))
+            if (deleting) {
+                ProgressIndicator(progress = 0.5f, modifier = Modifier.fillMaxWidth())
+            } else {
+                Text(deleteError.orEmpty())
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = { deleteError = null },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(tr("知道了")) }
             }
         }
     }
