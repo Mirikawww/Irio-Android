@@ -85,6 +85,25 @@ internal fun estimateRequestTokens(messages: List<ChatRequestMessage>): Int {
     }
 }
 
+/**
+ * 这一轮的接口 usage 还没到时，圆环在已发送请求之外补上正在生成的内容。
+ * 思考、工具参数、工具结果和搜索结果都算。工具名字算在参数文本里，不从过程行再加一遍。
+ */
+internal fun estimateLiveReplyTokens(
+    streamedText: String,
+    process: List<ProcessEvent>,
+    toolCallText: String,
+): Int {
+    var count = TokenEstimator.count(streamedText) + TokenEstimator.count(toolCallText)
+    process.forEach { event ->
+        when (event.kind) {
+            ProcessEventKind.THINKING, ProcessEventKind.SEARCH, ProcessEventKind.TOOL ->
+                count += TokenEstimator.count(event.content)
+        }
+    }
+    return count
+}
+
 /** 发给压缩模型的说明。压缩目标写在这里，不是用户的系统提示词。 */
 internal fun summarySystemPrompt(targetPercent: Int, budgetTokens: Int): String = buildString {
     append("你在压缩这段对话，供之后一个新的对话继续使用。不是在回答对话里的问题。")

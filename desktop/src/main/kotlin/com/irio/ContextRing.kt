@@ -359,3 +359,12 @@ internal fun formatContextCount(count: Int): String {
 
 internal fun contextWindowLabel(windowTokens: Int): String =
     if (windowTokens > 0) formatContextCount(windowTokens) else "—"
+
+internal fun contextRingUsedTokens(
+    apiUsed: Int,
+    liveEstimate: Int,
+    generatingReply: Boolean,
+): Int = when {
+    generatingReply && liveEstimate > 0 -> liveEstimate
+    else -> apiUsed
+}

@@ -18,11 +18,12 @@ internal fun shouldPublishStreamUpdate(
     userActivelyScrolling: Boolean = false,
     hasUsage: Boolean = false,
     toolOutputChanged: Boolean = false,
+    toolCallDeltaLength: Int = 0,
 ): Boolean {
     if (done || hasAttachments || searchingChanged || searchPagesDelta > 0 || toolChanged || hasUsage || toolOutputChanged) return true
     if (deltaLength > 0 && publishedBodyLength == 0) return true
     if (thinkingDeltaLength > 0 && !publishedThinking) return true
-    if (deltaLength == 0 && thinkingDeltaLength == 0) return false
+    if (deltaLength == 0 && thinkingDeltaLength == 0 && toolCallDeltaLength == 0) return false
     // 用户正在手指拖动/惯性滚动浏览时把重组隔到 120ms 一次：避免和滚动抢帧。
     val interval = when {
         userActivelyScrolling -> STREAM_PUBLISH_INTERVAL_MS * 5L / 2L

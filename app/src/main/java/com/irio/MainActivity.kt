@@ -316,6 +316,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var contextRingOpen by remember { mutableStateOf(false) }
     var contextCompressionEnabled by remember { mutableStateOf(ToolStore.loadContextCompression(context)) }
     var visualizeContext by remember { mutableStateOf(ToolStore.loadVisualizeContext(context)) }
+    var liveContextTokens by remember { mutableIntStateOf(0) }
     var attachMenuOpen by remember { mutableStateOf(false) }
     var reasoningEffort by remember { mutableStateOf(ProviderStore.loadReasoningEffort(context)) }
     var fastMode by remember { mutableStateOf(ProviderStore.loadFastMode(context)) }
@@ -1168,6 +1169,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     ChatCompletionResult(error = tr("请先选择一个可用模型"))
                 } else {
                 val requestMessages = modelRequestMessages(requestSource)
+                val baseContextTokens = estimateRequestTokens(requestMessages)
+                val streamedToolCalls = StringBuilder()
                 withContext(Dispatchers.IO) {
                     ChatApi.streamChat(
                         provider = provider,
@@ -1194,6 +1197,12 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                     if (update.newRound && streamedText.isNotEmpty()) roundBreakPending = true
                                     if (update.thinkingDelta.isNotEmpty()) {
                                         process.onThinkingDelta(update.thinkingDelta)
+                                    }
+                                    if (update.toolCallDeltas.isNotEmpty()) {
+                                        update.toolCallDeltas.forEach { delta ->
+                                            if (delta.name.isNotEmpty()) streamedToolCalls.append(delta.name)
+                                            if (delta.argumentsDelta.isNotEmpty()) streamedToolCalls.append(delta.argumentsDelta)
+                                        }
                                     }
                                     if (update.delta.isNotEmpty()) {
                                         if (roundBreakPending) {
@@ -1236,6 +1245,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 searchPagesDelta = update.searchPagesDelta,
                                 toolChanged = update.toolActive != null,
                                 toolOutputChanged = update.toolOutput != null,
+                                toolCallDeltaLength = update.toolCallDeltas.sumOf { it.name.length + it.argumentsDelta.length },
                                 publishedBodyLength = publishedBodyLength,
                                 publishedThinking = publishedThinking,
                                 deferNonEssential = imeAnimating.get(),
@@ -1272,6 +1282,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 )
                                 if (usage != null && currentConversation.id == requestConversationId) {
                                     currentConversation = currentConversation.copy(tokenUsage = usage)
+                                }
+                                if (currentConversation.id == requestConversationId) {
+                                    liveContextTokens = baseContextTokens + estimateLiveReplyTokens(
+                                        streamedText = streamedText,
+                                        process = snapshot,
+                                        toolCallText = streamedToolCalls.toString(),
+                                    )
                                 }
                             }
                         },
@@ -2121,6 +2138,12 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         val showContextRing = ThemeStore.contextRing
                         val contextUsage = currentConversation.tokenUsage
                             ?: messages.lastOrNull { !it.fromUser && it.usage != null }?.usage
+                        val apiUsed = contextUsage?.usedTokens ?: 0
+                        val shownUsed = contextRingUsedTokens(
+                            apiUsed = apiUsed,
+                            liveEstimate = liveContextTokens,
+                            generatingReply = generatingThisChat,
+                        )
                         if (showContextRing) {
                             val showCompression = contextCompressionEnabled
                             val canCompress = showCompression && !generatingThisChat && planCompression(
@@ -2130,7 +2153,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             ) != null
                             ToolbarCapsule {
                                 ContextUsageRing(
-                                    usedTokens = contextUsage?.usedTokens ?: 0,
+                                    usedTokens = shownUsed,
                                     windowTokens = ModelCatalog.contextWindow(context, selectedModel),
                                     compressionCount = compressionCount(messages),
                                     showCompression = showCompression,

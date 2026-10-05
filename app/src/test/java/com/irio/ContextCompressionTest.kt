@@ -169,6 +169,23 @@ class ContextCompressionTest {
     }
 
     @Test
+    fun liveReplyEstimateAddsThinkingToolsAndSearch() {
+        val text = estimateLiveReplyTokens("正文", emptyList(), "")
+        assertEquals(TokenEstimator.count("正文"), text)
+        val arguments = """web_search{"query":"irio"}"""
+        val full = estimateLiveReplyTokens(
+            streamedText = "正文",
+            process = listOf(
+                ProcessEvent(id = 1, kind = ProcessEventKind.THINKING, content = "推理过程"),
+                ProcessEvent(id = 2, kind = ProcessEventKind.TOOL, content = "命令输出", toolName = "shell"),
+                ProcessEvent(id = 3, kind = ProcessEventKind.SEARCH, content = "网页摘要"),
+            ),
+            toolCallText = arguments,
+        )
+        assertTrue(full > estimateLiveReplyTokens("正文", emptyList(), arguments))
+    }
+
+    @Test
     fun compressionStatusIsATranscriptLabel() {
         assertEquals("上下文压缩中", compressionStatusLabel(SummaryState.RUNNING))
         assertEquals("已压缩上下文", compressionStatusLabel(SummaryState.SUCCESS))
