@@ -360,11 +360,17 @@ internal fun formatContextCount(count: Int): String {
 internal fun contextWindowLabel(windowTokens: Int): String =
     if (windowTokens > 0) formatContextCount(windowTokens) else "—"
 
+/**
+ * 压缩进行中不改数字。完成后、下一次接口 usage 到来前，用压缩结果的估算。
+ * 估算不是压缩目标。真正在生成回复时才用流式估算，接口回报后再回到 apiUsed。
+ */
 internal fun contextRingUsedTokens(
     apiUsed: Int,
     liveEstimate: Int,
     generatingReply: Boolean,
+    compressionEstimate: Int? = null,
 ): Int = when {
     generatingReply && liveEstimate > 0 -> liveEstimate
+    compressionEstimate != null && compressionEstimate > 0 -> compressionEstimate
     else -> apiUsed
 }

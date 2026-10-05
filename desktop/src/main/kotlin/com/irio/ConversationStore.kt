@@ -21,7 +21,7 @@ data class ChatMessage(
     val responseToUserId: Long? = null,
     /** 用户消息编辑版本组：同组内多条用户消息为同一消息的不同版本；0 = 未编辑过。 */
     val editGroup: Long = 0L,
-    /** 最近一次接口回报的 usage；圆环只读这份数据，不做本地估算。 */
+    /** 最近一次接口回报的 usage。压缩完成后、下一次 usage 到来前，圆环改显示压缩结果的本地估算。 */
     val usage: TokenUsage? = null,
     /** 模型完成这条回复的时刻。0 表示还没完成，或旧数据没有记录。不要用 createdAt 代替，那是开始生成的时间。 */
     val finishedAt: Long = 0L,

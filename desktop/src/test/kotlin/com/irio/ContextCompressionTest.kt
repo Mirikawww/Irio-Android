@@ -109,6 +109,39 @@ class ContextCompressionTest {
     }
 
     @Test
+    fun finishedCompressionEstimatesTheRemainingRequestNotTheTarget() {
+        val old = "旧".repeat(400)
+        val messages = listOf(
+            msg(1, old),
+            msg(2, old, fromUser = false).copy(usage = TokenUsage(totalTokens = 50_000)),
+            msg(3, "短记录", fromUser = false, state = SummaryState.SUCCESS),
+        )
+        val estimate = compressionUsageEstimate(messages)
+        assertEquals(estimateRequestTokens(modelRequestMessages(messages)), estimate)
+        assertTrue(estimate!! < TokenEstimator.count(old))
+        assertTrue(estimate != summaryBudgetTokens(windowTokens = 100_000, targetPercent = 10))
+    }
+
+    @Test
+    fun compressionInProgressDoesNotEstimate() {
+        val messages = listOf(
+            msg(1, "还在"),
+            msg(2, "", fromUser = false, state = SummaryState.RUNNING),
+        )
+        assertNull(compressionUsageEstimate(messages))
+    }
+
+    @Test
+    fun laterUsageClearsTheCompressionEstimate() {
+        val messages = listOf(
+            msg(1, "旧"),
+            msg(2, "记录", fromUser = false, state = SummaryState.SUCCESS),
+            msg(3, "新回复", fromUser = false).copy(usage = TokenUsage(totalTokens = 4_000)),
+        )
+        assertNull(compressionUsageEstimate(messages))
+    }
+
+    @Test
     fun budgetIsTheTargetSliceOfTheWindow() {
         assertEquals(10_000, summaryBudgetTokens(windowTokens = 100_000, targetPercent = 10))
         assertEquals(0, summaryBudgetTokens(windowTokens = 0, targetPercent = 10))

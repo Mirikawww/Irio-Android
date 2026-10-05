@@ -200,6 +200,19 @@ internal fun modelConversationScope(conversationId: String, messages: List<ChatM
     return "$conversationId#${boundary.id}"
 }
 
+/**
+ * 成功压缩之后、下一次接口 usage 到来之前，圆环显示压缩后请求的本地估算。
+ * 还在压缩、没有成功边界、或边界之后已经有 usage 时返回 null。
+ * 不用压缩目标：那只是提示里的规模，结果对不上。
+ */
+internal fun compressionUsageEstimate(messages: List<ChatMessage>): Int? {
+    val boundary = messages.indexOfLast { it.summaryState == SummaryState.SUCCESS }
+    if (boundary < 0) return null
+    val boundaryId = messages[boundary].id
+    if (messages.any { it.usage != null && it.id > boundaryId }) return null
+    return estimateRequestTokens(modelRequestMessages(messages)).takeIf { it > 0 }
+}
+
 internal fun isBeforeCompression(messages: List<ChatMessage>, messageId: Long): Boolean {
     val boundary = messages.indexOfLast { it.summaryState == SummaryState.SUCCESS }
     if (boundary < 0) return false

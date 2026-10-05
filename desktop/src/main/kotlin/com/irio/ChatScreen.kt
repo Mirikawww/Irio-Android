@@ -2019,10 +2019,15 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         val contextUsage = currentConversation.tokenUsage
                             ?: messages.lastOrNull { !it.fromUser && it.usage != null }?.usage
                         val apiUsed = contextUsage?.usedTokens ?: 0
+                        val compressingThisChat = messages.any { message ->
+                            message.summaryState == SummaryState.RUNNING &&
+                                generations[message.id]?.conversationId == currentConversation.id
+                        }
                         val shownUsed = contextRingUsedTokens(
                             apiUsed = apiUsed,
                             liveEstimate = liveContextTokens,
-                            generatingReply = generatingThisChat,
+                            generatingReply = generatingThisChat && !compressingThisChat,
+                            compressionEstimate = compressionUsageEstimate(messages),
                         )
                         if (showContextRing) {
                             val showCompression = ToolStore.contextCompressionEnabled

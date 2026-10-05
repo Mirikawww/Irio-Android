@@ -26,5 +26,23 @@ class ContextRingTest {
         )
         assertEquals(12_800, contextRingUsedTokens(apiUsed = 90_000, liveEstimate = 12_800, generatingReply = true))
         assertEquals(90_000, contextRingUsedTokens(apiUsed = 90_000, liveEstimate = 0, generatingReply = true))
+        assertEquals(
+            3_200,
+            contextRingUsedTokens(
+                apiUsed = 90_000,
+                liveEstimate = 12_800,
+                generatingReply = false,
+                compressionEstimate = 3_200,
+            ),
+        )
+        assertEquals(
+            12_800,
+            contextRingUsedTokens(
+                apiUsed = 90_000,
+                liveEstimate = 12_800,
+                generatingReply = true,
+                compressionEstimate = 3_200,
+            ),
+        )
     }
 }
