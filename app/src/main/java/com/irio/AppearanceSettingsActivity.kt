@@ -114,8 +114,8 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = 16.dp, vertical = SettingsCardInset),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 DropdownMenu(
                     expanded = languageMenuOpen,
@@ -156,7 +156,8 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                 interactionSource = interactionSource,
                                 indication = null,
                                 onClick = { languageMenuOpen = !languageMenuOpen },
-                            ),
+                            )
+                            .padding(top = 6.dp, bottom = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -223,7 +224,8 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                 interactionSource = interactionSource,
                                 indication = null,
                                 onClick = { themeMenuOpen = !themeMenuOpen },
-                            ),
+                            )
+                            .settingsDropdownInset(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -296,7 +298,8 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                 interactionSource = interactionSource,
                                 indication = null,
                                 onClick = { accentMenuOpen = !accentMenuOpen },
-                            ),
+                            )
+                            .settingsDropdownInset(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -330,7 +333,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     }
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -348,11 +351,11 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = 16.dp, vertical = SettingsCardInset),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
@@ -371,7 +374,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
@@ -390,7 +393,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
@@ -409,7 +412,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
@@ -440,7 +443,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     },
                 )
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -457,7 +460,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(

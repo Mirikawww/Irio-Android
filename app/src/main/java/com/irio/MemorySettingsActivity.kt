@@ -105,7 +105,7 @@ private fun MemorySettingsScreen(onBack: () -> Unit) {
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .settingsRow()
                     .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,

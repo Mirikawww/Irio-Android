@@ -180,7 +180,8 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                                 interactionSource = interactionSource,
                                 indication = null,
                                 onClick = { providerMenuOpen = !providerMenuOpen },
-                            ),
+                            )
+                            .settingsDropdownInset(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -204,13 +205,15 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                         }
                     }
                 }
-                ProviderField(
-                    label = tr("%s API 密钥").format(tr(provider.label)),
-                    state = apiKey,
-                    keyboardType = KeyboardType.Password,
-                    mask = true,
-                    trailingSpace = false,
-                )
+                Column(Modifier.padding(vertical = 8.dp)) {
+                    ProviderField(
+                        label = tr("%s API 密钥").format(tr(provider.label)),
+                        state = apiKey,
+                        keyboardType = KeyboardType.Password,
+                        mask = true,
+                        trailingSpace = false,
+                    )
+                }
                 SettingsSlider(
                     label = tr("单次搜索上限"),
                     value = maxResults,
@@ -281,7 +284,8 @@ private fun SystemPromptRow(onClick: () -> Unit) {
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick,
-            ),
+            )
+            .settingsPromptInset(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -294,7 +298,7 @@ private fun SystemPromptRow(onClick: () -> Unit) {
             style = ButtonStyle.Ghost,
             buttonSize = ButtonSize.Small,
             shape = CircleShape,
-            modifier = Modifier.size(32.dp),
+            modifier = Modifier.size(24.dp),
             interactionSource = interactionSource,
         ) {
             Icon(
@@ -406,7 +410,8 @@ private fun ImageGenModelPicker(
                     interactionSource = interactionSource,
                     indication = null,
                     onClick = { menuOpen = !menuOpen },
-                ),
+                )
+                .settingsDropdownInset(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -554,7 +559,8 @@ private fun TitleModelPicker(
                     interactionSource = interactionSource,
                     indication = null,
                     onClick = { menuOpen = !menuOpen },
-                ),
+                )
+                .settingsDropdownInset(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -594,7 +600,7 @@ private fun SettingsSwitchRow(
     enabled: Boolean = true,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.settingsSwitchRow(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -618,8 +624,8 @@ private fun SettingsSectionCard(
         modifier = Modifier
             .fillMaxWidth()
             .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 16.dp, vertical = SettingsCardInset),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         content()
     }

@@ -169,7 +169,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .settingsRow()
                     .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -209,7 +209,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 16.dp, vertical = SettingsCardInset),
             ) {
                 SettingsSlider(
                     label = tr("单次命令数"),
