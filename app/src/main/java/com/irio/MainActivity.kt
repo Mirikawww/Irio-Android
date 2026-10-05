@@ -273,6 +273,18 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var processSheetMessageId by remember { mutableStateOf<Long?>(null) }
     var processSheetEventId by remember { mutableStateOf<Long?>(null) }
     val processSheetState = rememberBottomSheetState()
+    var backgroundCommandId by remember { mutableStateOf<Long?>(null) }
+    var backgroundSheetEvent by remember { mutableStateOf<ProcessEvent?>(null) }
+    val backgroundSheetState = rememberBottomSheetState()
+    LaunchedEffect(backgroundCommandId) {
+        val id = backgroundCommandId ?: return@LaunchedEffect
+        while (true) {
+            val job = LinuxBackgroundJobs.find(id.toString()) ?: break
+            backgroundSheetEvent = linuxBackgroundTerminalEvent(job)
+            if (!job.running && job.exitCode != null) break
+            delay(200)
+        }
+    }
     val message = rememberTextFieldState()
     // 抽屉列表只持轻量摘要（无正文）；正文按需从磁盘取并常驻缓存（见 [conversationContent]）。
     var conversations by remember { mutableStateOf(emptyList<ConversationSummary>()) }
@@ -2008,6 +2020,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 }
 
                 SpeechTransportBar()
+                LinuxBackgroundBar(onOpen = { id ->
+                    backgroundCommandId = id
+                    LinuxBackgroundJobs.find(id.toString())?.let { job ->
+                        backgroundSheetEvent = linuxBackgroundTerminalEvent(job)
+                    }
+                    backgroundSheetState.targetDetent = BottomSheetDetent.FullyExpanded
+                })
                 val canSend = (editingMessageId != null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty())) ||
                     (!generatingThisChat && editingMessageId == null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty()))
                 ComposerField(
@@ -2378,6 +2397,18 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             state = processSheetState,
             onDismiss = {
                 processSheetState.targetDetent = BottomSheetDetent.Hidden
+            },
+        )
+        TerminalCommandSheet(
+            event = backgroundSheetEvent ?: ProcessEvent(
+                id = 0,
+                kind = ProcessEventKind.TOOL,
+                toolName = LinuxShellTool.NAME,
+                content = "$",
+            ),
+            state = backgroundSheetState,
+            onDismiss = {
+                backgroundSheetState.targetDetent = BottomSheetDetent.Hidden
             },
         )
     }

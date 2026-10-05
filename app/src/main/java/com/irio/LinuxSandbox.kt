@@ -335,6 +335,20 @@ internal fun linuxSandboxTerminalTranscript(
     }
 }
 
+internal fun linuxBackgroundTerminalEvent(command: LinuxBackgroundCommand): ProcessEvent =
+    ProcessEvent(
+        id = command.id,
+        kind = ProcessEventKind.TOOL,
+        content = linuxSandboxTerminalTranscript(
+            command = command.command,
+            output = command.output,
+            exitCode = if (command.running) null else command.exitCode,
+            truncated = command.truncated,
+        ),
+        live = command.running,
+        toolName = LinuxShellTool.NAME,
+    )
+
 internal fun linuxSandboxFormatResult(
     exitCode: Int,
     output: String,
