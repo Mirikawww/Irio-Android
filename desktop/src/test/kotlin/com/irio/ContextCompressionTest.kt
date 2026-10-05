@@ -74,6 +74,14 @@ class ContextCompressionTest {
     }
 
     @Test
+    fun autoCompressNeedsAWindowAndTheTriggerPercent() {
+        assertFalse(shouldAutoCompress(enabled = true, windowTokens = 0, triggerPercent = 90, estimatedTokens = 100))
+        assertFalse(shouldAutoCompress(enabled = false, windowTokens = 1000, triggerPercent = 90, estimatedTokens = 900))
+        assertFalse(shouldAutoCompress(enabled = true, windowTokens = 1000, triggerPercent = 90, estimatedTokens = 899))
+        assertTrue(shouldAutoCompress(enabled = true, windowTokens = 1000, triggerPercent = 90, estimatedTokens = 900))
+    }
+
+    @Test
     fun budgetIsTheTargetSliceOfTheWindow() {
         assertEquals(10_000, summaryBudgetTokens(windowTokens = 100_000, targetPercent = 10))
         assertEquals(0, summaryBudgetTokens(windowTokens = 0, targetPercent = 10))

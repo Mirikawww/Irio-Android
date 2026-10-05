@@ -40,6 +40,17 @@ object TokenEstimator {
     }
 }
 
+internal fun shouldAutoCompress(
+    enabled: Boolean,
+    windowTokens: Int,
+    triggerPercent: Int,
+    estimatedTokens: Int,
+): Boolean {
+    if (!enabled || windowTokens <= 0 || estimatedTokens <= 0) return false
+    val percent = triggerPercent.coerceIn(0, 100)
+    return estimatedTokens.toLong() * 100 >= windowTokens.toLong() * percent
+}
+
 /** 压缩目标对应的 token 数。窗口未知时为 0，提示里仍写百分比。 */
 internal fun summaryBudgetTokens(windowTokens: Int, targetPercent: Int): Int {
     if (windowTokens <= 0) return 0

@@ -211,6 +211,7 @@ import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.onPrimaryColor
 import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.primaryColor
+import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.textSelectionColors
 import com.composeunstyled.ProvideTextStyle
 import com.composeunstyled.theme.Theme
@@ -426,6 +427,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     }
     val presentationReady = transcriptPresentation.conversationId == currentConversation.id
     val visibleTranscript = if (presentationReady) transcriptPresentation.visible else emptyList()
+    // 压缩记录留在列表里，但只画状态行，不画摘要正文。
+    val shownTranscript = visibleTranscript
     val renderContentArgb = content.toArgb()
     val renderPxPerPt = density.density
     val renderTexScale = remember { ProviderStore.loadTexScale(context) }
@@ -768,8 +771,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
     LaunchedEffect(
         currentConversation.id,
-        visibleTranscript.size,
-        visibleTranscript.lastOrNull()?.let(::transcriptTailFollowKey),
+        shownTranscript.size,
+        shownTranscript.lastOrNull()?.let(::transcriptTailFollowKey),
         newUserMessageId,
         stickToBottom,
         recyclerScrolling,
@@ -779,7 +782,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             seenTranscriptTailId = null
             stickToBottom = true
         }
-        val last = visibleTranscript.lastOrNull()
+        val last = shownTranscript.lastOrNull()
         if (last == null) {
             seenTranscriptTailId = null
             stickToBottom = true
@@ -1160,15 +1163,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 } else if (requestModel.isBlank()) {
                     ChatCompletionResult(error = tr("请先选择一个可用模型"))
                 } else {
-                val requestMessages = requestSource.map { item ->
-                    ChatRequestMessage(
-                        role = if (item.fromUser) "user" else "assistant",
-                        text = item.text,
-                        attachments = item.attachments,
-                        thinking = item.thinking,
-                        createdAt = item.createdAt,
-                    )
-                }
+                val requestMessages = modelRequestMessages(requestSource)
                 withContext(Dispatchers.IO) {
                     ChatApi.streamChat(
                         provider = provider,
@@ -1184,7 +1179,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         systemPrompt = requestSystemPrompt,
                         imageGenModel = requestImageGenModel,
                         toolRegistry = requestRegistry,
-                        connectionScope = requestConversationId,
+                        connectionScope = modelConversationScope(requestConversationId, requestSource),
                         cancellation = requestCancellation,
                         appContext = context,
                         onUpdate = update@{ update ->
@@ -1386,6 +1381,127 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     }
 
 
+    fun compressionModelId(): String {
+        val configured = ToolStore.loadCompressionModel(context)
+        return when {
+            configured.isNotBlank() -> configured
+            !ModelCatalog.isImageModel(context, selectedModel) -> selectedModel
+            else -> ProviderStore.loadLastChatModel(context)
+        }
+    }
+
+    suspend fun runSummary(
+        plan: CompressionPlan,
+        conversationId: String,
+        cancellation: ChatRequestCancellation,
+    ): String? {
+        val model = compressionModelId()
+        if (model.isBlank()) return null
+        val provider = ProviderStore.loadProviders(context)
+            .firstOrNull { model in it.models }
+            ?: ProviderStore.loadProvider(context)
+            ?: return null
+        val window = ModelCatalog.contextWindow(context, selectedModel)
+        val target = ToolStore.loadCompressionTarget(context)
+        val budget = summaryBudgetTokens(window, target)
+        return ChatApi.summarizeContext(
+            provider = provider,
+            model = model,
+            systemPrompt = summarySystemPrompt(target, budget),
+            messages = summaryTurns(plan),
+            connectionScope = "$conversationId#summary",
+            cancellation = cancellation,
+        )
+    }
+
+    fun messagesOf(conversationId: String): List<ChatMessage> {
+        return if (currentConversation.id == conversationId) {
+            messages
+        } else {
+            conversationContent(conversationId)?.messages.orEmpty()
+        }
+    }
+
+    fun finishSummaryCard(
+        conversationId: String,
+        card: ChatMessage,
+        plan: CompressionPlan,
+        text: String?,
+        cancelled: Boolean,
+    ) {
+        val updated = if (!cancelled && !text.isNullOrBlank()) {
+            card.copy(
+                text = stripContextSummary(text),
+                summaryState = SummaryState.SUCCESS,
+                summaryUntilId = plan.untilId,
+                isPending = false,
+            )
+        } else if (cancelled) {
+            // 取消不留失败行。
+            card.copy(text = "", summaryState = SummaryState.FAILED, isPending = false, selected = false)
+        } else {
+            card.copy(text = "", summaryState = SummaryState.FAILED, isPending = false)
+        }
+        replaceInConversation(conversationId, card.id, updated, persist = true)
+    }
+
+    /** 发送前若估算已到触发线，先插一张交接卡片。失败或目录里没有窗口就不挡住这次发送。 */
+    fun sendOrCompress(conversationId: String, source: List<ChatMessage>, reply: ChatMessage) {
+        val window = ModelCatalog.contextWindow(context, selectedModel)
+        val estimate = estimateRequestTokens(modelRequestMessages(source))
+        val compress = !ModelCatalog.isImageModel(context, selectedModel) &&
+            shouldAutoCompress(
+                enabled = ToolStore.loadContextCompression(context),
+                windowTokens = window,
+                triggerPercent = ToolStore.loadCompressionTrigger(context),
+                estimatedTokens = estimate,
+            )
+        val covered = if (source.lastOrNull()?.fromUser == true) source.dropLast(1) else source
+        val plan = if (compress) planCompression(covered) else null
+        if (plan == null) {
+            startGeneration(conversationId, source, reply)
+            return
+        }
+        val card = ChatMessage(
+            id = MessageIds.next(),
+            text = "",
+            fromUser = false,
+            summaryState = SummaryState.RUNNING,
+            isPending = true,
+        )
+        if (currentConversation.id == conversationId) {
+            messages = insertSummaryCard(messages, plan.untilId, card)
+            persistCurrent(messages)
+        }
+        val cancellation = ChatRequestCancellation()
+        val job = scope.launch {
+            val text = runSummary(plan, conversationId, cancellation)
+            withContext(Dispatchers.Main.immediate) {
+                val cancelled = cancellation.isCancelled()
+                finishSummaryCard(conversationId, card, plan, text, cancelled)
+                generations = generations - card.id
+                if (cancelled) {
+                    val next = messagesOf(conversationId).filterNot {
+                        it.id == reply.id && it.text.isBlank() && it.attachments.isEmpty() && it.process.isEmpty()
+                    }
+                    if (currentConversation.id == conversationId) {
+                        messages = next
+                        persistCurrent(messages)
+                    }
+                    return@withContext
+                }
+                val nextSource = contextMessages(messagesOf(conversationId))
+                    .filterNot { it.id == reply.id || it.isError || it.isPending }
+                startGeneration(conversationId, nextSource, reply)
+            }
+        }
+        generations = generations + (card.id to ActiveGeneration(
+            conversationId = conversationId,
+            job = job,
+            cancellation = cancellation,
+        ))
+    }
+
     fun submitMessage() {
         val text = message.text.toString().trim()
         if (generatingThisChat || (text.isEmpty() && pendingAttachments.isEmpty())) return
@@ -1410,7 +1526,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         pendingAttachments = emptyList()
         composerStatus = null
         message.clearText()
-        startGeneration(currentConversation.id, history + userMessage, reply)
+        sendOrCompress(currentConversation.id, history + userMessage, reply)
         keyboardController?.hide()
         focusManager.clearFocus()
     }
@@ -1468,7 +1584,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         editingMessageId = null
         keyboardController?.hide()
         focusManager.clearFocus()
-        startGeneration(currentConversation.id, committed.history, committed.reply)
+        sendOrCompress(currentConversation.id, committed.history, committed.reply)
     }
 
     /**
@@ -1519,7 +1635,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             }
         }
         persistCurrent(messages)
-        startGeneration(currentConversation.id, history, reply)
+        sendOrCompress(currentConversation.id, history, reply)
     }
 
     fun showRetryVersion(target: ChatMessage) {
@@ -1541,7 +1657,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
     // 模型选单开关会重组这一页。callbacks 若每次都是新对象，可见消息行会全部重绘，
     // 毛玻璃源跟着失效。只在行上真能看见的状态变化时才换一份。
-    val editAnchorId = visibleTranscript.lastOrNull { it.fromUser }?.id
+    val editAnchorId = visibleTranscript.lastOrNull { it.fromUser && it.summaryState == SummaryState.NONE }?.id
     val messageCallbacks = remember(
         newUserMessageId,
         editingMessageId,
@@ -1559,7 +1675,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         onOpenAttachment = ::openAttachment,
         onCopy = { chatMessage -> clipboard.setText(AnnotatedString(chatMessage.text)) },
         onRetry = ::retryMessage,
-        canRetry = { chatMessage -> !chatMessage.fromUser && !chatMessage.isPending && !chatMessage.isStreaming },
+        canRetry = { chatMessage ->
+            chatMessage.summaryState == SummaryState.NONE &&
+                !chatMessage.fromUser && !chatMessage.isPending && !chatMessage.isStreaming
+        },
         onPrevVersion = { target ->
             val versions = if (target.fromUser) listOf(target) else retryGroups[target.groupId].orEmpty()
             val index = versions.indexOfFirst { it.id == target.id }.coerceAtLeast(0)
@@ -2080,7 +2199,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     .imePadding()
             ) {
                 AndroidMessageList(
-                    messages = visibleTranscript,
+                    messages = shownTranscript,
                     controller = messageRecyclerController,
                     modifier = Modifier
                         .fillMaxSize()
@@ -2090,7 +2209,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     contentPaddingBottom = composerContentPaddingPx,
                     callbacks = messageCallbacks,
                     onVisibleRangeChanged = { first, last ->
-                        val snapshot = visibleTranscript
+                        val snapshot = shownTranscript
                         val conversationId = currentConversation.id
                         val candidates = listOf(first - 1, last + 1)
                             .filter { it in snapshot.indices }
@@ -2504,6 +2623,10 @@ internal fun MessageRow(
     onNextEditVersion: (() -> Unit)? = null,
 ) {
     observeIrioTheme()
+    if (chatMessage.summaryState != SummaryState.NONE) {
+        CompressionStatusLine(chatMessage.summaryState)
+        return
+    }
     val context = LocalContext.current
     val requestSpeechNotification = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -2694,6 +2817,21 @@ internal fun MessageRow(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CompressionStatusLine(state: SummaryState) {
+    val raw = compressionStatusLabel(state) ?: return
+    val label = tr(raw)
+    if (state == SummaryState.RUNNING) {
+        StatusSweepText(label)
+    } else {
+        Text(
+            label,
+            color = Theme[colors][mutedColor],
+            fontSize = 13.sp,
+        )
     }
 }
 
@@ -3454,7 +3592,7 @@ private suspend fun prepareFinishedMessage(
     texScale: Float,
     scope: CoroutineScope,
 ) {
-    if (message.fromUser || message.isError || message.isPending || message.isStreaming || message.text.isBlank()) return
+    if (message.summaryState != SummaryState.NONE || message.fromUser || message.isError || message.isPending || message.isStreaming || message.text.isBlank()) return
     val segments = FinishedMarkdownSegmentsCache.prepare(message.text, scope) ?: return
     segments.filterIsInstance<MarkdownSegment.Text_>()
         .filter { it.markdown }

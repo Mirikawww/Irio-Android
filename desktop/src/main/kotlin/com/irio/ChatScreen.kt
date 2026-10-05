@@ -165,6 +165,7 @@ import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.onPrimaryColor
 import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.primaryColor
+import com.composables.ui.theme.secondaryColor
 import com.composeunstyled.ProvideTextStyle
 import com.composeunstyled.theme.Theme
 import com.mikepenz.markdown.m3.markdownTypography
@@ -355,14 +356,16 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     }
     val presentationReady = transcriptPresentation.conversationId == currentConversation.id
     val visibleTranscript = if (presentationReady) transcriptPresentation.visible else emptyList()
+    // 压缩记录留在列表里，但只画状态行，不画摘要正文。
+    val shownTranscript = visibleTranscript
     val retryGroups = if (presentationReady) transcriptPresentation.retryGroups else emptyMap()
     val editGroups = if (presentationReady) transcriptPresentation.editGroups else emptyMap()
     val renderContentArgb = content.toArgb()
     val renderPxPerPt = density.density
     val renderTexScale = remember { ProviderStore.loadTexScale() }
 
-    LaunchedEffect(currentConversation.id, visibleTranscript) {
-        if (visibleTranscript.isEmpty()) return@LaunchedEffect
+    LaunchedEffect(currentConversation.id, shownTranscript) {
+        if (shownTranscript.isEmpty()) return@LaunchedEffect
         snapshotFlow {
             val visible = listState.layoutInfo.visibleItemsInfo
             visible.firstOrNull()?.index to visible.lastOrNull()?.index
@@ -371,10 +374,10 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             .collect { (first, last) ->
                 if (first == null || last == null) return@collect
                 val start = (first - 2).coerceAtLeast(0)
-                val end = (last + 2).coerceAtMost(visibleTranscript.lastIndex)
+                val end = (last + 2).coerceAtMost(shownTranscript.lastIndex)
                 for (index in start..end) {
                     prepareFinishedMessage(
-                        visibleTranscript[index], renderContentArgb, renderPxPerPt, renderTexScale, scope,
+                        shownTranscript[index], renderContentArgb, renderPxPerPt, renderTexScale, scope,
                     )
                 }
             }
@@ -567,8 +570,8 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     val transcriptFollowJob = remember { object { var job: Job? = null } }
     LaunchedEffect(
         currentConversation.id,
-        visibleTranscript.size,
-        visibleTranscript.lastOrNull()?.let(::transcriptTailFollowKey),
+        shownTranscript.size,
+        shownTranscript.lastOrNull()?.let(::transcriptTailFollowKey),
         newUserMessageId,
         stickToBottom,
         userDrivingTranscript,
@@ -578,7 +581,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             seenTranscriptTailId = null
             stickToBottom = true
         }
-        val last = visibleTranscript.lastOrNull()
+        val last = shownTranscript.lastOrNull()
         if (last == null) {
             transcriptFollowJob.job?.cancel()
             seenTranscriptTailId = null
@@ -642,7 +645,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         val info = listState.layoutInfo
         val lastVisible = info.visibleItemsInfo.lastOrNull()
         val catchUp = transcriptBottomCatchUpDelta(
-            itemCount = visibleTranscript.size,
+            itemCount = shownTranscript.size,
             lastVisibleIndex = lastVisible?.index ?: -1,
             lastEdge = lastVisible?.let { it.offset + it.size } ?: 0,
             viewportEnd = info.viewportEndOffset,
@@ -1011,15 +1014,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 } else if (requestModel.isBlank()) {
                     ChatCompletionResult(error = tr("请先选择一个可用模型"))
                 } else {
-                val requestMessages = requestSource.map { item ->
-                    ChatRequestMessage(
-                        role = if (item.fromUser) "user" else "assistant",
-                        text = item.text,
-                        attachments = item.attachments,
-                        thinking = item.thinking,
-                        createdAt = item.createdAt,
-                    )
-                }
+                val requestMessages = modelRequestMessages(requestSource)
                 withContext(Dispatchers.IO) {
                     ChatApi.streamChat(
                         provider = provider,
@@ -1035,7 +1030,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         systemPrompt = requestSystemPrompt,
                         imageGenModel = requestImageGenModel,
                         toolRegistry = requestRegistry,
-                        connectionScope = requestConversationId,
+                        connectionScope = modelConversationScope(requestConversationId, requestSource),
                         cancellation = requestCancellation,
                         onUpdate = update@{ update ->
                             val cancelled = requestCancellation.isCancelled()
@@ -1247,6 +1242,128 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         pendingAttachments = emptyList()
     }
 
+
+    fun compressionModelId(): String {
+        val configured = ToolStore.loadCompressionModel()
+        return when {
+            configured.isNotBlank() -> configured
+            !ModelCatalog.isImageModel(selectedModel) -> selectedModel
+            else -> ProviderStore.loadLastChatModel()
+        }
+    }
+
+    suspend fun runSummary(
+        plan: CompressionPlan,
+        conversationId: String,
+        cancellation: ChatRequestCancellation,
+    ): String? {
+        val model = compressionModelId()
+        if (model.isBlank()) return null
+        val provider = ProviderStore.loadProviders()
+            .firstOrNull { model in it.models }
+            ?: ProviderStore.loadProvider()
+            ?: return null
+        val window = ModelCatalog.contextWindow(selectedModel)
+        val target = ToolStore.loadCompressionTarget()
+        val budget = summaryBudgetTokens(window, target)
+        return ChatApi.summarizeContext(
+            provider = provider,
+            model = model,
+            systemPrompt = summarySystemPrompt(target, budget),
+            messages = summaryTurns(plan),
+            connectionScope = "$conversationId#summary",
+            cancellation = cancellation,
+        )
+    }
+
+    fun messagesOf(conversationId: String): List<ChatMessage> {
+        return if (currentConversation.id == conversationId) {
+            messages
+        } else {
+            ConversationStore.load(conversationId)?.messages.orEmpty()
+        }
+    }
+
+    fun finishSummaryCard(
+        conversationId: String,
+        card: ChatMessage,
+        plan: CompressionPlan,
+        text: String?,
+        cancelled: Boolean,
+    ) {
+        val updated = if (!cancelled && !text.isNullOrBlank()) {
+            card.copy(
+                text = stripContextSummary(text),
+                summaryState = SummaryState.SUCCESS,
+                summaryUntilId = plan.untilId,
+                isPending = false,
+            )
+        } else if (cancelled) {
+            // 取消不留失败行。
+            card.copy(text = "", summaryState = SummaryState.FAILED, isPending = false, selected = false)
+        } else {
+            card.copy(text = "", summaryState = SummaryState.FAILED, isPending = false)
+        }
+        replaceInConversation(conversationId, card.id, updated, persist = true)
+    }
+
+    /** 发送前若估算已到触发线，先插一张交接卡片。失败或目录里没有窗口就不挡住这次发送。 */
+    fun sendOrCompress(conversationId: String, source: List<ChatMessage>, reply: ChatMessage) {
+        val window = ModelCatalog.contextWindow(selectedModel)
+        val estimate = estimateRequestTokens(modelRequestMessages(source))
+        val compress = !ModelCatalog.isImageModel(selectedModel) &&
+            shouldAutoCompress(
+                enabled = ToolStore.loadContextCompression(),
+                windowTokens = window,
+                triggerPercent = ToolStore.loadCompressionTrigger(),
+                estimatedTokens = estimate,
+            )
+        val covered = if (source.lastOrNull()?.fromUser == true) source.dropLast(1) else source
+        val plan = if (compress) planCompression(covered) else null
+        if (plan == null) {
+            startGeneration(conversationId, source, reply)
+            return
+        }
+        val card = ChatMessage(
+            id = MessageIds.next(),
+            text = "",
+            fromUser = false,
+            summaryState = SummaryState.RUNNING,
+            isPending = true,
+        )
+        if (currentConversation.id == conversationId) {
+            messages = insertSummaryCard(messages, plan.untilId, card)
+            persistCurrent(messages)
+        }
+        val cancellation = ChatRequestCancellation()
+        val job = scope.launch {
+            val text = runSummary(plan, conversationId, cancellation)
+            withContext(Dispatchers.Main.immediate) {
+                val cancelled = cancellation.isCancelled()
+                finishSummaryCard(conversationId, card, plan, text, cancelled)
+                generations = generations - card.id
+                if (cancelled) {
+                    val next = messagesOf(conversationId).filterNot {
+                        it.id == reply.id && it.text.isBlank() && it.attachments.isEmpty() && it.process.isEmpty()
+                    }
+                    if (currentConversation.id == conversationId) {
+                        messages = next
+                        persistCurrent(messages)
+                    }
+                    return@withContext
+                }
+                val nextSource = contextMessages(messagesOf(conversationId))
+                    .filterNot { it.id == reply.id || it.isError || it.isPending }
+                startGeneration(conversationId, nextSource, reply)
+            }
+        }
+        generations = generations + (card.id to ActiveGeneration(
+            conversationId = conversationId,
+            job = job,
+            cancellation = cancellation,
+        ))
+    }
+
     /**
      * 提交编辑：新版本插回原消息位置（而不是列表尾），旧版本取消选中；
      * 紧随其后的模型回复组取消选中，新 pending 回复进同一个 retryGroup 并启动重生成。
@@ -1275,7 +1392,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         pendingAttachments = emptyList()
         editingMessageId = null
         focusManager.clearFocus()
-        startGeneration(currentConversation.id, committed.history, committed.reply)
+        sendOrCompress(currentConversation.id, committed.history, committed.reply)
     }
 
     /**
@@ -1318,7 +1435,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         pendingAttachments = emptyList()
         composerStatus = null
         message.clearText()
-        startGeneration(currentConversation.id, history + userMessage, reply)
+        sendOrCompress(currentConversation.id, history + userMessage, reply)
         focusManager.clearFocus()
     }
 
@@ -1358,7 +1475,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             }
         }
         persistCurrent(messages)
-        startGeneration(currentConversation.id, history, reply)
+        sendOrCompress(currentConversation.id, history, reply)
     }
 
     fun showRetryVersion(target: ChatMessage) {
@@ -1575,11 +1692,12 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(
-                        visibleTranscript,
+                        shownTranscript,
                         key = { it.id },
                         // Distinct structures reuse slots independently while scrolling.
                         contentType = { msg ->
                             when {
+                                msg.summaryState != SummaryState.NONE -> "summary"
                                 msg.fromUser -> "user"
                                 msg.isError -> "error"
                                 msg.isStreaming || msg.isPending -> "streaming"
@@ -1608,7 +1726,8 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                             onOpenAttachment = { openAttachment(it) },
                             onCopy = { clipboard.setText(AnnotatedString(chatMessage.text)) },
                             onRetry = { retryMessage(chatMessage) },
-                            canRetry = !chatMessage.fromUser && !chatMessage.isPending && !chatMessage.isStreaming,
+                            canRetry = chatMessage.summaryState == SummaryState.NONE &&
+                                !chatMessage.fromUser && !chatMessage.isPending && !chatMessage.isStreaming,
                             versionIndex = versionIndex + 1,
                             versionCount = versions.size,
                             onPrevVersion = versions.getOrNull(versionIndex - 1)?.let { previous ->
@@ -1620,8 +1739,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                             isEditing = editingMessageId == chatMessage.id,
                             // 只允许编辑最新一条用户消息：下方不会有其他轮次需要隐藏，重生成路径保持简单正确
                             onEdit = if (
-                                chatMessage.fromUser && !chatMessage.isPending && !chatMessage.isStreaming &&
-                                chatMessage.id == visibleTranscript.lastOrNull { it.fromUser }?.id
+                                chatMessage.fromUser && chatMessage.summaryState == SummaryState.NONE &&
+                                !chatMessage.isPending && !chatMessage.isStreaming &&
+                                chatMessage.id == visibleTranscript.lastOrNull { it.fromUser && it.summaryState == SummaryState.NONE }?.id
                             ) {
                                 { beginEdit(chatMessage) }
                             } else null,
@@ -2242,6 +2362,10 @@ private fun MessageRow(
     onNextEditVersion: (() -> Unit)? = null,
 ) {
     observeIrioTheme()
+    if (chatMessage.summaryState != SummaryState.NONE) {
+        CompressionStatusLine(chatMessage.summaryState)
+        return
+    }
     val spoken = remember(chatMessage.id, chatMessage.text) { speechPlainText(chatMessage.text) }
     val speech = SpeechPlayer.playback
     val isNewUserMessage = chatMessage.fromUser && chatMessage.id == newUserMessageId
@@ -2400,6 +2524,21 @@ private fun MessageRow(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CompressionStatusLine(state: SummaryState) {
+    val raw = compressionStatusLabel(state) ?: return
+    val label = tr(raw)
+    if (state == SummaryState.RUNNING) {
+        StatusSweepText(label)
+    } else {
+        Text(
+            label,
+            color = Theme[colors][mutedColor],
+            fontSize = 13.sp,
+        )
     }
 }
 
@@ -2941,7 +3080,7 @@ private suspend fun prepareFinishedMessage(
     texScale: Float,
     scope: CoroutineScope,
 ) {
-    if (message.fromUser || message.isError || message.isPending || message.isStreaming || message.text.isBlank()) return
+    if (message.summaryState != SummaryState.NONE || message.fromUser || message.isError || message.isPending || message.isStreaming || message.text.isBlank()) return
     val segments = FinishedMarkdownSegmentsCache.prepare(message.text, scope) ?: return
     segments.filterIsInstance<MarkdownSegment.Text_>()
         .filter { it.markdown }
