@@ -53,7 +53,11 @@ class ThemeStoreTest {
         assertEquals("Model diff", translate(AppLanguage.EN, "模型差异"))
         assertEquals("New message scroll", translate(AppLanguage.EN, "新消息滚动"))
         assertEquals("Experimental", translate(AppLanguage.EN, "实验性"))
+        assertEquals("Context compression", translate(AppLanguage.EN, "上下文压缩"))
+        assertEquals("Compression model", translate(AppLanguage.EN, "压缩模型"))
         assertEquals("Refresh port", translate(AppLanguage.EN, "刷新端口"))
+        assertEquals("Trigger threshold", translate(AppLanguage.EN, "触发时机"))
+        assertEquals("Compression target", translate(AppLanguage.EN, "压缩目标"))
         assertEquals("外观", translate(AppLanguage.ZH_CN, "外观"))
         assertEquals("New chat", translate(AppLanguage.EN, "新对话"))
     }

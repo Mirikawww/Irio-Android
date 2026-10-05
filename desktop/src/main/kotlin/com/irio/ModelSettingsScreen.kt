@@ -79,11 +79,19 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
     var imageGenModel by remember { mutableStateOf(ToolStore.loadImageGenModel()) }
     var titleModel by remember { mutableStateOf(ToolStore.loadTitleModel()) }
     var messageTimestamps by remember { mutableStateOf(ToolStore.loadMessageTimestamps()) }
+    var contextCompression by remember { mutableStateOf(ToolStore.loadContextCompression()) }
+    var compressionTrigger by remember { mutableIntStateOf(ToolStore.loadCompressionTrigger()) }
+    var compressionTarget by remember { mutableIntStateOf(ToolStore.loadCompressionTarget()) }
+    var compressionModel by remember { mutableStateOf(ToolStore.loadCompressionModel()) }
 
     val currentProvider by rememberUpdatedState(provider)
     val currentMaxResults by rememberUpdatedState(maxResults)
     val currentMaxRounds by rememberUpdatedState(maxRounds)
     val currentMessageTimestamps by rememberUpdatedState(messageTimestamps)
+    val currentContextCompression by rememberUpdatedState(contextCompression)
+    val currentCompressionTrigger by rememberUpdatedState(compressionTrigger)
+    val currentCompressionTarget by rememberUpdatedState(compressionTarget)
+    val currentCompressionModel by rememberUpdatedState(compressionModel)
 
     fun persistCurrent() {
         SearchStore.saveApiKey(apiKey.text.toString(), currentProvider)
@@ -91,6 +99,10 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
         SearchStore.saveProvider(currentProvider)
         ToolStore.saveMaxRounds(currentMaxRounds)
         ToolStore.saveMessageTimestamps(currentMessageTimestamps)
+        ToolStore.saveContextCompression(currentContextCompression)
+        ToolStore.saveCompressionTrigger(currentCompressionTrigger)
+        ToolStore.saveCompressionTarget(currentCompressionTarget)
+        ToolStore.saveCompressionModel(currentCompressionModel)
     }
 
     fun switchProvider(next: SearchProvider) {
@@ -228,6 +240,48 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
                         onCheckedChange = { messageTimestamps = it },
                     )
                 }
+            }
+            SettingsSectionCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            tr("上下文压缩"),
+                            color = Theme[colors][onBackgroundColor],
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        ExperimentalBadge()
+                    }
+                    Switch(
+                        checked = contextCompression,
+                        onCheckedChange = { contextCompression = it },
+                    )
+                }
+                TitleModelPicker(
+                    selected = compressionModel,
+                    onSelect = { compressionModel = it },
+                    label = tr("压缩模型"),
+                    contentDescription = tr("选择压缩模型"),
+                )
+                SettingsSlider(
+                    label = tr("触发时机"),
+                    value = compressionTrigger,
+                    valueRange = ToolStore.COMPRESSION_PERCENT_MIN..ToolStore.COMPRESSION_PERCENT_MAX,
+                    valueLabel = { "$it%" },
+                    onValueChange = { compressionTrigger = ToolStore.clampCompressionPercent(it) },
+                )
+                SettingsSlider(
+                    label = tr("压缩目标"),
+                    value = compressionTarget,
+                    valueRange = ToolStore.COMPRESSION_PERCENT_MIN..ToolStore.COMPRESSION_PERCENT_MAX,
+                    valueLabel = { "$it%" },
+                    onValueChange = { compressionTarget = ToolStore.clampCompressionPercent(it) },
+                )
             }
         }
     }
@@ -404,6 +458,8 @@ private fun ImageGenModelPicker(
 private fun TitleModelPicker(
     selected: String,
     onSelect: (String) -> Unit,
+    label: String = tr("标题生成模型"),
+    contentDescription: String = tr("选择标题生成模型"),
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val providers = remember { ProviderStore.loadProviders() }
@@ -511,7 +567,7 @@ private fun TitleModelPicker(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(tr("标题生成模型"), color = Theme[colors][onPanelColor])
+                Text(label, color = Theme[colors][onPanelColor])
                 Text(
                     selectedLabel,
                     color = Theme[colors][mutedColor],
@@ -530,7 +586,7 @@ private fun TitleModelPicker(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = tr("选择标题生成模型"),
+                    contentDescription = contentDescription,
                     tint = Theme[colors][onPanelColor],
                     modifier = Modifier.size(20.dp),
                 )
