@@ -265,6 +265,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     var webSearchAvailable by remember { mutableStateOf(SearchStore.hasApiKey()) }
     var webSearchEnabled by remember { mutableStateOf(SearchStore.loadWebSearchEnabled()) }
     var autoRead by remember { mutableStateOf(SpeechStore.loadAutoRead()) }
+    var visualizeContext by remember { mutableStateOf(ToolStore.loadVisualizeContext()) }
     var clearHistoryDialogOpen by remember { mutableStateOf(false) }
     var conversationAction by remember { mutableStateOf<ConversationSummary?>(null) }
     var viewingPhoto by remember { mutableStateOf<ChatAttachment?>(null) }
@@ -1784,6 +1785,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                             onNextEditVersion = editVersions.getOrNull(editIndex + 1)?.let { next ->
                                 { showEditVersion(next) }
                             },
+                            outsideContext = visualizeContext && isBeforeCompression(visibleTranscript, chatMessage.id),
                         )
                     }
                 }
@@ -2401,6 +2403,7 @@ private fun MessageRow(
     editVersionCount: Int = 1,
     onPrevEditVersion: (() -> Unit)? = null,
     onNextEditVersion: (() -> Unit)? = null,
+    outsideContext: Boolean = false,
 ) {
     observeIrioTheme()
     if (chatMessage.summaryState != SummaryState.NONE) {
@@ -2424,7 +2427,7 @@ private fun MessageRow(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
-                alpha = if (isNewUserMessage) entranceProgress.value else 1f
+                alpha = (if (isNewUserMessage) entranceProgress.value else 1f) * (if (outsideContext) 0.45f else 1f)
 
             },
         contentAlignment = alignment,

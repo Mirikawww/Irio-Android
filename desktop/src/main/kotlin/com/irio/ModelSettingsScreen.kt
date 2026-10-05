@@ -82,6 +82,7 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
     var contextCompression by remember { mutableStateOf(ToolStore.loadContextCompression()) }
     var compressionTrigger by remember { mutableIntStateOf(ToolStore.loadCompressionTrigger()) }
     var compressionTarget by remember { mutableIntStateOf(ToolStore.loadCompressionTarget()) }
+    var visualizeContext by remember { mutableStateOf(ToolStore.loadVisualizeContext()) }
     var compressionModel by remember { mutableStateOf(ToolStore.loadCompressionModel()) }
 
     val currentProvider by rememberUpdatedState(provider)
@@ -91,6 +92,7 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
     val currentContextCompression by rememberUpdatedState(contextCompression)
     val currentCompressionTrigger by rememberUpdatedState(compressionTrigger)
     val currentCompressionTarget by rememberUpdatedState(compressionTarget)
+    val currentVisualizeContext by rememberUpdatedState(visualizeContext)
     val currentCompressionModel by rememberUpdatedState(compressionModel)
 
     fun persistCurrent() {
@@ -102,6 +104,7 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
         ToolStore.saveContextCompression(currentContextCompression)
         ToolStore.saveCompressionTrigger(currentCompressionTrigger)
         ToolStore.saveCompressionTarget(currentCompressionTarget)
+        ToolStore.saveVisualizeContext(currentVisualizeContext)
         ToolStore.saveCompressionModel(currentCompressionModel)
     }
 
@@ -282,6 +285,20 @@ fun ModelSettingsScreen(onBack: () -> Unit, onSystemPrompt: () -> Unit) {
                     valueLabel = { "$it%" },
                     onValueChange = { compressionTarget = ToolStore.clampCompressionPercent(it) },
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("可视化上下文"),
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][onBackgroundColor],
+                    )
+                    Switch(
+                        checked = visualizeContext,
+                        onCheckedChange = { visualizeContext = it },
+                    )
+                }
             }
         }
     }

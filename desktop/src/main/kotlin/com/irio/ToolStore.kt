@@ -21,6 +21,7 @@ object ToolStore {
     private const val CONTEXT_COMPRESSION = "context_compression"
     private const val COMPRESSION_TRIGGER = "context_compression_trigger"
     private const val COMPRESSION_TARGET = "context_compression_target"
+    private const val VISUALIZE_CONTEXT = "visualize_context"
     private const val COMPRESSION_MODEL = "context_compression_model"
 
     fun loadMaxRounds(): Int =
@@ -98,6 +99,16 @@ object ToolStore {
     fun saveCompressionTarget(value: Int) {
         val root = loadRoot()
         root.put(COMPRESSION_TARGET, clampCompressionPercent(value))
+        AppPaths.toolsFile.writeText(root.toString())
+    }
+
+    /** 是否把过往消息变灰。默认关闭。 */
+    fun loadVisualizeContext(): Boolean =
+        loadRoot().optBoolean(VISUALIZE_CONTEXT, false)
+
+    fun saveVisualizeContext(enabled: Boolean) {
+        val root = loadRoot()
+        root.put(VISUALIZE_CONTEXT, enabled)
         AppPaths.toolsFile.writeText(root.toString())
     }
 

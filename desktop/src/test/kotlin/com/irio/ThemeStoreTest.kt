@@ -64,6 +64,7 @@ class ThemeStoreTest {
         assertEquals("Refresh port", translate(AppLanguage.EN, "刷新端口"))
         assertEquals("Trigger threshold", translate(AppLanguage.EN, "触发时机"))
         assertEquals("Compression target", translate(AppLanguage.EN, "压缩目标"))
+        assertEquals("Visualize context", translate(AppLanguage.EN, "可视化上下文"))
         assertEquals("%d messages", translate(AppLanguage.EN, "%d 条"))
         assertEquals("外观", translate(AppLanguage.ZH_CN, "外观"))
         assertEquals("New chat", translate(AppLanguage.EN, "新对话"))

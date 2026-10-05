@@ -181,6 +181,13 @@ internal fun modelConversationScope(conversationId: String, messages: List<ChatM
     return "$conversationId#${boundary.id}"
 }
 
+internal fun isBeforeCompression(messages: List<ChatMessage>, messageId: Long): Boolean {
+    val boundary = messages.indexOfLast { it.summaryState == SummaryState.SUCCESS }
+    if (boundary < 0) return false
+    val index = messages.indexOfFirst { it.id == messageId }
+    return index in 0 until boundary
+}
+
 internal fun insertSummaryCard(
     messages: List<ChatMessage>,
     untilId: Long,

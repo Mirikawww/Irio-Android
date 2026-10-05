@@ -42,7 +42,7 @@ internal data class AndroidMessageCallbacks(
     val versionInfo: (ChatMessage) -> VersionInfo,
     val editVersionInfo: (ChatMessage) -> VersionInfo,
     val newUserMessageId: Long?,
-
+    val outsideContext: (ChatMessage) -> Boolean = { false },
 )
 
 internal data class VersionInfo(val index: Int, val count: Int)
@@ -924,6 +924,7 @@ private fun AndroidMessageRow(
             editVersionCount = editVersion.count,
             onPrevEditVersion = callbacks.onPrevEditVersion(message),
             onNextEditVersion = callbacks.onNextEditVersion(message),
+            outsideContext = callbacks.outsideContext(message),
         )
     }
 }

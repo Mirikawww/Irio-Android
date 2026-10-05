@@ -102,6 +102,7 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
     var contextCompression by remember { mutableStateOf(ToolStore.loadContextCompression(context)) }
     var compressionTrigger by remember { mutableIntStateOf(ToolStore.loadCompressionTrigger(context)) }
     var compressionTarget by remember { mutableIntStateOf(ToolStore.loadCompressionTarget(context)) }
+    var visualizeContext by remember { mutableStateOf(ToolStore.loadVisualizeContext(context)) }
     var compressionModel by remember { mutableStateOf(ToolStore.loadCompressionModel(context)) }
 
     val currentProvider by rememberUpdatedState(provider)
@@ -111,6 +112,7 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
     val currentContextCompression by rememberUpdatedState(contextCompression)
     val currentCompressionTrigger by rememberUpdatedState(compressionTrigger)
     val currentCompressionTarget by rememberUpdatedState(compressionTarget)
+    val currentVisualizeContext by rememberUpdatedState(visualizeContext)
     val currentCompressionModel by rememberUpdatedState(compressionModel)
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -123,6 +125,7 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
         ToolStore.saveContextCompression(context, currentContextCompression)
         ToolStore.saveCompressionTrigger(context, currentCompressionTrigger)
         ToolStore.saveCompressionTarget(context, currentCompressionTarget)
+        ToolStore.saveVisualizeContext(context, currentVisualizeContext)
         ToolStore.saveCompressionModel(context, currentCompressionModel)
     }
 
@@ -316,6 +319,14 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                     valueRange = ToolStore.COMPRESSION_PERCENT_MIN..ToolStore.COMPRESSION_PERCENT_MAX,
                     valueLabel = { "$it%" },
                     onValueChange = { compressionTarget = ToolStore.clampCompressionPercent(it) },
+                )
+                SettingsSwitchRow(
+                    label = tr("可视化上下文"),
+                    checked = visualizeContext,
+                    onCheckedChange = {
+                        visualizeContext = it
+                        ToolStore.saveVisualizeContext(context, it)
+                    },
                 )
             }
             SettingsSectionCard {

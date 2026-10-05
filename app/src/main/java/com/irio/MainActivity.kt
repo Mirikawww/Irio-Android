@@ -315,6 +315,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var modelMenuOpen by remember { mutableStateOf(false) }
     var contextRingOpen by remember { mutableStateOf(false) }
     var contextCompressionEnabled by remember { mutableStateOf(ToolStore.loadContextCompression(context)) }
+    var visualizeContext by remember { mutableStateOf(ToolStore.loadVisualizeContext(context)) }
     var attachMenuOpen by remember { mutableStateOf(false) }
     var reasoningEffort by remember { mutableStateOf(ProviderStore.loadReasoningEffort(context)) }
     var fastMode by remember { mutableStateOf(ProviderStore.loadFastMode(context)) }
@@ -758,6 +759,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     modelsDevCatalog = ProviderStore.loadModelsDevCatalog(context)
                     modelsDevReasoning = ProviderStore.loadModelsDevReasoning(context)
                     contextCompressionEnabled = ToolStore.loadContextCompression(context)
+                    visualizeContext = ToolStore.loadVisualizeContext(context)
                     val provider = currentProviders.firstOrNull { it.id == currentActiveId }
                     val scopeId = currentConversationId
                     if (EndpointWarmup.shouldWarm(provider, currentConversationBusy)) {
@@ -1691,12 +1693,15 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     // 模型选单开关会重组这一页。callbacks 若每次都是新对象，可见消息行会全部重绘，
     // 毛玻璃源跟着失效。只在行上真能看见的状态变化时才换一份。
     val editAnchorId = visibleTranscript.lastOrNull { it.fromUser && it.summaryState == SummaryState.NONE }?.id
+    val contextBoundaryId = visibleTranscript.lastOrNull { it.summaryState == SummaryState.SUCCESS }?.id
     val messageCallbacks = remember(
         newUserMessageId,
         editingMessageId,
         editAnchorId,
         retryGroups,
         editGroups,
+        contextBoundaryId,
+        visualizeContext,
     ) {
         AndroidMessageCallbacks(
         markdownScope = scope,
@@ -1744,6 +1749,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         versionInfo = ::retryVersionInfo,
         editVersionInfo = ::editVersionInfo,
         newUserMessageId = newUserMessageId,
+        outsideContext = { chatMessage ->
+            visualizeContext && isBeforeCompression(visibleTranscript, chatMessage.id)
+        },
         )
     }
 
@@ -2664,6 +2672,7 @@ internal fun MessageRow(
     editVersionCount: Int = 1,
     onPrevEditVersion: (() -> Unit)? = null,
     onNextEditVersion: (() -> Unit)? = null,
+    outsideContext: Boolean = false,
 ) {
     observeIrioTheme()
     if (chatMessage.summaryState != SummaryState.NONE) {
@@ -2693,7 +2702,7 @@ internal fun MessageRow(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
-                alpha = if (isNewUserMessage) entranceProgress.value else 1f
+                alpha = (if (isNewUserMessage) entranceProgress.value else 1f) * (if (outsideContext) 0.45f else 1f)
 
             },
         contentAlignment = alignment,

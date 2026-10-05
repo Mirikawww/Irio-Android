@@ -62,6 +62,19 @@ class ContextCompressionTest {
             msg(3, "after", fromUser = false),
         )
         assertEquals(listOf("before", "after"), modelRequestMessages(messages).map { it.text })
+        assertFalse(isBeforeCompression(messages, 1))
+    }
+
+    @Test
+    fun visualizeMarksOnlyMessagesBeforeTheBoundary() {
+        val messages = listOf(
+            msg(1, "旧"),
+            msg(2, "记录", fromUser = false, state = SummaryState.SUCCESS),
+            msg(3, "新", fromUser = true),
+        )
+        assertTrue(isBeforeCompression(messages, 1))
+        assertFalse(isBeforeCompression(messages, 2))
+        assertFalse(isBeforeCompression(messages, 3))
     }
 
     @Test
