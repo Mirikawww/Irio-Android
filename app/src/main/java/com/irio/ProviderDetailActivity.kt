@@ -582,9 +582,9 @@ private fun ModelEnabledRow(
     val interactive = diff != ModelDiffKind.Removed
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .settingsRow()
             .background(background, Theme[shapes][largeShape])
-            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+            .padding(start = 16.dp, end = 8.dp, top = SettingsRowInset, bottom = SettingsRowInset),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

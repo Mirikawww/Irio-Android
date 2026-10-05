@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -304,13 +305,14 @@ internal fun ProtocolPicker(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = 48.dp)
                 .background(Theme[colors][fieldColor], Theme[shapes][fieldShape])
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
                     onClick = { onExpandedChange(!expanded) },
                 )
-                .padding(start = 12.dp, top = 8.dp, end = 4.dp, bottom = 8.dp),
+                .padding(start = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
