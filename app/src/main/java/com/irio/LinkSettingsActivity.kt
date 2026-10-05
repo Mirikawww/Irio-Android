@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.IntOffset
@@ -140,9 +141,9 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                 .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            LinkCard {
+            LinkCard(verticalPadding = 7.dp, spacing = 0.dp) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(tr("启用互连"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
@@ -158,7 +159,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                 fontSize = 13.sp,
             )
             if (state.settings.enabled) {
-                LinkCard {
+                LinkCard(topPadding = 11.dp) {
                     Text(
                         tr("本机配对码"),
                         modifier = Modifier.fillMaxWidth(),
@@ -224,7 +225,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                         style = ButtonStyle.Primary,
                     ) { Text(tr("刷新端口")) }
                 }
-                LinkCard {
+                LinkCard(verticalPadding = SettingsCardInset, spacing = 0.dp) {
                 DropdownMenu(
                     expanded = modeMenuOpen,
                     onExpandedChange = { modeMenuOpen = it },
@@ -252,7 +253,8 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                                 interactionSource = interactionSource,
                                 indication = null,
                                 onClick = { modeMenuOpen = !modeMenuOpen },
-                            ),
+                            )
+                            .settingsDropdownInset(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -277,7 +279,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     }
                 }
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.settingsSwitchRow(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(tr("自动同步数据"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
@@ -289,14 +291,14 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
 
                 Button(
                     onClick = { LinkRuntime.syncNow() },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     enabled = !state.syncing,
                     style = ButtonStyle.Primary,
                 ) { Text(if (state.syncing) tr("正在同步") else tr("立即同步")) }
                 if (state.syncing) {
                     ProgressIndicator(
                         progress = state.syncProgress.coerceIn(0f, 1f),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     )
                 }
                 }
@@ -322,13 +324,18 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun LinkCard(content: @Composable () -> Unit) {
+private fun LinkCard(
+    verticalPadding: Dp = 14.dp,
+    spacing: Dp = 8.dp,
+    topPadding: Dp = verticalPadding,
+    content: @Composable () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
                     .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(start = 16.dp, end = 16.dp, top = topPadding, bottom = verticalPadding),
+        verticalArrangement = Arrangement.spacedBy(spacing),
         content = { content() },
     )
 }
