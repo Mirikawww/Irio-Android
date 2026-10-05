@@ -38,6 +38,7 @@ internal class LinuxBackgroundBoard(
     private val running = LinkedHashMap<Long, Entry>()
     private val finished = ArrayDeque<Entry>()
     private val listeners = mutableListOf<() -> Unit>()
+    private var finishedListener: ((LinuxBackgroundCommand) -> Unit)? = null
 
     fun add(command: String, conversationId: String = "", stop: () -> Unit): Long {
         val id = synchronized(lock) {
@@ -66,22 +67,28 @@ internal class LinuxBackgroundBoard(
     }
 
     fun finish(id: Long, exitCode: Int) {
-        val changed = synchronized(lock) {
+        val completed = synchronized(lock) {
             val live = running.remove(id)
-            val entry = live ?: finished.firstOrNull { it.id == id } ?: return@synchronized false
+            val entry = live ?: finished.firstOrNull { it.id == id } ?: return@synchronized null
+            val firstExit = entry.exitCode == null
             entry.running = false
             entry.exitCode = exitCode
             if (live != null) rememberFinished(entry)
-            true
+            if (firstExit && entry.notify) entry.toCommand() else null
         }
-        if (changed) notifyListeners()
+        if (completed != null) {
+            notifyListeners()
+            val listener = synchronized(lock) { finishedListener }
+            listener?.let { callback -> runCatching { callback(completed) } }
+        }
     }
 
-    fun stop(id: Long): Boolean {
+    fun stop(id: Long, notify: Boolean = true): Boolean {
         val stopper = synchronized(lock) {
             val entry = running.remove(id) ?: return false
             entry.running = false
             entry.stopped = true
+            entry.notify = notify
             rememberFinished(entry)
             entry.stop
         }
@@ -117,6 +124,15 @@ internal class LinuxBackgroundBoard(
         return { synchronized(lock) { listeners.remove(listener) } }
     }
 
+    fun onFinished(listener: (LinuxBackgroundCommand) -> Unit): () -> Unit {
+        synchronized(lock) { finishedListener = listener }
+        return {
+            synchronized(lock) {
+                if (finishedListener === listener) finishedListener = null
+            }
+        }
+    }
+
     private fun rememberFinished(entry: Entry) {
         finished.addLast(entry)
         while (finished.size > finishedLimit) finished.removeAt(0)
@@ -138,6 +154,7 @@ internal class LinuxBackgroundBoard(
         var running = true
         var exitCode: Int? = null
         var stopped = false
+        var notify = true
 
         fun toCommand() = LinuxBackgroundCommand(
             id = id,
@@ -162,7 +179,7 @@ internal object LinuxBackgroundJobs {
 
     fun finish(id: Long, exitCode: Int) = board.finish(id, exitCode)
 
-    fun stop(id: Long): Boolean = board.stop(id)
+    fun stop(id: Long, notify: Boolean = true): Boolean = board.stop(id, notify)
 
     fun stopAll() = board.stopAll()
 
@@ -173,6 +190,8 @@ internal object LinuxBackgroundJobs {
     fun handle(arguments: String): String = linuxBackgroundHandle(arguments, board)
 
     fun subscribe(listener: () -> Unit): () -> Unit = board.subscribe(listener)
+
+    fun onFinished(listener: (LinuxBackgroundCommand) -> Unit): () -> Unit = board.onFinished(listener)
 }
 
 internal fun linuxBackgroundParseRequest(arguments: String): LinuxBackgroundRequest {
@@ -195,11 +214,21 @@ internal fun linuxBackgroundHandle(arguments: String, board: LinuxBackgroundBoar
             when {
                 found == null -> tr("没有这条后台命令。")
                 !found.running -> tr("后台命令 %s 已经结束。").format(found.id)
-                board.stop(found.id) -> tr("已停止后台命令 %s。").format(found.id)
+                board.stop(found.id, notify = false) -> tr("已停止后台命令 %s。").format(found.id)
                 else -> tr("没有这条后台命令。")
             }
         }
         else -> tr("未知操作")
+    }
+}
+
+internal fun linuxBackgroundCompletionText(commands: List<LinuxBackgroundCommand>): String {
+    return buildString {
+        append(tr("后台命令已结束。"))
+        commands.forEach { command ->
+            append("\n\n")
+            append(linuxBackgroundFormatStatus(command))
+        }
     }
 }
 

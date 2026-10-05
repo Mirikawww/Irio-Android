@@ -342,6 +342,34 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var conversationAction by remember { mutableStateOf<ConversationSummary?>(null) }
     var viewingPhoto by remember { mutableStateOf<ChatAttachment?>(null) }
     var generations by remember { mutableStateOf(emptyMap<Long, ActiveGeneration>()) }
+    class BackgroundNoticeSink {
+        var deliver: (String, List<LinuxBackgroundCommand>) -> Unit = { _, _ -> }
+    }
+    val backgroundNoticeSink = remember { BackgroundNoticeSink() }
+    val pendingBackgroundNotices = remember { mutableMapOf<String, MutableList<LinuxBackgroundCommand>>() }
+
+    fun flushBackgroundNotices(conversationId: String) {
+        if (generations.values.any { it.conversationId == conversationId }) return
+        val queued = pendingBackgroundNotices.remove(conversationId)?.toList().orEmpty()
+        if (queued.isEmpty()) return
+        backgroundNoticeSink.deliver(conversationId, queued)
+    }
+
+    fun noteBackgroundFinished(command: LinuxBackgroundCommand) {
+        val conversationId = command.conversationId
+        if (conversationId.isBlank()) return
+        pendingBackgroundNotices.getOrPut(conversationId) { mutableListOf() }.add(command)
+        flushBackgroundNotices(conversationId)
+    }
+
+    DisposableEffect(Unit) {
+        val remove = LinuxBackgroundJobs.onFinished { command ->
+            scope.launch(Dispatchers.Main.immediate) {
+                noteBackgroundFinished(command)
+            }
+        }
+        onDispose { remove() }
+    }
     val currentConversationState = rememberUpdatedState(currentConversation)
     val generationsSnapshotState = rememberUpdatedState(generations)
     // 消息 ID 由全局 MessageIds 分配，避免跨会话/重启后的回复错配。
@@ -1405,9 +1433,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     appliedFinal = true
                 }
                 generations = generations - reply.id
+                flushBackgroundNotices(requestConversationId)
             }
             } finally {
-                if (!appliedFinal) generations = generations - reply.id
+                if (!appliedFinal) {
+                    generations = generations - reply.id
+                    flushBackgroundNotices(requestConversationId)
+                }
             }
         }
         generations = generations + (reply.id to ActiveGeneration(
@@ -1525,6 +1557,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         messages = next
                         persistCurrent(messages)
                     }
+                    flushBackgroundNotices(conversationId)
                     return@withContext
                 }
                 val nextSource = contextMessages(messagesOf(conversationId))
@@ -1561,6 +1594,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 val cancelled = cancellation.isCancelled()
                 finishSummaryCard(conversationId, card, plan, text, cancelled)
                 generations = generations - card.id
+                flushBackgroundNotices(conversationId)
             }
         }
         generations = generations + (card.id to ActiveGeneration(
@@ -1568,6 +1602,56 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             job = job,
             cancellation = cancellation,
         ))
+    }
+
+    fun deliverBackgroundNotices(conversationId: String, commands: List<LinuxBackgroundCommand>) {
+        if (clearingHistory || commands.isEmpty()) return
+        val stored = if (currentConversation.id == conversationId) {
+            currentConversation.copy(messages = messages)
+        } else {
+            conversationContent(conversationId) ?: return
+        }
+        val notice = ChatMessage(
+            id = MessageIds.next(),
+            text = linuxBackgroundCompletionText(commands),
+            fromUser = true,
+            hidden = true,
+        )
+        val reply = ChatMessage(
+            id = MessageIds.next(),
+            text = "",
+            fromUser = false,
+            isPending = true,
+            responseToUserId = notice.id,
+        )
+        val next = messagesOf(conversationId) + notice + reply
+        if (currentConversation.id == conversationId) {
+            messages = next
+            persistCurrent(messages)
+        } else {
+            val updated = stored.copy(
+                messages = next,
+                updatedAt = System.currentTimeMillis(),
+                title = if (stored.titlePending) ConversationStore.titleFrom(next) else stored.title,
+            )
+            cacheConversationContent(updated)
+            conversations = conversations
+                .filterNot { it.id == updated.id }
+                .plus(updated.summary())
+                .let { list ->
+                    val sorted = list.sortedWith(
+                        compareByDescending<ConversationSummary> { it.pinned }.thenByDescending { it.updatedAt },
+                    )
+                    if (sorted == list) list else sorted
+                }
+            scope.launch(Dispatchers.IO) { ConversationStore.save(context, updated) }
+        }
+        val history = contextMessages(next).filterNot { it.isError || it.isPending }
+        sendOrCompress(conversationId, history, reply)
+    }
+
+    backgroundNoticeSink.deliver = { conversationId, commands ->
+        deliverBackgroundNotices(conversationId, commands)
     }
 
     fun submitMessage() {

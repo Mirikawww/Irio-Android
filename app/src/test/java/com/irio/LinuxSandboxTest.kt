@@ -399,6 +399,44 @@ class LinuxSandboxTest {
         assertEquals("list", linuxBackgroundParseRequest("""{"id":"1"}""").action)
     }
 
+    @Test
+    fun finishedBackgroundCommandNotifiesOnceWithItsConversation() {
+        val board = LinuxBackgroundBoard()
+        val notices = mutableListOf<LinuxBackgroundCommand>()
+        board.onFinished { notices += it }
+        val id = board.add("echo hi", "chat-1") {}
+        board.append(id, "hi\n".toByteArray(), 3)
+        board.finish(id, 0)
+        board.finish(id, 0)
+        assertEquals(1, notices.size)
+        assertEquals("chat-1", notices[0].conversationId)
+        assertEquals(0, notices[0].exitCode)
+        assertEquals("hi", notices[0].output.trim())
+        val text = linuxBackgroundCompletionText(notices)
+        assertTrue(text.startsWith("后台命令已结束。"))
+        assertTrue(text.contains("echo hi"))
+        assertEquals("Background command finished.", translate(AppLanguage.EN, "后台命令已结束。"))
+
+        val stopped = LinuxBackgroundBoard()
+        var stoppedNotices = 0
+        stopped.onFinished { stoppedNotices += 1 }
+        val sleep = stopped.add("sleep 5", "chat-1") {}
+        assertTrue(stopped.stop(sleep))
+        assertEquals(0, stoppedNotices)
+        stopped.finish(sleep, 143)
+        stopped.finish(sleep, 143)
+        assertEquals(1, stoppedNotices)
+        assertEquals(true, stopped.find(sleep.toString())?.stopped)
+
+        val quiet = LinuxBackgroundBoard()
+        var quietNotices = 0
+        quiet.onFinished { quietNotices += 1 }
+        val managed = quiet.add("sleep 9", "chat-1") {}
+        assertTrue(quiet.stop(managed, notify = false))
+        quiet.finish(managed, 143)
+        assertEquals(0, quietNotices)
+    }
+
     private fun parametersOf(schema: org.json.JSONObject, protocol: ProviderProtocol): org.json.JSONObject =
         when (protocol) {
             ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
