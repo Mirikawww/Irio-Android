@@ -307,6 +307,84 @@ object ChatApi {
         }.getOrNull()
     }
 
+    /**
+     * 单独写交接记录。不带工具、搜索和生图。取消或失败返回 null，调用方仍按旧对话发送。
+     */
+    suspend fun summarizeContext(
+        provider: ProviderConfig,
+        model: String,
+        systemPrompt: String,
+        messages: List<ChatRequestMessage>,
+        connectionScope: String = "",
+        cancellation: ChatRequestCancellation = ChatRequestCancellation(),
+    ): String? = withContext(Dispatchers.IO) {
+        if (model.isBlank() || cancellation.isCancelled()) return@withContext null
+        runCatching {
+            val body = summaryRequestBody(provider.protocol, model, systemPrompt, messages, connectionScope)
+            val builder = Request.Builder()
+                .url(requestUrl(provider))
+                .post(body.toByteArray(Charsets.UTF_8).toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .header("Accept", "application/json")
+                .isolateConversation(connectionScope)
+            applyAuth(builder, provider)
+            val call = IrioHttp.clientFor(connectionScope).newCall(builder.build())
+            cancellation.attach(call)
+            var response: okhttp3.Response? = null
+            try {
+                response = call.execute()
+                if (cancellation.isCancelled()) return@withContext null
+                if (response.code !in 200..299) return@withContext null
+                parseNonStreamText(provider.protocol, response.body?.string().orEmpty())
+                    ?.let(::stripContextSummary)
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+            } finally {
+                cancellation.detach(call)
+                response?.close()
+            }
+        }.getOrNull()
+    }
+
+    private fun summaryRequestBody(
+        protocol: ProviderProtocol,
+        model: String,
+        systemPrompt: String,
+        messages: List<ChatRequestMessage>,
+        conversationId: String,
+    ): String {
+        return when (protocol) {
+            ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().apply {
+                put("model", model)
+                put("stream", false)
+                put("messages", JSONArray().apply {
+                    if (systemPrompt.isNotBlank()) {
+                        put(JSONObject().put("role", "system").put("content", systemPrompt))
+                    }
+                    messages.forEach { put(it.toChatCompletionsJson()) }
+                })
+                putConversationKey(conversationId)
+            }.toString()
+            ProviderProtocol.RESPONSES -> JSONObject().apply {
+                put("model", model)
+                put("stream", false)
+                if (systemPrompt.isNotBlank()) put("instructions", systemPrompt)
+                put("input", JSONArray().apply {
+                    messages.forEach { message -> message.toResponsesItems().forEach(::put) }
+                })
+                putConversationKey(conversationId)
+            }.toString()
+            ProviderProtocol.ANTHROPIC -> JSONObject().apply {
+                put("model", model)
+                put("stream", false)
+                put("max_tokens", 4096)
+                if (systemPrompt.isNotBlank()) put("system", systemPrompt)
+                put("messages", JSONArray().apply {
+                    messages.forEach { put(it.toAnthropicJson()) }
+                })
+            }.toString()
+        }
+    }
+
     /** 非流式响应里取纯文本。 */
     private fun parseNonStreamText(protocol: ProviderProtocol, body: String): String? {
         return runCatching {
