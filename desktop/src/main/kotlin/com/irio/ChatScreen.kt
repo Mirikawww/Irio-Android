@@ -2450,6 +2450,12 @@ private fun ProcessEventRow(
     ) {
         return
     }
+    val thinkingMode = thinkingRowMode(event.kind, event.live, ThemeStore.thinkingBlock)
+    if (thinkingMode == ThinkingRowMode.Hidden) return
+    if (thinkingMode == ThinkingRowMode.StatusOnly) {
+        StatusSweepText(tr("思考中"))
+        return
+    }
     val muted = Theme[colors][mutedColor]
     val openable = event.toolName != ImageGenTool.NAME && !event.live && event.content.isNotBlank()
     val label = when (event.kind) {

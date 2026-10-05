@@ -48,4 +48,15 @@ class ProcessTrackerTest {
         assertFalse(event.live)
         assertEquals(2_400L, event.millis)
     }
+
+    @Test
+    fun thinkingBlockOffKeepsOnlyTheLiveStatus() {
+        assertEquals(ThinkingRowMode.Full, thinkingRowMode(ProcessEventKind.THINKING, live = true, blockEnabled = true))
+        assertEquals(ThinkingRowMode.Full, thinkingRowMode(ProcessEventKind.THINKING, live = false, blockEnabled = true))
+        assertEquals(ThinkingRowMode.StatusOnly, thinkingRowMode(ProcessEventKind.THINKING, live = true, blockEnabled = false))
+        assertEquals(ThinkingRowMode.Hidden, thinkingRowMode(ProcessEventKind.THINKING, live = false, blockEnabled = false))
+        // 搜索和工具行不受影响。
+        assertEquals(ThinkingRowMode.Full, thinkingRowMode(ProcessEventKind.SEARCH, live = false, blockEnabled = false))
+        assertEquals(ThinkingRowMode.Full, thinkingRowMode(ProcessEventKind.TOOL, live = true, blockEnabled = false))
+    }
 }

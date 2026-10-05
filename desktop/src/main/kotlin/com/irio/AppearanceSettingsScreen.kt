@@ -414,6 +414,22 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         },
                     )
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("思考块"),
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][onPanelColor],
+                    )
+                    Switch(
+                        checked = ThemeStore.thinkingBlock,
+                        onCheckedChange = { enabled ->
+                            ThemeStore.saveThinkingBlock(enabled)
+                        },
+                    )
+                }
                 SettingsSlider(
                     label = tr("公式大小"),
                     value = texScalePercent,

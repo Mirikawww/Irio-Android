@@ -139,6 +139,7 @@ object ThemeStore {
     private const val GLYPH_FADE_KEY = "glyph_fade"
     private const val MODEL_DIFF_KEY = "model_diff"
     private const val NEW_MESSAGE_SCROLL_KEY = "new_message_scroll"
+    private const val THINKING_BLOCK_KEY = "thinking_block"
     private const val LEGACY_PREFS = "provider_settings"
     private const val LEGACY_KEY = "theme_preference"
 
@@ -170,6 +171,10 @@ object ThemeStore {
     var newMessageScroll by mutableStateOf(false)
         private set
 
+    /** 显示思考块（进行中的思考内容和「已思考 x 秒」）。关闭后只剩「思考中」。默认开。 */
+    var thinkingBlock by mutableStateOf(true)
+        private set
+
     @Volatile
     private var loaded = false
 
@@ -188,6 +193,7 @@ object ThemeStore {
             glyphFade = appearance.getBoolean(GLYPH_FADE_KEY, false)
             modelDiff = appearance.getBoolean(MODEL_DIFF_KEY, false)
             newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, false)
+            thinkingBlock = appearance.getBoolean(THINKING_BLOCK_KEY, true)
             if (appearance.getString(KEY, null) == null && stored != null) {
                 appearance.edit().putString(KEY, stored).apply()
             }
@@ -262,6 +268,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(NEW_MESSAGE_SCROLL_KEY, enabled)
+            .apply()
+    }
+
+    fun saveThinkingBlock(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (thinkingBlock == enabled) return
+        thinkingBlock = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(THINKING_BLOCK_KEY, enabled)
             .apply()
     }
 

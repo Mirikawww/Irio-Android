@@ -57,6 +57,7 @@ private val English = mapOf(
     "公式大小" to "Formula size",
     "文本淡入" to "Text fade-in",
     "新消息滚动" to "New message scroll",
+    "思考块" to "Thinking block",
     "模型差异" to "Model diff",
     "共存" to "Keep both",
     "写入记忆" to "Saving memory",

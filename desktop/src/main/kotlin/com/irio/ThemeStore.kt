@@ -138,6 +138,7 @@ object ThemeStore {
     private const val GLYPH_FADE_KEY = "glyph_fade"
     private const val MODEL_DIFF_KEY = "model_diff"
     private const val NEW_MESSAGE_SCROLL_KEY = "new_message_scroll"
+    private const val THINKING_BLOCK_KEY = "thinking_block"
 
     private val initial = loadInitial()
     var preference by mutableStateOf(initial.preference)
@@ -156,6 +157,9 @@ object ThemeStore {
     var modelDiff by mutableStateOf(initial.modelDiff)
         private set
     var newMessageScroll by mutableStateOf(initial.newMessageScroll)
+        private set
+    /** 显示思考块（进行中的思考内容和「已思考 x 秒」）。关闭后只剩「思考中」。默认开。 */
+    var thinkingBlock by mutableStateOf(initial.thinkingBlock)
         private set
 
     fun save(value: ThemePreference) {
@@ -200,6 +204,12 @@ object ThemeStore {
         updateAppearance { it.put(NEW_MESSAGE_SCROLL_KEY, enabled) }
     }
 
+    fun saveThinkingBlock(enabled: Boolean) {
+        if (thinkingBlock == enabled) return
+        thinkingBlock = enabled
+        updateAppearance { it.put(THINKING_BLOCK_KEY, enabled) }
+    }
+
     fun saveContextRing(enabled: Boolean) {
         if (contextRing == enabled) return
         contextRing = enabled
@@ -223,6 +233,7 @@ object ThemeStore {
         val glyphFade = appearance?.optBoolean(GLYPH_FADE_KEY, false) ?: false
         val modelDiff = appearance?.optBoolean(MODEL_DIFF_KEY, false) ?: false
         val newMessageScroll = appearance?.optBoolean(NEW_MESSAGE_SCROLL_KEY, false) ?: false
+        val thinkingBlock = appearance?.optBoolean(THINKING_BLOCK_KEY, true) ?: true
         if (fromAppearance != null) {
             return LoadedAppearance(
                 ThemePreference.fromStored(fromAppearance),
@@ -233,6 +244,7 @@ object ThemeStore {
                 modelDiff,
                 newMessageScroll,
                 contextRing,
+                thinkingBlock,
             )
         }
         val legacy = runCatching {
@@ -251,6 +263,7 @@ object ThemeStore {
             modelDiff,
             newMessageScroll,
             contextRing,
+            thinkingBlock,
         )
     }
 
@@ -263,5 +276,6 @@ object ThemeStore {
         val modelDiff: Boolean,
         val newMessageScroll: Boolean,
         val contextRing: Boolean,
+        val thinkingBlock: Boolean,
     )
 }
