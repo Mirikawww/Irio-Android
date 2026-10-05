@@ -157,7 +157,7 @@ private fun VoiceMenu(
                     enabled = enabled,
                     onClick = { onExpandedChange(!expanded) },
                 )
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 10.5.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
