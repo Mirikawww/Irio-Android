@@ -42,6 +42,8 @@ private val English = mapOf(
     "上下文压缩中" to "Compressing context",
     "上下文压缩失败" to "Context compression failed",
     "压缩模型" to "Compression model",
+    "压缩次数" to "Compressions",
+    "压缩上下文" to "Compress context",
     "触发时机" to "Trigger threshold",
     "压缩目标" to "Compression target",
     "%d 条" to "%d messages",

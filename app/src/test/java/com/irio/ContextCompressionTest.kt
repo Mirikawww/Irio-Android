@@ -82,6 +82,20 @@ class ContextCompressionTest {
     }
 
     @Test
+    fun compressionCountIsSuccessfulBoundariesOnly() {
+        val messages = listOf(
+            msg(1, "a"),
+            msg(2, "one", fromUser = false, state = SummaryState.SUCCESS),
+            msg(3, "b"),
+            msg(4, "running", fromUser = false, state = SummaryState.RUNNING),
+            msg(5, "failed", fromUser = false, state = SummaryState.FAILED),
+            msg(6, "two", fromUser = false, state = SummaryState.SUCCESS),
+        )
+        assertEquals(2, compressionCount(messages))
+        assertEquals(0, compressionCount(emptyList()))
+    }
+
+    @Test
     fun budgetIsTheTargetSliceOfTheWindow() {
         assertEquals(10_000, summaryBudgetTokens(windowTokens = 100_000, targetPercent = 10))
         assertEquals(0, summaryBudgetTokens(windowTokens = 0, targetPercent = 10))

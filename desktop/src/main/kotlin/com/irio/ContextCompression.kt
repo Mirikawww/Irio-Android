@@ -57,6 +57,10 @@ internal fun summaryBudgetTokens(windowTokens: Int, targetPercent: Int): Int {
     return (windowTokens.toLong() * targetPercent.coerceIn(0, 100) / 100L).toInt()
 }
 
+/** 成功的压缩边界张数。失败和进行中的不算。 */
+internal fun compressionCount(messages: List<ChatMessage>): Int =
+    messages.count { it.summaryState == SummaryState.SUCCESS }
+
 internal fun planCompression(history: List<ChatMessage>): CompressionPlan? {
     val boundary = history.indexOfLast { it.summaryState == SummaryState.SUCCESS }
     val prior = history.getOrNull(boundary)?.text?.takeIf { it.isNotBlank() }

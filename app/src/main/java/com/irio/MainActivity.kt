@@ -314,6 +314,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var activeProviderId by remember { mutableStateOf(ProviderStore.loadActiveProviderId(context)) }
     var modelMenuOpen by remember { mutableStateOf(false) }
     var contextRingOpen by remember { mutableStateOf(false) }
+    var contextCompressionEnabled by remember { mutableStateOf(ToolStore.loadContextCompression(context)) }
     var attachMenuOpen by remember { mutableStateOf(false) }
     var reasoningEffort by remember { mutableStateOf(ProviderStore.loadReasoningEffort(context)) }
     var fastMode by remember { mutableStateOf(ProviderStore.loadFastMode(context)) }
@@ -756,6 +757,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     // 设置页是独立 Activity；返回时主动重读，确保名称开关无需重启主页即可生效。
                     modelsDevCatalog = ProviderStore.loadModelsDevCatalog(context)
                     modelsDevReasoning = ProviderStore.loadModelsDevReasoning(context)
+                    contextCompressionEnabled = ToolStore.loadContextCompression(context)
                     val provider = currentProviders.firstOrNull { it.id == currentActiveId }
                     val scopeId = currentConversationId
                     if (EndpointWarmup.shouldWarm(provider, currentConversationBusy)) {
@@ -1502,6 +1504,37 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         ))
     }
 
+    /** 不等触发线，也不接着生成回复。当前可见历史整段压成一道边界。 */
+    fun compressNow() {
+        if (generatingThisChat) return
+        val conversationId = currentConversation.id
+        val covered = contextMessages(messages).filterNot { it.isError || it.isPending || it.isStreaming }
+        val plan = planCompression(covered) ?: return
+        val card = ChatMessage(
+            id = MessageIds.next(),
+            text = "",
+            fromUser = false,
+            summaryState = SummaryState.RUNNING,
+            isPending = true,
+        )
+        messages = insertSummaryCard(messages, plan.untilId, card)
+        persistCurrent(messages)
+        val cancellation = ChatRequestCancellation()
+        val job = scope.launch {
+            val text = runSummary(plan, conversationId, cancellation)
+            withContext(Dispatchers.Main.immediate) {
+                val cancelled = cancellation.isCancelled()
+                finishSummaryCard(conversationId, card, plan, text, cancelled)
+                generations = generations - card.id
+            }
+        }
+        generations = generations + (card.id to ActiveGeneration(
+            conversationId = conversationId,
+            job = job,
+            cancellation = cancellation,
+        ))
+    }
+
     fun submitMessage() {
         val text = message.text.toString().trim()
         if (generatingThisChat || (text.isEmpty() && pendingAttachments.isEmpty())) return
@@ -2081,10 +2114,20 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         val contextUsage = currentConversation.tokenUsage
                             ?: messages.lastOrNull { !it.fromUser && it.usage != null }?.usage
                         if (showContextRing) {
+                            val showCompression = contextCompressionEnabled
+                            val canCompress = showCompression && !generatingThisChat && planCompression(
+                                contextMessages(messages).filterNot {
+                                    it.isError || it.isPending || it.isStreaming
+                                },
+                            ) != null
                             ToolbarCapsule {
                                 ContextUsageRing(
                                     usedTokens = contextUsage?.usedTokens ?: 0,
                                     windowTokens = ModelCatalog.contextWindow(context, selectedModel),
+                                    compressionCount = compressionCount(messages),
+                                    showCompression = showCompression,
+                                    compressEnabled = canCompress,
+                                    onCompress = ::compressNow,
                                     expanded = contextRingOpen,
                                     onExpandedChange = { contextRingOpen = it },
                                 )

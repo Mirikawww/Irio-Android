@@ -1364,6 +1364,37 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         ))
     }
 
+    /** 不等触发线，也不接着生成回复。当前可见历史整段压成一道边界。 */
+    fun compressNow() {
+        if (generatingThisChat) return
+        val conversationId = currentConversation.id
+        val covered = contextMessages(messages).filterNot { it.isError || it.isPending || it.isStreaming }
+        val plan = planCompression(covered) ?: return
+        val card = ChatMessage(
+            id = MessageIds.next(),
+            text = "",
+            fromUser = false,
+            summaryState = SummaryState.RUNNING,
+            isPending = true,
+        )
+        messages = insertSummaryCard(messages, plan.untilId, card)
+        persistCurrent(messages)
+        val cancellation = ChatRequestCancellation()
+        val job = scope.launch {
+            val text = runSummary(plan, conversationId, cancellation)
+            withContext(Dispatchers.Main.immediate) {
+                val cancelled = cancellation.isCancelled()
+                finishSummaryCard(conversationId, card, plan, text, cancelled)
+                generations = generations - card.id
+            }
+        }
+        generations = generations + (card.id to ActiveGeneration(
+            conversationId = conversationId,
+            job = job,
+            cancellation = cancellation,
+        ))
+    }
+
     /**
      * 提交编辑：新版本插回原消息位置（而不是列表尾），旧版本取消选中；
      * 紧随其后的模型回复组取消选中，新 pending 回复进同一个 retryGroup 并启动重生成。
@@ -1969,10 +2000,20 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         val contextUsage = currentConversation.tokenUsage
                             ?: messages.lastOrNull { !it.fromUser && it.usage != null }?.usage
                         if (showContextRing) {
+                            val showCompression = ToolStore.contextCompressionEnabled
+                            val canCompress = showCompression && !generatingThisChat && planCompression(
+                                contextMessages(messages).filterNot {
+                                    it.isError || it.isPending || it.isStreaming
+                                },
+                            ) != null
                             ToolbarCapsule {
                                 ContextUsageRing(
                                     usedTokens = contextUsage?.usedTokens ?: 0,
                                     windowTokens = ModelCatalog.contextWindow(selectedModel),
+                                    compressionCount = compressionCount(messages),
+                                    showCompression = showCompression,
+                                    compressEnabled = canCompress,
+                                    onCompress = ::compressNow,
                                     expanded = contextRingOpen,
                                     onExpandedChange = { contextRingOpen = it },
                                 )

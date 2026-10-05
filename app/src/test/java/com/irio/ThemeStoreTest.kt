@@ -58,6 +58,8 @@ class ThemeStoreTest {
         assertEquals("Context compressed", translate(AppLanguage.EN, "已压缩上下文"))
         assertEquals("Context compression failed", translate(AppLanguage.EN, "上下文压缩失败"))
         assertEquals("Compression model", translate(AppLanguage.EN, "压缩模型"))
+        assertEquals("Compressions", translate(AppLanguage.EN, "压缩次数"))
+        assertEquals("Compress context", translate(AppLanguage.EN, "压缩上下文"))
         assertEquals("Summarize", translate(AppLanguage.EN, "摘要"))
         assertEquals("Refresh port", translate(AppLanguage.EN, "刷新端口"))
         assertEquals("Trigger threshold", translate(AppLanguage.EN, "触发时机"))

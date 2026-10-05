@@ -31,6 +31,9 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.composables.ui.components.Button
+import com.composables.ui.components.ButtonSize
+import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.DropdownMenu
 import com.composables.ui.components.DropdownMenuAlignment
 import com.composables.ui.components.DropdownMenuPanel
@@ -41,11 +44,15 @@ import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.primaryColor
 import com.composeunstyled.theme.Theme
 
-/** 用量来自接口 usage，窗口来自 OpenRouter `context_length`。点击弹出共计与已使用。 */
+/** 用量来自接口 usage，窗口来自 OpenRouter `context_length`。点击弹出共计和已使用。压缩打开时才带压缩次数和压缩按钮。 */
 @Composable
 fun ContextUsageRing(
     usedTokens: Int,
     windowTokens: Int,
+    compressionCount: Int,
+    showCompression: Boolean,
+    compressEnabled: Boolean,
+    onCompress: () -> Unit,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -59,9 +66,19 @@ fun ContextUsageRing(
         alignment = DropdownMenuAlignment.End,
         panel = {
             DropdownMenuPanel(minWidth = 0.dp) {
-                ContextStatTable(
+                ContextRingMenu(
                     total = contextWindowLabel(windowTokens),
                     used = formatContextCount(usedTokens),
+                    compressions = if (showCompression) formatContextCount(compressionCount) else null,
+                    compressEnabled = compressEnabled,
+                    onCompress = if (showCompression) {
+                        {
+                            onExpandedChange(false)
+                            onCompress()
+                        }
+                    } else {
+                        null
+                    },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                 )
             }
@@ -138,7 +155,36 @@ private fun ContextRingCanvas(
 }
 
 @Composable
-private fun ContextStatTable(total: String, used: String, modifier: Modifier = Modifier) {
+private fun ContextRingMenu(
+    total: String,
+    used: String,
+    compressions: String?,
+    compressEnabled: Boolean,
+    onCompress: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val measurePolicy = remember { contextRingMenuMeasurePolicy() }
+    Layout(
+        content = {
+            ContextStatTable(total = total, used = used, compressions = compressions)
+            if (onCompress != null) {
+                Button(
+                    onClick = onCompress,
+                    enabled = compressEnabled,
+                    style = ButtonStyle.Primary,
+                    buttonSize = ButtonSize.Small,
+                ) {
+                    Text(tr("压缩上下文"))
+                }
+            }
+        },
+        modifier = modifier,
+        measurePolicy = measurePolicy,
+    )
+}
+
+@Composable
+private fun ContextStatTable(total: String, used: String, compressions: String?) {
     val measurePolicy = remember { contextStatMeasurePolicy() }
     Layout(
         content = {
@@ -146,8 +192,11 @@ private fun ContextStatTable(total: String, used: String, modifier: Modifier = M
             ContextStatText(total)
             ContextStatText(tr("已使用"))
             ContextStatText(used)
+            if (compressions != null) {
+                ContextStatText(tr("压缩次数"))
+                ContextStatText(compressions)
+            }
         },
-        modifier = modifier,
         measurePolicy = measurePolicy,
     )
 }
@@ -160,6 +209,68 @@ private fun ContextStatText(text: String) {
         fontSize = 15.sp,
         maxLines = 1,
     )
+}
+
+private fun contextRingMenuMeasurePolicy(): MeasurePolicy = object : MeasurePolicy {
+    override fun MeasureScope.measure(
+        measurables: List<Measurable>,
+        constraints: Constraints,
+    ): MeasureResult {
+        val gap = 10.dp.roundToPx()
+        val statsWidth = measurables[0].maxIntrinsicWidth(Constraints.Infinity)
+        val buttonMeasurable = measurables.getOrNull(1)
+        val buttonWidth = buttonMeasurable?.maxIntrinsicWidth(Constraints.Infinity) ?: 0
+        val contentWidth = maxOf(statsWidth, buttonWidth)
+        val width = if (
+            constraints.hasBoundedWidth &&
+            constraints.maxWidth >= contentWidth &&
+            constraints.maxWidth - contentWidth <= 2
+        ) {
+            constraints.maxWidth
+        } else {
+            contentWidth
+        }.coerceAtLeast(constraints.minWidth).let { wanted ->
+            if (constraints.hasBoundedWidth) wanted.coerceAtMost(constraints.maxWidth) else wanted
+        }
+        val maxHeight = if (constraints.hasBoundedHeight) constraints.maxHeight else Constraints.Infinity
+        val exact = Constraints(minWidth = width, maxWidth = width, minHeight = 0, maxHeight = maxHeight)
+        val stats = measurables[0].measure(exact)
+        val button = buttonMeasurable?.measure(exact)
+        val height = if (button == null) stats.height else stats.height + gap + button.height
+        return layout(width, height) {
+            stats.placeRelative(0, 0)
+            button?.placeRelative(0, stats.height + gap)
+        }
+    }
+
+    override fun IntrinsicMeasureScope.maxIntrinsicWidth(
+        measurables: List<IntrinsicMeasurable>,
+        height: Int,
+    ): Int {
+        val stats = measurables[0].maxIntrinsicWidth(height)
+        val button = measurables.getOrNull(1)?.maxIntrinsicWidth(height) ?: 0
+        return maxOf(stats, button)
+    }
+
+    override fun IntrinsicMeasureScope.minIntrinsicWidth(
+        measurables: List<IntrinsicMeasurable>,
+        height: Int,
+    ): Int = maxIntrinsicWidth(measurables, height)
+
+    override fun IntrinsicMeasureScope.maxIntrinsicHeight(
+        measurables: List<IntrinsicMeasurable>,
+        width: Int,
+    ): Int {
+        val stats = measurables[0].maxIntrinsicHeight(width)
+        val button = measurables.getOrNull(1) ?: return stats
+        val gap = 10.dp.roundToPx()
+        return stats + gap + button.maxIntrinsicHeight(width)
+    }
+
+    override fun IntrinsicMeasureScope.minIntrinsicHeight(
+        measurables: List<IntrinsicMeasurable>,
+        width: Int,
+    ): Int = maxIntrinsicHeight(measurables, width)
 }
 
 private fun contextStatMeasurePolicy(): MeasurePolicy = object : MeasurePolicy {
