@@ -57,6 +57,7 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-compose:3.6.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.0")
     implementation("com.squareup.okhttp3:okhttp:${libs.versions.okhttp.get()}")
+    implementation("com.knuddels:jtokkit:1.1.0")
 
     // 图片预览：双击/双指缩放（PhotoViewer）
     implementation("me.saket.telephoto:zoomable:0.19.0")
