@@ -1110,13 +1110,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 val result = if (provider == null) {
                     ChatCompletionResult(error = tr("请先在设置中添加提供商"))
                 } else if (ModelCatalog.isImageModel(context, requestModel)) {
-                    val lastUserIndex = requestSource.indexOfLast { it.fromUser }
+                    val lastUserIndex = requestSource.indexOfLast { it.fromUser && !it.hidden }
                     val prompt = requestSource.getOrNull(lastUserIndex)?.text.orEmpty().ifBlank { tr("图片") }
                     // Images API 无状态：多轮要回传上轮 prompt + 生成图。
                     // 上轮 = 本条用户消息之前最近的一次生图往返（上轮用户 prompt + 其后模型产出的图）。
                     val imageContext = if (lastUserIndex > 0) {
                         val previousUserPrompt = requestSource.subList(0, lastUserIndex)
-                            .lastOrNull { it.fromUser }?.text.orEmpty()
+                            .lastOrNull { it.fromUser && !it.hidden }?.text.orEmpty()
                         val previousImages = requestSource.subList(0, lastUserIndex)
                             .filter { !it.fromUser }
                             .flatMap { it.attachments.filter { attachment -> attachment.isImage } }
@@ -1354,7 +1354,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             // 首轮成功回复后生成 AI 标题（异步，不阻塞 UI）
                             maybeGenerateTitle(
                                 conversationId = requestConversationId,
-                                userText = requestSource.lastOrNull { it.fromUser }?.text.orEmpty(),
+                                userText = requestSource.lastOrNull { it.fromUser && !it.hidden }?.text.orEmpty(),
                                 assistantText = finalMessage.text,
                             )
                             if (
@@ -1404,7 +1404,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             isPending = true,
             responseToUserId = userMessage.id,
         )
-        val history = visibleMessages(messages).filterNot { it.isError || it.isPending }
+        val history = contextMessages(messages).filterNot { it.isError || it.isPending }
         messages = messages + userMessage + reply
         persistCurrent(messages)
         pendingAttachments = emptyList()
@@ -1493,7 +1493,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         val groupId = assistant.groupId
         val firstIndex = messages.indexOfFirst { !it.fromUser && it.groupId == groupId }
         if (firstIndex <= 0) return
-        val history = visibleMessages(messages.take(firstIndex)).filterNot { it.isError || it.isPending }
+        val history = contextMessages(messages.take(firstIndex)).filterNot { it.isError || it.isPending }
         if (history.isEmpty()) return
         val reply = ChatMessage(
             id = MessageIds.next(),

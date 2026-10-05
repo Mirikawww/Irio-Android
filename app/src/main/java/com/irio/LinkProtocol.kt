@@ -234,6 +234,7 @@ object LinkConversationJson {
                                 put("isError", message.isError)
                                 put("retryGroup", message.groupId)
                                 put("selected", message.selected)
+                                if (message.hidden) put("hidden", true)
                                 if (message.finishedAt > 0L) put("finishedAt", message.finishedAt)
                                 message.responseToUserId?.let { put("responseToUserId", it) }
                                 message.usage?.let { usage ->
@@ -290,6 +291,7 @@ object LinkConversationJson {
                         finishedAt = item.optLong("finishedAt"),
                         responseToUserId = item.optLong("responseToUserId").takeIf { it != 0L },
                         usage = tokenUsageFrom(item.optJSONObject("usage")),
+                        hidden = item.optBoolean("hidden"),
                     )
                 )
             }

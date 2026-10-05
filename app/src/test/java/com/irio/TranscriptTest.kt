@@ -138,4 +138,16 @@ class TranscriptTest {
         assertEquals(false, committed.messages.first { it.id == 2L }.selected)
         assertEquals(listOf(4L), committed.history.map { it.id })
     }
+
+    @Test
+    fun hiddenUserMessageStaysInContextButNotOnScreen() {
+        val user = ChatMessage(id = 1, text = "hi", fromUser = true)
+        val reply = ChatMessage(id = 2, text = "ok", fromUser = false, responseToUserId = 1)
+        val notice = ChatMessage(id = 3, text = "done", fromUser = true, hidden = true)
+        val follow = ChatMessage(id = 4, text = "noted", fromUser = false, responseToUserId = 3)
+        val all = listOf(user, reply, notice, follow)
+        assertEquals(listOf(1L, 2L, 4L), visibleMessages(all).map { it.id })
+        assertEquals(listOf(1L, 2L, 3L, 4L), contextMessages(all).map { it.id })
+        assertEquals("hi", ConversationStore.titleFrom(all))
+    }
 }

@@ -5,6 +5,7 @@ internal data class TranscriptPresentation(
     val visible: List<ChatMessage>,
     val retryGroups: Map<Long, List<ChatMessage>>,
     val editGroups: Map<Long, List<ChatMessage>>,
+    val context: List<ChatMessage> = emptyList(),
 )
 
 internal fun buildTranscriptPresentation(
@@ -13,7 +14,7 @@ internal fun buildTranscriptPresentation(
 ): TranscriptPresentation {
     val retryGroups = retryVersionsForSelectedUsers(messages)
     val editGroups = editVersionsByGroup(messages)
-    val visible = messages.filter { message ->
+    val selected = messages.filter { message ->
         if (message.fromUser) {
             message.selected
         } else {
@@ -26,7 +27,8 @@ internal fun buildTranscriptPresentation(
             }
         }
     }
-    return TranscriptPresentation(conversationId, visible, retryGroups, editGroups)
+    val visible = selected.filter { !it.hidden }
+    return TranscriptPresentation(conversationId, visible, retryGroups, editGroups, selected)
 }
 
 private fun responseOwnerId(messages: List<ChatMessage>, reply: ChatMessage): Long? {
@@ -69,6 +71,11 @@ internal fun editVersionsByGroup(messages: List<ChatMessage>): Map<Long, List<Ch
 
 internal fun visibleMessages(messages: List<ChatMessage>): List<ChatMessage> {
     return buildTranscriptPresentation("", messages).visible
+}
+
+/** 发给模型的历史。和界面同一套版本选择，但保留用户看不见的消息。 */
+internal fun contextMessages(messages: List<ChatMessage>): List<ChatMessage> {
+    return buildTranscriptPresentation("", messages).context
 }
 
 internal fun retryVersions(messages: List<ChatMessage>, message: ChatMessage): List<ChatMessage> {
@@ -143,7 +150,7 @@ internal fun commitEditedTurn(
         responseToUserId = version.id,
     )
     val history = buildList {
-        addAll(visibleMessages(messages.subList(0, targetIndex)).filterNot { it.isError || it.isPending })
+        addAll(contextMessages(messages.subList(0, targetIndex)).filterNot { it.isError || it.isPending })
         add(version)
     }
     val updated = buildList {

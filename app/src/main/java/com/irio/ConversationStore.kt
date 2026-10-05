@@ -26,6 +26,8 @@ data class ChatMessage(
     val usage: TokenUsage? = null,
     /** 模型完成这条回复的时刻。0 表示还没完成，或旧数据没有记录。不要用 createdAt 代替，那是开始生成的时间。 */
     val finishedAt: Long = 0L,
+    /** 只发给模型，不出现在对话里。 */
+    val hidden: Boolean = false,
 ) {
     val groupId: Long get() = retryGroup.takeIf { it != 0L } ?: id
     /** 用户版本组键：编辑过取 editGroup，否则取 id（单条即自己）。 */
@@ -193,8 +195,8 @@ object ConversationStore {
     }
 
     fun titleFrom(messages: List<ChatMessage>): String {
-        val first = messages.firstOrNull { it.fromUser && it.text.isNotBlank() }?.text
-            ?: messages.firstOrNull { it.fromUser }?.attachments?.firstOrNull()?.name
+        val first = messages.firstOrNull { it.fromUser && !it.hidden && it.text.isNotBlank() }?.text
+            ?: messages.firstOrNull { it.fromUser && !it.hidden }?.attachments?.firstOrNull()?.name
         return first?.trim()?.replace('\n', ' ')?.take(24)?.ifBlank { "新对话" } ?: "新对话"
     }
 
@@ -233,6 +235,7 @@ object ConversationStore {
                             put("selected", message.selected)
                             message.responseToUserId?.let { put("responseToUserId", it) }
                             if (message.fromUser && message.editGroup != 0L) put("editGroup", message.userGroupId)
+                            if (message.hidden) put("hidden", true)
                             message.usage?.let { usage ->
                                 put(
                                     "usage",
@@ -320,6 +323,7 @@ object ConversationStore {
                             item.optLong("editGroup").takeIf { it != 0L } ?: 0L
                         } else 0L,
                         usage = tokenUsageFrom(item.optJSONObject("usage")),
+                        hidden = item.optBoolean("hidden"),
                     )
                 )
             }
