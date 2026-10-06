@@ -90,7 +90,6 @@ private fun SettingsScreen(onBack: () -> Unit) {
                 ListRowButton(
                     label = "TTS/STT",
                     icon = Icons.Rounded.RecordVoiceOver,
-                    experimental = true,
                     onClick = {
                         context.startActivity(Intent(context, SpeechSettingsActivity::class.java))
                     },

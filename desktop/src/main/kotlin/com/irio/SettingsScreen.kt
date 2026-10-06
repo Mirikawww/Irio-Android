@@ -84,7 +84,6 @@ fun SettingsScreen(
                 ListRowButton(
                     label = "TTS/STT",
                     icon = Icons.Rounded.RecordVoiceOver,
-                    experimental = true,
                     onClick = onSpeech,
                 )
                 Spacer(Modifier.height(12.dp))
