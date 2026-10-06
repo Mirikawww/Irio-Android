@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -37,6 +38,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -91,6 +94,7 @@ fun ProviderSettingsScreen(
     val name = rememberTextFieldState()
     val endpoint = rememberTextFieldState()
     val apiKey = rememberTextFieldState()
+    val headers = rememberProviderHeadersState()
 
     fun reload() {
         providers = ProviderStore.loadProviders()
@@ -107,6 +111,7 @@ fun ProviderSettingsScreen(
         endpoint.clearText()
         protocol = ProviderProtocol.CHAT_COMPLETIONS
         apiKey.clearText()
+        headers.reset()
         formError = null
         protocolMenuOpen = false
     }
@@ -156,42 +161,56 @@ fun ProviderSettingsScreen(
         }
     }
 
+    val addDialogMaxHeight = with(LocalDensity.current) {
+        LocalWindowInfo.current.containerSize.height.toDp() - 64.dp
+    }.coerceAtLeast(160.dp)
+
     IrioAlertDialog(
         visible = dialogOpen,
         onDismissRequest = { if (!saving) dialogOpen = false },
         backgroundColor = Theme[colors][panelColor],
         contentColor = Theme[colors][onPanelColor],
     ) {
-        Column {
+        Column(modifier = Modifier.heightIn(max = addDialogMaxHeight)) {
             DialogTitle(tr("添加提供商"))
             Spacer(Modifier.height(16.dp))
-            ProviderField(tr("名称"), name, KeyboardType.Text)
-            ProtocolPicker(
-                protocol = protocol,
-                expanded = protocolMenuOpen,
-                onExpandedChange = { protocolMenuOpen = it },
-                onSelect = { protocol = it },
-            )
-            Spacer(Modifier.height(12.dp))
-            ProviderField(tr("端点 URL"), endpoint, KeyboardType.Uri)
-            ProviderField(tr("密钥"), apiKey, KeyboardType.Password, mask = true)
-            if (formError != null) {
-                Text(formError!!)
-                Spacer(Modifier.height(8.dp))
+            Column(
+                modifier = Modifier.weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                ProviderField(tr("名称"), name, KeyboardType.Text, readOnly = saving)
+                ProtocolPicker(
+                    protocol = protocol,
+                    expanded = protocolMenuOpen,
+                    onExpandedChange = { protocolMenuOpen = it },
+                    onSelect = { protocol = it },
+                    enabled = !saving,
+                )
+                Spacer(Modifier.height(12.dp))
+                ProviderField(tr("端点 URL"), endpoint, KeyboardType.Uri, readOnly = saving)
+                ProviderField(tr("密钥"), apiKey, KeyboardType.Password, mask = true, readOnly = saving)
+                ProviderHeadersEditor(headers, enabled = !saving)
+                Spacer(Modifier.height(12.dp))
+                if (formError != null) {
+                    Text(formError!!)
+                    Spacer(Modifier.height(8.dp))
+                }
             }
+            Spacer(Modifier.height(16.dp))
             DialogButtonRow(
                 confirmLabel = if (saving) tr("保存中") else tr("保存"),
                 confirmEnabled = !saving &&
                     name.text.isNotBlank() &&
-                    endpoint.text.toString().isNotBlank() &&
-                    apiKey.text.isNotBlank(),
-                onConfirm = {
+                    endpoint.text.toString().isNotBlank(),
+                onConfirm = confirm@{
+                    val customHeaders = headers.validatedHeaders() ?: return@confirm
                     val config = ProviderConfig(
                         id = UUID.randomUUID().toString(),
                         name = name.text.toString().trim(),
                         endpointUrl = endpoint.text.toString().trim(),
                         apiKey = apiKey.text.toString(),
                         protocol = protocol,
+                        customHeaders = customHeaders,
                     )
                     saving = true
                     formError = null
@@ -257,10 +276,11 @@ internal fun ProtocolPicker(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     onSelect: (ProviderProtocol) -> Unit,
+    enabled: Boolean = true,
 ) {
     DropdownMenu(
-        expanded = expanded,
-        onExpandedChange = onExpandedChange,
+        expanded = expanded && enabled,
+        onExpandedChange = { if (enabled) onExpandedChange(it) },
         modifier = Modifier.fillMaxWidth(),
         alignment = DropdownMenuAlignment.End,
         panel = {
@@ -285,6 +305,7 @@ internal fun ProtocolPicker(
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
+                    enabled = enabled,
                     onClick = { onExpandedChange(!expanded) },
                 )
                 .padding(start = 12.dp, top = 8.dp, end = 4.dp, bottom = 8.dp),
@@ -296,6 +317,7 @@ internal fun ProtocolPicker(
             }
             IconButton(
                 onClick = { onExpandedChange(!expanded) },
+                enabled = enabled,
                 style = ButtonStyle.Ghost,
                 buttonSize = ButtonSize.Small,
                 shape = CircleShape,

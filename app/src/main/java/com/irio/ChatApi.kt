@@ -9,7 +9,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import org.json.JSONArray
 import org.json.JSONObject
 import okhttp3.Call
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
@@ -289,11 +288,12 @@ object ChatApi {
             }
             val builder = Request.Builder()
                 .url(requestUrl(provider))
-                .post(body.toString().toByteArray(Charsets.UTF_8).toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .post(body.toString().toByteArray(Charsets.UTF_8).toRequestBody(null))
+                .header("Content-Type", "application/json; charset=utf-8")
                 .header("Accept", "application/json")
                 .isolateConversation(connectionScope)
             applyAuth(builder, provider)
-            val call = IrioHttp.clientFor(connectionScope).newCall(builder.build())
+            val call = provider.requestClient(connectionScope).newCall(builder.build())
             var response: okhttp3.Response? = null
             try {
                 response = call.execute()
@@ -329,11 +329,12 @@ object ChatApi {
             val body = summaryRequestBody(provider.protocol, model, systemPrompt, messages, connectionScope)
             val builder = Request.Builder()
                 .url(requestUrl(provider))
-                .post(body.toByteArray(Charsets.UTF_8).toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .post(body.toByteArray(Charsets.UTF_8).toRequestBody(null))
+                .header("Content-Type", "application/json; charset=utf-8")
                 .header("Accept", "application/json")
                 .isolateConversation(connectionScope)
             applyAuth(builder, provider)
-            val call = IrioHttp.clientFor(connectionScope).newCall(builder.build())
+            val call = provider.requestClient(connectionScope).newCall(builder.build())
             cancellation.attach(call)
             var response: okhttp3.Response? = null
             try {
@@ -468,7 +469,8 @@ object ChatApi {
         val request = try {
             val builder = Request.Builder()
                 .url(requestUrl(provider))
-                .post(bodyBytes.toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .post(bodyBytes.toRequestBody(null))
+                .header("Content-Type", "application/json; charset=utf-8")
                 .header("Accept", "text/event-stream")
                 .header("Cache-Control", "no-cache, no-store")
                 .header("Pragma", "no-cache")
@@ -479,7 +481,7 @@ object ChatApi {
         } catch (_: Exception) {
             return ChatCompletionResult(error = tr("端点 URL 无效"))
         }
-        val call = IrioHttp.clientFor(connectionScope).newCall(request)
+        val call = provider.requestClient(connectionScope).newCall(request)
         cancellation.attach(call)
         var response: okhttp3.Response? = null
 

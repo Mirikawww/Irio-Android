@@ -44,6 +44,7 @@ data class ProviderConfig(
     val disabledModels: Set<String> = emptySet(),
     val enabled: Boolean = true,
     val selectedModel: String = "",
+    val customHeaders: List<ProviderHeader> = emptyList(),
 )
 
 data class ModelFetchResult(
@@ -166,12 +167,19 @@ object ProviderStore {
                     val models = stringList(item.optJSONArray("models"))
                     val disabled = stringList(item.optJSONArray("disabled_models")).filter { it in models }.toSet()
                     val selected = item.optString("selected_model").takeIf { it in models }.orEmpty()
+                    val headers = runCatching {
+                        if (item.has("encrypted_headers")) {
+                            val rawHeaders = requireNotNull(decrypt(item.getString("encrypted_headers")))
+                            providerHeadersFromJson(JSONArray(rawHeaders))
+                        } else emptyList()
+                    }.getOrNull() ?: continue
                     add(
                         ProviderConfig(
                             id = item.optString("id").ifBlank { UUID.randomUUID().toString() },
                             name = item.optString("name"),
                             endpointUrl = item.optString("endpoint"),
                             apiKey = apiKey,
+                            customHeaders = headers,
                             protocol = protocol,
                             models = models,
                             disabledModels = disabled,
@@ -327,6 +335,7 @@ object ProviderStore {
                         put("name", provider.name)
                         put("endpoint", provider.endpointUrl)
                         put("encrypted_key", encrypt(provider.apiKey))
+                        put("encrypted_headers", encrypt(providerHeadersJson(provider.customHeaders).toString()))
                         put("protocol", provider.protocol.name)
                         put("models", JSONArray().apply { provider.models.forEach(::put) })
                         put("disabled_models", JSONArray().apply { provider.disabledModels.forEach(::put) })
@@ -360,6 +369,7 @@ object ProviderStore {
                                 put("name", provider.name)
                                 put("endpoint", provider.endpointUrl)
                                 put("apiKey", provider.apiKey)
+                                put("customHeaders", providerHeadersJson(provider.customHeaders))
                                 put("protocol", provider.protocol.name)
                                 put("models", JSONArray().apply { provider.models.forEach(::put) })
                                 put("disabled_models", JSONArray().apply { provider.disabledModels.forEach(::put) })
@@ -400,19 +410,22 @@ object ProviderStore {
             for (index in 0 until array.length()) {
                 val item = array.optJSONObject(index) ?: continue
                 val apiKey = item.optString("apiKey")
-                if (apiKey.isBlank()) continue
                 val protocol = runCatching {
                     ProviderProtocol.valueOf(item.optString("protocol"))
                 }.getOrDefault(ProviderProtocol.CHAT_COMPLETIONS)
                 val models = stringList(item.optJSONArray("models"))
                 val disabled = stringList(item.optJSONArray("disabled_models")).filter { it in models }.toSet()
                 val selected = item.optString("selected_model").takeIf { it in models }.orEmpty()
+                val headers = runCatching {
+                    providerHeadersFromJson(if (item.has("customHeaders")) item.getJSONArray("customHeaders") else null)
+                }.getOrNull() ?: continue
                 add(
                     ProviderConfig(
                         id = item.optString("id").ifBlank { UUID.randomUUID().toString() },
                         name = item.optString("name"),
                         endpointUrl = item.optString("endpoint"),
                         apiKey = apiKey,
+                        customHeaders = headers,
                         protocol = protocol,
                         models = models,
                         disabledModels = disabled,
@@ -534,8 +547,8 @@ object ProviderApi {
             connection.requestMethod = "GET"
             connection.connectTimeout = 15_000
             connection.readTimeout = 20_000
-            applyAuth(connection, config)
             connection.setRequestProperty("Accept", "application/json")
+            applyAuth(connection, config)
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
@@ -640,9 +653,9 @@ object ProviderApi {
             connection.connectTimeout = 30_000
             connection.readTimeout = 300_000
             connection.doOutput = true
-            applyAuth(connection, config)
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             connection.setRequestProperty("Accept", "application/json")
+            applyAuth(connection, config)
             connection.outputStream.use { output ->
                 if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
                 output.write(
@@ -694,9 +707,9 @@ object ProviderApi {
             connection.connectTimeout = 30_000
             connection.readTimeout = 300_000
             connection.doOutput = true
-            applyAuth(connection, config)
             connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
             connection.setRequestProperty("Accept", "application/json")
+            applyAuth(connection, config)
             DataOutputStream(connection.outputStream).use { output ->
                 fun field(name: String, value: String) {
                     output.writeBytes("--$boundary\r\n")
@@ -812,7 +825,7 @@ object ProviderApi {
             connection.connectTimeout = 15_000
             connection.readTimeout = 60_000
             connection.requestMethod = "GET"
-            if (sameHost(trimmed, config.endpointUrl)) applyAuth(connection, config)
+            if (sameOrigin(trimmed, config.endpointUrl)) applyAuth(connection, config)
             val status = connection.responseCode
             if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
             if (status !in 200..299) return ImageGenResult(error = tr("图片地址无法下载"))
@@ -864,10 +877,13 @@ object ProviderApi {
         )
     }
 
-    private fun sameHost(imageUrl: String, endpointUrl: String): Boolean {
-        val imageHost = runCatching { URL(imageUrl).host }.getOrNull()?.lowercase() ?: return false
-        val endpointHost = runCatching { URL(endpointUrl.trim()).host }.getOrNull()?.lowercase() ?: return false
-        return imageHost.isNotEmpty() && imageHost == endpointHost
+    private fun sameOrigin(imageUrl: String, endpointUrl: String): Boolean {
+        val image = runCatching { URL(imageUrl) }.getOrNull() ?: return false
+        val endpoint = runCatching { URL(endpointUrl.trim()) }.getOrNull() ?: return false
+        return image.host.isNotEmpty() && image.host.equals(endpoint.host, ignoreCase = true) &&
+            image.protocol.equals(endpoint.protocol, ignoreCase = true) &&
+            (if (image.port < 0) image.defaultPort else image.port) ==
+            (if (endpoint.port < 0) endpoint.defaultPort else endpoint.port)
     }
 
     private fun mimeForDownloadedImage(contentType: String?, url: String): String {
@@ -891,17 +907,23 @@ object ProviderApi {
 }
 
 internal fun applyAuth(connection: HttpURLConnection, config: ProviderConfig) {
-    connection.setRequestProperty("Authorization", "Bearer ${config.apiKey}")
+    require(validateProviderHeaders(config.customHeaders) == null) { tr("自定义请求头无效") }
+    // Arbitrary credential headers must not be forwarded by automatic redirects.
+    if (config.customHeaders.isNotEmpty()) connection.instanceFollowRedirects = false
+    if (config.apiKey.isNotBlank()) connection.setRequestProperty("Authorization", "Bearer ${config.apiKey}")
     if (config.protocol == ProviderProtocol.ANTHROPIC) {
-        connection.setRequestProperty("x-api-key", config.apiKey)
+        if (config.apiKey.isNotBlank()) connection.setRequestProperty("x-api-key", config.apiKey)
         connection.setRequestProperty("anthropic-version", "2023-06-01")
     }
+    config.customHeaders.forEach { connection.setRequestProperty(it.name, it.value) }
 }
 
 internal fun applyAuth(builder: okhttp3.Request.Builder, config: ProviderConfig) {
-    builder.header("Authorization", "Bearer ${config.apiKey}")
+    require(validateProviderHeaders(config.customHeaders) == null) { tr("自定义请求头无效") }
+    if (config.apiKey.isNotBlank()) builder.header("Authorization", "Bearer ${config.apiKey}")
     if (config.protocol == ProviderProtocol.ANTHROPIC) {
-        builder.header("x-api-key", config.apiKey)
+        if (config.apiKey.isNotBlank()) builder.header("x-api-key", config.apiKey)
         builder.header("anthropic-version", "2023-06-01")
     }
+    config.customHeaders.forEach { builder.header(it.name, it.value) }
 }

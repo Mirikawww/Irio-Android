@@ -104,6 +104,7 @@ fun ProviderDetailScreen(
     val name = rememberTextFieldState(provider?.name.orEmpty())
     val endpoint = rememberTextFieldState(provider?.endpointUrl.orEmpty())
     val apiKey = rememberTextFieldState(provider?.apiKey.orEmpty())
+    val headers = rememberProviderHeadersState(provider?.customHeaders.orEmpty())
     var protocol by remember { mutableStateOf(provider?.protocol ?: ProviderProtocol.CHAT_COMPLETIONS) }
     var page by rememberSaveable { mutableStateOf(ProviderDetailPage.Config) }
     val configScroll = rememberScrollState()
@@ -147,21 +148,25 @@ fun ProviderDetailScreen(
                                 name = name,
                                 endpoint = endpoint,
                                 apiKey = apiKey,
+                                headers = headers,
                                 protocol = protocol,
                                 protocolMenuOpen = protocolMenuOpen,
                                 onProtocolMenuExpanded = { protocolMenuOpen = it },
                                 onProtocol = { protocol = it },
                                 formError = formError,
-                                saving = saving,
+                                saving = saving || refreshing,
                                 onSave = save@{
+                                    if (saving || refreshing) return@save
                                     val currentProvider = provider ?: return@save
+                                    val customHeaders = headers.validatedHeaders() ?: return@save
                                     val updated = currentProvider.copy(
                                         name = name.text.toString().trim(),
                                         endpointUrl = endpoint.text.toString().trim(),
                                         apiKey = apiKey.text.toString(),
                                         protocol = protocol,
+                                        customHeaders = customHeaders,
                                     )
-                                    if (updated.name.isBlank() || updated.endpointUrl.isBlank() || updated.apiKey.isBlank()) {
+                                    if (updated.name.isBlank() || updated.endpointUrl.isBlank()) {
                                         return@save
                                     }
                                     saving = true
@@ -188,12 +193,12 @@ fun ProviderDetailScreen(
                             )
                             ProviderDetailPage.Models -> ProviderModelsPage(
                                 provider = provider!!,
-                                refreshing = refreshing,
+                                refreshing = refreshing || saving,
                                 formError = formError,
                                 refreshDiff = refreshDiff,
                                 onRefresh = refresh@{
                                     val currentProvider = provider ?: return@refresh
-                                    if (refreshing) return@refresh
+                                    if (refreshing || saving) return@refresh
                                     refreshing = true
                                     formError = null
                                     scope.launch {
@@ -304,6 +309,7 @@ private fun ProviderConfigPage(
     name: TextFieldState,
     endpoint: TextFieldState,
     apiKey: TextFieldState,
+    headers: ProviderHeadersState,
     protocol: ProviderProtocol,
     protocolMenuOpen: Boolean,
     onProtocolMenuExpanded: (Boolean) -> Unit,
@@ -329,15 +335,17 @@ private fun ProviderConfigPage(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            ProviderField(tr("名称"), name, KeyboardType.Text, trailingSpace = false)
+            ProviderField(tr("名称"), name, KeyboardType.Text, readOnly = saving, trailingSpace = false)
             ProtocolPicker(
                 protocol = protocol,
                 expanded = protocolMenuOpen,
                 onExpandedChange = onProtocolMenuExpanded,
                 onSelect = onProtocol,
+                enabled = !saving,
             )
-            ProviderField(tr("端点 URL"), endpoint, KeyboardType.Uri, trailingSpace = false)
-            ProviderField(tr("密钥"), apiKey, KeyboardType.Password, mask = true, trailingSpace = false)
+            ProviderField(tr("端点 URL"), endpoint, KeyboardType.Uri, readOnly = saving, trailingSpace = false)
+            ProviderField(tr("密钥"), apiKey, KeyboardType.Password, mask = true, readOnly = saving, trailingSpace = false)
+            ProviderHeadersEditor(headers, enabled = !saving)
             if (formError != null) {
                 Text(formError)
             }
@@ -351,6 +359,7 @@ private fun ProviderConfigPage(
             }
             Button(
                 onClick = onDelete,
+                enabled = !saving,
                 modifier = Modifier.fillMaxWidth(),
                 style = ButtonStyle.Destructive,
             ) {
