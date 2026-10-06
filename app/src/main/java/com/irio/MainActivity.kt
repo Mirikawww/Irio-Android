@@ -3405,9 +3405,9 @@ private fun AttachmentPreview(
 ) {
     // Decode off the main thread: scrolled-off items are disposed, and a
     // synchronous `remember { decodePreview() }` re-decoded on every scroll-back.
-    // 槽位最大 360×280dp。解码长边不能低于这块的物理像素，否则会被放大成缩略图。
+    // Decode enough physical pixels for the thumbnail, without changing the original file.
     val previewMaxPx = with(LocalDensity.current) {
-        maxOf(360.dp.roundToPx(), 280.dp.roundToPx())
+        (if (compact) 64.dp else 160.dp).roundToPx()
     }
     val cacheKey = "${attachment.filePath}#$previewMaxPx"
     var preview by remember(cacheKey) {
@@ -3427,21 +3427,26 @@ private fun AttachmentPreview(
     val clickable = if (onOpen != null && !compact) Modifier.clickable(onClick = onOpen) else Modifier
     val rendered = preview
     if (rendered != null) {
+        val previewSize = attachmentPreviewSize(
+            rendered.width, rendered.height, LocalDensity.current.density, compact,
+        )
         Image(
             bitmap = rendered,
             contentDescription = attachment.name,
             modifier = Modifier
-                .heightIn(max = if (compact) 64.dp else 280.dp)
-                .widthIn(max = if (compact) 64.dp else 360.dp)
+                .size(previewSize.width, previewSize.height)
                 .clip(RoundedCornerShape(12.dp))
                 .then(clickable),
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
         )
     } else {
         Text(
             attachment.name,
             fontSize = 12.sp,
+            maxLines = if (compact) 1 else 2,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
+                .widthIn(max = 160.dp)
                 .then(
                     if (boxed || compact) {
                         Modifier

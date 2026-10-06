@@ -2918,21 +2918,26 @@ private fun AttachmentPreview(
     val clickable = if (onOpen != null && !compact) Modifier.clickable(onClick = onOpen) else Modifier
     val rendered = preview
     if (rendered != null) {
+        val previewSize = attachmentPreviewSize(
+            rendered.width, rendered.height, LocalDensity.current.density, compact,
+        )
         Image(
             bitmap = rendered,
             contentDescription = attachment.name,
             modifier = Modifier
-                .heightIn(max = if (compact) 64.dp else 280.dp)
-                .widthIn(max = if (compact) 64.dp else 360.dp)
+                .size(previewSize.width, previewSize.height)
                 .clip(RoundedCornerShape(12.dp))
                 .then(clickable),
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
         )
     } else {
         Text(
             attachment.name,
             fontSize = 12.sp,
+            maxLines = if (compact) 1 else 2,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
+                .widthIn(max = 160.dp)
                 .then(
                     if (boxed || compact) {
                         Modifier
