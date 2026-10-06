@@ -1212,7 +1212,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     ChatCompletionResult(error = tr("请先选择一个可用模型"))
                 } else {
                 val requestMessages = modelRequestMessages(requestSource)
-                val baseContextTokens = estimateRequestTokens(requestMessages)
+                val baseContextTokens = withContext(Dispatchers.Default) {
+                    estimateRequestTokens(requestMessages)
+                }
+                val liveTokenEstimator = LiveReplyTokenEstimator()
                 val streamedToolCalls = StringBuilder()
                 withContext(Dispatchers.IO) {
                     ChatApi.streamChat(
@@ -1304,6 +1307,12 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             val text = streamedText
                             val attachments = streamedAttachments
                             val usage = streamedUsage
+                            val liveTokens = liveTokenEstimator.estimateOnWorker(
+                                enabled = ThemeStore.contextRing,
+                                streamedText = text,
+                                process = snapshot,
+                                toolCallText = streamedToolCalls.toString(),
+                            )
                             withContext(Dispatchers.Main.immediate) {
                                 if (requestCancellation.isCancelled()) return@withContext
                                 replaceInConversation(
@@ -1327,12 +1336,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 if (usage != null && currentConversation.id == requestConversationId) {
                                     currentConversation = currentConversation.copy(tokenUsage = usage)
                                 }
-                                if (currentConversation.id == requestConversationId) {
-                                    liveContextTokens = baseContextTokens + estimateLiveReplyTokens(
-                                        streamedText = streamedText,
-                                        process = snapshot,
-                                        toolCallText = streamedToolCalls.toString(),
-                                    )
+                                if (liveTokens != null && currentConversation.id == requestConversationId) {
+                                    liveContextTokens = baseContextTokens + liveTokens
                                 }
                             }
                         },
