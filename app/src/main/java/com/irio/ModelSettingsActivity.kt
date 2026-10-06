@@ -337,7 +337,6 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                         modelsDevReasoning = it
                         ProviderStore.saveModelsDevReasoning(context, it)
                     },
-                    enabled = false,
                 )
             }
         }
