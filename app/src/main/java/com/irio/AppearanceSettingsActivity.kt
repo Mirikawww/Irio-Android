@@ -382,8 +382,6 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(tr("模型差异"), color = Theme[colors][onPanelColor])
-                        Spacer(Modifier.width(8.dp))
-                        ExperimentalBadge()
                     }
                     Switch(
                         checked = ThemeStore.modelDiff,
