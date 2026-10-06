@@ -149,8 +149,6 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         Column(modifier = Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(tr("语言"), color = Theme[colors][onPanelColor])
-                                Spacer(Modifier.width(8.dp))
-                                ExperimentalBadge()
                             }
                             Text(tr(language.label), color = Theme[colors][mutedColor], fontSize = 13.sp)
                         }
