@@ -330,14 +330,31 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                 )
             }
             SettingsSectionCard {
-                SettingsSwitchRow(
-                    label = tr("使用 OpenRouter 思考数据"),
-                    checked = modelsDevReasoning,
-                    onCheckedChange = {
-                        modelsDevReasoning = it
-                        ProviderStore.saveModelsDevReasoning(context, it)
-                    },
-                )
+                Row(
+                    modifier = Modifier.settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            tr("使用 OpenRouter 思考数据"),
+                            modifier = Modifier.weight(1f),
+                            color = Theme[colors][onBackgroundColor],
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        ExperimentalBadge()
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = modelsDevReasoning,
+                        onCheckedChange = {
+                            modelsDevReasoning = it
+                            ProviderStore.saveModelsDevReasoning(context, it)
+                        },
+                    )
+                }
             }
         }
     }

@@ -39,6 +39,17 @@ class ReasoningSettingWiringTest(unittest.TestCase):
         self.assertIn("ProviderStore.saveModelsDevReasoning(context, it)", section)
         self.assertNotIn("enabled = false", section)
 
+    def test_experimental_badge_sits_beside_wrapping_title_before_switch(self):
+        screen = (SOURCE / "ModelSettingsActivity.kt").read_text(encoding="utf-8")
+        title = screen.index('tr("使用 OpenRouter 思考数据")')
+        start = screen.rfind("SettingsSectionCard {", 0, title)
+        section = screen[start:screen.index("\n            }", title)]
+        self.assertIn("ExperimentalBadge()", section)
+        self.assertLess(section.index("ExperimentalBadge()"), section.index("Switch("))
+        self.assertIn("modifier = Modifier.weight(1f)", section[section.index("Text("):section.index("ExperimentalBadge()")])
+        self.assertIn("Spacer(Modifier.width(8.dp))", section)
+        self.assertNotIn("SettingsSwitchRow(", section)
+
 
 if __name__ == "__main__":
     unittest.main()
