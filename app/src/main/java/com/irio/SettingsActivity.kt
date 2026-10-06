@@ -122,7 +122,6 @@ private fun SettingsScreen(onBack: () -> Unit) {
                 ListRowButton(
                     label = tr("Linux 沙盒"),
                     icon = Icons.Rounded.Terminal,
-                    experimental = true,
                     onClick = {
                         context.startActivity(Intent(context, LinuxSandboxSettingsActivity::class.java))
                     },

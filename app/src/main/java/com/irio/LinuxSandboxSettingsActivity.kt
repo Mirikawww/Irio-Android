@@ -182,7 +182,6 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
     SettingsHazeScaffold(
         title = tr("Linux 沙盒"),
         onBack = onBack,
-        titleTrailing = { ExperimentalBadge() },
     ) { topInset, bottomInset ->
         Column(
             modifier = Modifier
