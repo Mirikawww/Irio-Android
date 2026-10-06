@@ -482,8 +482,6 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                             modifier = Modifier.weight(1f),
                             color = Theme[colors][onPanelColor],
                         )
-                        Spacer(Modifier.width(8.dp))
-                        ExperimentalBadge()
                     }
                     Spacer(Modifier.width(8.dp))
                     Switch(
