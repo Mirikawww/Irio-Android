@@ -418,8 +418,6 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(tr("上下文圆环"), color = Theme[colors][onPanelColor])
-                        Spacer(Modifier.width(8.dp))
-                        ExperimentalBadge()
                     }
                     Switch(
                         checked = ThemeStore.contextRing,
