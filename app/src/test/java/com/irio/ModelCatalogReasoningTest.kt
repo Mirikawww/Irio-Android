@@ -19,6 +19,23 @@ class ModelCatalogReasoningTest {
     """.trimIndent()
 
     @Test
+    fun openRouterMandatoryControlsToggleabilityIndependentlyOfEffortLevels() {
+        val parsed = ModelCatalog.parseReasoning("""
+            {
+                "locked": {"supports": true, "toggleable": false, "options": ["none", "high"]},
+                "optional": {"supports": true, "toggleable": true, "options": ["high", "low"]},
+                "unknown": {"supports": true, "options": ["high", "low"]},
+                "plain": {"supports": false}
+            }
+        """.trimIndent())
+
+        assertEquals(ModelCatalog.ReasoningInfo(true, false), parsed["locked"])
+        assertEquals(ModelCatalog.ReasoningInfo(true, true), parsed["optional"])
+        assertEquals(ModelCatalog.ReasoningInfo(true, null), parsed["unknown"])
+        assertEquals(ModelCatalog.ReasoningInfo(false, null), parsed["plain"])
+    }
+
+    @Test
     fun mergedReasoningSemantics() {
         val off = ModelCatalog.ReasoningInfo(supports = false, toggleable = null)
         val locked = ModelCatalog.ReasoningInfo(supports = true, toggleable = false)

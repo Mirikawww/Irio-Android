@@ -331,7 +331,7 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
             }
             SettingsSectionCard {
                 SettingsSwitchRow(
-                    label = tr("使用 Models.dev 思考数据"),
+                    label = tr("使用 OpenRouter 思考数据"),
                     checked = modelsDevReasoning,
                     onCheckedChange = {
                         modelsDevReasoning = it

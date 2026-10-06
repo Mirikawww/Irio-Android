@@ -4,23 +4,23 @@ import android.content.Context
 import org.json.JSONObject
 
 /**
- * OpenRouter 目录：显示名与上下文窗口；思考能力仍来自离线能力数据。
+ * OpenRouter 离线目录：显示名、上下文窗口与思考能力。
  *
  * 文件由 scripts/generate-catalog.py 离线生成：
  *   model-names.json     id -> OpenRouter name（去掉 provider 前缀）
  *   model-context.json   id -> OpenRouter context_length
- *   model-reasoning.json id -> {supports, options(可省略)}
- * options 存在且含 "none" 表示思考可关闭；存在但为空数组表示支持思考且不可关闭；缺失即未知。
+ *   model-reasoning.json id -> {supports, toggleable(可省略), options(可省略)}
+ * toggleable 来自 reasoning.mandatory 的反值；缺失即未知，不能用 effort 列表推断。
  */
 object ModelCatalog {
 
     private val MERGE_SUFFIXES = listOf("-thinking", "-fast", "-reasoning", "-non-reasoning")
 
-    /** 模型在 models.dev 里的思考能力。 */
+    /** 模型在 OpenRouter 里的思考能力。 */
     data class ReasoningInfo(
         /** 是否支持思考。 */
         val supports: Boolean,
-        /** 能否关闭思考（reasoning_options 含 none）；拿不到 options 时为 null。 */
+        /** 能否关闭思考（reasoning.mandatory 的反值）；未提供时为 null。 */
         val toggleable: Boolean?,
     )
 
@@ -127,12 +127,7 @@ object ModelCatalog {
                 for (key in root.keys()) {
                     val entry = root.optJSONObject(key) ?: continue
                     val supports = entry.optBoolean("supports", false)
-                    val toggleable = if (!entry.has("options")) {
-                        null
-                    } else {
-                        val options = entry.optJSONArray("options")
-                        options != null && (0 until options.length()).any { options.optString(it) == "none" }
-                    }
+                    val toggleable = entry.opt("toggleable") as? Boolean
                     put(key, ReasoningInfo(supports, toggleable))
                 }
             }
@@ -155,7 +150,7 @@ object ModelCatalog {
     }
 
     /**
-     * Models.dev 思考数据；查不到（目录无记录或开关关闭）返回 null。
+     * OpenRouter 思考数据；查不到（目录无记录或开关关闭）返回 null。
      */
     fun reasoningInfo(context: Context, modelId: String, useCatalog: Boolean): ReasoningInfo? {
         if (!useCatalog || modelId.isBlank()) return null

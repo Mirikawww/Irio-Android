@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Regenerate app assets and Windows desktop resources.
 
-Names and context windows come from OpenRouter /api/v1/models
+Names, reasoning and context windows come from OpenRouter /api/v1/models
 (`name`, model-level `context_length` — not `top_provider.context_length`).
-Reasoning and image flags still come from https://models.dev/api.json.
-Run from the Irio repo root."""
-import json, urllib.request
+Image flags still come from https://models.dev/api.json.
+Run from the Irio repo root; --reasoning-only leaves other catalogs untouched."""
+import json, sys, urllib.request
+from typing import Any
 
 API = "https://models.dev/api.json"
 OPENROUTER_MODELS_API = "https://openrouter.ai/api/v1/models"
@@ -22,7 +23,8 @@ def get_json(url):
         return json.load(response)
 
 
-data = get_json(API)
+reasoning_only = "--reasoning-only" in sys.argv[1:]
+data = {} if reasoning_only else get_json(API)
 openrouter_data = get_json(OPENROUTER_MODELS_API)
 names, reasoning, image, context = {}, {}, {}, {}
 for provider in data.values():
@@ -32,20 +34,6 @@ for provider in data.values():
         if not mid or not isinstance(m, dict):
             continue
         tail = mid.split("/")[-1]
-        ent = {"supports": bool(m.get("reasoning"))}
-        opts = m.get("reasoning_options")
-        if isinstance(opts, list):
-            vals = [v for o in opts if isinstance(o, dict)
-                    for v in (o.get("values") or []) if isinstance(v, str)]
-            if vals:
-                ent["options"] = vals
-        prev = reasoning.get(mid)
-        if prev:
-            prev["supports"] = prev["supports"] or ent["supports"]
-            if "options" in ent:
-                prev["options"] = sorted(set(prev.get("options") or []) | set(ent["options"]))
-        else:
-            reasoning[mid] = ent
         mod = m.get("modalities")
         outs = (mod.get("output") or []) if isinstance(mod, dict) else []
         if "image" in outs:
@@ -67,6 +55,25 @@ for model in openrouter_data.get("data", []):
         display = name.split(": ", 1)[-1]
         names[mid] = display
         names[tail] = display
+    # 动态路由器没有固定思考能力；缺少元数据时不把未知当作不支持。
+    metadata = model.get("reasoning")
+    parameters = model.get("supported_parameters")
+    if mid not in ("openrouter/auto", "openrouter/free") and (
+        isinstance(metadata, dict) or isinstance(parameters, list)
+    ):
+        supports = isinstance(metadata, dict) or any(
+            parameter in ("reasoning", "reasoning_effort", "include_reasoning")
+            for parameter in (parameters or [])
+        )
+        entry: dict[str, Any] = {"supports": supports}
+        if isinstance(metadata, dict):
+            mandatory = metadata.get("mandatory")
+            if isinstance(mandatory, bool):
+                entry["toggleable"] = not mandatory
+            efforts = metadata.get("supported_efforts")
+            if isinstance(efforts, list):
+                entry["options"] = [effort for effort in efforts if isinstance(effort, str)]
+        reasoning[mid] = entry
     window = model.get("context_length")
     if isinstance(window, (int, float)) and not isinstance(window, bool) and window > 0:
         context[mid] = int(window)
@@ -81,6 +88,27 @@ for mid, value in context.items():
     if prev is None or value > prev:
         tails[tail] = value
 context.update(tails)
+
+# 裸 id 查找与其他目录一致；精确 id 优先，同名别名按最宽松的能力合并。
+reasoning_tails = {}
+for mid, entry in reasoning.items():
+    tail = mid.split("/")[-1]
+    if tail == mid or tail in reasoning:
+        continue
+    previous = reasoning_tails.get(tail)
+    if previous is None:
+        reasoning_tails[tail] = dict(entry)
+        continue
+    supported = [value for value in (previous, entry) if value["supports"]]
+    merged: dict[str, Any] = {"supports": bool(supported)}
+    if any(value.get("toggleable") is True for value in supported):
+        merged["toggleable"] = True
+    elif supported and all(value.get("toggleable") is False for value in supported):
+        merged["toggleable"] = False
+    if "options" in previous or "options" in entry:
+        merged["options"] = sorted(set(previous.get("options", [])) | set(entry.get("options", [])))
+    reasoning_tails[tail] = merged
+reasoning.update(reasoning_tails)
 
 # OpenRouter 未收录的网关自定义生图模型（models.dev 也未收录）在此补充，避免目录命中失败：
 # 例：gpt-image-2.5（api.yjs.im Image 组，无上游记录）。
@@ -113,8 +141,11 @@ for path, payload in (
     (OUT_REASONING, reasoning),
     (OUT_IMAGE, image),
     (OUT_CONTEXT, context),
+    (OUT_IMAGE_DESKTOP, image),
+    (OUT_CONTEXT_DESKTOP, context),
 ):
-    json.dump(payload, open(path, "w"), separators=(",", ":"), ensure_ascii=False)
-json.dump(image, open(OUT_IMAGE_DESKTOP, "w"), separators=(",", ":"))
-json.dump(context, open(OUT_CONTEXT_DESKTOP, "w"), separators=(",", ":"))
+    if reasoning_only and path != OUT_REASONING:
+        continue
+    with open(path, "w", encoding="utf-8") as output:
+        json.dump(payload, output, separators=(",", ":"), ensure_ascii=False)
 print(f"names={len(names)} reasoning={len(reasoning)} image={len(image)} context={len(context)}")

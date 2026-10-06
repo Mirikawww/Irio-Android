@@ -309,7 +309,7 @@ object ProviderStore {
         notifyChanged()
     }
 
-    /** 模型列表跟随 Models.dev 思考数据；永久禁用。 */
+    /** 模型列表跟随 OpenRouter 思考数据；永久禁用。保留旧偏好键以兼容备份。 */
     fun loadModelsDevReasoning(context: Context): Boolean = false
 
     fun saveModelsDevReasoning(context: Context, enabled: Boolean) {
