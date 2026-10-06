@@ -5,9 +5,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -28,6 +31,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -178,7 +182,7 @@ private fun ContextRingMenu(
                 }
             }
         },
-        modifier = modifier,
+        modifier = modifier.heightIn(max = 600.dp).verticalScroll(rememberScrollState()),
         measurePolicy = measurePolicy,
     )
 }
@@ -234,12 +238,18 @@ private fun contextRingMenuMeasurePolicy(): MeasurePolicy = object : MeasurePoli
         }
         val maxHeight = if (constraints.hasBoundedHeight) constraints.maxHeight else Constraints.Infinity
         val exact = Constraints(minWidth = width, maxWidth = width, minHeight = 0, maxHeight = maxHeight)
-        val stats = measurables[0].measure(exact)
         val button = buttonMeasurable?.measure(exact)
-        val height = if (button == null) stats.height else stats.height + gap + button.height
+        val actualGap = if (button == null) 0 else minOf(gap, (maxHeight - button.height).coerceAtLeast(0))
+        val statsMaxHeight = if (constraints.hasBoundedHeight) {
+            (maxHeight - (button?.height ?: 0) - actualGap).coerceAtLeast(0)
+        } else {
+            Constraints.Infinity
+        }
+        val stats = measurables[0].measure(exact.copy(maxHeight = statsMaxHeight))
+        val height = constraints.constrainHeight(stats.height + actualGap + (button?.height ?: 0))
         return layout(width, height) {
             stats.placeRelative(0, 0)
-            button?.placeRelative(0, stats.height + gap)
+            button?.placeRelative(0, stats.height + actualGap)
         }
     }
 
@@ -278,11 +288,9 @@ private fun contextStatMeasurePolicy(): MeasurePolicy = object : MeasurePolicy {
         measurables: List<Measurable>,
         constraints: Constraints,
     ): MeasureResult {
-        val gap = 16.dp.roundToPx()
-        val rowGap = 8.dp.roundToPx()
-        val loose = constraints.copy(minWidth = 0, minHeight = 0)
-        val placeables = measurables.map { it.measure(loose) }
-        val contentWidth = statTableWidth(placeables.map { it.width }, gap)
+        val preferredGap = 16.dp.roundToPx()
+        val intrinsicWidths = measurables.map { it.maxIntrinsicWidth(Constraints.Infinity) }
+        val contentWidth = statTableWidth(intrinsicWidths, preferredGap)
         val width = if (
             constraints.hasBoundedWidth &&
             constraints.maxWidth >= contentWidth &&
@@ -294,9 +302,31 @@ private fun contextStatMeasurePolicy(): MeasurePolicy = object : MeasurePolicy {
         }.coerceAtLeast(constraints.minWidth).let { wanted ->
             if (constraints.hasBoundedWidth) wanted.coerceAtMost(constraints.maxWidth) else wanted
         }
+        val rows = measurables.size / 2
+        val gap = minOf(preferredGap, width)
+        val rowGap = if (constraints.hasBoundedHeight && rows > 1) {
+            minOf(8.dp.roundToPx(), constraints.maxHeight / (rows - 1))
+        } else {
+            8.dp.roundToPx()
+        }
+        val rowMaxHeight = if (constraints.hasBoundedHeight && rows > 0) {
+            ((constraints.maxHeight - rowGap * (rows - 1)) / rows).coerceAtLeast(0)
+        } else {
+            Constraints.Infinity
+        }
+        val availableWidth = (width - gap).coerceAtLeast(0)
+        val placeables = measurables.mapIndexed { index, measurable ->
+            val labelIndex = index / 2 * 2
+            val labelWidth = intrinsicWidths[labelIndex]
+            val valueWidth = intrinsicWidths.getOrElse(labelIndex + 1) { 0 }
+            // Keep both columns readable on narrow screens; never measure each
+            // against the entire row width and overlap them during placement.
+            val valueBudget = minOf(valueWidth, maxOf(availableWidth - labelWidth, availableWidth / 2))
+            val columnWidth = if (index % 2 == 0) availableWidth - valueBudget else valueBudget
+            measurable.measure(Constraints(maxWidth = columnWidth, maxHeight = rowMaxHeight))
+        }
         val rowHeight = placeables.maxOfOrNull { it.height } ?: 0
-        val rows = placeables.size / 2
-        val height = if (rows == 0) 0 else rowHeight * rows + rowGap * (rows - 1)
+        val height = constraints.constrainHeight(if (rows == 0) 0 else rowHeight * rows + rowGap * (rows - 1))
         return layout(width, height) {
             for (index in 0 until rows) {
                 val label = placeables[index * 2]

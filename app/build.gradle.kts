@@ -141,6 +141,7 @@ dependencies {
 
     // Test
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.17")
     testImplementation("org.json:json:20241224")
     testImplementation("com.squareup.okhttp3:mockwebserver:${libs.versions.okhttp.get()}")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")

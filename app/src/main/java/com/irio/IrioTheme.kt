@@ -24,7 +24,9 @@ import androidx.compose.material3.dynamicLightColorScheme
 
 import com.composables.ui.theme.ColorScheme
 import com.composables.ui.theme.ComposablesTheme
+import com.composables.ui.theme.InteractionMode
 import com.composables.ui.theme.LocalColorScheme
+import com.composables.ui.theme.LocalInteractionMode
 import com.composables.ui.theme.alphas
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.borderColor
@@ -144,6 +146,16 @@ fun AppTheme(content: @Composable () -> Unit) {
         LocalResolvedTheme provides resolvedTheme,
         LocalDynamicAccent provides monetColors,
     ) {
+        IrioComponentTheme(content)
+    }
+}
+
+@Composable
+internal fun IrioComponentTheme(content: @Composable () -> Unit) {
+    // Android keeps touch geometry even when an OEM or an attached input device
+    // reports a pointer. Pin before the base theme resolves shapes and typography;
+    // components also read this local directly for their heights and padding.
+    CompositionLocalProvider(LocalInteractionMode provides InteractionMode.Touch) {
         ComposablesTheme {
             SurfaceOverride(content)
         }

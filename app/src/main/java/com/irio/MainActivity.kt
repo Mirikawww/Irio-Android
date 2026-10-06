@@ -2638,90 +2638,96 @@ private fun ModelPicker(
         panel = {
             Row(modifier = Modifier.widthIn(max = 340.dp).heightIn(max = 600.dp)) {
                 DropdownMenuPanel(modifier = Modifier.widthIn(min = 112.dp, max = 140.dp)) {
-                    if (supportsThinking) {
-                        ReasoningEffort.entries.forEach { option ->
-                            // 模型被标记为无法关闭思考时，只允许保持非「关闭」档位
-                            val enabled = !thinkingLockedOn || option != ReasoningEffort.OFF
+                    Column(
+                        modifier = Modifier
+                            .heightIn(max = 600.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        if (supportsThinking) {
+                            ReasoningEffort.entries.forEach { option ->
+                                // 模型被标记为无法关闭思考时，只允许保持非「关闭」档位
+                                val enabled = !thinkingLockedOn || option != ReasoningEffort.OFF
+                                DropdownMenuItem(
+                                    onClick = { if (enabled) onReasoningChange(option) },
+                                    leading = {
+                                        val checked = reasoningEffort == option && (enabled || option != ReasoningEffort.OFF)
+                                        if (checked) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        } else {
+                                            Spacer(Modifier.size(16.dp))
+                                        }
+                                    },
+                                ) {
+                                    Text(
+                                        tr(option.label),
+                                        fontSize = 15.5.sp,
+                                        color = if (enabled) Theme[colors][onBackgroundColor] else Theme[colors][mutedColor],
+                                    )
+                                }
+                            }
+                        } else {
                             DropdownMenuItem(
-                                onClick = { if (enabled) onReasoningChange(option) },
-                                leading = {
-                                    val checked = reasoningEffort == option && (enabled || option != ReasoningEffort.OFF)
-                                    if (checked) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Check,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    } else {
-                                        Spacer(Modifier.size(16.dp))
-                                    }
-                                },
+                                onClick = {},
+                                leading = { Spacer(Modifier.size(16.dp)) },
                             ) {
-                                Text(
-                                    tr(option.label),
-                                    fontSize = 15.5.sp,
-                                    color = if (enabled) Theme[colors][onBackgroundColor] else Theme[colors][mutedColor],
-                                )
+                                Text(tr("不支持思考"), fontSize = 15.5.sp, color = Theme[colors][mutedColor])
                             }
                         }
-                    } else {
+                        DropdownMenuSeparator()
                         DropdownMenuItem(
-                            onClick = {},
-                            leading = { Spacer(Modifier.size(16.dp)) },
+                            onClick = { onFastModeChange(!fastMode) },
+                            leading = {
+                                if (fastMode) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                } else {
+                                    Spacer(Modifier.size(16.dp))
+                                }
+                            },
                         ) {
-                            Text(tr("不支持思考"), fontSize = 15.5.sp, color = Theme[colors][mutedColor])
+                            Text(tr("快速"), fontSize = 15.5.sp)
                         }
-                    }
-                    DropdownMenuSeparator()
-                    DropdownMenuItem(
-                        onClick = { onFastModeChange(!fastMode) },
-                        leading = {
-                            if (fastMode) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            } else {
-                                Spacer(Modifier.size(16.dp))
-                            }
-                        },
-                    ) {
-                        Text(tr("快速"), fontSize = 15.5.sp)
-                    }
-                    val webSearchOn = webSearchAvailable && webSearchEnabled
-                    DropdownMenuItem(
-                        onClick = { onWebSearchChange(!webSearchEnabled) },
-                        enabled = webSearchAvailable,
-                        leading = {
-                            if (webSearchOn) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            } else {
-                                Spacer(Modifier.size(16.dp))
-                            }
-                        },
-                    ) {
-                        Text(tr("网络搜索"), fontSize = 15.5.sp)
-                    }
-                    DropdownMenuItem(
-                        onClick = { onAutoReadChange(!autoRead) },
-                        leading = {
-                            if (autoRead) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            } else {
-                                Spacer(Modifier.size(16.dp))
-                            }
-                        },
-                    ) {
-                        Text(tr("自动朗读"), fontSize = 15.5.sp)
+                        val webSearchOn = webSearchAvailable && webSearchEnabled
+                        DropdownMenuItem(
+                            onClick = { onWebSearchChange(!webSearchEnabled) },
+                            enabled = webSearchAvailable,
+                            leading = {
+                                if (webSearchOn) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                } else {
+                                    Spacer(Modifier.size(16.dp))
+                                }
+                            },
+                        ) {
+                            Text(tr("网络搜索"), fontSize = 15.5.sp)
+                        }
+                        DropdownMenuItem(
+                            onClick = { onAutoReadChange(!autoRead) },
+                            leading = {
+                                if (autoRead) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                } else {
+                                    Spacer(Modifier.size(16.dp))
+                                }
+                            },
+                        ) {
+                            Text(tr("自动朗读"), fontSize = 15.5.sp)
+                        }
                     }
                 }
                 DropdownMenuPanel(modifier = Modifier.width(200.dp)) {
