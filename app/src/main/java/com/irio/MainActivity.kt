@@ -3123,7 +3123,7 @@ private fun ProcessEventRow(
     val label = when (event.kind) {
         ProcessEventKind.THINKING -> if (event.live) null else tr("已思考 %s").format(formatThinkingDuration(event.millis))
         ProcessEventKind.SEARCH -> if (event.live) null else searchCompletedLabel(event.pages, event.searchQuery)
-        ProcessEventKind.TOOL -> if (event.live) null else MemoryTool.doneLabel(event.toolName, event.content)
+        ProcessEventKind.TOOL -> if (event.live) null else MemoryTool.doneLabel(event.toolName, event.content, event.webDomain)
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (event.live) {

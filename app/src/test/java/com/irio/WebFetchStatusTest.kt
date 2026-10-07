@@ -56,6 +56,31 @@ class WebFetchStatusTest {
     }
 
     @Test
+    fun completedLabelKeepsDomainSeparateFromPageContent() {
+        val tracker = ProcessTracker()
+        tracker.onToolStarted(WebFetchTool.NAME, "docs.example.com")
+        tracker.onToolFinished("网页正文")
+        val event = tracker.snapshot().single()
+        assertEquals("已浏览网页 - docs.example.com", MemoryTool.doneLabel(event.toolName, event.content, event.webDomain))
+    }
+
+    @Test
+    fun completedLabelWithoutDomainKeepsTheLegacyLabel() {
+        assertEquals("已浏览网页", MemoryTool.doneLabel(WebFetchTool.NAME, "网页正文"))
+        assertEquals("已浏览网页", MemoryTool.doneLabel(WebFetchTool.NAME, "网页正文", "  "))
+    }
+
+    @Test
+    fun completedLabelUsesDomainOnlyForWebFetch() {
+        assertEquals("已获取时间", MemoryTool.doneLabel(TimeTool.NAME, webDomain = "docs.example.com"))
+        assertEquals("已读取记忆", MemoryTool.doneLabel(MemoryTool.GET, webDomain = "docs.example.com"))
+        assertEquals(
+            "生成图片失败",
+            MemoryTool.doneLabel(ImageGenTool.NAME, ImageGenTool.STATUS_FAILED, "docs.example.com"),
+        )
+    }
+
+    @Test
     fun trackerKeepsDomainSeparateFromPageContentAndDoesNotLeakItToOtherTools() {
         val tracker = ProcessTracker()
         tracker.onToolStarted(WebFetchTool.NAME, "docs.example.com")
@@ -80,12 +105,16 @@ class WebFetchStatusTest {
             )),
         )
         val restored = LinkConversationJson.decode(JSONObject(LinkConversationJson.encode(conversation).toString()))
-        assertEquals("docs.example.com", restored.messages.single().process.single().webDomain)
+        val event = restored.messages.single().process.single()
+        assertEquals("docs.example.com", event.webDomain)
+        assertEquals("已浏览网页 - docs.example.com", MemoryTool.doneLabel(event.toolName, event.content, event.webDomain))
     }
 
     @Test
     fun legacyToolEventsDefaultToAnEmptyDomain() {
         val json = JSONObject("""{"process":[{"id":1,"kind":"TOOL","toolName":"web_fetch"}]}""")
-        assertEquals("", processEventsFrom(json).single().webDomain)
+        val event = processEventsFrom(json).single()
+        assertEquals("", event.webDomain)
+        assertEquals("已浏览网页", MemoryTool.doneLabel(event.toolName, event.content, event.webDomain))
     }
 }

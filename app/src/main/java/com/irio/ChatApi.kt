@@ -1455,7 +1455,7 @@ internal object MemoryTool {
         else -> tr("调用工具")
     }
 
-    fun doneLabel(name: String, content: String = ""): String = when (name) {
+    fun doneLabel(name: String, content: String = "", webDomain: String = ""): String = when (name) {
         ImageGenTool.NAME -> when (content) {
             ImageGenTool.STATUS_FAILED -> tr("生成图片失败")
             else -> tr("图片生成已停止")
@@ -1463,7 +1463,9 @@ internal object MemoryTool {
         TimeTool.NAME -> tr("已获取时间")
         LinuxShellTool.NAME -> tr("已运行命令")
         LinuxBackgroundTool.NAME -> tr("已处理后台命令")
-        WebFetchTool.NAME -> tr("已浏览网页")
+        WebFetchTool.NAME -> tr("已浏览网页").let { status ->
+            if (webDomain.isBlank()) status else "$status - $webDomain"
+        }
         GET -> tr("已读取记忆")
         UPDATE -> tr("已写入记忆")
         else -> tr("已调用工具")
