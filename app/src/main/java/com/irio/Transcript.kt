@@ -77,7 +77,15 @@ internal fun visibleMessages(messages: List<ChatMessage>): List<ChatMessage> {
 
 /** 发给模型的历史。和界面同一套版本选择，但保留用户看不见的消息。 */
 internal fun contextMessages(messages: List<ChatMessage>): List<ChatMessage> {
-    return buildTranscriptPresentation("", messages).context
+    return buildTranscriptPresentation("", messages).context.map { message ->
+        // 工具已执行后，后续模型请求仍可能失败。只忽略本地错误正文，不丢已发生的执行记录。
+        val hasTools = message.toolRecords.isNotEmpty() || message.process.any {
+            !it.live && it.kind != ProcessEventKind.THINKING && it.content.isNotBlank()
+        }
+        if (!message.fromUser && message.isError && hasTools) {
+            message.copy(text = "", isError = false)
+        } else message
+    }
 }
 
 internal fun retryVersions(messages: List<ChatMessage>, message: ChatMessage): List<ChatMessage> {

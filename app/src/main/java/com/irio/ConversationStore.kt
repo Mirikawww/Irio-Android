@@ -38,6 +38,8 @@ data class ChatMessage(
     val modelReaction: String = "",
     /** 用户对该模型回复的回应，最多一个。 */
     val userReaction: String = "",
+    /** 完整工具记录，与界面过程行和正文分别保存。 */
+    val toolRecords: List<ChatToolRecord> = emptyList(),
 ) {
     val groupId: Long get() = retryGroup.takeIf { it != 0L } ?: id
     /** 用户版本组键：编辑过取 editGroup，否则取 id（单条即自己）。 */
@@ -266,6 +268,7 @@ object ConversationStore {
                             message.responseToUserId?.let { put("responseToUserId", it) }
                             if (message.fromUser && message.editGroup != 0L) put("editGroup", message.userGroupId)
                             if (message.hidden) put("hidden", true)
+                            if (message.toolRecords.isNotEmpty()) put("toolRecords", toolRecordsJson(message.toolRecords))
                             message.usage?.let { usage ->
                                 put(
                                     "usage",
@@ -352,6 +355,7 @@ object ConversationStore {
                         summaryUntilId = item.optLong("summaryUntilId"),
                         attachments = attachments,
                         process = processEventsFrom(item),
+                        toolRecords = toolRecordsFrom(item),
                         isError = item.optBoolean("isError"),
                         retryGroup = item.optLong("retryGroup").takeIf { it != 0L } ?: item.optLong("id"),
                         selected = if (item.has("selected")) item.optBoolean("selected") else true,

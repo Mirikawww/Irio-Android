@@ -123,7 +123,6 @@ internal class LinuxShellToolProvider(
         } ?: backgroundEnabled
         val selection = linuxSandboxSelectCommands(call.arguments, limit, backgroundOn)
         val finished = mutableListOf<String>()
-        val returned = mutableListOf<String>()
         var transcript = ""
         suspend fun publish(current: String? = null) {
             transcript = linuxSandboxJoinSections(finished + listOfNotNull(current))
@@ -147,7 +146,7 @@ internal class LinuxShellToolProvider(
                         shown.map { linuxSandboxTerminalTranscript(it, message) },
                     )
                 }
-                return ToolExecutionResult(message)
+                return ToolExecutionResult(transcript)
             }
             val app = context.appContext ?: return refuse(tr("Linux 沙盒当前不可用。"))
             if (!LinuxSandboxPolicy.exposed(
@@ -172,7 +171,6 @@ internal class LinuxShellToolProvider(
                 if (normalized == null) {
                     val message = if (command.trim().isEmpty()) tr("命令为空") else tr("命令太长")
                     finished += linuxSandboxTerminalTranscript(command, message)
-                    returned += message
                     publish()
                     continue
                 }
@@ -195,7 +193,6 @@ internal class LinuxShellToolProvider(
                 }
                 if (!sawProgress) block = linuxSandboxTerminalTranscript(command, result)
                 finished += block
-                returned += result
                 publish()
             }
             for (command in selection.background) {
@@ -204,7 +201,6 @@ internal class LinuxShellToolProvider(
                 if (normalized == null) {
                     val message = if (command.trim().isEmpty()) tr("命令为空") else tr("命令太长")
                     finished += linuxSandboxTerminalTranscript(command, message)
-                    returned += message
                     publish()
                     continue
                 }
@@ -216,22 +212,19 @@ internal class LinuxShellToolProvider(
                     started.error ?: tr("无法启动后台命令。")
                 }
                 finished += linuxSandboxTerminalTranscript(command, message)
-                returned += message
                 publish()
             }
             if (selection.backgroundIgnored > 0) {
                 val note = tr("后台命令已关闭，未启动 %s 条。").format(selection.backgroundIgnored)
                 finished += note
-                returned += note
                 publish()
             }
             if (selection.skipped > 0) {
                 val note = tr("已达到单次命令上限，其余 %s 条未运行。").format(selection.skipped)
                 finished += note
-                returned += note
                 publish()
             }
-            ToolExecutionResult(linuxSandboxJoinSections(returned))
+            ToolExecutionResult(transcript)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } finally {

@@ -238,6 +238,7 @@ object LinkConversationJson {
                                 put("retryGroup", message.groupId)
                                 put("selected", message.selected)
                                 if (message.hidden) put("hidden", true)
+                                if (message.toolRecords.isNotEmpty()) put("toolRecords", toolRecordsJson(message.toolRecords))
                                 if (message.finishedAt > 0L) put("finishedAt", message.finishedAt)
                                 if (message.summaryState != SummaryState.NONE) {
                                     put("summaryState", message.summaryState.name)
@@ -297,6 +298,7 @@ object LinkConversationJson {
                         userReaction = userReactionFrom(item),
                         fromUser = item.optBoolean("fromUser"),
                         process = processEventsFrom(item),
+                        toolRecords = toolRecordsFrom(item),
                         isError = item.optBoolean("isError"),
                         retryGroup = item.optLong("retryGroup").takeIf { it != 0L } ?: item.optLong("id"),
                         selected = if (item.has("selected")) item.optBoolean("selected") else true,

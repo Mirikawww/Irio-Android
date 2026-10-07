@@ -101,6 +101,8 @@ data class ChatStreamUpdate(
     val searchQuery: String = "",
     /** 正在读取的网页域名，不携带 URL 路径、参数或凭据。 */
     val webDomain: String = "",
+    /** 已执行的工具调用及实际结果，统一交给对话层保存。 */
+    val toolRecord: ChatToolRecord? = null,
 )
 
 data class ToolCallDelta(
@@ -238,6 +240,7 @@ object ChatApi {
                     if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
                     throw cancelled
                 }
+                onUpdate(ChatStreamUpdate(toolRecord = ChatToolRecord(call, result.text), toolContent = result.text))
                 if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
                 searchPages += result.searchPages
                 history += ChatRequestMessage(

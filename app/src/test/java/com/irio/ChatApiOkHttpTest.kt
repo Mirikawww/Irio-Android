@@ -26,6 +26,27 @@ class ChatApiOkHttpTest {
     }
 
     @Test
+    fun everyExecutedToolPublishesItsResultForPersistentContext() = runBlocking {
+        server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call1\",\"function\":{\"name\":\"unknown_tool\",\"arguments\":\"{\\\"command\\\":\\\"echo hello\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n",
+        ))
+        server.enqueue(sse("done"))
+        val updates = mutableListOf<ChatStreamUpdate>()
+        val provider = ProviderConfig("p", "t", server.url("/v1").toString(), "k", protocol = ProviderProtocol.CHAT_COMPLETIONS)
+        val result = ChatApi.streamChat(
+            provider = provider, model = "m", messages = listOf(ChatRequestMessage("user", "run")),
+            reasoningEffort = ReasoningEffort.OFF, fastMode = false, toolRegistry = ToolRegistry(),
+            cancellation = ChatRequestCancellation(), onUpdate = { updates += it },
+        )
+        assertEquals(null, result.error)
+        server.takeRequest()
+        val continued = org.json.JSONObject(server.takeRequest().body.readUtf8()).getJSONArray("messages")
+        val output = continued.getJSONObject(continued.length() - 1).getString("content")
+        assertTrue(output.contains("unknown_tool"))
+        assertTrue("Tool results must also leave the request-local loop", updates.any { it.toolContent == output })
+    }
+
+    @Test
     fun warmupThenStreamReusesClientAndDoesNotPostOnWarmup() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(404))
         server.enqueue(

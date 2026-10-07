@@ -547,7 +547,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             },
             updatedAt = if (touchUpdatedAt) System.currentTimeMillis() else currentConversation.updatedAt,
             messages = updatedMessages.filterNot {
-                it.isPending && !hasReplyContent(it.text, it.attachments, it.process)
+                it.isPending && it.toolRecords.isEmpty() && !hasReplyContent(it.text, it.attachments, it.process)
             },
             tokenUsage = currentConversation.tokenUsage
                 ?: updatedMessages.lastOrNull { !it.fromUser && it.usage != null }?.usage,
@@ -1201,6 +1201,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 var streamedText = ""
                 var roundBreakPending = false
                 var streamedAttachments = emptyList<ChatAttachment>()
+                var toolRecords = emptyList<ChatToolRecord>()
                 val process = ProcessTracker()
                 var lastPublishAt = 0L
                 var publishedBodyLength = 0
@@ -1297,6 +1298,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             }
                         },
                         onUpdate = update@{ update ->
+                            update.toolRecord?.let { toolRecords = toolRecords + it }
                             val cancelled = requestCancellation.isCancelled()
                             val terminalState = update.searching == false || update.toolActive == false || update.done
                             if (!cancelled || terminalState || update.attachments.isNotEmpty()) {
@@ -1350,7 +1352,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 done = update.done,
                                 searchingChanged = update.searching != null,
                                 searchPagesDelta = update.searchPagesDelta,
-                                toolChanged = update.toolActive != null,
+                                toolChanged = update.toolActive != null || update.toolRecord != null,
                                 toolOutputChanged = update.toolOutput != null,
                                 toolCallDeltaLength = update.toolCallDeltas.sumOf { it.name.length + it.argumentsDelta.length },
                                 publishedBodyLength = publishedBodyLength,
@@ -1383,12 +1385,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                         process = snapshot,
                                         attachments = attachments,
                                         usage = usage,
+                                        toolRecords = toolRecords,
                                         finishedAt = if (update.done && snapshot.none { it.live }) {
                                             System.currentTimeMillis()
                                         } else {
                                             0L
                                         },
-                                        isPending = !hasReplyContent(text, attachments, snapshot),
+                                        isPending = toolRecords.isEmpty() && !hasReplyContent(text, attachments, snapshot),
                                         isStreaming = (!update.done && !requestCancellation.isCancelled()) ||
                                             snapshot.any { it.live },
                                     )
@@ -1423,7 +1426,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 result.stopped -> {
                     val finalText = streamedText.ifBlank { current?.text.orEmpty() }
                     val finalAttachments = streamedAttachments.ifEmpty { current?.attachments.orEmpty() }
-                    if (!hasReplyContent(finalText, finalAttachments, finalProcess)) {
+                    if (toolRecords.isEmpty() && !hasReplyContent(finalText, finalAttachments, finalProcess)) {
                         null
                     } else {
                         reply.copy(
@@ -1431,6 +1434,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             process = finalProcess.map { it.copy(live = false) },
                             attachments = finalAttachments,
                             usage = finalUsage,
+                            toolRecords = toolRecords,
                             finishedAt = finishedAt,
                             isPending = false,
                             isStreaming = false,
@@ -1440,6 +1444,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 result.error != null -> reply.copy(
                     text = result.error,
                     process = finalProcess.map { it.copy(live = false) },
+                    toolRecords = toolRecords,
                     usage = finalUsage,
                     finishedAt = finishedAt,
                     isError = true,
@@ -1449,6 +1454,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 else -> reply.copy(
                     text = settledAssistantText(streamedText, result.content),
                     process = finalProcess.map { it.copy(live = false) },
+                    toolRecords = toolRecords,
                     attachments = result.attachments.ifEmpty { streamedAttachments },
                     usage = finalUsage,
                     finishedAt = finishedAt,
