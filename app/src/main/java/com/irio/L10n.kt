@@ -114,6 +114,7 @@ private val English = mapOf(
     "图片地址无法下载" to "Couldn't download the image",
     "图片端点没有返回图片" to "The image endpoint returned no image",
     "复制" to "Copy",
+    "已复制" to "Copied",
     "导入数据" to "Import",
     "导出数据" to "Export",
     "实验性" to "Experimental",

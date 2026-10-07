@@ -3007,6 +3007,7 @@ internal fun MessageRow(
                     editVersionCount <= 1
                 ) {
                     AssistantActions(
+                        messageId = chatMessage.id,
                         onCopy = onCopy,
                         onSpeak = if (spoken.isNotBlank()) {
                             {
@@ -4216,6 +4217,7 @@ private fun UserEditVersionSwitcher(
 
 @Composable
 private fun AssistantActions(
+    messageId: Long,
     onCopy: () -> Unit,
     onSpeak: (() -> Unit)?,
     speaking: Boolean,
@@ -4229,17 +4231,18 @@ private fun AssistantActions(
 ) {
     val muted = Theme[colors][mutedColor]
     val clock = formatReplyClock(finishedAt)
+    val copyConfirmation = rememberCopyConfirmation(messageId)
     Row(
         modifier = Modifier.padding(top = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = Icons.Rounded.ContentCopy,
-            contentDescription = tr("复制"),
+            imageVector = if (copyConfirmation.confirmed) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
+            contentDescription = tr(if (copyConfirmation.confirmed) "已复制" else "复制"),
             modifier = Modifier
                 .size(18.dp)
-                .clickable(onClick = onCopy),
+                .clickable(onClick = { copyConfirmation.copy(onCopy) }),
             tint = muted,
         )
         if (canRetry) {
