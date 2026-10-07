@@ -27,7 +27,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloatAsState
@@ -2861,22 +2860,15 @@ internal fun MessageRow(
     val speech = SpeechPlayer.playback
     val isNewUserMessage = chatMessage.fromUser && chatMessage.id == newUserMessageId
 
-    val entranceProgress = remember(chatMessage.id) {
-        Animatable(if (isNewUserMessage) 0f else 1f)
-    }
-    LaunchedEffect(chatMessage.id, isNewUserMessage) {
-        if (isNewUserMessage) {
-            entranceProgress.animateTo(1f, animationSpec = tween(260, easing = FastOutSlowInEasing))
-        }
-    }
+    val entranceProgress = rememberMessageEntranceAlpha(chatMessage.id, isNewUserMessage)
+    // Observe opacity in composition so finishing the fade removes its temporary layer.
+    // A retained transparent RenderNode must not outlive a recycled row's entrance.
+    val rowAlpha = (if (isNewUserMessage) entranceProgress.value else 1f) * (if (outsideContext) 0.45f else 1f)
     val alignment = if (chatMessage.fromUser) Alignment.CenterEnd else Alignment.CenterStart
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                alpha = (if (isNewUserMessage) entranceProgress.value else 1f) * (if (outsideContext) 0.45f else 1f)
-
-            },
+            .then(if (rowAlpha < 1f) Modifier.graphicsLayer(alpha = rowAlpha) else Modifier),
         contentAlignment = alignment,
     ) {
         Column(
