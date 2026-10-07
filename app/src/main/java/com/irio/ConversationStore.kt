@@ -42,6 +42,19 @@ data class ChatMessage(
     val isSearching: Boolean get() = process.any { it.kind == ProcessEventKind.SEARCH && it.live }
 }
 
+/** 工具和搜索状态行本身也是回复内容，不要求已有正文或工具结果。 */
+internal fun hasReplyContent(
+    text: String,
+    attachments: List<ChatAttachment>,
+    process: List<ProcessEvent>,
+): Boolean = text.isNotBlank() || attachments.isNotEmpty() || process.any {
+    when (it.kind) {
+        ProcessEventKind.TOOL -> it.live || it.toolName != ImageGenTool.NAME || it.content != ImageGenTool.STATUS_OK
+        ProcessEventKind.SEARCH -> true
+        ProcessEventKind.THINKING -> it.live || it.content.isNotBlank() || it.millis > 0L
+    }
+}
+
 /** 回复完成时刻，只显示时分秒。未完成或旧数据返回空串，不拿开始时间充数。 */
 internal fun formatReplyClock(
     millis: Long,

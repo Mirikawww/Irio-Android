@@ -285,6 +285,46 @@ class ChatApiOkHttpTest {
         assertEquals(1, updates.count { it.done })
     }
 
+    @Test(timeout = 8_000)
+    fun stoppingDuringAToolOnlyReplyKeepsTheToolStatus() = runBlocking {
+        server.enqueue(
+            MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+                "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call1\",\"function\":{\"name\":\"get_time\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n" +
+                    "data: [DONE]\n\n",
+            ),
+        )
+        val provider = ProviderConfig(
+            id = "p", name = "t", endpointUrl = server.url("/v1").toString(), apiKey = "k",
+            protocol = ProviderProtocol.CHAT_COMPLETIONS,
+        )
+        val cancellation = ChatRequestCancellation()
+        val process = ProcessTracker()
+        val result = ChatApi.streamChat(
+            provider = provider,
+            model = "m",
+            messages = listOf(ChatRequestMessage(role = "user", text = "time")),
+            reasoningEffort = ReasoningEffort.OFF,
+            fastMode = false,
+            toolRegistry = ToolRegistry(listOf(TimeToolProvider())),
+            cancellation = cancellation,
+            onUpdate = { update ->
+                if (update.toolActive == true) {
+                    process.onToolStarted(update.toolName)
+                    cancellation.cancel()
+                }
+                if (update.toolActive == false) process.onToolFinished(update.toolContent)
+            },
+        )
+        process.finishAll()
+        val events = process.snapshot()
+        assertTrue(result.stopped)
+        assertEquals("", result.content)
+        assertEquals(1, server.requestCount)
+        assertEquals(TimeTool.NAME, events.single().toolName)
+        assertEquals(false, events.single().live)
+        assertTrue(hasReplyContent(result.content, result.attachments, events))
+    }
+
     private fun sse(text: String) = MockResponse()
         .setHeader("Content-Type", "text/event-stream")
         .setBody(

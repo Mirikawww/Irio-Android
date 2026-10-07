@@ -538,9 +538,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             },
             updatedAt = if (touchUpdatedAt) System.currentTimeMillis() else currentConversation.updatedAt,
             messages = updatedMessages.filterNot {
-                it.isPending && it.text.isBlank() && it.process.none { event ->
-                    event.live || event.content.isNotBlank() || event.millis > 0L || event.pages > 0
-                }
+                it.isPending && !hasReplyContent(it.text, it.attachments, it.process)
             },
             tokenUsage = currentConversation.tokenUsage
                 ?: updatedMessages.lastOrNull { !it.fromUser && it.usage != null }?.usage,
@@ -1346,7 +1344,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                         } else {
                                             0L
                                         },
-                                        isPending = text.isBlank() && snapshot.none { it.live || it.content.isNotBlank() || it.pages > 0 },
+                                        isPending = !hasReplyContent(text, attachments, snapshot),
                                         isStreaming = (!update.done && !requestCancellation.isCancelled()) ||
                                             snapshot.any { it.live },
                                     )
@@ -1381,7 +1379,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 result.stopped -> {
                     val finalText = streamedText.ifBlank { current?.text.orEmpty() }
                     val finalAttachments = streamedAttachments.ifEmpty { current?.attachments.orEmpty() }
-                    if (finalText.isBlank() && finalAttachments.isEmpty() && finalProcess.none { it.content.isNotBlank() || it.millis > 0L || it.pages > 0 }) {
+                    if (!hasReplyContent(finalText, finalAttachments, finalProcess)) {
                         null
                     } else {
                         reply.copy(
