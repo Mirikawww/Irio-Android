@@ -129,11 +129,13 @@ internal fun commitEditedTurn(
     replyId: Long,
     text: String,
     attachments: List<ChatAttachment>,
+    quote: String = target.quote,
 ): CommittedEdit {
     val version = target.copy(
         id = versionId,
         text = text,
         attachments = attachments,
+        quote = quote,
         process = emptyList(),
         isError = false,
         isPending = false,

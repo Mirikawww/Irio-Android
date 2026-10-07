@@ -32,6 +32,8 @@ data class ChatMessage(
     val summaryUntilId: Long = 0L,
     /** 只发给模型，不出现在对话里。 */
     val hidden: Boolean = false,
+    /** 用户选中的引用原文，与输入正文分别保存。 */
+    val quote: String = "",
 ) {
     val groupId: Long get() = retryGroup.takeIf { it != 0L } ?: id
     /** 用户版本组键：编辑过取 editGroup，否则取 id（单条即自己）。 */
@@ -244,6 +246,7 @@ object ConversationStore {
                         JSONObject().apply {
                             put("id", message.id)
                             put("text", message.text)
+                            if (message.quote.isNotEmpty()) put("quote", message.quote)
                             put("fromUser", message.fromUser)
                             put("createdAt", message.createdAt)
                             if (message.finishedAt > 0L) put("finishedAt", message.finishedAt)
@@ -333,6 +336,7 @@ object ConversationStore {
                     ChatMessage(
                         id = item.optLong("id"),
                         text = item.optString("text"),
+                        quote = item.optString("quote"),
                         fromUser = item.optBoolean("fromUser"),
                         createdAt = item.optLong("createdAt").takeIf { it > 0L } ?: System.currentTimeMillis(),
                         finishedAt = item.optLong("finishedAt"),

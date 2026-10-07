@@ -230,6 +230,7 @@ object LinkConversationJson {
                             JSONObject().apply {
                                 put("id", message.id)
                                 put("text", message.text)
+                                if (message.quote.isNotEmpty()) put("quote", message.quote)
                                 put("fromUser", message.fromUser)
                                 put("isError", message.isError)
                                 put("retryGroup", message.groupId)
@@ -289,6 +290,7 @@ object LinkConversationJson {
                     ChatMessage(
                         id = item.optLong("id"),
                         text = item.optString("text"),
+                        quote = item.optString("quote"),
                         fromUser = item.optBoolean("fromUser"),
                         process = processEventsFrom(item),
                         isError = item.optBoolean("isError"),

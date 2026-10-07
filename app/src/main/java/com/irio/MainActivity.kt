@@ -297,6 +297,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var composerStatus by remember { mutableStateOf<String?>(null) }
     /** 正在编辑的用户消息 id；null = 普通发送模式。 */
     var editingMessageId by remember { mutableStateOf<Long?>(null) }
+    var pendingQuote by remember { mutableStateOf("") }
     // 未发送的输入按会话分开。当前会话的内容只在输入框里，切走才写入这张表。
     val composerDrafts = remember { mutableMapOf<String, ComposerDraft>() }
     fun swapComposer(fromId: String, toId: String) {
@@ -308,6 +309,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 text = message.text.toString(),
                 attachments = pendingAttachments,
                 editingMessageId = editingMessageId,
+                quote = pendingQuote,
             ),
         )
         if (message.text.toString() != restored.text) {
@@ -315,6 +317,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         }
         pendingAttachments = restored.attachments
         editingMessageId = restored.editingMessageId
+        pendingQuote = restored.quote
         composerStatus = null
     }
     val composerFocusRequester = remember { FocusRequester() }
@@ -979,6 +982,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         pendingAttachments = emptyList()
         editingMessageId = null
         composerDrafts.clear()
+        pendingQuote = ""
         conversations = emptyList()
         newConversation(closeDrawer = false)
         val jobs = generations.values.map { it.job }
@@ -1174,12 +1178,12 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     ChatCompletionResult(error = tr("请先在设置中添加提供商"))
                 } else if (ModelCatalog.isImageModel(context, requestModel)) {
                     val lastUserIndex = requestSource.indexOfLast { it.fromUser && !it.hidden }
-                    val prompt = requestSource.getOrNull(lastUserIndex)?.text.orEmpty().ifBlank { tr("图片") }
+                    val prompt = requestSource.getOrNull(lastUserIndex)?.requestText().orEmpty().ifBlank { tr("图片") }
                     // Images API 无状态：多轮要回传上轮 prompt + 生成图。
                     // 上轮 = 本条用户消息之前最近的一次生图往返（上轮用户 prompt + 其后模型产出的图）。
                     val imageContext = if (lastUserIndex > 0) {
                         val previousUserPrompt = requestSource.subList(0, lastUserIndex)
-                            .lastOrNull { it.fromUser && !it.hidden }?.text.orEmpty()
+                            .lastOrNull { it.fromUser && !it.hidden }?.requestText().orEmpty()
                         val previousImages = requestSource.subList(0, lastUserIndex)
                             .filter { !it.fromUser }
                             .flatMap { it.attachments.filter { attachment -> attachment.isImage } }
@@ -1683,6 +1687,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             text = text,
             fromUser = true,
             attachments = attachments,
+            quote = pendingQuote,
         )
         newUserMessageId = userMessage.id
         val reply = ChatMessage(
@@ -1697,6 +1702,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         persistCurrent(messages)
         pendingAttachments = emptyList()
         composerStatus = null
+        pendingQuote = ""
         message.clearText()
         sendOrCompress(currentConversation.id, history + userMessage, reply)
         keyboardController?.hide()
@@ -1712,6 +1718,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             replace(0, length, target.text)
         }
         pendingAttachments = target.attachments
+        pendingQuote = target.quote
         // 清掉本就待发的内容可能带来的混淆状态
         composerStatus = null
         // 直接编辑：拉起输入法并聚焦输入框
@@ -1722,6 +1729,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     /** 退出编辑模式（不保存）。 */
     fun cancelEdit() {
         editingMessageId = null
+        pendingQuote = ""
         message.clearText()
         pendingAttachments = emptyList()
     }
@@ -1747,6 +1755,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             replyId = MessageIds.next(),
             text = text,
             attachments = pendingAttachments,
+            quote = pendingQuote,
         )
         newUserMessageId = committed.history.last().id
         messages = committed.messages
@@ -1754,6 +1763,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         message.clearText()
         pendingAttachments = emptyList()
         editingMessageId = null
+        pendingQuote = ""
         keyboardController?.hide()
         focusManager.clearFocus()
         sendOrCompress(currentConversation.id, committed.history, committed.reply)
@@ -1849,6 +1859,11 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         },
         onOpenAttachment = ::openAttachment,
         onCopy = { chatMessage -> clipboard.setText(AnnotatedString(chatMessage.text)) },
+        onQuote = { excerpt ->
+            pendingQuote = excerpt
+            composerFocusRequester.requestFocus()
+            keyboardController?.show()
+        },
         onRetry = ::retryMessage,
         canRetry = { chatMessage ->
             chatMessage.summaryState == SummaryState.NONE &&
@@ -2129,6 +2144,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     }
                     backgroundSheetState.targetDetent = BottomSheetDetent.FullyExpanded
                 })
+                if (pendingQuote.isNotBlank()) {
+                    MessageQuotePreview(
+                        quote = pendingQuote,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        onCancel = { pendingQuote = "" },
+                    )
+                }
                 val canSend = (editingMessageId != null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty())) ||
                     (!generatingThisChat && editingMessageId == null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty()))
                 ComposerField(
@@ -2831,6 +2853,7 @@ internal fun MessageRow(
     onOpenProcess: (ProcessEvent) -> Unit,
     onOpenAttachment: (ChatAttachment) -> Unit,
     onCopy: () -> Unit,
+    onQuote: (String) -> Unit,
     onRetry: () -> Unit,
     canRetry: Boolean,
     versionIndex: Int = 1,
@@ -2877,6 +2900,12 @@ internal fun MessageRow(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (chatMessage.fromUser) {
+                if (chatMessage.quote.isNotBlank()) {
+                    MessageQuotePreview(
+                        quote = chatMessage.quote,
+                        modifier = Modifier.fillMaxWidth(0.85f),
+                    )
+                }
                 if (chatMessage.attachments.isNotEmpty()) {
                     SentAttachmentRow(
                         attachments = chatMessage.attachments,
@@ -2895,7 +2924,7 @@ internal fun MessageRow(
                         CompositionLocalProvider(
                             LocalTextSelectionColors provides Theme[textSelectionColors][defaultTextSelectionColors],
                         ) {
-                            SelectionContainer {
+                            QuoteSelectionContainer(onQuote = onQuote) {
                                 Text(
                                     chatMessage.text,
                                     modifier = Modifier
@@ -2947,7 +2976,7 @@ internal fun MessageRow(
                         CompositionLocalProvider(
                             LocalTextSelectionColors provides Theme[textSelectionColors][defaultTextSelectionColors],
                         ) {
-                            SelectionContainer {
+                            QuoteSelectionContainer(onQuote = onQuote) {
                                 Text(
                                     chatMessage.text,
                                     color = irioErrorTextColor(),
@@ -2980,7 +3009,7 @@ internal fun MessageRow(
                                             CompositionLocalProvider(
                                                 LocalTextSelectionColors provides Theme[textSelectionColors][defaultTextSelectionColors],
                                             ) {
-                                                SelectionContainer {
+                                                QuoteSelectionContainer(onQuote = onQuote) {
                                                     AssistantMarkdown(
                                                         text = shown,
                                                         streaming = streamingBody && index == lastTextIndex,

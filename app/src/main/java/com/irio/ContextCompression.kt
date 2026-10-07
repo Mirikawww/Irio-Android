@@ -147,7 +147,7 @@ internal fun summaryTurns(plan: CompressionPlan): List<ChatRequestMessage> {
             add(
                 ChatRequestMessage(
                     role = if (message.fromUser) "user" else "assistant",
-                    text = message.text,
+                    text = message.requestText(),
                     attachments = message.attachments,
                     createdAt = 0L,
                 ),
@@ -179,7 +179,7 @@ internal fun modelRequestMessages(messages: List<ChatMessage>): List<ChatRequest
         } else {
             ChatRequestMessage(
                 role = if (message.fromUser) "user" else "assistant",
-                text = message.text,
+                text = message.requestText(),
                 attachments = message.attachments,
                 thinking = message.thinking,
                 createdAt = message.createdAt,

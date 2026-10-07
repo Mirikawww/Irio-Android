@@ -17,6 +17,8 @@ private val English = mapOf(
     "提供商" to "Providers",
     "互连" to "Link",
     "保存" to "Save",
+    "引用" to "Quote",
+    "取消引用" to "Remove quote",
     "保存中" to "Saving",
     "其他" to "Other",
     "名称" to "Name",

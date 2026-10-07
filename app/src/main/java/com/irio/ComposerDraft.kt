@@ -4,9 +4,10 @@ internal data class ComposerDraft(
     val text: String = "",
     val attachments: List<ChatAttachment> = emptyList(),
     val editingMessageId: Long? = null,
+    val quote: String = "",
 ) {
     val isEmpty: Boolean
-        get() = text.isEmpty() && attachments.isEmpty() && editingMessageId == null
+        get() = text.isEmpty() && attachments.isEmpty() && editingMessageId == null && quote.isEmpty()
 }
 
 /**
