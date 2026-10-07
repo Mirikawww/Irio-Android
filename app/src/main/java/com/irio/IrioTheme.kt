@@ -222,17 +222,22 @@ private val SurfaceOverride: ThemeComposable = buildTheme {
         mutedColor to Theme[colors][mutedColor],
         primaryColor to if (ThemeStore.accent == AccentColor.MONET) {
             dynamicAccent?.primary ?: ThemeStore.accent.color
+        } else if (ThemeStore.accent == AccentColor.BLACK && darkTheme) {
+            // Match the send button's monochrome inversion instead of painting
+            // black buttons (and black text) on AMOLED's black page.
+            Theme[colors][onBackgroundColor]
         } else {
             ThemeStore.accent.color
         },
         onPrimaryColor to if (ThemeStore.accent == AccentColor.MONET && dynamicAccent != null) {
             dynamicAccent.onPrimary
-        } else if (ThemeStore.accent == AccentColor.BLACK) {
-            if (amoled) Color.Black else Theme[colors][onPrimaryColor]
+        } else if (ThemeStore.accent == AccentColor.BLACK && darkTheme) {
+            Theme[colors][backgroundColor]
         } else {
             ThemeStore.accent.onContent()
         },
-        secondaryColor to if (amoled) Color(0xFF121212) else Theme[colors][secondaryColor],
+        // Secondary buttons must remain distinct when hosted on a dialog panel.
+        secondaryColor to if (amoled) Color(0xFF222222) else Theme[colors][secondaryColor],
         onSecondaryColor to Theme[colors][onSecondaryColor],
         controlColor to if (amoled) Color(0xFF1A1A1A) else Theme[colors][controlColor],
         onControlColor to Theme[colors][onControlColor],

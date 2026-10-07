@@ -156,11 +156,7 @@ fun ExperimentalBadge() {
         modifier = Modifier
             .background(Theme[colors][primaryColor], RoundedCornerShape(4.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp),
-        color = if (ThemeStore.accent == AccentColor.MONET) {
-            Theme[colors][onPrimaryColor]
-        } else {
-            ThemeStore.accent.onContent()
-        },
+        color = Theme[colors][onPrimaryColor],
         fontSize = 12.sp,
         lineHeight = 16.sp,
         fontWeight = FontWeight.Medium,
