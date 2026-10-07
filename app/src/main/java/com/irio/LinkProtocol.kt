@@ -231,6 +231,8 @@ object LinkConversationJson {
                                 put("id", message.id)
                                 put("text", message.text)
                                 if (message.quote.isNotEmpty()) put("quote", message.quote)
+                                if (message.modelReaction.isNotEmpty()) put("modelReaction", message.modelReaction)
+                                if (message.userReaction.isNotEmpty()) put("userReaction", message.userReaction)
                                 put("fromUser", message.fromUser)
                                 put("isError", message.isError)
                                 put("retryGroup", message.groupId)
@@ -291,6 +293,8 @@ object LinkConversationJson {
                         id = item.optLong("id"),
                         text = item.optString("text"),
                         quote = item.optString("quote"),
+                        modelReaction = modelReactionFrom(item),
+                        userReaction = userReactionFrom(item),
                         fromUser = item.optBoolean("fromUser"),
                         process = processEventsFrom(item),
                         isError = item.optBoolean("isError"),

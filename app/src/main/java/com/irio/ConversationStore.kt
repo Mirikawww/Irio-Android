@@ -34,6 +34,10 @@ data class ChatMessage(
     val hidden: Boolean = false,
     /** 用户选中的引用原文，与输入正文分别保存。 */
     val quote: String = "",
+    /** 模型对该用户消息的回应，最多一个。 */
+    val modelReaction: String = "",
+    /** 用户对该模型回复的回应，最多一个。 */
+    val userReaction: String = "",
 ) {
     val groupId: Long get() = retryGroup.takeIf { it != 0L } ?: id
     /** 用户版本组键：编辑过取 editGroup，否则取 id（单条即自己）。 */
@@ -247,6 +251,8 @@ object ConversationStore {
                             put("id", message.id)
                             put("text", message.text)
                             if (message.quote.isNotEmpty()) put("quote", message.quote)
+                            if (message.modelReaction.isNotEmpty()) put("modelReaction", message.modelReaction)
+                            if (message.userReaction.isNotEmpty()) put("userReaction", message.userReaction)
                             put("fromUser", message.fromUser)
                             put("createdAt", message.createdAt)
                             if (message.finishedAt > 0L) put("finishedAt", message.finishedAt)
@@ -337,6 +343,8 @@ object ConversationStore {
                         id = item.optLong("id"),
                         text = item.optString("text"),
                         quote = item.optString("quote"),
+                        modelReaction = modelReactionFrom(item),
+                        userReaction = userReactionFrom(item),
                         fromUser = item.optBoolean("fromUser"),
                         createdAt = item.optLong("createdAt").takeIf { it > 0L } ?: System.currentTimeMillis(),
                         finishedAt = item.optLong("finishedAt"),

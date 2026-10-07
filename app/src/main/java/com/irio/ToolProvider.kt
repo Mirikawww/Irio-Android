@@ -26,6 +26,8 @@ data class ToolExecutionContext(
     val onUpdate: suspend (ChatStreamUpdate) -> Unit = {},
     val appContext: android.content.Context? = null,
     val conversationId: String = "",
+    /** 静默更新发起这次请求的对话；返回 false 表示目标已经不可用。 */
+    val onReaction: suspend (Long, String) -> Boolean = { _, _ -> false },
 )
 
 /** Provider-neutral result that can be appended to the next model turn. */
@@ -133,6 +135,7 @@ class ToolRegistry(providers: Iterable<ToolProvider> = emptyList()) {
                 WebFetchToolProvider(),
                 ImageGenToolProvider(),
                 TimeToolProvider(),
+                ReactionToolProvider(),
             )
         )
     }

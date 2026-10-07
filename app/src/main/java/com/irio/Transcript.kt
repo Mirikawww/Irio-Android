@@ -136,6 +136,8 @@ internal fun commitEditedTurn(
         text = text,
         attachments = attachments,
         quote = quote,
+        modelReaction = "",
+        userReaction = "",
         process = emptyList(),
         isError = false,
         isPending = false,

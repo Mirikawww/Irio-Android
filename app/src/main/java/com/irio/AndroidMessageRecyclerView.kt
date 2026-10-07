@@ -32,6 +32,9 @@ internal data class AndroidMessageCallbacks(
     val onOpenAttachment: (ChatAttachment) -> Unit,
     val onCopy: (ChatMessage) -> Unit,
     val onQuote: (String) -> Unit,
+    val onAddReaction: (ChatMessage) -> Unit,
+    val onRemoveReaction: (ChatMessage) -> Unit,
+    val reactionAnimations: ReactionBounceTracker,
     val onRetry: (ChatMessage) -> Unit,
     val canRetry: (ChatMessage) -> Boolean,
     val onPrevVersion: (ChatMessage) -> (() -> Unit)?,
@@ -641,6 +644,8 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
         itemAnimator = null
         setItemViewCacheSize(8)
         clipToPadding = false
+        // Tapbacks may draw above an item without contributing to its measured height.
+        clipChildren = false
         overScrollMode = View.OVER_SCROLL_NEVER
         addItemDecoration(VerticalMessageSpacing(context, 12))
         addOnScrollListener(object : OnScrollListener() {
@@ -866,6 +871,8 @@ private class AndroidMessageViewHolder(
         private set
 
     init {
+        composeView.clipChildren = false
+        composeView.clipToPadding = false
         composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         composeView.setContent {
             val currentMessage = message
@@ -906,6 +913,7 @@ private fun AndroidMessageRow(
     key(message.id) {
         MessageRow(
             chatMessage = message,
+            reactionAnimations = callbacks.reactionAnimations,
             newUserMessageId = callbacks.newUserMessageId,
 
 
@@ -914,6 +922,8 @@ private fun AndroidMessageRow(
             onOpenAttachment = callbacks.onOpenAttachment,
             onCopy = { callbacks.onCopy(message) },
             onQuote = callbacks.onQuote,
+            onAddReaction = { callbacks.onAddReaction(message) },
+            onRemoveReaction = { callbacks.onRemoveReaction(message) },
             onRetry = { callbacks.onRetry(message) },
             canRetry = callbacks.canRetry(message),
             versionIndex = version.index,

@@ -271,6 +271,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     val keyboardController = LocalSoftwareKeyboardController.current
     var processSheetMessageId by remember { mutableStateOf<Long?>(null) }
     var processSheetEventId by remember { mutableStateOf<Long?>(null) }
+    var reactionTarget by remember { mutableStateOf<Pair<String, Long>?>(null) }
+    val reactionSheetState = rememberBottomSheetState()
+    val reactionAnimations = remember { ReactionBounceTracker() }
     val processSheetState = rememberBottomSheetState()
     var backgroundCommandId by remember { mutableStateOf<Long?>(null) }
     var backgroundSheetEvent by remember { mutableStateOf<ProcessEvent?>(null) }
@@ -321,6 +324,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         composerStatus = null
     }
     val composerFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(currentConversation.id) {
+        reactionSheetState.targetDetent = BottomSheetDetent.Hidden
+        reactionTarget = null
+    }
     var selectedModel by remember {
         mutableStateOf(ProviderStore.loadProvider(context)?.selectedModel.orEmpty())
     }
@@ -621,6 +628,28 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 ConversationStore.save(context, next)
             }
         }
+    }
+
+    fun updateMessageReaction(conversationId: String, messageId: Long, emoji: String, fromModel: Boolean): Boolean {
+        if (clearingHistory) return false
+        val stored = if (currentConversation.id == conversationId) {
+            currentConversation.copy(messages = messages)
+        } else conversationContent(conversationId) ?: return false
+        val target = stored.messages.firstOrNull { it.id == messageId && it.selected } ?: return false
+        val updated = if (fromModel) setModelReaction(target, emoji) else setUserReaction(target, emoji)
+        if (updated == null) return false
+        if (updated == target) return true
+        reactionAnimations.record(messageId, if (fromModel) updated.modelReaction else updated.userReaction)
+        val next = stored.messages.map { if (it.id == messageId) updated else it }
+        if (currentConversation.id == conversationId) {
+            messages = next
+            persistCurrent(messages, touchUpdatedAt = false)
+        } else {
+            val conversation = stored.copy(messages = next)
+            cacheConversationContent(conversation)
+            scope.launch(Dispatchers.IO) { ConversationStore.save(context, conversation) }
+        }
+        return true
     }
 
     fun addAttachments(uris: List<Uri>) {
@@ -938,7 +967,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         if (!keepPool) IrioHttp.evictConversation(previous.id)
     }
 
-    val processSheetOpen = processSheetState.targetDetent != BottomSheetDetent.Hidden
+    val processSheetOpen = processSheetState.targetDetent != BottomSheetDetent.Hidden ||
+        reactionSheetState.targetDetent != BottomSheetDetent.Hidden
     DismissComposerFocusWhenImeHides()
     NavigationBackHandler(
         viewingPhoto = viewingPhoto != null,
@@ -946,7 +976,11 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         drawerOpen = drawerOpen,
         hasMessages = messages.isNotEmpty(),
         onDismissPhoto = { viewingPhoto = null },
-        onDismissSheet = { processSheetState.targetDetent = BottomSheetDetent.Hidden },
+        onDismissSheet = {
+            if (reactionSheetState.targetDetent != BottomSheetDetent.Hidden) {
+                reactionSheetState.targetDetent = BottomSheetDetent.Hidden
+            } else processSheetState.targetDetent = BottomSheetDetent.Hidden
+        },
         onCloseDrawer = { drawerProgress = 0f },
         onHideIme = {
             keyboardController?.hide()
@@ -1134,6 +1168,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 }
                 if (requestImageGenModel.isNotBlank()) add(ImageGenToolProvider())
                 add(TimeToolProvider())
+                add(ReactionToolProvider())
                 if (MemoryStore.loadEnabled(context)) add(MemoryToolProvider())
                 if (LinuxSandboxPolicy.exposed(
                         LinuxSandboxStore.loadEnabled(LinuxSandboxLayout.of(context.filesDir).stateFile),
@@ -1255,6 +1290,12 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         conversationId = requestConversationId,
                         cancellation = requestCancellation,
                         appContext = context,
+                        onReaction = { messageId, emoji ->
+                            withContext(Dispatchers.Main.immediate) {
+                                !requestCancellation.isCancelled() &&
+                                    updateMessageReaction(requestConversationId, messageId, emoji, fromModel = true)
+                            }
+                        },
                         onUpdate = update@{ update ->
                             val cancelled = requestCancellation.isCancelled()
                             val terminalState = update.searching == false || update.toolActive == false || update.done
@@ -1864,6 +1905,16 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             composerFocusRequester.requestFocus()
             keyboardController?.show()
         },
+        onAddReaction = { chatMessage ->
+            reactionTarget = currentConversation.id to chatMessage.id
+            keyboardController?.hide()
+            focusManager.clearFocus()
+            reactionSheetState.targetDetent = BottomSheetDetent.FullyExpanded
+        },
+        onRemoveReaction = { chatMessage ->
+            updateMessageReaction(currentConversation.id, chatMessage.id, "", fromModel = false)
+        },
+        reactionAnimations = reactionAnimations,
         onRetry = ::retryMessage,
         canRetry = { chatMessage ->
             chatMessage.summaryState == SummaryState.NONE &&
@@ -2523,6 +2574,16 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 processSheetState.targetDetent = BottomSheetDetent.Hidden
             },
         )
+        ReactionEmojiSheet(
+            state = reactionSheetState,
+            onDismiss = { reactionSheetState.targetDetent = BottomSheetDetent.Hidden },
+            onSelect = { emoji ->
+                reactionTarget?.let { (conversationId, messageId) ->
+                    updateMessageReaction(conversationId, messageId, emoji, fromModel = false)
+                }
+                reactionSheetState.targetDetent = BottomSheetDetent.Hidden
+            },
+        )
         TerminalCommandSheet(
             event = backgroundSheetEvent ?: ProcessEvent(
                 id = 0,
@@ -2846,6 +2907,7 @@ private fun ModelPicker(
 @Composable
 internal fun MessageRow(
     chatMessage: ChatMessage,
+    reactionAnimations: ReactionBounceTracker,
     newUserMessageId: Long? = null,
 
 
@@ -2854,6 +2916,8 @@ internal fun MessageRow(
     onOpenAttachment: (ChatAttachment) -> Unit,
     onCopy: () -> Unit,
     onQuote: (String) -> Unit,
+    onAddReaction: () -> Unit,
+    onRemoveReaction: () -> Unit,
     onRetry: () -> Unit,
     canRetry: Boolean,
     versionIndex: Int = 1,
@@ -2880,6 +2944,11 @@ internal fun MessageRow(
         if (granted) SpeechNotifications.sync(context, SpeechPlayer.playback)
     }
     val spoken = remember(chatMessage.id, chatMessage.text) { speechPlainText(chatMessage.text) }
+    val reactionBounce = rememberReactionBounce(
+        chatMessage.id,
+        if (chatMessage.fromUser) chatMessage.modelReaction else chatMessage.userReaction,
+        reactionAnimations,
+    )
     val speech = SpeechPlayer.playback
     val isNewUserMessage = chatMessage.fromUser && chatMessage.id == newUserMessageId
 
@@ -2907,13 +2976,19 @@ internal fun MessageRow(
                     )
                 }
                 if (chatMessage.attachments.isNotEmpty()) {
-                    SentAttachmentRow(
-                        attachments = chatMessage.attachments,
-                        boxed = true,
-                        alignEnd = true,
-                        scrollKey = chatMessage.id,
-                        onOpen = onOpenAttachment,
-                    )
+                    UserBubbleReaction(
+                        emoji = if (chatMessage.text.isBlank()) chatMessage.modelReaction else "",
+                        bubbleColor = currentUserBubbleColors(isEditing).background,
+                        bounce = reactionBounce,
+                    ) {
+                        SentAttachmentRow(
+                            attachments = chatMessage.attachments,
+                            boxed = true,
+                            alignEnd = true,
+                            scrollKey = chatMessage.id,
+                            onOpen = onOpenAttachment,
+                        )
+                    }
                 }
                 if (chatMessage.text.isNotBlank()) {
                     val bubble = currentUserBubbleColors(isEditing)
@@ -2924,27 +2999,29 @@ internal fun MessageRow(
                         CompositionLocalProvider(
                             LocalTextSelectionColors provides Theme[textSelectionColors][defaultTextSelectionColors],
                         ) {
-                            QuoteSelectionContainer(onQuote = onQuote) {
-                                Text(
-                                    chatMessage.text,
-                                    modifier = Modifier
-                                        .widthIn(max = maxWidth * 0.85f)
-                                        .background(
-                                            color = bubble.background,
-                                            shape = RoundedCornerShape(16.dp),
-                                        )
-                                        .then(
-                                            if (onEdit != null) {
-                                                Modifier.clickable(onClick = onEdit)
-                                            } else {
-                                                Modifier
-                                            }
-                                        )
-                                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                                    fontSize = 16.sp,
-                                    lineHeight = 22.sp,
-                                    color = bubble.content,
-                                )
+                            UserBubbleReaction(chatMessage.modelReaction, bubble.background, reactionBounce) {
+                                QuoteSelectionContainer(onQuote = onQuote) {
+                                    Text(
+                                        chatMessage.text,
+                                        modifier = Modifier
+                                            .widthIn(max = maxWidth * 0.85f)
+                                            .background(
+                                                color = bubble.background,
+                                                shape = RoundedCornerShape(16.dp),
+                                            )
+                                            .then(
+                                                if (onEdit != null) {
+                                                    Modifier.clickable(onClick = onEdit)
+                                                } else {
+                                                    Modifier
+                                                }
+                                            )
+                                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                                        fontSize = 16.sp,
+                                        lineHeight = 22.sp,
+                                        color = bubble.content,
+                                    )
+                                }
                             }
                         }
                     }
@@ -3038,6 +3115,10 @@ internal fun MessageRow(
                     AssistantActions(
                         messageId = chatMessage.id,
                         onCopy = onCopy,
+                        userReaction = chatMessage.userReaction,
+                        reactionBounce = reactionBounce,
+                        onAddReaction = onAddReaction,
+                        onRemoveReaction = onRemoveReaction,
                         onSpeak = if (spoken.isNotBlank()) {
                             {
                                 if (
@@ -4248,6 +4329,10 @@ private fun UserEditVersionSwitcher(
 private fun AssistantActions(
     messageId: Long,
     onCopy: () -> Unit,
+    userReaction: String,
+    reactionBounce: androidx.compose.runtime.State<Float>,
+    onAddReaction: () -> Unit,
+    onRemoveReaction: () -> Unit,
     onSpeak: (() -> Unit)?,
     speaking: Boolean,
     onRetry: () -> Unit,
@@ -4294,6 +4379,7 @@ private fun AssistantActions(
                 tint = if (speaking) Theme[colors][onBackgroundColor] else muted,
             )
         }
+        AssistantReactionButton(userReaction, reactionBounce, onAddReaction, onRemoveReaction)
         if (clock.isNotEmpty()) {
             Text(
                 clock,

@@ -47,6 +47,8 @@ data class ChatRequestMessage(
     val createdAt: Long = 0L,
     val geminiParts: List<String> = emptyList(),
     val geminiFunctionId: String? = null,
+    /** 本地用户消息标识，供回应工具精确定位；不作为提供商 JSON 字段发送。 */
+    val reactionTargetId: Long? = null,
 )
 
 data class TokenUsage(
@@ -174,8 +176,9 @@ object ChatApi {
         cancellation: ChatRequestCancellation,
         onUpdate: suspend (ChatStreamUpdate) -> Unit,
         appContext: android.content.Context? = null,
+        onReaction: suspend (Long, String) -> Boolean = { _, _ -> false },
     ): ChatCompletionResult {
-        val history = messages.toMutableList()
+        val history = (if (toolRegistry.handles(ReactionTool.NAME)) reactionRequestMessages(messages) else messages).toMutableList()
         var searchPages = 0
         var lastUsage: TokenUsage? = null
         val rounds = ToolStore.clampMaxRounds(maxToolRounds)
@@ -194,6 +197,7 @@ object ChatApi {
             onUpdate = onUpdate,
             appContext = appContext,
             conversationId = conversationId,
+            onReaction = onReaction,
         )
         repeat(rounds) { roundIndex ->
             if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)

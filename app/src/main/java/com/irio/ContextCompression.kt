@@ -183,6 +183,7 @@ internal fun modelRequestMessages(messages: List<ChatMessage>): List<ChatRequest
                 attachments = message.attachments,
                 thinking = message.thinking,
                 createdAt = message.createdAt,
+                reactionTargetId = message.id.takeIf { message.fromUser && !message.hidden },
             )
         }
     }
