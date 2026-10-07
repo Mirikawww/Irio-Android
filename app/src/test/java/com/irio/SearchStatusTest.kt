@@ -64,6 +64,30 @@ class SearchStatusTest {
     }
 
     @Test
+    fun completedLabelKeepsPageCountAndQuery() {
+        val tracker = ProcessTracker()
+        tracker.onSearchStarted("Kotlin \"Compose\" 中文")
+        tracker.onSearchFinished(3, "网页结果")
+        val event = tracker.snapshot().single()
+        assertEquals(
+            "搜索了 3 个网页 - Kotlin \"Compose\" 中文",
+            searchCompletedLabel(event.pages, event.searchQuery, AppLanguage.ZH_CN),
+        )
+    }
+
+    @Test
+    fun completedLabelLocalizesOnlyTheStatus() {
+        assertEquals("Searched 3 pages - Kotlin 中文", searchCompletedLabel(3, "Kotlin 中文", AppLanguage.EN))
+        assertEquals("搜索了 0 个网页 - no results", searchCompletedLabel(0, "no results", AppLanguage.ZH_CN))
+    }
+
+    @Test
+    fun completedLabelWithoutQueryKeepsTheLegacyLabel() {
+        assertEquals("搜索了 3 个网页", searchCompletedLabel(3, "", AppLanguage.ZH_CN))
+        assertEquals("Searched 0 pages", searchCompletedLabel(0, "  ", AppLanguage.EN))
+    }
+
+    @Test
     fun querySurvivesConversationJsonRoundTrip() {
         val conversation = Conversation(
             id = "test", title = "Test", updatedAt = 0,
@@ -73,12 +97,16 @@ class SearchStatusTest {
             )),
         )
         val restored = LinkConversationJson.decode(JSONObject(LinkConversationJson.encode(conversation).toString()))
-        assertEquals("Kotlin Compose", restored.messages.single().process.single().searchQuery)
+        val event = restored.messages.single().process.single()
+        assertEquals("Kotlin Compose", event.searchQuery)
+        assertEquals("搜索了 3 个网页 - Kotlin Compose", searchCompletedLabel(event.pages, event.searchQuery, AppLanguage.ZH_CN))
     }
 
     @Test
     fun legacySearchEventsDefaultToAnEmptyQuery() {
         val json = JSONObject("""{"process":[{"id":1,"kind":"SEARCH","pages":3}]}""")
-        assertEquals("", processEventsFrom(json).single().searchQuery)
+        val event = processEventsFrom(json).single()
+        assertEquals("", event.searchQuery)
+        assertEquals("搜索了 3 个网页", searchCompletedLabel(event.pages, event.searchQuery, AppLanguage.ZH_CN))
     }
 }

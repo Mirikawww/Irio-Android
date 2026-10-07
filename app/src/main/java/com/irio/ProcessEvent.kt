@@ -32,6 +32,11 @@ internal fun searchStatusLabel(query: String, language: AppLanguage = ThemeStore
     return if (query.isBlank()) status else "$status - $query"
 }
 
+internal fun searchCompletedLabel(pages: Int, query: String, language: AppLanguage = ThemeStore.language): String {
+    val status = translate(language, "搜索了 %s 个网页").format(pages)
+    return if (query.isBlank()) status else "$status - $query"
+}
+
 internal sealed class TranscriptPiece {
     data class Text(val text: String) : TranscriptPiece()
     data class Event(val event: ProcessEvent) : TranscriptPiece()
