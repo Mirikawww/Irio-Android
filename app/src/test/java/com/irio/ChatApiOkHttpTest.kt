@@ -175,6 +175,116 @@ class ChatApiOkHttpTest {
         assertEquals(0, server.requestCount)
     }
 
+    @Test
+    fun chatCompletionsReadsUsageAfterFinishReason() = runBlocking {
+        server.enqueue(
+            MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+                "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"},\"finish_reason\":\"stop\"}]}\n\n" +
+                    "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":120,\"completion_tokens\":40,\"total_tokens\":160}}\n\n" +
+                    "data: [DONE]\n\n",
+            ),
+        )
+        val provider = ProviderConfig(
+            id = "p", name = "t", endpointUrl = server.url("/v1").toString(), apiKey = "k",
+            protocol = ProviderProtocol.CHAT_COMPLETIONS,
+        )
+        val updates = mutableListOf<ChatStreamUpdate>()
+        val result = ChatApi.streamChat(
+            provider = provider,
+            model = "m",
+            messages = listOf(ChatRequestMessage(role = "user", text = "hello")),
+            reasoningEffort = ReasoningEffort.OFF,
+            fastMode = false,
+            cancellation = ChatRequestCancellation(),
+            onUpdate = { updates += it },
+        )
+        assertEquals(null, result.error)
+        assertEquals("hi", result.content)
+        assertEquals(TokenUsage(120, 40, 160), result.usage)
+        assertEquals(TokenUsage(120, 40, 160), updates.last().usage)
+        assertTrue(updates.last().done)
+        assertEquals(1, updates.count { it.done })
+    }
+
+    @Test
+    fun anthropicMergesInputUsageWithTheFinalOutputUsage() = runBlocking {
+        server.enqueue(
+            MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+                "data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":80,\"output_tokens\":0}}}\n\n" +
+                    "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"hi\"}}\n\n" +
+                    "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":20}}\n\n" +
+                    "data: {\"type\":\"message_stop\"}\n\n",
+            ),
+        )
+        val provider = ProviderConfig(
+            id = "p", name = "t", endpointUrl = server.url("/v1").toString(), apiKey = "k",
+            protocol = ProviderProtocol.ANTHROPIC,
+        )
+        val updates = mutableListOf<ChatStreamUpdate>()
+        val result = ChatApi.streamChat(
+            provider = provider,
+            model = "m",
+            messages = listOf(ChatRequestMessage(role = "user", text = "hello")),
+            reasoningEffort = ReasoningEffort.OFF,
+            fastMode = false,
+            cancellation = ChatRequestCancellation(),
+            onUpdate = { updates += it },
+        )
+        assertEquals(null, result.error)
+        assertEquals(TokenUsage(80, 20, 100), result.usage)
+        assertEquals(TokenUsage(80, 20, 100), updates.last().usage)
+    }
+
+    @Test(timeout = 8_000)
+    fun missingUsageTrailerOnAnOpenConnectionDoesNotDiscardTheReply() = runBlocking {
+        val body = "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"},\"finish_reason\":\"stop\"}]}\n\n"
+        // 声明还有更多 body，但服务端不再发送，也不关闭连接。
+        server.enqueue(
+            MockResponse().setHeader("Content-Type", "text/event-stream")
+                .setBody(body).setHeader("Content-Length", body.toByteArray().size + 100),
+        )
+        val provider = ProviderConfig(
+            id = "p", name = "t", endpointUrl = server.url("/v1").toString(), apiKey = "k",
+            protocol = ProviderProtocol.CHAT_COMPLETIONS,
+        )
+        val started = System.nanoTime()
+        val result = chat(provider, "open-connection", "hello")
+        assertEquals(null, result.error)
+        assertEquals("hi", result.content)
+        assertEquals(null, result.usage)
+        assertTrue(java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 5_000)
+    }
+
+    @Test
+    fun toolRoundWithoutDoneDoesNotFinishTheReplyBeforeTheNextRound() = runBlocking {
+        server.enqueue(
+            MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+                "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call1\",\"function\":{\"name\":\"unknown_tool\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n",
+            ),
+        )
+        server.enqueue(sse("hi"))
+        val provider = ProviderConfig(
+            id = "p", name = "t", endpointUrl = server.url("/v1").toString(), apiKey = "k",
+            protocol = ProviderProtocol.CHAT_COMPLETIONS,
+        )
+        val updates = mutableListOf<ChatStreamUpdate>()
+        val result = ChatApi.streamChat(
+            provider = provider,
+            model = "m",
+            messages = listOf(ChatRequestMessage(role = "user", text = "hello")),
+            reasoningEffort = ReasoningEffort.OFF,
+            fastMode = false,
+            toolRegistry = ToolRegistry(),
+            cancellation = ChatRequestCancellation(),
+            onUpdate = { updates += it },
+        )
+        assertEquals(null, result.error)
+        assertEquals("hi", result.content)
+        assertTrue(updates.any { it.newRound })
+        assertTrue(updates.takeWhile { !it.newRound }.none { it.done })
+        assertEquals(1, updates.count { it.done })
+    }
+
     private fun sse(text: String) = MockResponse()
         .setHeader("Content-Type", "text/event-stream")
         .setBody(

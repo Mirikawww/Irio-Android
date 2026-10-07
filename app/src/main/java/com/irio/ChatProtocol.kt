@@ -33,6 +33,16 @@ internal object ChatProtocol {
         return TokenUsage(promptTokens = prompt, completionTokens = completion, totalTokens = total)
     }
 
+    /** 流式计数是累计值，不相加；缺省字段保留上一帧，部分更新后重算总数。 */
+    fun mergeUsage(previous: TokenUsage?, update: TokenUsage): TokenUsage {
+        if (previous == null) return update
+        val prompt = update.promptTokens ?: previous.promptTokens
+        val completion = update.completionTokens ?: previous.completionTokens
+        val total = update.totalTokens
+            ?: listOfNotNull(prompt, completion).takeIf { it.size == 2 }?.sum()
+        return TokenUsage(promptTokens = prompt, completionTokens = completion, totalTokens = total)
+    }
+
     fun usageFromResponses(response: JSONObject?): TokenUsage? {
         if (response == null) return null
         return parseUsage(response.optJSONObject("usage"))

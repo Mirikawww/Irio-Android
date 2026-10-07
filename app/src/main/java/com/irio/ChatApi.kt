@@ -524,6 +524,7 @@ object ChatApi {
             var finishReason = ""
             var terminalUpdateSent = false
             var lastUsage: TokenUsage? = null
+            var awaitingUsage = false
             response.body!!.byteStream().bufferedReader().use { reader ->
                 val eventName = StringBuilder()
                 val eventData = StringBuilder()
@@ -556,7 +557,7 @@ object ChatApi {
                     if (update.finishReason.isNotBlank() && update.finishReason != "null") {
                         finishReason = update.finishReason
                     }
-                    if (update.usage != null) lastUsage = update.usage
+                    if (update.usage != null) lastUsage = ChatProtocol.mergeUsage(lastUsage, update.usage)
                     geminiParts += update.geminiParts
                     val completedToolCount = ChatProtocol.completedToolCalls(toolCalls).size
                     val shouldEnd = ChatProtocol.shouldEndStream(
@@ -564,20 +565,35 @@ object ChatApi {
                         finishReason = finishReason,
                         completedToolCount = completedToolCount,
                     )
-                    if (shouldEnd) terminalUpdateSent = true
+                    // Chat Completions 可在 finish_reason 后单独发送 usage；限时读取尾帧，
+                    // 避免兼容端点不发 [DONE]、不关连接时拖住下一轮工具调用。
+                    val waitForUsage = shouldEnd && !update.done &&
+                        provider.protocol == ProviderProtocol.CHAT_COMPLETIONS &&
+                        (update.usage?.usedTokens ?: 0) <= 0
+                    if (waitForUsage && !awaitingUsage) {
+                        response.body!!.source().timeout().deadline(2, java.util.concurrent.TimeUnit.SECONDS)
+                    }
+                    awaitingUsage = waitForUsage
+                    val endStream = shouldEnd && !waitForUsage
+                    if (endStream) terminalUpdateSent = true
                     // 单轮 SSE 结束不等于整个请求结束：工具调用后还会继续下一轮。
                     // 只有没有已完成工具调用时，done 才能让 UI 进入最终完成态。
                     publish(
                         update.copy(
                             model = update.model.ifBlank { responseModel },
-                            done = update.done && completedToolCount == 0,
-                            usage = update.usage ?: lastUsage,
+                            done = endStream && completedToolCount == 0,
+                            usage = lastUsage,
                         )
                     )
-                    return shouldEnd
+                    return endStream
                 }
                 while (true) {
-                    val line = reader.readLine() ?: break
+                    val line = try {
+                        reader.readLine()
+                    } catch (timeout: java.io.InterruptedIOException) {
+                        if (!awaitingUsage) throw timeout
+                        break
+                    } ?: break
                     if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
                     when {
                         line.isEmpty() -> if (flush()) break
@@ -593,7 +609,13 @@ object ChatApi {
                     }
                 }
                 if (eventData.isNotEmpty()) flush()
-                if (!terminalUpdateSent) publish(ChatStreamUpdate(done = true, model = responseModel, usage = lastUsage))
+                if (!terminalUpdateSent) publish(
+                    ChatStreamUpdate(
+                        done = ChatProtocol.completedToolCalls(toolCalls).isEmpty(),
+                        model = responseModel,
+                        usage = lastUsage,
+                    ),
+                )
             }
             if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
             val completedTools = ChatProtocol.completedToolCalls(toolCalls)

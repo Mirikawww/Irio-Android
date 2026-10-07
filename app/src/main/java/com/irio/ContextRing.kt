@@ -392,7 +392,7 @@ internal fun contextWindowLabel(windowTokens: Int): String =
 
 /**
  * 压缩进行中不改数字。完成后、下一次接口 usage 到来前，用压缩结果的估算。
- * 估算不是压缩目标。真正在生成回复时才用流式估算，接口回报后再回到 apiUsed。
+ * 估算不是压缩目标。生成时用流式估算；结束后优先接口用量，缺失时保留本地估算。
  */
 internal fun contextRingUsedTokens(
     apiUsed: Int,
@@ -402,5 +402,6 @@ internal fun contextRingUsedTokens(
 ): Int = when {
     generatingReply && liveEstimate > 0 -> liveEstimate
     compressionEstimate != null && compressionEstimate > 0 -> compressionEstimate
-    else -> apiUsed
+    apiUsed > 0 -> apiUsed
+    else -> liveEstimate.coerceAtLeast(0)
 }

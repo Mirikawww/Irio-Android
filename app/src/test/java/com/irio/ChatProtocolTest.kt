@@ -88,4 +88,20 @@ class ChatProtocolTest {
         assertEquals(20, usage?.completionTokens)
         assertEquals(100, usage?.totalTokens)
     }
+
+    @Test
+    fun usageUpdatesReplaceCumulativeCountsRatherThanAddingThem() {
+        val start = TokenUsage(promptTokens = 80, completionTokens = 0, totalTokens = 80)
+        val first = ChatProtocol.mergeUsage(start, TokenUsage(completionTokens = 10))
+        val last = ChatProtocol.mergeUsage(first, TokenUsage(completionTokens = 20))
+        assertEquals(TokenUsage(80, 20, 100), last)
+    }
+
+    @Test
+    fun usageMergePreservesAnExplicitProviderTotal() {
+        assertEquals(
+            TokenUsage(80, 20, 120),
+            ChatProtocol.mergeUsage(TokenUsage(promptTokens = 80), TokenUsage(completionTokens = 20, totalTokens = 120)),
+        )
+    }
 }

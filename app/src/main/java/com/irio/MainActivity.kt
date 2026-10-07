@@ -328,7 +328,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var contextRingOpen by remember { mutableStateOf(false) }
     var contextCompressionEnabled by remember { mutableStateOf(ToolStore.loadContextCompression(context)) }
     var visualizeContext by remember { mutableStateOf(ToolStore.loadVisualizeContext(context)) }
-    var liveContextTokens by remember { mutableIntStateOf(0) }
+    var liveContextEstimate by remember { mutableStateOf("" to 0) }
     var attachMenuOpen by remember { mutableStateOf(false) }
     var reasoningEffort by remember { mutableStateOf(ProviderStore.loadReasoningEffort(context)) }
     var fastMode by remember { mutableStateOf(ProviderStore.loadFastMode(context)) }
@@ -469,6 +469,21 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         }
     }
     val presentationReady = transcriptPresentation.conversationId == currentConversation.id
+    // 缺少接口统计的旧会话也能恢复本地估算；不在主线程或每个流式增量上重算历史。
+    LaunchedEffect(currentConversation.id, messages, generatingThisChat, ThemeStore.contextRing) {
+        if (generatingThisChat || !ThemeStore.contextRing) return@LaunchedEffect
+        val conversationId = currentConversation.id
+        val messageSnapshot = messages
+        val apiUsage = currentConversation.tokenUsage
+            ?: messageSnapshot.lastOrNull { !it.fromUser && it.usage != null }?.usage
+        if ((apiUsage?.usedTokens ?: 0) > 0) return@LaunchedEffect
+        val estimate = withContext(Dispatchers.Default) {
+            estimateRequestTokens(modelRequestMessages(contextMessages(messageSnapshot)))
+        }
+        if (currentConversation.id == conversationId && messages === messageSnapshot) {
+            liveContextEstimate = conversationId to estimate
+        }
+    }
     val visibleTranscript = if (presentationReady) transcriptPresentation.visible else emptyList()
     // 压缩记录留在列表里，但只画状态行，不画摘要正文。
     val shownTranscript = visibleTranscript
@@ -1215,6 +1230,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 val baseContextTokens = withContext(Dispatchers.Default) {
                     estimateRequestTokens(requestMessages)
                 }
+                if (currentConversation.id == requestConversationId) {
+                    liveContextEstimate = requestConversationId to baseContextTokens
+                }
                 val liveTokenEstimator = LiveReplyTokenEstimator()
                 val streamedToolCalls = StringBuilder()
                 withContext(Dispatchers.IO) {
@@ -1337,7 +1355,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                     currentConversation = currentConversation.copy(tokenUsage = usage)
                                 }
                                 if (liveTokens != null && currentConversation.id == requestConversationId) {
-                                    liveContextTokens = baseContextTokens + liveTokens
+                                    liveContextEstimate = requestConversationId to (baseContextTokens + liveTokens)
                                 }
                             }
                         },
@@ -2257,7 +2275,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         }
                         val shownUsed = contextRingUsedTokens(
                             apiUsed = apiUsed,
-                            liveEstimate = liveContextTokens,
+                            liveEstimate = liveContextEstimate.takeIf { it.first == currentConversation.id }?.second ?: 0,
                             generatingReply = generatingThisChat && !compressingThisChat,
                             compressionEstimate = compressionUsageEstimate(messages),
                         )
