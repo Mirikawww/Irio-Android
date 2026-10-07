@@ -268,6 +268,7 @@ object ConversationStore {
                                                 if (event.belowText) put("belowText", true)
                                                 if (event.textOffset > 0) put("textOffset", event.textOffset)
                                                 if (event.toolName.isNotBlank()) put("toolName", event.toolName)
+                                                if (event.searchQuery.isNotBlank()) put("searchQuery", event.searchQuery)
                                             }
                                         )
                                     }
@@ -385,6 +386,7 @@ internal fun processEventsFrom(item: JSONObject): List<ProcessEvent> {
                         belowText = event.optBoolean("belowText"),
                         textOffset = event.optInt("textOffset"),
                         toolName = event.optString("toolName"),
+                        searchQuery = event.optString("searchQuery"),
                     )
                 )
             }

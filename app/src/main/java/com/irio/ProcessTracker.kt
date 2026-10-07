@@ -43,7 +43,7 @@ internal class ProcessTracker {
         if (textLength >= 0) outputLength = textLength
     }
 
-    fun onSearchStarted() {
+    fun onSearchStarted(query: String = "") {
         finishThinking()
         finishLiveTool()
         if (liveSearchId != null) return
@@ -53,6 +53,7 @@ internal class ProcessTracker {
             id = id,
             kind = ProcessEventKind.SEARCH,
             live = true,
+            searchQuery = query,
             belowText = outputStarted,
             textOffset = eventAnchor(),
         )

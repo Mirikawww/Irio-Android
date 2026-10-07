@@ -265,6 +265,7 @@ object LinkConversationJson {
                                                     if (event.belowText) put("belowText", true)
                                                     if (event.textOffset > 0) put("textOffset", event.textOffset)
                                                     if (event.toolName.isNotBlank()) put("toolName", event.toolName)
+                                                    if (event.searchQuery.isNotBlank()) put("searchQuery", event.searchQuery)
                                                 }
                                             )
                                         }

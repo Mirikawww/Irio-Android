@@ -23,7 +23,13 @@ data class ProcessEvent(
      * 旧数据没有这个字段（0）且 [belowText] 为 true：仍渲染在整段正文之后。
      */
     val textOffset: Int = 0,
+    val searchQuery: String = "",
 )
+
+internal fun searchStatusLabel(query: String, language: AppLanguage = ThemeStore.language): String {
+    val status = translate(language, "网络搜索中")
+    return if (query.isBlank()) status else "$status - $query"
+}
 
 internal sealed class TranscriptPiece {
     data class Text(val text: String) : TranscriptPiece()

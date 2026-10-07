@@ -95,6 +95,8 @@ data class ChatStreamUpdate(
     /** 进行中的工具输出快照。非 null 时刷新当前工具事件的内容，不结束它。 */
     val toolOutput: String? = null,
     val geminiParts: List<String> = emptyList(),
+    /** 本次网络搜索实际使用的搜索词，不混入搜索结果正文。 */
+    val searchQuery: String = "",
 )
 
 data class ToolCallDelta(

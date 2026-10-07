@@ -157,11 +157,12 @@ internal class WebSearchToolProvider : ToolProvider {
         if (!context.webSearch || context.searchApiKey.isBlank()) {
             return@withContext ToolExecutionResult(tr("搜索工具当前不可用：请先启用网页搜索并配置密钥。"))
         }
-        context.onUpdate(ChatStreamUpdate(searching = true))
+        val query = ToolArguments.value(call.arguments, "query")
+        context.onUpdate(ChatStreamUpdate(searching = true, searchQuery = query))
         val result = WebSearch.search(
             provider = context.searchProvider,
             apiKey = context.searchApiKey,
-            query = ToolArguments.value(call.arguments, "query"),
+            query = query,
             cancellation = context.cancellation,
             maxResults = context.searchMaxResults,
         )

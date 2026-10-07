@@ -134,6 +134,7 @@ private val English = mapOf(
     "找不到这个提供商" to "Can't find this provider",
     "提供商数据" to "Provider data",
     "搜索中" to "Searching",
+    "网络搜索中" to "Searching the web",
     "搜索工具当前不可用：请先启用网页搜索并配置密钥。" to "Web search is unavailable. Enable it and add an API key first.",
     "搜索提供商" to "Search provider",
     "搜索提供商数据" to "Search provider data",
