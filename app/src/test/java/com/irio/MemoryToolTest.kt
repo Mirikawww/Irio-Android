@@ -46,6 +46,8 @@ class MemoryToolTest {
                 ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
                 ProviderProtocol.RESPONSES -> schema.getJSONObject("parameters")
                 ProviderProtocol.ANTHROPIC -> schema.getJSONObject("input_schema")
+                ProviderProtocol.GEMINI -> schema.getJSONObject("parametersJsonSchema")
+                ProviderProtocol.GEMINI_INTERACTIONS -> schema.getJSONObject("parameters")
             }
             assertEquals(0, params.optJSONObject("properties")?.length() ?: 0)
             assertEquals("object", params.optString("type"))
@@ -61,6 +63,8 @@ class MemoryToolTest {
                 ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
                 ProviderProtocol.RESPONSES -> schema.getJSONObject("parameters")
                 ProviderProtocol.ANTHROPIC -> schema.getJSONObject("input_schema")
+                ProviderProtocol.GEMINI -> schema.getJSONObject("parametersJsonSchema")
+                ProviderProtocol.GEMINI_INTERACTIONS -> schema.getJSONObject("parameters")
             }
             assertTrue(params.getJSONObject("properties").has("content"))
             assertEquals("content", params.getJSONArray("required").getString(0))

@@ -36,7 +36,7 @@ internal fun providerHeadersFromJson(array: JSONArray?): List<ProviderHeader> {
 /** Preserve the conversation's pool, but never redirect arbitrary credential headers. */
 internal fun ProviderConfig.requestClient(scope: String): okhttp3.OkHttpClient {
     val client = IrioHttp.clientFor(scope)
-    return if (customHeaders.isEmpty()) client else client.newBuilder()
+    return if (customHeaders.isEmpty() && !protocol.isGoogleGemini) client else client.newBuilder()
         .followRedirects(false)
         .followSslRedirects(false)
         .build()

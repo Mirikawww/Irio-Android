@@ -6,6 +6,7 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.net.HttpURLConnection
 import java.net.URL
 import java.io.File
@@ -21,7 +22,12 @@ enum class ProviderProtocol(val label: String, val defaultEndpoint: String) {
     CHAT_COMPLETIONS("OpenAI Chat Completions", "https://api.openai.com/v1"),
     RESPONSES("OpenAI Responses", "https://api.openai.com/v1"),
     ANTHROPIC("Anthropic Messages", "https://api.anthropic.com"),
+    GEMINI("Google Gemini generateContent API", "https://generativelanguage.googleapis.com/v1beta"),
+    GEMINI_INTERACTIONS("Google Gemini Interactions API", "https://generativelanguage.googleapis.com/v1beta"),
 }
+
+internal val ProviderProtocol.isGoogleGemini: Boolean
+    get() = this == ProviderProtocol.GEMINI || this == ProviderProtocol.GEMINI_INTERACTIONS
 
 enum class ReasoningEffort(val label: String, val apiValue: String?) {
     OFF("关闭", "none"),
@@ -539,6 +545,7 @@ data class ImageGenResult(
 
 object ProviderApi {
     fun fetchModels(config: ProviderConfig): ModelFetchResult {
+        if (config.protocol.isGoogleGemini) return fetchGeminiModels(config)
         val connection = runCatching {
             URL(modelsUrl(config.endpointUrl, config.protocol)).openConnection() as HttpURLConnection
         }.getOrElse { return ModelFetchResult(error = tr("端点 URL 无效")) }
@@ -565,6 +572,50 @@ object ProviderApi {
             connection.disconnect()
         }
     }
+
+    private fun fetchGeminiModels(config: ProviderConfig): ModelFetchResult = runCatching {
+        val models = linkedSetOf<String>()
+        val seenTokens = mutableSetOf<String>()
+        var pageToken = ""
+        do {
+            // Resolve the page token as a query parameter, never as an arbitrary next-page URL.
+            val base = (ProviderEndpoints.geminiBase(config.endpointUrl) + "/models").toHttpUrl()
+            val pageUrl = base.newBuilder().apply {
+                if (pageToken.isNotBlank()) addQueryParameter("pageToken", pageToken)
+            }.build()
+            val connection = URL(pageUrl.toString()).openConnection() as HttpURLConnection
+            val root = try {
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 20_000
+                connection.setRequestProperty("Accept", "application/json")
+                applyAuth(connection, config)
+                val status = connection.responseCode
+                val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
+                    ?.bufferedReader()?.use { it.readText() }.orEmpty()
+                if (status !in 200..299) return ModelFetchResult(error = apiError(body).ifBlank { tr("获取模型失败（HTTP %s）").format(status) })
+                JSONObject(body)
+            } finally { connection.disconnect() }
+            val items = root.optJSONArray("models") ?: JSONArray()
+            for (index in 0 until items.length()) {
+                val item = items.optJSONObject(index) ?: continue
+                val methods = item.optJSONArray("supportedGenerationMethods")
+                val supportedMethods = (0 until (methods?.length() ?: 0)).map { methods!!.optString(it) }.toSet()
+                val supportsProtocol = if (config.protocol == ProviderProtocol.GEMINI_INTERACTIONS) {
+                    methods == null || methods.length() == 0 || supportedMethods.any {
+                        it in setOf("generateContent", "interactions", "interactions.create")
+                    }
+                } else "generateContent" in supportedMethods
+                if (!supportsProtocol) continue
+                val name = item.optString("name").removePrefix("models/")
+                if (name.isNotBlank()) models += name
+            }
+            pageToken = root.optString("nextPageToken")
+            require(pageToken.isBlank() || seenTokens.add(pageToken)) { "Repeated Gemini model page token" }
+        } while (pageToken.isNotBlank())
+        if (models.isEmpty()) ModelFetchResult(error = tr("端点没有返回可用模型"))
+        else ModelFetchResult(models = models.sorted())
+    }.getOrElse { ModelFetchResult(error = it.message ?: tr("无法连接到端点")) }
 
     private fun parseModels(body: String): List<String> {
         val root = JSONObject(body)
@@ -621,6 +672,7 @@ object ProviderApi {
         cancellation: ChatRequestCancellation? = null,
     ): ImageGenResult {
         if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
+        if (config.protocol.isGoogleGemini) return generateImagePlain(config, model, prompt, cancellation, context)
         if (context != null && context.previousImages.isNotEmpty()) {
             val edited = runCatching { generateImageWithEdits(config, model, prompt, context, cancellation) }.getOrNull()
             if (edited != null) return edited
@@ -641,9 +693,12 @@ object ProviderApi {
         model: String,
         prompt: String,
         cancellation: ChatRequestCancellation?,
+        context: ImageGenContext? = null,
     ): ImageGenResult {
         val connection = runCatching {
-            URL(imagesUrl(config.endpointUrl)).openConnection() as HttpURLConnection
+            val url = if (config.protocol.isGoogleGemini) ProviderEndpoints.chatUrl(config, model, streaming = false)
+                else imagesUrl(config.endpointUrl)
+            URL(url).openConnection() as HttpURLConnection
         }.getOrElse { return ImageGenResult(error = tr("端点 URL 无效")) }
         cancellation?.attach(connection)
 
@@ -656,16 +711,24 @@ object ProviderApi {
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             connection.setRequestProperty("Accept", "application/json")
             applyAuth(connection, config)
+            val messages = buildList {
+                if (context != null && context.previousImages.isNotEmpty()) {
+                    add(ChatRequestMessage("user", context.previousPrompt))
+                    add(ChatRequestMessage("assistant", attachments = context.previousImages))
+                }
+                add(ChatRequestMessage("user", prompt))
+            }
+            val requestBody = if (config.protocol == ProviderProtocol.GEMINI_INTERACTIONS) {
+                GeminiInteractionsProtocol.requestBody(model, messages, null)
+                    .put("response_modalities", JSONArray().put("IMAGE"))
+            } else if (config.protocol == ProviderProtocol.GEMINI) {
+                GeminiProtocol.requestBody(messages, null).put("generationConfig", JSONObject()
+                    .put("responseModalities", JSONArray().put("TEXT").put("IMAGE")))
+            } else JSONObject().put("model", model).put("prompt", prompt).put("n", 1).put("size", "1024x1024")
             connection.outputStream.use { output ->
                 if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
                 output.write(
-                    JSONObject()
-                        .put("model", model)
-                        .put("prompt", prompt)
-                        .put("n", 1)
-                        .put("size", "1024x1024")
-                        .toString()
-                        .toByteArray(Charsets.UTF_8)
+                    requestBody.toString().toByteArray(Charsets.UTF_8)
                 )
             }
             val status = connection.responseCode
@@ -676,7 +739,15 @@ object ProviderApi {
             if (status !in 200..299) {
                 ImageGenResult(error = apiError(body).ifBlank { tr("图片生成失败（HTTP %s）").format(status) })
             } else {
-                parseImageResponse(body, config, cancellation)
+                if (config.protocol.isGoogleGemini) {
+                    val parsed = if (config.protocol == ProviderProtocol.GEMINI_INTERACTIONS) {
+                        GeminiInteractionsProtocol.parseResponse(body)
+                    } else GeminiProtocol.parse(body)
+                    val image = parsed?.attachments?.firstOrNull { it.isImage }
+                    parsed?.attachments?.filter { it != image }?.forEach { File(it.filePath).delete() }
+                    if (image != null) ImageGenResult(attachment = image)
+                    else ImageGenResult(error = parsed?.error ?: tr("图片端点没有返回图片"))
+                } else parseImageResponse(body, config, cancellation)
                     ?: ImageGenResult(error = tr("图片端点没有返回图片"))
             }
         } catch (error: Exception) {
@@ -909,8 +980,11 @@ object ProviderApi {
 internal fun applyAuth(connection: HttpURLConnection, config: ProviderConfig) {
     require(validateProviderHeaders(config.customHeaders) == null) { tr("自定义请求头无效") }
     // Arbitrary credential headers must not be forwarded by automatic redirects.
-    if (config.customHeaders.isNotEmpty()) connection.instanceFollowRedirects = false
-    if (config.apiKey.isNotBlank()) connection.setRequestProperty("Authorization", "Bearer ${config.apiKey}")
+    if (config.customHeaders.isNotEmpty() || config.protocol.isGoogleGemini) connection.instanceFollowRedirects = false
+    if (config.apiKey.isNotBlank()) {
+        if (config.protocol.isGoogleGemini) connection.setRequestProperty("x-goog-api-key", config.apiKey)
+        else connection.setRequestProperty("Authorization", "Bearer ${config.apiKey}")
+    }
     if (config.protocol == ProviderProtocol.ANTHROPIC) {
         if (config.apiKey.isNotBlank()) connection.setRequestProperty("x-api-key", config.apiKey)
         connection.setRequestProperty("anthropic-version", "2023-06-01")
@@ -920,7 +994,10 @@ internal fun applyAuth(connection: HttpURLConnection, config: ProviderConfig) {
 
 internal fun applyAuth(builder: okhttp3.Request.Builder, config: ProviderConfig) {
     require(validateProviderHeaders(config.customHeaders) == null) { tr("自定义请求头无效") }
-    if (config.apiKey.isNotBlank()) builder.header("Authorization", "Bearer ${config.apiKey}")
+    if (config.apiKey.isNotBlank()) {
+        if (config.protocol.isGoogleGemini) builder.header("x-goog-api-key", config.apiKey)
+        else builder.header("Authorization", "Bearer ${config.apiKey}")
+    }
     if (config.protocol == ProviderProtocol.ANTHROPIC) {
         if (config.apiKey.isNotBlank()) builder.header("x-api-key", config.apiKey)
         builder.header("anthropic-version", "2023-06-01")

@@ -92,6 +92,7 @@ internal object ChatProtocol {
             val existing = toolCalls[key] ?: MutableToolCall(index = delta.index).also { toolCalls[key] = it }
             if (delta.id.isNotBlank()) existing.id = delta.id
             if (delta.name.isNotBlank()) existing.name = delta.name
+            if (delta.geminiFunctionId != null) existing.geminiFunctionId = delta.geminiFunctionId
             if (delta.argumentsDelta.isNotBlank()) existing.arguments.append(delta.argumentsDelta)
         }
     }
@@ -102,7 +103,7 @@ internal object ChatProtocol {
             .mapNotNull { call ->
                 val id = call.id.ifBlank { return@mapNotNull null }
                 val name = call.name.ifBlank { return@mapNotNull null }
-                ChatToolCall(id = id, name = name, arguments = call.arguments.toString())
+                ChatToolCall(id = id, name = name, arguments = call.arguments.toString(), geminiFunctionId = call.geminiFunctionId)
             }
     }
 
@@ -122,6 +123,8 @@ internal object ChatProtocol {
         model: String = "",
     ) {
         when (protocol) {
+            ProviderProtocol.GEMINI -> GeminiProtocol.putThinking(target, effort, model)
+            ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.putThinking(target, effort, model)
             ProviderProtocol.CHAT_COMPLETIONS -> {
                 val value = effort.apiValue ?: return
                 // Chat Completions and Responses have different reasoning shapes.

@@ -22,6 +22,8 @@ class TimeToolTest {
         ProviderProtocol.entries.forEach { protocol ->
             val schema = TimeTool.schemaFor(protocol)
             val params: JSONObject = when (protocol) {
+                ProviderProtocol.GEMINI -> schema.getJSONObject("parametersJsonSchema")
+                ProviderProtocol.GEMINI_INTERACTIONS -> schema.getJSONObject("parameters")
                 ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
                 ProviderProtocol.RESPONSES -> schema.getJSONObject("parameters")
                 ProviderProtocol.ANTHROPIC -> schema.getJSONObject("input_schema")

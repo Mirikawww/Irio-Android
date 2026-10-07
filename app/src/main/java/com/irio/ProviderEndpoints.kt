@@ -23,13 +23,26 @@ internal object ProviderEndpoints {
         }.trimEnd('/')
     }
 
-    fun chatUrl(provider: ProviderConfig): String {
-        val base = apiBase(provider.endpointUrl)
+    fun chatUrl(provider: ProviderConfig, model: String = "", streaming: Boolean = true): String {
+        val base = if (provider.protocol.isGoogleGemini) geminiBase(provider.endpointUrl) else apiBase(provider.endpointUrl)
         return when (provider.protocol) {
+            ProviderProtocol.GEMINI_INTERACTIONS -> "$base/interactions" + if (streaming) "?alt=sse" else ""
+            ProviderProtocol.GEMINI -> {
+                val id = model.removePrefix("models/")
+                require(id.isNotBlank() && id.all { it.isLetterOrDigit() || it in "-_." }) { "Invalid Gemini model ID" }
+                val action = if (streaming) "streamGenerateContent?alt=sse" else "generateContent"
+                "$base/models/$id:$action"
+            }
             ProviderProtocol.CHAT_COMPLETIONS -> "$base/chat/completions"
             ProviderProtocol.RESPONSES -> "$base/responses"
             ProviderProtocol.ANTHROPIC ->
                 if (base.endsWith("/v1")) "$base/messages" else "$base/v1/messages"
         }
+    }
+
+    fun geminiBase(endpointUrl: String): String {
+        val clean = endpointUrl.trim().substringBefore('?').substringBefore('#').trimEnd('/')
+        val base = apiBase(clean.removeSuffix("/interactions").replace(Regex("/models/[^/]+:(?:streamGenerateContent|generateContent)$"), ""))
+        return if (base.endsWith("/v1beta") || base.endsWith("/v1")) base else "$base/v1beta"
     }
 }

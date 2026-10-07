@@ -32,6 +32,7 @@ data class ChatToolCall(
     val id: String,
     val name: String,
     val arguments: String,
+    val geminiFunctionId: String? = null,
 )
 
 data class ChatRequestMessage(
@@ -44,6 +45,8 @@ data class ChatRequestMessage(
     val toolName: String = "",
     /** 消息发送时间戳（毫秒），仅用于模型侧提示，不渲染到 UI。 */
     val createdAt: Long = 0L,
+    val geminiParts: List<String> = emptyList(),
+    val geminiFunctionId: String? = null,
 )
 
 data class TokenUsage(
@@ -65,6 +68,7 @@ data class ChatCompletionResult(
     val toolCalls: List<ChatToolCall> = emptyList(),
     val searchPages: Int = 0,
     val usage: TokenUsage? = null,
+    val geminiParts: List<String> = emptyList(),
 )
 
 data class ChatStreamUpdate(
@@ -90,6 +94,7 @@ data class ChatStreamUpdate(
     val usage: TokenUsage? = null,
     /** 进行中的工具输出快照。非 null 时刷新当前工具事件的内容，不结束它。 */
     val toolOutput: String? = null,
+    val geminiParts: List<String> = emptyList(),
 )
 
 data class ToolCallDelta(
@@ -98,6 +103,7 @@ data class ToolCallDelta(
     val id: String = "",
     val name: String = "",
     val argumentsDelta: String = "",
+    val geminiFunctionId: String? = null,
 )
 
 class MutableToolCall(
@@ -105,6 +111,7 @@ class MutableToolCall(
     var id: String = "",
     var name: String = "",
     val arguments: StringBuilder = StringBuilder(),
+    var geminiFunctionId: String? = null,
 )
 
 class ChatRequestCancellation {
@@ -210,6 +217,7 @@ object ChatApi {
                 text = turn.content,
                 thinking = turn.thinking,
                 toolCalls = turn.toolCalls,
+                geminiParts = turn.geminiParts,
             )
             turn.toolCalls.forEach { call ->
                 if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
@@ -229,6 +237,7 @@ object ChatApi {
                     text = result.text,
                     toolCallId = call.id,
                     toolName = call.name,
+                    geminiFunctionId = call.geminiFunctionId,
                 )
             }
         }
@@ -256,6 +265,8 @@ object ChatApi {
                 append(firstAssistantMessage.take(500))
             }
             val body = when (provider.protocol) {
+                ProviderProtocol.GEMINI -> GeminiProtocol.requestBody(listOf(ChatRequestMessage("user", prompt)), null)
+                ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.requestBody(model, listOf(ChatRequestMessage("user", prompt)), null)
                 ProviderProtocol.RESPONSES -> JSONObject().apply {
                     put("model", model)
                     put("stream", false)
@@ -283,11 +294,11 @@ object ChatApi {
                     )
                 }
             }
-            if (provider.protocol != ProviderProtocol.ANTHROPIC) {
+            if (provider.protocol == ProviderProtocol.CHAT_COMPLETIONS || provider.protocol == ProviderProtocol.RESPONSES) {
                 body.putConversationKey(connectionScope)
             }
             val builder = Request.Builder()
-                .url(requestUrl(provider))
+                .url(ProviderEndpoints.chatUrl(provider, model, streaming = false))
                 .post(body.toString().toByteArray(Charsets.UTF_8).toRequestBody(null))
                 .header("Content-Type", "application/json; charset=utf-8")
                 .header("Accept", "application/json")
@@ -328,7 +339,7 @@ object ChatApi {
         runCatching {
             val body = summaryRequestBody(provider.protocol, model, systemPrompt, messages, connectionScope)
             val builder = Request.Builder()
-                .url(requestUrl(provider))
+                .url(ProviderEndpoints.chatUrl(provider, model, streaming = false))
                 .post(body.toByteArray(Charsets.UTF_8).toRequestBody(null))
                 .header("Content-Type", "application/json; charset=utf-8")
                 .header("Accept", "application/json")
@@ -360,6 +371,8 @@ object ChatApi {
         conversationId: String,
     ): String {
         return when (protocol) {
+            ProviderProtocol.GEMINI -> GeminiProtocol.requestBody(messages, systemPrompt).toString()
+            ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.requestBody(model, messages, systemPrompt).toString()
             ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().apply {
                 put("model", model)
                 put("stream", false)
@@ -397,6 +410,8 @@ object ChatApi {
         return runCatching {
             val root = JSONObject(body)
             when (protocol) {
+                ProviderProtocol.GEMINI -> GeminiProtocol.parse(body)?.delta?.takeIf { it.isNotBlank() }
+                ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.parseResponse(body).let { if (it.error == null) it.delta.takeIf(String::isNotBlank) else null }
                 ProviderProtocol.CHAT_COMPLETIONS -> {
                     val content = root.optJSONArray("choices")
                         ?.optJSONObject(0)
@@ -462,13 +477,15 @@ object ChatApi {
             }
             onUpdate(update)
         }
-        val bodyBytes = requestBody(
-            provider.protocol, model, messages, reasoningEffort, fastMode, systemPrompt, toolRegistry,
-            conversationId = connectionScope,
-        ).toByteArray(Charsets.UTF_8)
+        val bodyBytes = try {
+            requestBody(provider.protocol, model, messages, reasoningEffort, fastMode, systemPrompt, toolRegistry,
+                conversationId = connectionScope).toByteArray(Charsets.UTF_8)
+        } catch (error: Exception) {
+            return ChatCompletionResult(error = error.message ?: tr("请求内容无效"))
+        }
         val request = try {
             val builder = Request.Builder()
-                .url(requestUrl(provider))
+                .url(ProviderEndpoints.chatUrl(provider, model))
                 .post(bodyBytes.toRequestBody(null))
                 .header("Content-Type", "application/json; charset=utf-8")
                 .header("Accept", "text/event-stream")
@@ -499,6 +516,9 @@ object ChatApi {
             val streamedThinking = StringBuilder()
             val streamedAttachments = linkedMapOf<String, ChatAttachment>()
             val toolCalls = linkedMapOf<String, MutableToolCall>()
+            val geminiParser = GeminiProtocol.StreamParser()
+            val interactionsParser = GeminiInteractionsProtocol.StreamParser()
+            val geminiParts = mutableListOf<String>()
             var anthropicBlockType = ""
             var anthropicToolIndex = -1
             var finishReason = ""
@@ -513,7 +533,8 @@ object ChatApi {
                     eventData.setLength(0)
                     eventName.setLength(0)
                     if (payload.isBlank()) return false
-                    val update = parseSse(
+                    val update = (if (provider.protocol == ProviderProtocol.GEMINI) geminiParser.parse(payload)
+                        else if (provider.protocol == ProviderProtocol.GEMINI_INTERACTIONS) interactionsParser.parse(payload, name) else parseSse(
                         protocol = provider.protocol,
                         eventName = name,
                         payload = payload,
@@ -521,7 +542,7 @@ object ChatApi {
                         onAnthropicBlockType = { anthropicBlockType = it },
                         onAnthropicToolIndex = { anthropicToolIndex = it },
                         anthropicToolIndex = { anthropicToolIndex },
-                    ) ?: return false
+                    )) ?: return false
                     if (update.error != null) {
                         throw StreamFailedException(update.error)
                     }
@@ -536,6 +557,7 @@ object ChatApi {
                         finishReason = update.finishReason
                     }
                     if (update.usage != null) lastUsage = update.usage
+                    geminiParts += update.geminiParts
                     val completedToolCount = ChatProtocol.completedToolCalls(toolCalls).size
                     val shouldEnd = ChatProtocol.shouldEndStream(
                         done = update.done,
@@ -587,6 +609,7 @@ object ChatApi {
                     model = responseModel,
                     toolCalls = completedTools,
                     usage = lastUsage,
+                    geminiParts = geminiParts,
                 )
                 streamedContent.isBlank() &&
                     streamedAttachments.isEmpty() &&
@@ -656,6 +679,8 @@ object ChatApi {
         if (data.isEmpty() || data.startsWith(":")) return null
         if (data == "[DONE]") return ChatStreamUpdate(done = true)
         return when (protocol) {
+            ProviderProtocol.GEMINI -> GeminiProtocol.parse(data)
+            ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.StreamParser().parse(data, eventName)
             ProviderProtocol.CHAT_COMPLETIONS -> ChatProtocol.parseChatCompletions(data)
             ProviderProtocol.RESPONSES -> parseResponses(data)
             ProviderProtocol.ANTHROPIC -> parseAnthropic(
@@ -831,6 +856,12 @@ object ChatApi {
             return if (tools.length() > 0) tools else null
         }
         return when (protocol) {
+        ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.requestBody(model, messages, systemPrompt, toolRegistry.schemas(protocol), streaming = true).apply {
+            ChatProtocol.putReasoning(this, protocol, reasoningEffort, model)
+        }.toString()
+        ProviderProtocol.GEMINI -> GeminiProtocol.requestBody(messages, systemPrompt, toolRegistry.schemas(protocol)).apply {
+            ChatProtocol.putReasoning(this, protocol, reasoningEffort, model)
+        }.toString()
         ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().apply {
             put("model", model)
             put("stream", true)
@@ -1168,7 +1199,6 @@ object ChatApi {
     private fun String.withTimestampPrefix(createdAt: Long, fromUser: Boolean): String =
         stampMessageText(this, createdAt, fromUser)
 
-    private fun requestUrl(provider: ProviderConfig): String = ProviderEndpoints.chatUrl(provider)
 
     private fun anthropicMaxTokens(effort: ReasoningEffort): Int = when (effort) {
         ReasoningEffort.XHIGH, ReasoningEffort.MAX -> 32_000
@@ -1235,6 +1265,8 @@ internal object WebSearchTool {
             .put("name", NAME)
             .put("description", DESCRIPTION)
             .put("input_schema", parameters())
+        ProviderProtocol.GEMINI -> GeminiProtocol.declaration(NAME, DESCRIPTION, parameters())
+        ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.declaration(NAME, DESCRIPTION, parameters())
     }
 }
 
@@ -1258,6 +1290,8 @@ internal object WebFetchTool {
             .put("description", DESCRIPTION).put("parameters", parameters()).put("strict", true)
         ProviderProtocol.ANTHROPIC -> JSONObject().put("name", NAME).put("description", DESCRIPTION)
             .put("input_schema", parameters())
+        ProviderProtocol.GEMINI -> GeminiProtocol.declaration(NAME, DESCRIPTION, parameters())
+        ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.declaration(NAME, DESCRIPTION, parameters())
     }
 }
 
@@ -1305,6 +1339,8 @@ internal object ImageGenTool {
             .put("name", NAME)
             .put("description", DESCRIPTION)
             .put("input_schema", parameters())
+        ProviderProtocol.GEMINI -> GeminiProtocol.declaration(NAME, DESCRIPTION, parameters())
+        ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.declaration(NAME, DESCRIPTION, parameters())
     }
 }
 
@@ -1341,6 +1377,8 @@ internal object TimeTool {
             .put("name", NAME)
             .put("description", DESCRIPTION)
             .put("input_schema", parameters())
+        ProviderProtocol.GEMINI -> GeminiProtocol.declaration(NAME, DESCRIPTION, parameters())
+        ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.declaration(NAME, DESCRIPTION, parameters())
     }
 
     /** 设备本地当前时间；一次调用返回完整描述，模型无需再追问。 */
@@ -1470,6 +1508,8 @@ internal object MemoryTool {
             .put("name", name)
             .put("description", description)
             .put("input_schema", parameters)
+        ProviderProtocol.GEMINI -> GeminiProtocol.declaration(name, description, parameters)
+        ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.declaration(name, description, parameters)
     }
 }
 

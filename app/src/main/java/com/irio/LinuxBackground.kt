@@ -324,6 +324,8 @@ internal object LinuxBackgroundTool {
     }
 
     private fun functionSchema(protocol: ProviderProtocol, parameters: JSONObject): JSONObject = when (protocol) {
+        ProviderProtocol.GEMINI -> GeminiProtocol.declaration(NAME, DESCRIPTION, parameters)
+        ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.declaration(NAME, DESCRIPTION, parameters)
         ProviderProtocol.CHAT_COMPLETIONS -> JSONObject()
             .put("type", "function")
             .put(

@@ -12,6 +12,8 @@ class ImageGenToolTest {
         for (protocol in ProviderProtocol.entries) {
             val schema = ImageGenTool.schemaFor(protocol)
             val parameters = when (protocol) {
+                ProviderProtocol.GEMINI -> schema.optJSONObject("parametersJsonSchema")
+                ProviderProtocol.GEMINI_INTERACTIONS -> schema.optJSONObject("parameters")
                 ProviderProtocol.CHAT_COMPLETIONS -> schema.optJSONObject("function")?.optJSONObject("parameters")
                 ProviderProtocol.RESPONSES -> schema.optJSONObject("parameters")
                 ProviderProtocol.ANTHROPIC -> schema.optJSONObject("input_schema")

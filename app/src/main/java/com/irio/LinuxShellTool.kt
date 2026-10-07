@@ -75,6 +75,8 @@ internal object LinuxShellTool {
         parameters: JSONObject,
         description: String,
     ): JSONObject = when (protocol) {
+        ProviderProtocol.GEMINI -> GeminiProtocol.declaration(NAME, description, parameters)
+        ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.declaration(NAME, description, parameters)
         ProviderProtocol.CHAT_COMPLETIONS -> JSONObject()
             .put("type", "function")
             .put(

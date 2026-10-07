@@ -496,6 +496,7 @@ class LinuxSandboxTest {
 
     private fun parametersOf(schema: org.json.JSONObject, protocol: ProviderProtocol): org.json.JSONObject =
         when (protocol) {
+            ProviderProtocol.GEMINI -> schema.getJSONObject("parametersJsonSchema")
             ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
             ProviderProtocol.ANTHROPIC -> schema.getJSONObject("input_schema")
             else -> schema.getJSONObject("parameters")
@@ -515,6 +516,7 @@ class LinuxSandboxTest {
     private fun commandItems(protocol: ProviderProtocol, limit: Int): org.json.JSONObject {
         val schema = LinuxShellTool.schemaFor(protocol, limit)
         val parameters = when (protocol) {
+            ProviderProtocol.GEMINI -> schema.getJSONObject("parametersJsonSchema")
             ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
             ProviderProtocol.ANTHROPIC -> schema.getJSONObject("input_schema")
             else -> schema.getJSONObject("parameters")
