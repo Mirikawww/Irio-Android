@@ -3,6 +3,7 @@ package com.irio
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONObject
 
 /**
@@ -196,13 +197,16 @@ internal class WebFetchToolProvider : ToolProvider {
         if (!context.webSearch || context.searchApiKey.isBlank()) {
             return@withContext ToolExecutionResult(tr("网页读取工具当前不可用：请先启用网页搜索并配置密钥。"))
         }
-        context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = WebFetchTool.NAME))
+        val url = ToolArguments.value(call.arguments, "url")
+        context.onUpdate(
+            ChatStreamUpdate(toolActive = true, toolName = WebFetchTool.NAME, webDomain = webPageDomain(url)),
+        )
         var resultText = ""
         return@withContext try {
             val result = WebFetch.fetch(
                 provider = context.searchProvider,
                 apiKey = context.searchApiKey,
-                url = ToolArguments.value(call.arguments, "url"),
+                url = url,
                 cancellation = context.cancellation,
             )
             resultText = result.text
@@ -346,6 +350,8 @@ internal class MemoryToolProvider : ToolProvider {
         }
     }
 }
+
+internal fun webPageDomain(url: String): String = url.trim().toHttpUrlOrNull()?.host.orEmpty()
 
 internal object ToolArguments {
     fun value(arguments: String, key: String): String {

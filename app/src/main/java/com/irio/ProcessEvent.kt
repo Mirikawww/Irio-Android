@@ -24,6 +24,7 @@ data class ProcessEvent(
      */
     val textOffset: Int = 0,
     val searchQuery: String = "",
+    val webDomain: String = "",
 )
 
 internal fun searchStatusLabel(query: String, language: AppLanguage = ThemeStore.language): String {

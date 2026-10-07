@@ -68,7 +68,7 @@ internal class ProcessTracker {
     }
 
     /** 本地工具调用开始：锚在当前正文长度上，后续正文排在它后面，而不是整段的最下面。 */
-    fun onToolStarted(name: String = "") {
+    fun onToolStarted(name: String = "", webDomain: String = "") {
         finishThinking()
         liveToolId?.let { id ->
             // toolOutput snapshots may carry toolActive=true as well. They update the
@@ -84,6 +84,7 @@ internal class ProcessTracker {
             live = true,
             belowText = outputStarted,
             toolName = name,
+            webDomain = webDomain,
             textOffset = eventAnchor(),
         )
     }

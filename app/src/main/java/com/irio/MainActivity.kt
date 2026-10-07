@@ -1285,7 +1285,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 if (update.usage != null) streamedUsage = update.usage
                                 if (update.searching == true && !cancelled) process.onSearchStarted(update.searchQuery)
                                 if (update.searching == false) process.onSearchFinished(update.searchPagesDelta, update.searchContent)
-                                if (update.toolActive == true && !cancelled) process.onToolStarted(update.toolName)
+                                if (update.toolActive == true && !cancelled) process.onToolStarted(update.toolName, update.webDomain)
                                 if (update.toolOutput != null) process.onToolOutput(update.toolOutput)
                                 if (update.toolActive == false) {
                                     if (update.toolName == ImageGenTool.NAME && update.toolContent == ImageGenTool.STATUS_OK) {
@@ -3146,7 +3146,7 @@ private fun ProcessEventRow(
                 when (event.kind) {
                     ProcessEventKind.THINKING -> tr("思考中")
                     ProcessEventKind.SEARCH -> searchStatusLabel(event.searchQuery)
-                    ProcessEventKind.TOOL -> MemoryTool.liveLabel(event.toolName)
+                    ProcessEventKind.TOOL -> MemoryTool.liveLabel(event.toolName, event.webDomain)
                 }
             )
             if (event.kind == ProcessEventKind.THINKING && event.content.isNotBlank()) {

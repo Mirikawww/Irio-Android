@@ -97,6 +97,8 @@ data class ChatStreamUpdate(
     val geminiParts: List<String> = emptyList(),
     /** 本次网络搜索实际使用的搜索词，不混入搜索结果正文。 */
     val searchQuery: String = "",
+    /** 正在读取的网页域名，不携带 URL 路径、参数或凭据。 */
+    val webDomain: String = "",
 )
 
 data class ToolCallDelta(
@@ -1440,12 +1442,14 @@ internal object MemoryTool {
             "preferences, identity, or constraints — not for the current conversation. " +
             "Call with {\"content\":\"one concise fact in the user's language\"}."
 
-    fun liveLabel(name: String): String = when (name) {
+    fun liveLabel(name: String, webDomain: String = ""): String = when (name) {
         ImageGenTool.NAME -> tr("图片生成中")
         TimeTool.NAME -> tr("获取时间")
         LinuxShellTool.NAME -> tr("运行命令中")
         LinuxBackgroundTool.NAME -> tr("处理后台命令")
-        WebFetchTool.NAME -> tr("浏览网页中")
+        WebFetchTool.NAME -> tr("浏览网页中").let { status ->
+            if (webDomain.isBlank()) status else "$status - $webDomain"
+        }
         GET -> tr("读取记忆")
         UPDATE -> tr("写入记忆")
         else -> tr("调用工具")
