@@ -2085,10 +2085,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
                 // 编辑模式提示条：正在编辑某条用户消息
                 if (editingMessageId != null) {
-                    val dark = LocalResolvedTheme.current.isDark
-                    val blackOnDark = ThemeStore.accent == AccentColor.BLACK && dark
-                    val editFill = if (blackOnDark) Theme[colors][onBackgroundColor] else Theme[colors][primaryColor]
-                    val editContent = if (blackOnDark) Theme[colors][backgroundColor] else Theme[colors][onPrimaryColor]
+                    val editFill = Theme[colors][primaryColor]
+                    val editContent = Theme[colors][onPrimaryColor]
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

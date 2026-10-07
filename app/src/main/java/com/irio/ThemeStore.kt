@@ -51,7 +51,6 @@ enum class AppLanguage(val label: String, val stored: String) {
 }
 
 enum class AccentColor(val label: String, val stored: String, val color: Color) {
-    BLACK("黑色", "black", Color.Black),
     BLUE("蓝色", "blue", Color(0xFF3B82F6)),
     PINK("粉色", "pink", Color(0xFFEC4899)),
     MONET("莫奈", "monet", Color(0xFF6750A4));
@@ -89,22 +88,17 @@ internal fun Color.mixOver(base: Color, fraction: Float): Color {
 internal data class UserBubbleColors(val background: Color, val content: Color)
 
 /**
- * Light non-black bubbles are a pale mix of the accent into white.
- * Dark non-black bubbles mix that same accent into near-black — not a single navy/gray.
- * Black accent stays neutral. [accentColor] is the resolved accent (Monet's dynamic primary).
+ * Light bubbles are a pale mix of the accent into white.
+ * Dark bubbles mix that same accent into near-black — not a single navy/gray.
+ * [accentColor] is the resolved accent (Monet's dynamic primary).
  */
 internal fun userBubbleColors(
     dark: Boolean,
-    accent: AccentColor,
     accentColor: Color,
-    panel: Color,
     onPanel: Color,
     editing: Boolean,
 ): UserBubbleColors {
     if (editing) return UserBubbleColors(accentColor.copy(alpha = 0.16f), accentColor)
-    if (accent == AccentColor.BLACK) {
-        return if (dark) UserBubbleColors(Color(0xFF2A2A2A), onPanel) else UserBubbleColors(panel, onPanel)
-    }
     return if (dark) {
         UserBubbleColors(accentColor.mixOver(Color(0xFF141414), 0.28f), onPanel)
     } else {

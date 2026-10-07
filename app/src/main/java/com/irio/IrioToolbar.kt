@@ -145,7 +145,6 @@ internal val ToolbarCapsuleShape = RoundedCornerShape(50)
 
 /**
  * 圆形图标按钮。强调色只填这个圆，图标用对比色，不跟强调色。
- * 黑色在深色主题里改用前景色当圆，避免黑圆贴在深色底上消失。
  * [active] 为 false（例如发不出去）时用淡圆，不跟强调色。
  */
 @Composable
@@ -159,18 +158,12 @@ internal fun AccentCircleIconButton(
     buttonSize: Dp = 32.dp,
     iconSize: Dp = 20.dp,
 ) {
-    val background = Theme[colors][backgroundColorToken]
-    val content = Theme[colors][onBackgroundColorToken]
     val showAccent = active && enabled
-    val accent = ThemeStore.accent
     val fill: Color
     val iconTint: Color
     if (!showAccent) {
         fill = Theme[colors][mutedColor].copy(alpha = 0.28f)
         iconTint = Theme[colors][mutedColor]
-    } else if (accent == AccentColor.BLACK && background.luminance() < 0.5f) {
-        fill = content
-        iconTint = background
     } else {
         fill = Theme[colors][primaryColorToken]
         iconTint = Theme[colors][onPrimaryColorToken]

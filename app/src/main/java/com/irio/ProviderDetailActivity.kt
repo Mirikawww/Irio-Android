@@ -53,7 +53,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -504,11 +503,8 @@ private fun ProviderDetailTabs(
         animationSpec = tween(ProviderPageAnimMillis, easing = FastOutSlowInEasing),
         label = "providerTab",
     )
-    val background = Theme[colors][backgroundColor]
-    // 黑色强调色在深底上用前景色当选中胶囊，避免黑块贴在深色轨道上消失。
-    val blackOnDark = ThemeStore.accent == AccentColor.BLACK && background.luminance() < 0.5f
-    val selectedFill = if (blackOnDark) Theme[colors][onBackgroundColor] else Theme[colors][primaryColor]
-    val selectedInk = if (blackOnDark) background else Theme[colors][onPrimaryColor]
+    val selectedFill = Theme[colors][primaryColor]
+    val selectedInk = Theme[colors][onPrimaryColor]
     val idleInk = Theme[colors][onBackgroundColor]
     Box(
         modifier = Modifier

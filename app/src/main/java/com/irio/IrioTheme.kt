@@ -185,9 +185,7 @@ internal fun currentUserBubbleColors(editing: Boolean): UserBubbleColors {
     val resolved = LocalResolvedTheme.current
     return userBubbleColors(
         dark = resolved.isDark,
-        accent = ThemeStore.accent,
         accentColor = Theme[colors][primaryColor],
-        panel = Theme[colors][panelColor],
         onPanel = Theme[colors][onPanelColor],
         editing = editing,
     )
@@ -222,17 +220,11 @@ private val SurfaceOverride: ThemeComposable = buildTheme {
         mutedColor to Theme[colors][mutedColor],
         primaryColor to if (ThemeStore.accent == AccentColor.MONET) {
             dynamicAccent?.primary ?: ThemeStore.accent.color
-        } else if (ThemeStore.accent == AccentColor.BLACK && darkTheme) {
-            // Match the send button's monochrome inversion instead of painting
-            // black buttons (and black text) on AMOLED's black page.
-            Theme[colors][onBackgroundColor]
         } else {
             ThemeStore.accent.color
         },
         onPrimaryColor to if (ThemeStore.accent == AccentColor.MONET && dynamicAccent != null) {
             dynamicAccent.onPrimary
-        } else if (ThemeStore.accent == AccentColor.BLACK && darkTheme) {
-            Theme[colors][backgroundColor]
         } else {
             ThemeStore.accent.onContent()
         },
@@ -242,17 +234,12 @@ private val SurfaceOverride: ThemeComposable = buildTheme {
         controlColor to if (amoled) Color(0xFF1A1A1A) else Theme[colors][controlColor],
         onControlColor to Theme[colors][onControlColor],
         thumbColor to Theme[colors][thumbColor],
-        // Off-track stays monochrome. On-track follows a non-black accent; black
-        // keeps the existing monochrome selected track.
+        // Off-track stays monochrome. On-track follows the resolved accent.
         switchTrackColor to if (darkTheme) Color(0xFF4A4A4A) else Theme[colors][switchTrackColor],
-        switchSelectedTrackColor to if (ThemeStore.accent == AccentColor.BLACK) {
-            if (darkTheme) Color.Black else Theme[colors][switchSelectedTrackColor]
+        switchSelectedTrackColor to if (ThemeStore.accent == AccentColor.MONET) {
+            dynamicAccent?.primary ?: ThemeStore.accent.color
         } else {
-            if (ThemeStore.accent == AccentColor.MONET) {
-                dynamicAccent?.primary ?: ThemeStore.accent.color
-            } else {
-                ThemeStore.accent.color
-            }
+            ThemeStore.accent.color
         },
         switchThumbColor to if (darkTheme) Color.White else Theme[colors][switchThumbColor],
         selectedControlColor to if (amoled) Color(0xFF222222) else Theme[colors][selectedControlColor],

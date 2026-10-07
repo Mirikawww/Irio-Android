@@ -31,6 +31,13 @@ class ThemeStoreTest {
     }
 
     @Test
+    fun removedBlackAccentFallsBackToBlue() {
+        assertFalse(AccentColor.entries.any { it.stored == "black" })
+        assertEquals(AccentColor.BLUE, AccentColor.fromStored("black"))
+        assertEquals(AccentColor.BLUE, AccentColor.fromStored("BLACK"))
+    }
+
+    @Test
     fun resolvedAmoledIsDark() {
         assertTrue(ResolvedTheme.AMOLED.isDark)
         assertTrue(ResolvedTheme.DARK.isDark)

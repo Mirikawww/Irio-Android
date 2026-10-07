@@ -7,17 +7,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UserBubbleColorsTest {
-    private val panel = Color(0xFFF3F3F3)
     private val onPanel = Color.White
 
     @Test
-    fun lightNonBlackBubbleUsesTheResolvedAccent() {
+    fun lightBubbleUsesTheResolvedAccent() {
         val blue = AccentColor.BLUE.color
         val colors = userBubbleColors(
             dark = false,
-            accent = AccentColor.BLUE,
             accentColor = blue,
-            panel = panel,
             onPanel = onPanel,
             editing = false,
         )
@@ -30,9 +27,7 @@ class UserBubbleColorsTest {
         val dynamic = Color(0xFF006B5E)
         val colors = userBubbleColors(
             dark = false,
-            accent = AccentColor.MONET,
             accentColor = dynamic,
-            panel = panel,
             onPanel = onPanel,
             editing = false,
         )
@@ -41,10 +36,10 @@ class UserBubbleColorsTest {
     }
 
     @Test
-    fun darkNonBlackBubblesFollowAccentInsteadOfOneGray() {
+    fun darkBubblesFollowAccentInsteadOfOneGray() {
         val neutral = Color(0xFF2A2A2A)
-        val pink = userBubbleColors(true, AccentColor.PINK, AccentColor.PINK.color, panel, onPanel, false)
-        val blue = userBubbleColors(true, AccentColor.BLUE, AccentColor.BLUE.color, panel, onPanel, false)
+        val pink = userBubbleColors(true, AccentColor.PINK.color, onPanel, false)
+        val blue = userBubbleColors(true, AccentColor.BLUE.color, onPanel, false)
         assertNotEquals(neutral, pink.background)
         assertNotEquals(neutral, blue.background)
         assertNotEquals(pink.background, blue.background)
@@ -55,20 +50,21 @@ class UserBubbleColorsTest {
     }
 
     @Test
-    fun blackAccentStaysNeutral() {
-        val light = userBubbleColors(false, AccentColor.BLACK, Color.Black, panel, Color.Black, false)
-        assertEquals(panel, light.background)
-        assertEquals(Color.Black, light.content)
-        val dark = userBubbleColors(true, AccentColor.BLACK, Color.Black, panel, onPanel, false)
-        assertEquals(Color(0xFF2A2A2A), dark.background)
+    fun legacyBlackAccentUsesBlueTint() {
+        val accent = AccentColor.fromStored("black").color
+        val light = userBubbleColors(false, accent, Color.Black, false)
+        assertEquals(AccentColor.BLUE.color.softened(), light.background)
+        assertEquals(Color(0xFF1A1A1A), light.content)
+        val dark = userBubbleColors(true, accent, onPanel, false)
+        assertEquals(AccentColor.BLUE.color.mixOver(Color(0xFF141414), 0.28f), dark.background)
         assertEquals(onPanel, dark.content)
     }
 
     @Test
     fun editingUsesTheAccentOnBothThemes() {
         val blue = AccentColor.BLUE.color
-        val light = userBubbleColors(false, AccentColor.BLUE, blue, panel, onPanel, true)
-        val dark = userBubbleColors(true, AccentColor.BLUE, blue, panel, onPanel, true)
+        val light = userBubbleColors(false, blue, onPanel, true)
+        val dark = userBubbleColors(true, blue, onPanel, true)
         assertEquals(blue.copy(alpha = 0.16f), light.background)
         assertEquals(blue, light.content)
         assertEquals(light, dark)

@@ -38,7 +38,7 @@ fun SettingsSlider(
     onValueChangeFinished: (() -> Unit)? = null,
 ) {
     val content = Theme[colors][onBackgroundColor]
-    val accentFill = if (ThemeStore.accent == AccentColor.BLACK) content else Theme[colors][primaryColor]
+    val accentFill = Theme[colors][primaryColor]
     val muted = Theme[colors][mutedColor]
     val min = valueRange.first
     val max = valueRange.last

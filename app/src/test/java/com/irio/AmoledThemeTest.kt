@@ -38,13 +38,14 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33], manifest = Config.NONE)
 class AmoledThemeTest {
     @Test
-    fun blackPrimaryButtonStaysVisibleOnAmoledBackground() = withTheme(ThemePreference.AMOLED, AccentColor.BLACK) {
+    fun legacyBlackAccentUsesBlueOnAmoledBackground() = withTheme(ThemePreference.AMOLED, AccentColor.fromStored("black")) {
         val background = Theme[colors][backgroundColor]
         val fill = Theme[colors][primaryColor]
         val ink = Theme[colors][onPrimaryColor]
         assertEquals(Color.Black, background)
         assertNotEquals("Primary button must not merge into the page", background, fill)
-        assertTrue("Primary button text must remain readable", wcagContrastRatio(fill, ink) >= 4.5f)
+        assertEquals(AccentColor.BLUE.color, fill)
+        assertEquals(AccentColor.BLUE.onContent(), ink)
     }
 
     @Test
@@ -55,18 +56,6 @@ class AmoledThemeTest {
         assertNotEquals(Theme[colors][backgroundColor], fill)
         assertEquals(1f, fill.alpha)
         assertTrue(wcagContrastRatio(fill, Theme[colors][onSecondaryColor]) >= 4.5f)
-    }
-
-    @Test
-    fun blackPrimaryButtonTextRemainsReadableInRegularDarkTheme() = withTheme(ThemePreference.DARK, AccentColor.BLACK) {
-        assertNotEquals(Theme[colors][backgroundColor], Theme[colors][primaryColor])
-        assertTrue(wcagContrastRatio(Theme[colors][primaryColor], Theme[colors][onPrimaryColor]) >= 4.5f)
-    }
-
-    @Test
-    fun blackPrimaryButtonKeepsItsBlackFillInLightTheme() = withTheme(ThemePreference.LIGHT, AccentColor.BLACK) {
-        assertEquals(Color.Black, Theme[colors][primaryColor])
-        assertEquals(Color.White, Theme[colors][onPrimaryColor])
     }
 
     @Test

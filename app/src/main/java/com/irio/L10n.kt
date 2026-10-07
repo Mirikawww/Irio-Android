@@ -249,7 +249,6 @@ private val English = mapOf(
     "附件总大小超过 5GB" to "Attachments exceed 5 GB",
     "附件数量超过 15 个槽位（照片和视频各算半个）" to "More than 15 attachment slots (each photo or video counts as half)",
     "高" to "High",
-    "黑色" to "Black",
     "不支持思考" to "Thinking isn't supported",
     "使用 OpenRouter 格式化模型名称" to "Use OpenRouter-formatted model names",
     "使用 OpenRouter 思考数据" to "Use OpenRouter thinking data",
