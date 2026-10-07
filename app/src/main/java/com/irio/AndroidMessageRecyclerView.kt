@@ -10,7 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.foundation.layout.Box
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.viewinterop.AndroidView
@@ -801,7 +801,7 @@ private class AndroidMessageAdapter : ListAdapter<ChatMessage, AndroidMessageVie
         // committed. For an unchanged structure, renderedMessages is the
         // latest snapshot (ListAdapter's currentList intentionally stays at
         // the last submit), so payloads can update streaming/final text.
-        val sameStructure = currentList.size == next.size &&
+        val sameStructure = !updatePending && currentList.size == next.size &&
             currentList.indices.all { currentList[it].id == next[it].id }
         if (sameStructure) {
             val changed = next.indices.filter { renderedMessages.getOrNull(it) != next[it] }
@@ -842,7 +842,9 @@ private class AndroidMessageAdapter : ListAdapter<ChatMessage, AndroidMessageVie
         // adapter's latest rendered snapshot, otherwise a completed reply can
         // remain visually stuck at the old "请求中" placeholder until the
         // conversation is reopened.
-        holder.bind(renderedMessages.getOrNull(position) ?: getItem(position))
+        val committed = getItem(position)
+        val latest = renderedMessages.getOrNull(position)
+        holder.bind(if (latest?.id == committed.id) latest else committed)
     }
 
     override fun onViewRecycled(holder: AndroidMessageViewHolder) {
@@ -878,26 +880,35 @@ private class AndroidMessageViewHolder(
             val currentMessage = message
             val currentCallbacks = callbacks.value
             if (currentMessage != null && currentCallbacks != null) {
-                Box(
-                    Modifier.onSizeChanged { size ->
-                        val shown = message
-                        if (size.height > 0 && shown?.id == currentMessage.id) {
-                            readyMessageId = shown.id
-                        }
-                    },
-                ) {
-                    AndroidMessageRow(currentMessage, currentCallbacks)
+                key(currentMessage.id) {
+                    Box(
+                        Modifier.onGloballyPositioned { coordinates ->
+                            val shown = message
+                            if (coordinates.size.height > 0 && shown?.id == currentMessage.id) {
+                                readyMessageId = shown.id
+                                composeView.visibility = View.VISIBLE
+                            }
+                        },
+                    ) {
+                        AndroidMessageRow(currentMessage, currentCallbacks)
+                    }
                 }
             }
         }
     }
 
     fun bind(nextMessage: ChatMessage) {
-        if (message?.id != nextMessage.id) readyMessageId = Long.MIN_VALUE
+        if (message?.id != nextMessage.id) {
+            readyMessageId = Long.MIN_VALUE
+            // The View can be drawn before its new Compose state is applied. Never expose
+            // the recycled message (including its bubble/reaction) in that handoff frame.
+            composeView.visibility = View.INVISIBLE
+        }
         message = nextMessage
     }
 
     fun clear() {
+        composeView.visibility = View.INVISIBLE
         message = null
         readyMessageId = Long.MIN_VALUE
     }
