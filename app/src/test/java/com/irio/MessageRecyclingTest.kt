@@ -131,6 +131,23 @@ class MessageRecyclingTest {
             assertEquals(5L, readyId())
             assertEquals(listOf("latest"), texts())
 
+            // A retained row can get only a draw invalidation when the replacement has
+            // the same constraints. Do not force a layout: production must recover via
+            // the normal draw traversal, including Compose's deferred layout callbacks.
+            bind(ChatMessage(6L, "latest", true))
+            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+            runCurrent()
+            clock.sendFrame(96_000_000L)
+            runCurrent()
+            val bitmap = android.graphics.Bitmap.createBitmap(600, 800, android.graphics.Bitmap.Config.ARGB_8888)
+            try {
+                repeat(3) { host.draw(android.graphics.Canvas(bitmap)) }
+                assertEquals("Draw-only rebinds must not leave a measured row permanently blank", 6L, readyId())
+                assertEquals(View.VISIBLE, item.visibility)
+            } finally {
+                bitmap.recycle()
+            }
+
             holder.javaClass.getDeclaredMethod("clear").apply { isAccessible = true }.invoke(holder)
             assertEquals("Recycling must hide the retained composition immediately", View.INVISIBLE, item.visibility)
             assertEquals(Long.MIN_VALUE, readyId())

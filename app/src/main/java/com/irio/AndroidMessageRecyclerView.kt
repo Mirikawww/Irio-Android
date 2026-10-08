@@ -830,7 +830,9 @@ private class AndroidMessageAdapter : ListAdapter<ChatMessage, AndroidMessageVie
         AndroidMessageViewHolder(ComposeView(parent.context), callbacks)
 
     override fun onBindViewHolder(holder: AndroidMessageViewHolder, position: Int) {
-        holder.bind(getItem(position))
+        val committed = getItem(position)
+        val latest = renderedMessages.getOrNull(position)
+        holder.bind(if (!updatePending && latest?.id == committed.id) latest else committed)
     }
 
     override fun onBindViewHolder(
