@@ -41,8 +41,8 @@ internal fun UserBubbleReaction(
     bounce: State<Float>,
     content: @Composable () -> Unit,
 ) {
-    val emojiSize = with(LocalDensity.current) { 18.dp.toSp() }
-    val emojiLineHeight = with(LocalDensity.current) { 22.dp.toSp() }
+    val emojiSize = with(LocalDensity.current) { 16.dp.toSp() }
+    val emojiLineHeight = with(LocalDensity.current) { 20.dp.toSp() }
     // Only the original content determines size; the reaction is an overlaid decoration.
     Box {
         content()
@@ -54,7 +54,7 @@ internal fun UserBubbleReaction(
                         .align(Alignment.TopStart)
                         .offset(x = (-12).dp, y = (-26).dp)
                         .wrapContentSize(Alignment.TopStart, unbounded = true)
-                        .size(width = 40.dp, height = 42.dp)
+                        .size(width = 38.dp, height = 40.dp)
                         .graphicsLayer {
                             scaleX = bounce.value
                             scaleY = bounce.value
@@ -63,7 +63,7 @@ internal fun UserBubbleReaction(
                         .semantics { contentDescription = tr("模型回应") + " " + emoji },
                 ) {
                     Box(
-                        modifier = Modifier.offset(x = 6.dp).size(32.dp)
+                        modifier = Modifier.offset(x = 6.dp).size(30.dp)
                             .background(bubbleColor, CircleShape)
                             .border(2.dp, Theme[colors][backgroundColor], CircleShape),
                         contentAlignment = Alignment.Center,
@@ -122,8 +122,8 @@ internal fun AssistantReactionButton(
                 emoji,
                 modifier = Modifier.wrapContentSize(unbounded = true).padding(2.dp),
                 style = TextStyle(
-                    fontSize = 18.sp,
-                    lineHeight = 24.sp,
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp,
                     textAlign = TextAlign.Center,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
                     lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),

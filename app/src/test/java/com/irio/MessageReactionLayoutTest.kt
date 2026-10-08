@@ -111,8 +111,8 @@ class MessageReactionLayoutTest {
                     if (reaction.isNotEmpty()) {
                         val root = (view.getChildAt(0) as ViewRootForTest).semanticsOwner.unmergedRootSemanticsNode
                         val modelGlyph = textNodes(root).first()
-                        assertEquals("The model glyph must stay centered inside the 32dp badge", 10f, modelGlyph.positionInRoot.x + modelGlyph.size.width / 2f, 0.5f)
-                        assertEquals("The model glyph must stay centered inside the 32dp badge", -10f, modelGlyph.positionInRoot.y + modelGlyph.size.height / 2f, 0.5f)
+                        assertEquals("The model glyph must stay centered inside the 30dp badge", 9f, modelGlyph.positionInRoot.x + modelGlyph.size.width / 2f, 0.5f)
+                        assertEquals("The model glyph must stay centered inside the 30dp badge", -11f, modelGlyph.positionInRoot.y + modelGlyph.size.height / 2f, 0.5f)
                     }
                     bounce.value = 1.16f
                     measure()
