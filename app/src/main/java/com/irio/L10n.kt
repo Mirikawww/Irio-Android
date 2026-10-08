@@ -20,6 +20,7 @@ private val English = mapOf(
     "引用" to "Quote",
     "取消引用" to "Remove quote",
     "模型回应" to "Assistant reaction",
+    "添加响应" to "Add reaction",
     "撤销回应" to "Remove reaction",
     "笑脸与情绪" to "Smileys & Emotion",
     "人物与身体" to "People & Body",

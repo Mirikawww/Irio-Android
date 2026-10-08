@@ -65,7 +65,7 @@ internal fun ReactionEmojiSheet(
                 .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Add Reaction", fontSize = 18.sp, color = content, modifier = Modifier.padding(horizontal = 4.dp))
+            Text(tr("添加响应"), fontSize = 18.sp, color = content, modifier = Modifier.padding(horizontal = 4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
