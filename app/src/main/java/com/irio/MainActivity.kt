@@ -3737,15 +3737,35 @@ private fun splitSheetChunks(text: String): List<String> {
 /**
  * 导航栏下箭头、或被输入法自己吃掉的返回，都不会进 [NavigationBackHandler]，
  * 消息框会一直保持聚焦。只在输入法从可见落到收起时清焦点；弹起和首帧不碰，
- * 否则一点消息框键盘就会被立刻关掉。
+ * 否则一点消息框键盘就会被立刻关掉。退后台或窗口失焦造成的收起不算主动关闭。
  */
 @Composable
-private fun DismissComposerFocusWhenImeHides() {
+internal fun DismissComposerFocusWhenImeHides(
+    imeVisible: Boolean = WindowInsets.ime.getBottom(LocalDensity.current) > 0,
+) {
     val focusManager by rememberUpdatedState(LocalFocusManager.current)
-    val density = LocalDensity.current
-    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val windowInfo = LocalWindowInfo.current
+    val windowFocused = windowInfo.isWindowFocused
+    val currentImeVisible by rememberUpdatedState(imeVisible)
     var imeWasVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(imeVisible) {
+    var resumed by remember(lifecycleOwner) {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            resumed = event.targetState.isAtLeast(Lifecycle.State.RESUMED)
+            // 同步取消这次可见记录，快速退出再进入也不能把后台收起当作主动关闭。
+            if (!resumed) imeWasVisible = false
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(imeVisible, resumed, windowFocused) {
+        if (!resumed || !windowFocused) {
+            imeWasVisible = false
+            return@LaunchedEffect
+        }
         if (imeVisible) {
             imeWasVisible = true
             return@LaunchedEffect
@@ -3753,7 +3773,11 @@ private fun DismissComposerFocusWhenImeHides() {
         if (!imeWasVisible) return@LaunchedEffect
         // 动画过程中 inset 可能空一帧。等它稳定再清，否则聚焦消息框会立刻失焦。
         delay(48)
-        focusManager.clearFocus(force = true)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+            windowInfo.isWindowFocused && !currentImeVisible && imeWasVisible
+        ) {
+            focusManager.clearFocus(force = true)
+        }
         imeWasVisible = false
     }
 }
