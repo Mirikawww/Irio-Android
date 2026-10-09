@@ -86,6 +86,13 @@
             android:screenOrientation="portrait"
             android:theme="@style/AppTheme" />
         <activity
+            android:name=".McpSettingsActivity"
+            android:exported="false"
+            android:label="MCP"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name=".SystemPromptSettingsActivity"
             android:exported="false"
             android:label="系统提示词"

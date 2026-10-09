@@ -1,6 +1,7 @@
 package com.irio
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -21,6 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -55,6 +58,7 @@ fun ListRowButton(
     contentPadding: PaddingValues? = null,
     onLongClick: (() -> Unit)? = null,
     experimental: Boolean = false,
+    iconPainter: Painter? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val contentColor = if (style == ButtonStyle.Ghost) {
@@ -69,7 +73,11 @@ fun ListRowButton(
         Color.Transparent
     }
     val content: @Composable RowScope.() -> Unit = {
-        if (icon != null) {
+        if (iconPainter != null) {
+            Image(painter = iconPainter, contentDescription = null, modifier = Modifier.size(20.dp),
+                colorFilter = ColorFilter.tint(contentColor))
+            Spacer(Modifier.width(12.dp))
+        } else if (icon != null) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,

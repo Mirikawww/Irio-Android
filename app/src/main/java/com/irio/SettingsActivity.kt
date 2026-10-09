@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -101,6 +102,13 @@ private fun SettingsScreen(onBack: () -> Unit) {
                     onClick = {
                         context.startActivity(Intent(context, MemorySettingsActivity::class.java))
                     },
+                )
+                Spacer(Modifier.height(12.dp))
+                ListRowButton(
+                    label = "MCP",
+                    iconPainter = painterResource(R.drawable.ic_mcp),
+                    experimental = true,
+                    onClick = { context.startActivity(Intent(context, McpSettingsActivity::class.java)) },
                 )
                 Spacer(Modifier.height(12.dp))
                 ListRowButton(
