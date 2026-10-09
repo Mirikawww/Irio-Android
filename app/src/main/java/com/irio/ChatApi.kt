@@ -1459,7 +1459,7 @@ internal object MemoryTool {
         }
         GET -> tr("读取记忆")
         UPDATE -> tr("写入记忆")
-        else -> tr("调用工具")
+        else -> if (name.startsWith(GitHubMcpToolProvider.PREFIX)) GitHubMcpToolProvider.progressLabel(name, completed = false) else tr("调用工具")
     }
 
     fun doneLabel(name: String, content: String = "", webDomain: String = ""): String = when (name) {
@@ -1475,7 +1475,7 @@ internal object MemoryTool {
         }
         GET -> tr("已读取记忆")
         UPDATE -> tr("已写入记忆")
-        else -> tr("已调用工具")
+        else -> if (name.startsWith(GitHubMcpToolProvider.PREFIX)) GitHubMcpToolProvider.progressLabel(name, completed = true) else tr("已调用工具")
     }
 
     fun getSchema(protocol: ProviderProtocol): JSONObject =

@@ -1195,6 +1195,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         val job = scope.launch {
             var appliedFinal = false
             try {
+                GitHubMcpStore.of(context).toolProvider(requestCancellation)?.let(requestRegistry::register)
                 val provider = requestProvider
                 var streamedText = ""
                 var roundBreakPending = false
