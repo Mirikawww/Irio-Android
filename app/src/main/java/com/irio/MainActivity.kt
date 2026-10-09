@@ -121,7 +121,6 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -129,7 +128,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -2041,6 +2039,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         }
                         is ConversationDrawerRow.Conversation -> {
                             val conversation = row.summary
+                            val generating = conversation.id in generatingIds
                             DropdownMenu(
                                 expanded = conversationAction?.id == conversation.id,
                                 onExpandedChange = { expanded ->
@@ -2072,10 +2071,12 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 ListRowButton(
                                     label = displayConversationTitle(conversation.title),
                                     style = ButtonStyle.Ghost,
-                                    contentPadding = DrawerRowPadding,
+                                    contentPadding = if (generating) {
+                                        PaddingValues(start = 16.dp, end = 56.dp)
+                                    } else DrawerRowPadding,
                                     icon = if (conversation.pinned) Icons.Rounded.PushPin else null,
                                     active = conversation.id == currentConversation.id,
-                                    modifier = Modifier.generatingHighlight(conversation.id in generatingIds),
+                                    modifier = Modifier.generatingRipple(generating),
                                     onClick = { openConversation(conversation) },
                                     onLongClick = { conversationAction = conversation },
                                 )
@@ -4265,33 +4266,6 @@ private data class ActiveGeneration(
     val job: Job,
     val cancellation: ChatRequestCancellation,
 )
-
-private fun Modifier.generatingHighlight(active: Boolean): Modifier = composed {
-    if (!active) return@composed this
-    val highlight = Theme[colors][onBackgroundColor]
-    val alpha by rememberInfiniteTransition(label = "generatingPulse").animateFloat(
-        initialValue = 0.2f,
-        targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "generatingPulseAlpha",
-    )
-    drawWithContent {
-        drawContent()
-        val stroke = 2.5.dp.toPx()
-        val inset = stroke / 2f
-        val radius = 12.dp.toPx()
-        drawRoundRect(
-            color = highlight.copy(alpha = alpha),
-            topLeft = Offset(inset, inset),
-            size = Size(size.width - inset * 2, size.height - inset * 2),
-            cornerRadius = CornerRadius(radius, radius),
-            style = Stroke(width = stroke, cap = StrokeCap.Round),
-        )
-    }
-}
 
 /** 用户消息编辑版本的切换器：与模型回复版本切换器同款式，右对齐贴气泡。 */
 @Composable
