@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.runtime.SideEffect
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
@@ -888,10 +889,25 @@ private class AndroidMessageViewHolder(
                             val shown = message
                             if (coordinates.size.height > 0 && shown?.id == currentMessage.id) {
                                 readyMessageId = shown.id
-                                composeView.visibility = View.VISIBLE
                             }
                         },
                     ) {
+                        // Reveal the row as soon as the composition for this message has been
+                        // applied. The layout callback above only decides whether the row is
+                        // measured; visibility must never depend on it: RecyclerView skips
+                        // drawing an INVISIBLE child, so the ComposeView never reaches its own
+                        // measureAndLayout pass and the callback can never fire again. That
+                        // deadlocks the row as invisible forever, and only a full recycle
+                        // (app restart, or scrolling far enough to drop the cached view)
+                        // brings it back — which is exactly the vanishing-message glitch.
+                        // Exposing at apply time is still safe: the previous message was hidden
+                        // by bind(), and AndroidComposeView measures and lays out before it
+                        // draws, so the first revealed pixels already belong to this message.
+                        SideEffect {
+                            if (message?.id == currentMessage.id) {
+                                composeView.visibility = View.VISIBLE
+                            }
+                        }
                         AndroidMessageRow(currentMessage, currentCallbacks)
                     }
                 }

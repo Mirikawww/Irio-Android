@@ -148,6 +148,26 @@ class MessageRecyclingTest {
                 bitmap.recycle()
             }
 
+            // The reveal must not depend on a layout callback or on being drawn. An INVISIBLE
+            // child is skipped by RecyclerView's draw traversal, so Compose never measures it
+            // and the callback can never fire — regressing this made rows vanish until restart.
+            bind(ChatMessage(7L, "latest", true))
+            assertEquals("Rebinding must still hide the previous row", View.INVISIBLE, item.visibility)
+            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+            runCurrent()
+            clock.sendFrame(112_000_000L)
+            runCurrent()
+            assertEquals(
+                "A composition apply alone must reveal the row, with no draw and no measure",
+                View.VISIBLE,
+                item.visibility,
+            )
+            assertEquals(
+                "Measurement still waits for a real layout traversal; the reveal must not fake it",
+                Long.MIN_VALUE,
+                readyId(),
+            )
+
             holder.javaClass.getDeclaredMethod("clear").apply { isAccessible = true }.invoke(holder)
             assertEquals("Recycling must hide the retained composition immediately", View.INVISIBLE, item.visibility)
             assertEquals(Long.MIN_VALUE, readyId())
