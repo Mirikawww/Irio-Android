@@ -99,6 +99,7 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
     var imageGenMenuOpen by remember { mutableStateOf(false) }
     var titleModel by remember { mutableStateOf(ToolStore.loadTitleModel(context)) }
     var messageTimestamps by remember { mutableStateOf(ToolStore.loadMessageTimestamps(context)) }
+    var smartToolHints by remember { mutableStateOf(ToolStore.loadSmartToolHints(context)) }
     var contextCompression by remember { mutableStateOf(ToolStore.loadContextCompression(context)) }
     var compressionTrigger by remember { mutableIntStateOf(ToolStore.loadCompressionTrigger(context)) }
     var compressionTarget by remember { mutableIntStateOf(ToolStore.loadCompressionTarget(context)) }
@@ -243,6 +244,30 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                     valueRange = ToolStore.MAX_ROUNDS_MIN..ToolStore.MAX_ROUNDS_MAX,
                     onValueChange = { maxRounds = it },
                 )
+                Row(
+                    modifier = Modifier.settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            tr("更智能的工具调用提示"),
+                            modifier = Modifier.weight(1f, fill = false),
+                            color = Theme[colors][onBackgroundColor],
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        ExperimentalBadge()
+                    }
+                    Switch(
+                        checked = smartToolHints,
+                        onCheckedChange = {
+                            smartToolHints = it
+                            ToolStore.saveSmartToolHints(context, it)
+                        },
+                    )
+                }
                 ImageGenModelPicker(
                     selected = imageGenModel,
                     onSelect = { model ->

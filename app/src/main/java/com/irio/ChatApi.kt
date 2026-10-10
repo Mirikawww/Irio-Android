@@ -103,6 +103,8 @@ data class ChatStreamUpdate(
     val webDomain: String = "",
     /** 已执行的工具调用及实际结果，统一交给对话层保存。 */
     val toolRecord: ChatToolRecord? = null,
+    /** 模型为本次工具调用提供的 UI 文案，不作为工具执行参数。 */
+    val displayText: String = "",
 )
 
 data class ToolCallDelta(
@@ -212,7 +214,9 @@ object ChatApi {
                 messages = if (includeTimestamps) history else history.map { it.copy(createdAt = 0L) },
                 reasoningEffort = reasoningEffort,
                 fastMode = fastMode,
-                systemPrompt = systemPrompt,
+                systemPrompt = if (toolRegistry.smartToolHints) {
+                    listOfNotNull(systemPrompt?.takeIf { it.isNotBlank() }, SmartToolHints.INSTRUCTIONS).joinToString("\n\n")
+                } else systemPrompt,
                 toolRegistry = toolRegistry,
                 connectionScope = connectionScope,
                 cancellation = cancellation,

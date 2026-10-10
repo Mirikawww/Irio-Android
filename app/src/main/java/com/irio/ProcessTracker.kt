@@ -43,7 +43,7 @@ internal class ProcessTracker {
         if (textLength >= 0) outputLength = textLength
     }
 
-    fun onSearchStarted(query: String = "") {
+    fun onSearchStarted(query: String = "", displayText: String = "") {
         finishThinking()
         finishLiveTool()
         if (liveSearchId != null) return
@@ -54,6 +54,7 @@ internal class ProcessTracker {
             kind = ProcessEventKind.SEARCH,
             live = true,
             searchQuery = query,
+            displayText = displayText,
             belowText = outputStarted,
             textOffset = eventAnchor(),
         )
@@ -68,7 +69,7 @@ internal class ProcessTracker {
     }
 
     /** 本地工具调用开始：锚在当前正文长度上，后续正文排在它后面，而不是整段的最下面。 */
-    fun onToolStarted(name: String = "", webDomain: String = "") {
+    fun onToolStarted(name: String = "", webDomain: String = "", displayText: String = "") {
         finishThinking()
         liveToolId?.let { id ->
             // toolOutput snapshots may carry toolActive=true as well. They update the
@@ -85,6 +86,7 @@ internal class ProcessTracker {
             belowText = outputStarted,
             toolName = name,
             webDomain = webDomain,
+            displayText = displayText,
             textOffset = eventAnchor(),
         )
     }

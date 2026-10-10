@@ -21,6 +21,14 @@ object ToolStore {
     private const val COMPRESSION_TARGET = "context_compression_target"
     private const val VISUALIZE_CONTEXT = "visualize_context"
     private const val COMPRESSION_MODEL = "context_compression_model"
+    private const val SMART_TOOL_HINTS = "smart_tool_hints"
+
+    fun loadSmartToolHints(context: Context): Boolean =
+        preferences(context).getBoolean(SMART_TOOL_HINTS, false)
+
+    fun saveSmartToolHints(context: Context, enabled: Boolean) {
+        preferences(context).edit().putBoolean(SMART_TOOL_HINTS, enabled).apply()
+    }
 
     fun loadMaxRounds(context: Context): Int =
         clampMaxRounds(preferences(context).getInt(MAX_ROUNDS, MAX_ROUNDS_DEFAULT))

@@ -70,7 +70,10 @@ interface ToolProvider {
  * provider, which keeps the model-facing surface deterministic and makes a missing registration
  * fail at startup rather than being selected nondeterministically at execution time.
  */
-class ToolRegistry(providers: Iterable<ToolProvider> = emptyList()) {
+class ToolRegistry(
+    providers: Iterable<ToolProvider> = emptyList(),
+    val smartToolHints: Boolean = false,
+) {
     private val registered = LinkedHashMap<String, ToolProvider>()
     private val owners = LinkedHashMap<String, String>()
 
@@ -102,7 +105,7 @@ class ToolRegistry(providers: Iterable<ToolProvider> = emptyList()) {
             val name = schemaToolName(schema)
                 ?: error("Tool definition from registry has no name")
             require(names.add(name)) { "Tool name is duplicated in ${protocol.name}: $name" }
-        }
+        }.map { if (smartToolHints) SmartToolHints.decorate(it) else it }
     }
 
     /** Alias that makes call sites read naturally when building a request body. */
@@ -116,8 +119,12 @@ class ToolRegistry(providers: Iterable<ToolProvider> = emptyList()) {
     suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {
         val provider = providerFor(call.name)
             ?: return ToolExecutionResult(tr("未知工具 %s").format(call.name))
+        val displayText = if (smartToolHints) SmartToolHints.displayText(call.arguments) else ""
+        val executionContext = context.copy(onUpdate = { update ->
+            context.onUpdate(update.copy(displayText = displayText))
+        })
         return try {
-            provider.execute(call, context)
+            provider.execute(SmartToolHints.executionCall(call), executionContext)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {

@@ -1184,7 +1184,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         ),
                     )
                 }
-            }
+            },
+            smartToolHints = ToolStore.loadSmartToolHints(context),
         )
         val requestCancellation = ChatRequestCancellation()
         // 优先用当前内存态的 provider（省一次全量 Keystore 解密解析）；
@@ -1326,9 +1327,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                         .distinctBy { it.filePath }
                                 }
                                 if (update.usage != null) streamedUsage = update.usage
-                                if (update.searching == true && !cancelled) process.onSearchStarted(update.searchQuery)
+                                if (update.searching == true && !cancelled) process.onSearchStarted(update.searchQuery, update.displayText)
                                 if (update.searching == false) process.onSearchFinished(update.searchPagesDelta, update.searchContent)
-                                if (update.toolActive == true && !cancelled) process.onToolStarted(update.toolName, update.webDomain)
+                                if (update.toolActive == true && !cancelled) process.onToolStarted(update.toolName, update.webDomain, update.displayText)
                                 if (update.toolOutput != null) process.onToolOutput(update.toolOutput)
                                 if (update.toolActive == false) {
                                     if (update.toolName == ImageGenTool.NAME && update.toolContent == ImageGenTool.STATUS_OK) {
@@ -3231,7 +3232,7 @@ private fun ProcessEventRow(
         ProcessEventKind.THINKING -> if (event.live) null else tr("已思考 %s").format(formatThinkingDuration(event.millis))
         ProcessEventKind.SEARCH -> if (event.live) null else searchCompletedLabel(event.pages, event.searchQuery)
         ProcessEventKind.TOOL -> if (event.live) null else MemoryTool.doneLabel(event.toolName, event.content, event.webDomain)
-    }
+    }?.let { event.displayText.ifEmpty { it } }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (event.live) {
             if (terminal) {
@@ -3240,7 +3241,7 @@ private fun ProcessEventRow(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    StatusSweepText(MemoryTool.liveLabel(event.toolName))
+                    StatusSweepText(event.displayText.ifEmpty { MemoryTool.liveLabel(event.toolName) })
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                         contentDescription = null,
@@ -3250,10 +3251,12 @@ private fun ProcessEventRow(
                 }
             } else {
             StatusSweepText(
-                when (event.kind) {
-                    ProcessEventKind.THINKING -> tr("思考中")
-                    ProcessEventKind.SEARCH -> searchStatusLabel(event.searchQuery)
-                    ProcessEventKind.TOOL -> MemoryTool.liveLabel(event.toolName, event.webDomain)
+                event.displayText.ifEmpty {
+                    when (event.kind) {
+                        ProcessEventKind.THINKING -> tr("思考中")
+                        ProcessEventKind.SEARCH -> searchStatusLabel(event.searchQuery)
+                        ProcessEventKind.TOOL -> MemoryTool.liveLabel(event.toolName, event.webDomain)
+                    }
                 }
             )
             if (event.kind == ProcessEventKind.THINKING && event.content.isNotBlank()) {

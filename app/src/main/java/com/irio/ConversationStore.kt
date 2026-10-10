@@ -295,6 +295,7 @@ object ConversationStore {
                                                 if (event.toolName.isNotBlank()) put("toolName", event.toolName)
                                                 if (event.searchQuery.isNotBlank()) put("searchQuery", event.searchQuery)
                                                 if (event.webDomain.isNotBlank()) put("webDomain", event.webDomain)
+                                                if (event.displayText.isNotEmpty()) put("displayText", event.displayText)
                                             }
                                         )
                                     }
@@ -418,6 +419,7 @@ internal fun processEventsFrom(item: JSONObject): List<ProcessEvent> {
                         toolName = event.optString("toolName"),
                         searchQuery = event.optString("searchQuery"),
                         webDomain = event.optString("webDomain"),
+                        displayText = event.optString("displayText"),
                     )
                 )
             }
