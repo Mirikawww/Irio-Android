@@ -2759,7 +2759,7 @@ private fun ModelPicker(
                             .verticalScroll(rememberScrollState()),
                     ) {
                         if (supportsThinking) {
-                            ReasoningEffort.entries.forEach { option ->
+                            ReasoningEffort.entries.filter { it != ReasoningEffort.AUTO }.forEach { option ->
                                 // 模型被标记为无法关闭思考时，只允许保持非「关闭」档位
                                 val enabled = !thinkingLockedOn || option != ReasoningEffort.OFF
                                 DropdownMenuItem(

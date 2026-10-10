@@ -31,7 +31,7 @@ internal val ProviderProtocol.isGoogleGemini: Boolean
 
 enum class ReasoningEffort(val label: String, val apiValue: String?) {
     OFF("关闭", "none"),
-    AUTO("自动", null),
+    AUTO("自动", null), // 仅用于协议内部默认处理，不能作为用户设置保存。
     MINIMAL("最低", "minimal"),
     LOW("低", "low"),
     MEDIUM("中", "medium"),
@@ -283,11 +283,13 @@ object ProviderStore {
     fun loadReasoningEffort(context: Context): ReasoningEffort {
         val saved = preferences(context).getString(REASONING_EFFORT, null)
         return saved?.let { runCatching { ReasoningEffort.valueOf(it) }.getOrNull() }
+            ?.takeUnless { it == ReasoningEffort.AUTO }
             ?: ReasoningEffort.OFF
     }
 
     fun saveReasoningEffort(context: Context, effort: ReasoningEffort) {
-        preferences(context).edit().putString(REASONING_EFFORT, effort.name).apply()
+        val selected = effort.takeUnless { it == ReasoningEffort.AUTO } ?: ReasoningEffort.OFF
+        preferences(context).edit().putString(REASONING_EFFORT, selected.name).apply()
         notifyChanged()
     }
 
