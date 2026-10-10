@@ -142,6 +142,7 @@ private fun ProviderDetailScreen(
 
     val capsulePx = remember { mutableIntStateOf(0) }
     val capsuleHeight = with(LocalDensity.current) { capsulePx.intValue.toDp() }
+    DismissComposerFocusWhenImeHides()
     Box(Modifier.fillMaxSize().background(background)) {
         if (provider == null) {
             Text(
