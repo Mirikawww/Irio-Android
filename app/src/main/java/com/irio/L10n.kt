@@ -347,7 +347,7 @@ private val English = mapOf(
     "无法连接到图片端点" to "Can't connect to the image endpoint",
     "昨天" to "Yesterday",
     "最低" to "Minimal",
-    "最高" to "Extra high",
+    "极高" to "Extra high",
     "有附件无法读取" to "Couldn't read an attachment",
     "未勾选" to "Not checked",
     "未授权" to "Unauthorized",

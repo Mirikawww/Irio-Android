@@ -36,7 +36,7 @@ enum class ReasoningEffort(val label: String, val apiValue: String?) {
     LOW("低", "low"),
     MEDIUM("中", "medium"),
     HIGH("高", "high"),
-    XHIGH("最高", "xhigh"),
+    XHIGH("极高", "xhigh"),
     MAX("超高", "max"),
     ULTRA("极致", "ultra"),
 }
