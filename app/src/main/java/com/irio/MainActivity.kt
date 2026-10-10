@@ -2229,7 +2229,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     leading = {
                         DropdownMenu(
                             expanded = attachMenuOpen,
-                            onExpandedChange = { attachMenuOpen = !generatingThisChat && it },
+                            onExpandedChange = { attachMenuOpen = it },
                             modifier = Modifier.wrapContentWidth(Alignment.Start),
                             alignment = DropdownMenuAlignment.Start,
                             side = DropdownMenuSide.Top,
@@ -2267,8 +2267,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             },
                         ) {
                             IconButton(
-                                onClick = { if (!generatingThisChat) attachMenuOpen = !attachMenuOpen },
-                                enabled = !generatingThisChat,
+                                onClick = { attachMenuOpen = !attachMenuOpen },
                                 style = ButtonStyle.Ghost,
                                 buttonSize = ButtonSize.Small,
                                 modifier = Modifier
@@ -2279,7 +2278,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                     imageVector = Icons.Rounded.Add,
                                     contentDescription = tr("添加附件"),
                                     modifier = Modifier.size(20.dp),
-                                    tint = if (generatingThisChat) muted else content,
+                                    tint = content,
                                 )
                             }
                         }
