@@ -76,7 +76,7 @@ internal object GeminiProtocol {
                     ReasoningEffort.MEDIUM -> 4096
                     ReasoningEffort.HIGH -> 8192
                     ReasoningEffort.XHIGH -> 16384
-                    ReasoningEffort.MAX -> if (pro) 32768 else 24576
+                    ReasoningEffort.MAX, ReasoningEffort.ULTRA -> if (pro) 32768 else 24576
                     ReasoningEffort.AUTO -> -1
                 }
                 thinking.put("thinkingBudget", budget)

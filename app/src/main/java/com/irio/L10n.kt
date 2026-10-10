@@ -425,6 +425,7 @@ private val English = mapOf(
     "读取记忆" to "Reading memory",
     "调用工具" to "Using a tool",
     "超高" to "Max",
+    "极致" to "Ultra",
     "跟随对话模型" to "Use the chat model",
     "跟随系统" to "System",
     "输入对方配对码" to "Enter the other device's code",

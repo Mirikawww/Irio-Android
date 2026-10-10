@@ -38,6 +38,7 @@ enum class ReasoningEffort(val label: String, val apiValue: String?) {
     HIGH("高", "high"),
     XHIGH("最高", "xhigh"),
     MAX("超高", "max"),
+    ULTRA("极致", "ultra"),
 }
 
 data class ProviderConfig(

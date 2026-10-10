@@ -1238,7 +1238,7 @@ object ChatApi {
 
 
     private fun anthropicMaxTokens(effort: ReasoningEffort): Int = when (effort) {
-        ReasoningEffort.XHIGH, ReasoningEffort.MAX -> 32_000
+        ReasoningEffort.XHIGH, ReasoningEffort.MAX, ReasoningEffort.ULTRA -> 32_000
         ReasoningEffort.HIGH -> 16_000
         else -> 8_192
     }

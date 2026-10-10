@@ -164,7 +164,7 @@ internal object ChatProtocol {
                         "thinking",
                         JSONObject().put("type", "enabled").put("budget_tokens", 8_192),
                     )
-                    ReasoningEffort.XHIGH, ReasoningEffort.MAX -> target.put(
+                    ReasoningEffort.XHIGH, ReasoningEffort.MAX, ReasoningEffort.ULTRA -> target.put(
                         "thinking",
                         JSONObject().put("type", "enabled").put("budget_tokens", 16_000),
                     )
@@ -192,7 +192,7 @@ internal object ChatProtocol {
             ReasoningEffort.MEDIUM -> "medium"
             ReasoningEffort.HIGH -> "high"
             ReasoningEffort.XHIGH -> "xhigh"
-            ReasoningEffort.MAX -> "max"
+            ReasoningEffort.MAX, ReasoningEffort.ULTRA -> "max"
         }
         // display=summarized：不带时响应不返回思考内容，应用的思考面板会是空的。
         target.put("thinking", JSONObject().put("type", "adaptive").put("display", "summarized"))

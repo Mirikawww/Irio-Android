@@ -57,6 +57,26 @@ class ChatProtocolTest {
     }
 
     @Test
+    fun ultraUsesExplicitEffortOrProviderMaximum() {
+        val chat = JSONObject()
+        ChatProtocol.putReasoning(chat, ProviderProtocol.CHAT_COMPLETIONS, ReasoningEffort.ULTRA)
+        assertEquals("ultra", chat.getString("reasoning_effort"))
+
+        val responses = JSONObject()
+        ChatProtocol.putReasoning(responses, ProviderProtocol.RESPONSES, ReasoningEffort.ULTRA)
+        assertEquals("ultra", responses.getJSONObject("reasoning").getString("effort"))
+
+        val adaptive = JSONObject()
+        ChatProtocol.putReasoning(adaptive, ProviderProtocol.ANTHROPIC, ReasoningEffort.ULTRA, "claude-sonnet-5-5")
+        assertEquals("adaptive", adaptive.getJSONObject("thinking").getString("type"))
+        assertEquals("max", adaptive.getJSONObject("output_config").getString("effort"))
+
+        val legacy = JSONObject()
+        ChatProtocol.putReasoning(legacy, ProviderProtocol.ANTHROPIC, ReasoningEffort.ULTRA, "claude-sonnet-4-5")
+        assertEquals(16_000, legacy.getJSONObject("thinking").getInt("budget_tokens"))
+    }
+
+    @Test
     fun adaptiveThinkingModelDetection() {
         listOf(
             "claude-sonnet-5-5", "claude-sonnet-5", "claude-opus-5", "anthropic.claude-opus-5-5",
