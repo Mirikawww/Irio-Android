@@ -392,6 +392,22 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Text(
+                        tr("模型切换器居左"),
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][onPanelColor],
+                    )
+                    Switch(
+                        checked = ThemeStore.modelPickerOnLeft,
+                        onCheckedChange = { enabled ->
+                            ThemeStore.saveModelPickerOnLeft(context, enabled)
+                        },
+                    )
+                }
+                Row(
+                    modifier = Modifier.settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Row(
                         modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically,

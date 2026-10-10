@@ -281,6 +281,7 @@ private val English = mapOf(
     "新消息滚动" to "New message scroll",
     "思考块" to "Thinking block",
     "模型差异" to "Model diff",
+    "模型切换器居左" to "Model selector on the left",
     "共存" to "Keep both",
     "写入记忆" to "Saving memory",
     "删除全部历史" to "Delete all history",

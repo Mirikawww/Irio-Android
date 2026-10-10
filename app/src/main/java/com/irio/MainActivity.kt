@@ -2307,6 +2307,65 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
     @Composable
     fun BoxScope.ChatToolbar() {
+        val modelPickerOnLeft = ThemeStore.modelPickerOnLeft
+
+        @Composable
+        fun ToolbarModelPicker() {
+            ToolbarCapsule {
+                ModelPicker(
+                    alignLeft = modelPickerOnLeft,
+                    selectedModel = selectedModel,
+                    providers = providers,
+                    activeProviderId = activeProviderId,
+                    mergeModels = mergeModels,
+                    useModelsDev = modelsDevCatalog,
+                    useModelsDevReasoning = modelsDevReasoning,
+                    reasoningEffort = reasoningEffort,
+                    fastMode = fastMode,
+                    webSearchAvailable = webSearchAvailable,
+                    webSearchEnabled = webSearchEnabled,
+                    autoRead = autoRead,
+                    expanded = modelMenuOpen,
+                    onExpandedChange = { modelMenuOpen = it },
+                    onSelectedModelChange = { model, providerId ->
+                        suppressProviderEcho.fn()
+                        selectedModel = model
+                        // 记录最近一次选中的非图片对话模型（标题生成在图片模型场景的回退目标）
+                        if (!ModelCatalog.isImageModel(context, model)) {
+                            ProviderStore.saveLastChatModel(context, model)
+                        }
+                        // 持久化走 IO：persist 会对每个 provider 做 AndroidKeyStore 加密
+                        // （binder 往返），主线程同步执行会造成点击切换模型的可感卡顿。
+                        scope.launch(Dispatchers.IO) {
+                            if (providerId != activeProviderId) {
+                                withContext(Dispatchers.Main) { activeProviderId = providerId }
+                                ProviderStore.saveActiveProviderId(context, providerId)
+                            }
+                            ProviderStore.saveSelectedModel(context, model, providerId)
+                        }
+                    },
+                    onReasoningChange = { effort ->
+                        suppressProviderEcho.fn()
+                        reasoningEffort = effort
+                        ProviderStore.saveReasoningEffort(context, effort)
+                    },
+                    onFastModeChange = { enabled ->
+                        suppressProviderEcho.fn()
+                        fastMode = enabled
+                        ProviderStore.saveFastMode(context, enabled)
+                    },
+                    onWebSearchChange = { enabled ->
+                        webSearchEnabled = enabled
+                        SearchStore.saveWebSearchEnabled(context, enabled)
+                    },
+                    onAutoReadChange = { enabled ->
+                        autoRead = enabled
+                        SpeechStore.saveAutoRead(context, enabled)
+                    },
+                )
+            }
+        }
+
                 Column(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
@@ -2339,6 +2398,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 )
                             }
                         }
+                        if (modelPickerOnLeft) ToolbarModelPicker()
                     },
                     trailing = {
                         val showContextRing = ThemeStore.contextRing
@@ -2375,58 +2435,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 )
                             }
                         }
-                        ToolbarCapsule {
-                            ModelPicker(
-                            selectedModel = selectedModel,
-                            providers = providers,
-                            activeProviderId = activeProviderId,
-                            mergeModels = mergeModels,
-                            useModelsDev = modelsDevCatalog,
-                            useModelsDevReasoning = modelsDevReasoning,
-                            reasoningEffort = reasoningEffort,
-                            fastMode = fastMode,
-                            webSearchAvailable = webSearchAvailable,
-                            webSearchEnabled = webSearchEnabled,
-                            autoRead = autoRead,
-                            expanded = modelMenuOpen,
-                            onExpandedChange = { modelMenuOpen = it },
-                            onSelectedModelChange = { model, providerId ->
-                                suppressProviderEcho.fn()
-                                selectedModel = model
-                                // 记录最近一次选中的非图片对话模型（标题生成在图片模型场景的回退目标）
-                                if (!ModelCatalog.isImageModel(context, model)) {
-                                    ProviderStore.saveLastChatModel(context, model)
-                                }
-                                // 持久化走 IO：persist 会对每个 provider 做 AndroidKeyStore 加密
-                                // （binder 往返），主线程同步执行会造成点击切换模型的可感卡顿。
-                                scope.launch(Dispatchers.IO) {
-                                    if (providerId != activeProviderId) {
-                                        withContext(Dispatchers.Main) { activeProviderId = providerId }
-                                        ProviderStore.saveActiveProviderId(context, providerId)
-                                    }
-                                    ProviderStore.saveSelectedModel(context, model, providerId)
-                                }
-                            },
-                            onReasoningChange = { effort ->
-                                suppressProviderEcho.fn()
-                                reasoningEffort = effort
-                                ProviderStore.saveReasoningEffort(context, effort)
-                            },
-                            onFastModeChange = { enabled ->
-                                suppressProviderEcho.fn()
-                                fastMode = enabled
-                                ProviderStore.saveFastMode(context, enabled)
-                            },
-                            onWebSearchChange = { enabled ->
-                                webSearchEnabled = enabled
-                                SearchStore.saveWebSearchEnabled(context, enabled)
-                            },
-                            onAutoReadChange = { enabled ->
-                                autoRead = enabled
-                                SpeechStore.saveAutoRead(context, enabled)
-                            },
-                            )
-                        }
+                        if (!modelPickerOnLeft) ToolbarModelPicker()
                     },
                 )
                     Spacer(Modifier.height(ChatToolbarHazeBleed))
@@ -2633,6 +2642,7 @@ private sealed interface ModelPickerRow {
 
 @Composable
 private fun ModelPicker(
+    alignLeft: Boolean,
     selectedModel: String,
     providers: List<ProviderConfig>,
     activeProviderId: String,
@@ -2737,10 +2747,11 @@ private fun ModelPicker(
     DropdownMenu(
         expanded = expanded,
         onExpandedChange = onExpandedChange,
-        modifier = Modifier.wrapContentWidth(Alignment.End),
-        alignment = DropdownMenuAlignment.End,
+        modifier = Modifier.wrapContentWidth(if (alignLeft) Alignment.Start else Alignment.End),
+        alignment = if (alignLeft) DropdownMenuAlignment.Start else DropdownMenuAlignment.End,
         panel = {
-            Row(modifier = Modifier.widthIn(max = 340.dp).heightIn(max = 600.dp)) {
+            @Composable
+            fun ReasoningPanel() {
                 DropdownMenuPanel(modifier = Modifier.widthIn(min = 112.dp, max = 140.dp)) {
                     Column(
                         modifier = Modifier
@@ -2834,6 +2845,10 @@ private fun ModelPicker(
                         }
                     }
                 }
+            }
+
+            @Composable
+            fun ModelsPanel() {
                 DropdownMenuPanel(modifier = Modifier.width(200.dp)) {
                     // 面板会做 IntrinsicSize.Max：LazyColumn 会崩。逐行 ComposeView 又会在
                     // 展开那一帧建起来，把 120ms 的缩放动画吃掉。这里只要一棵可滚动 Column。
@@ -2883,6 +2898,16 @@ private fun ModelPicker(
                             }
                         }
                     }
+                }
+            }
+
+            Row(modifier = Modifier.widthIn(max = 340.dp).heightIn(max = 600.dp)) {
+                if (alignLeft) {
+                    ModelsPanel()
+                    ReasoningPanel()
+                } else {
+                    ReasoningPanel()
+                    ModelsPanel()
                 }
             }
         },

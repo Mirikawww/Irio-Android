@@ -132,6 +132,7 @@ object ThemeStore {
     private const val CONTEXT_RING_KEY = "context_ring"
     private const val GLYPH_FADE_KEY = "glyph_fade"
     private const val MODEL_DIFF_KEY = "model_diff"
+    private const val MODEL_PICKER_ON_LEFT_KEY = "model_picker_on_left"
     private const val NEW_MESSAGE_SCROLL_KEY = "new_message_scroll"
     private const val THINKING_BLOCK_KEY = "thinking_block"
     private const val LEGACY_PREFS = "provider_settings"
@@ -151,6 +152,10 @@ object ThemeStore {
 
     /** 工具栏上的上下文占用圆环。默认关。 */
     var contextRing by mutableStateOf(false)
+        private set
+
+    /** 模型切换器位于侧边栏按钮右侧，菜单模型列在左。默认关。 */
+    var modelPickerOnLeft by mutableStateOf(false)
         private set
 
     /** 流式回复的新字淡入。默认关。 */
@@ -186,6 +191,7 @@ object ThemeStore {
             contextRing = appearance.getBoolean(CONTEXT_RING_KEY, false)
             glyphFade = appearance.getBoolean(GLYPH_FADE_KEY, false)
             modelDiff = appearance.getBoolean(MODEL_DIFF_KEY, false)
+            modelPickerOnLeft = appearance.getBoolean(MODEL_PICKER_ON_LEFT_KEY, false)
             newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, false)
             thinkingBlock = appearance.getBoolean(THINKING_BLOCK_KEY, true)
             if (appearance.getString(KEY, null) == null && stored != null) {
@@ -272,6 +278,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(THINKING_BLOCK_KEY, enabled)
+            .apply()
+    }
+
+    fun saveModelPickerOnLeft(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (modelPickerOnLeft == enabled) return
+        modelPickerOnLeft = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(MODEL_PICKER_ON_LEFT_KEY, enabled)
             .apply()
     }
 
