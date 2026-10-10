@@ -17,6 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Irio"
+rootProject.name = "Irio-Android"
 include(":app")
-include(":desktop")

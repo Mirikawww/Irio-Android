@@ -1,7 +1,6 @@
 [versions]
 agp = "9.3.1"
 kotlin = "2.4.10"
-compose-multiplatform = "1.11.1"
 okhttp = "4.12.0"
 
 [libraries]
@@ -9,5 +8,3 @@ okhttp = "4.12.0"
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
-composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }

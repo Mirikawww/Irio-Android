@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Regenerate app assets and Windows desktop resources.
+"""Regenerate Android model catalog assets.
 
 Names, reasoning and context windows come from OpenRouter /api/v1/models
 (`name`, model-level `context_length` — not `top_provider.context_length`).
 Image flags still come from https://models.dev/api.json.
-Run from the Irio repo root; --reasoning-only leaves other catalogs untouched."""
+Run from the Irio Android repo root; --reasoning-only leaves other catalogs untouched."""
 import json, sys, urllib.request
 from typing import Any
 
@@ -14,8 +14,6 @@ OUT_NAMES = "app/src/main/assets/model-names.json"
 OUT_REASONING = "app/src/main/assets/model-reasoning.json"
 OUT_IMAGE = "app/src/main/assets/model-image.json"
 OUT_CONTEXT = "app/src/main/assets/model-context.json"
-OUT_IMAGE_DESKTOP = "desktop/src/main/resources/model-image.json"
-OUT_CONTEXT_DESKTOP = "desktop/src/main/resources/model-context.json"
 
 def get_json(url):
     request = urllib.request.Request(url, headers={"User-Agent": "Irio model catalog"})
@@ -141,8 +139,6 @@ for path, payload in (
     (OUT_REASONING, reasoning),
     (OUT_IMAGE, image),
     (OUT_CONTEXT, context),
-    (OUT_IMAGE_DESKTOP, image),
-    (OUT_CONTEXT_DESKTOP, context),
 ):
     if reasoning_only and path != OUT_REASONING:
         continue

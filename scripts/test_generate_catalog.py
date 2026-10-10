@@ -27,7 +27,6 @@ class ReasoningCatalogTest(unittest.TestCase):
             root = pathlib.Path(directory)
             assets = root / "app/src/main/assets"
             assets.mkdir(parents=True)
-            (root / "desktop/src/main/resources").mkdir(parents=True)
             untouched = assets / "model-names.json"
             untouched.write_text("sentinel", encoding="utf-8")
             import os
@@ -72,13 +71,13 @@ class ReasoningCatalogTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
             root = pathlib.Path(directory)
             (root / "app/src/main/assets").mkdir(parents=True)
-            (root / "desktop/src/main/resources").mkdir(parents=True)
             import os
             previous = os.getcwd()
             try:
                 os.chdir(root)
                 with patch("urllib.request.urlopen", side_effect=response):
                     runpy.run_path(str(SCRIPT), run_name="__main__")
+                self.assertFalse((root / "desktop").exists())
                 catalog = json.loads((root / "app/src/main/assets/model-reasoning.json").read_text(encoding="utf-8"))
             finally:
                 os.chdir(previous)

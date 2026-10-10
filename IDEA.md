@@ -1,1 +1,1 @@
-BYOK AI聊天应用（Android + Compose Multiplatform 桌面）
+BYOK AI 聊天应用（Android）

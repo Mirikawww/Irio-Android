@@ -34,3 +34,7 @@ Thumbs.db
 
 # Hermes local planning files
 .hermes/
+
+# Local work files
+work/
+__pycache__/
