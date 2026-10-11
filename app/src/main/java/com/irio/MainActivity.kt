@@ -2626,7 +2626,7 @@ private sealed interface ConversationDrawerRow {
 }
 
 /** 模型列表的预计算行：文本与目标模型在 remember 里一次算好，滚动路径零文本处理。 */
-private sealed interface ModelPickerRow {
+internal sealed interface ModelPickerRow {
     val key: String
 
     data class Gap(override val key: String) : ModelPickerRow
@@ -2742,174 +2742,37 @@ private fun ModelPicker(
             }
         }
     }
-    val supportsThinking = reasoningInfo?.supports ?: true
-    val thinkingLockedOn = reasoningInfo?.let { it.toggleable == false } == true
+    val reasoningLevels = remember(reasoningInfo) {
+        if (reasoningInfo?.supports == false) listOf(ReasoningEffort.OFF)
+        else ReasoningEffort.entries.filter {
+            it != ReasoningEffort.AUTO && (it != ReasoningEffort.OFF || reasoningInfo?.toggleable != false)
+        }
+    }
+    val effectiveEffort = reasoningEffort.takeIf { it in reasoningLevels } ?: reasoningLevels.first()
     DropdownMenu(
         expanded = expanded,
         onExpandedChange = onExpandedChange,
         modifier = Modifier.wrapContentWidth(if (alignLeft) Alignment.Start else Alignment.End),
         alignment = if (alignLeft) DropdownMenuAlignment.Start else DropdownMenuAlignment.End,
         panel = {
-            @Composable
-            fun ReasoningPanel() {
-                DropdownMenuPanel(modifier = Modifier.widthIn(min = 112.dp, max = 140.dp)) {
-                    Column(
-                        modifier = Modifier
-                            .heightIn(max = 600.dp)
-                            .verticalScroll(rememberScrollState()),
-                    ) {
-                        if (supportsThinking) {
-                            ReasoningEffort.entries.filter { it != ReasoningEffort.AUTO }.forEach { option ->
-                                // 模型被标记为无法关闭思考时，只允许保持非「关闭」档位
-                                val enabled = !thinkingLockedOn || option != ReasoningEffort.OFF
-                                DropdownMenuItem(
-                                    onClick = { if (enabled) onReasoningChange(option) },
-                                    leading = {
-                                        val checked = reasoningEffort == option && (enabled || option != ReasoningEffort.OFF)
-                                        if (checked) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        } else {
-                                            Spacer(Modifier.size(16.dp))
-                                        }
-                                    },
-                                ) {
-                                    Text(
-                                        tr(option.label),
-                                        fontSize = 15.5.sp,
-                                        color = if (enabled) Theme[colors][onBackgroundColor] else Theme[colors][mutedColor],
-                                    )
-                                }
-                            }
-                        } else {
-                            DropdownMenuItem(
-                                onClick = {},
-                                leading = { Spacer(Modifier.size(16.dp)) },
-                            ) {
-                                Text(tr("不支持思考"), fontSize = 15.5.sp, color = Theme[colors][mutedColor])
-                            }
-                        }
-                        DropdownMenuSeparator()
-                        DropdownMenuItem(
-                            onClick = { onFastModeChange(!fastMode) },
-                            leading = {
-                                if (fastMode) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                } else {
-                                    Spacer(Modifier.size(16.dp))
-                                }
-                            },
-                        ) {
-                            Text(tr("快速"), fontSize = 15.5.sp)
-                        }
-                        val webSearchOn = webSearchAvailable && webSearchEnabled
-                        DropdownMenuItem(
-                            onClick = { onWebSearchChange(!webSearchEnabled) },
-                            enabled = webSearchAvailable,
-                            leading = {
-                                if (webSearchOn) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                } else {
-                                    Spacer(Modifier.size(16.dp))
-                                }
-                            },
-                        ) {
-                            Text(tr("网络搜索"), fontSize = 15.5.sp)
-                        }
-                        DropdownMenuItem(
-                            onClick = { onAutoReadChange(!autoRead) },
-                            leading = {
-                                if (autoRead) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                } else {
-                                    Spacer(Modifier.size(16.dp))
-                                }
-                            },
-                        ) {
-                            Text(tr("自动朗读"), fontSize = 15.5.sp)
-                        }
-                    }
-                }
-            }
-
-            @Composable
-            fun ModelsPanel() {
-                DropdownMenuPanel(modifier = Modifier.width(200.dp)) {
-                    // 面板会做 IntrinsicSize.Max：LazyColumn 会崩。逐行 ComposeView 又会在
-                    // 展开那一帧建起来，把 120ms 的缩放动画吃掉。这里只要一棵可滚动 Column。
-                    Column(
-                        modifier = Modifier
-                            .width(200.dp)
-                            .heightIn(max = 600.dp)
-                            .verticalScroll(rememberScrollState()),
-                    ) {
-                        rows.forEach { row ->
-                            key(row.key) {
-                                when (row) {
-                                    is ModelPickerRow.Gap -> Spacer(Modifier.height(10.dp))
-                                    is ModelPickerRow.GroupLabel -> Text(
-                                        // 提供商分组小字：与下方条目文本左对齐，与上一组之间留出空隙
-                                        row.text,
-                                        modifier = Modifier
-                                            .padding(start = 36.dp)
-                                            .padding(top = 6.dp, bottom = 2.dp),
-                                        color = Theme[colors][mutedColor],
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                    is ModelPickerRow.Model -> {
-                                        val active = row.providerId == activeProviderId && selectedModel in row.variants
-                                        DropdownMenuItem(
-                                            onClick = { onSelectedModelChange(row.target, row.providerId) },
-                                            leading = {
-                                                if (active) {
-                                                    Icon(
-                                                        imageVector = Icons.Rounded.Check,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(16.dp),
-                                                    )
-                                                } else {
-                                                    Spacer(Modifier.size(16.dp))
-                                                }
-                                            },
-                                        ) {
-                                            Text(
-                                                row.display,
-                                                fontSize = 15.5.sp,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Row(modifier = Modifier.widthIn(max = 340.dp).heightIn(max = 600.dp)) {
-                if (alignLeft) {
-                    ModelsPanel()
-                    ReasoningPanel()
-                } else {
-                    ReasoningPanel()
-                    ModelsPanel()
-                }
-            }
+            ModelSwitcherPanel(
+                selectedDisplay = selectedDisplay,
+                selectedModel = selectedModel,
+                activeProviderId = activeProviderId,
+                rows = rows,
+                reasoningEffort = effectiveEffort,
+                supportsThinking = reasoningInfo?.supports ?: true,
+                reasoningLevels = reasoningLevels,
+                fastMode = fastMode,
+                webSearchAvailable = webSearchAvailable,
+                webSearchEnabled = webSearchEnabled,
+                autoRead = autoRead,
+                onSelectedModelChange = onSelectedModelChange,
+                onReasoningChange = onReasoningChange,
+                onFastModeChange = onFastModeChange,
+                onWebSearchChange = onWebSearchChange,
+                onAutoReadChange = onAutoReadChange,
+            )
         },
     ) {
         Button(

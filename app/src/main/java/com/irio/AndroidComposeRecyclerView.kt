@@ -4,10 +4,12 @@ import android.content.Context
 import android.graphics.Outline
 import android.graphics.Rect
 import android.view.View
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -35,6 +37,9 @@ internal fun <T : Any> AndroidComposeRecyclerList(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
     itemSpacing: Dp = 0.dp,
+    cornerRadius: Dp = 0.dp,
+    opacity: State<Float>? = null,
+    interactionEnabled: Boolean = true,
     content: @Composable (T) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -48,17 +53,22 @@ internal fun <T : Any> AndroidComposeRecyclerList(
         )
     }
     val spacingPx = with(density) { itemSpacing.roundToPx() }
+    val cornerRadiusPx = with(density) { cornerRadius.toPx() }
 
     AndroidView(
         modifier = modifier,
         factory = { context ->
             ComposeRecyclerView(context, key, content).also { view ->
+                view.updateVisibility(opacity?.value ?: 1f, interactionEnabled)
+                view.updateCornerRadius(cornerRadiusPx)
                 view.updatePadding(padding)
                 view.updateItemSpacing(spacingPx)
                 view.updateItems(items)
             }
         },
         update = { view ->
+            view.updateVisibility(opacity?.value ?: 1f, interactionEnabled)
+            view.updateCornerRadius(cornerRadiusPx)
             view.updatePadding(padding)
             view.updateItemSpacing(spacingPx)
             view.updateContent(content)
@@ -81,6 +91,8 @@ private class ComposeRecyclerView<T : Any>(
 ) : RecyclerView(context) {
     private val listAdapter = ComposeListAdapter(key, content)
     private var spacingDecoration: RecyclerSpacingDecoration? = null
+    private var cornerRadiusPx = 0f
+    private var acceptsTouch = true
 
     init {
         layoutManager = LinearLayoutManager(context)
@@ -93,11 +105,28 @@ private class ComposeRecyclerView<T : Any>(
         // 把绘制锁在视图矩形里，历史行才不会叠到「新对话」上或从设置按钮底下的缝漏出去。
         outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(view: View, outline: Outline) {
-                outline.setRect(0, 0, view.width, view.height)
+                outline.setRoundRect(0, 0, view.width, view.height, cornerRadiusPx)
             }
         }
         clipToOutline = true
         setItemViewCacheSize(4)
+    }
+
+    fun updateVisibility(opacity: Float, interactionEnabled: Boolean) {
+        alpha = opacity.coerceIn(0f, 1f)
+        acceptsTouch = interactionEnabled && alpha >= 0.5f
+        importantForAccessibility = if (acceptsTouch) View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+            else View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean =
+        acceptsTouch && super.dispatchTouchEvent(event)
+
+    fun updateCornerRadius(next: Float) {
+        if (cornerRadiusPx != next) {
+            cornerRadiusPx = next
+            invalidateOutline()
+        }
     }
 
     fun updateItems(next: List<T>) {
