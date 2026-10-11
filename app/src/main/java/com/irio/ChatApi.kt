@@ -1071,7 +1071,11 @@ object ChatApi {
     }
 
     private fun ChatRequestMessage.openAiParts(text: Boolean, overrideText: String? = null): List<JSONObject> {
-        val textType = if (text) "text" else "input_text"
+        val textType = when {
+            text -> "text"
+            role == "assistant" -> "output_text"
+            else -> "input_text"
+        }
         val imageType = if (text) "image_url" else "input_image"
         val fileType = if (text) "file" else "input_file"
         val bodyText = overrideText ?: this@openAiParts.text
