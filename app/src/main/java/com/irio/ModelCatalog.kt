@@ -22,6 +22,8 @@ object ModelCatalog {
         val supports: Boolean,
         /** 能否关闭思考（reasoning.mandatory 的反值）；未提供时为 null。 */
         val toggleable: Boolean?,
+        /** 明确提供的 reasoning.supported_efforts；缺失时不限制档位。 */
+        val options: Set<String>? = null,
     )
 
     @Volatile
@@ -128,7 +130,14 @@ object ModelCatalog {
                     val entry = root.optJSONObject(key) ?: continue
                     val supports = entry.optBoolean("supports", false)
                     val toggleable = entry.opt("toggleable") as? Boolean
-                    put(key, ReasoningInfo(supports, toggleable))
+                    val options = entry.optJSONArray("options")?.let { array ->
+                        buildSet {
+                            for (index in 0 until array.length()) {
+                                (array.opt(index) as? String)?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let(::add)
+                            }
+                        }
+                    }
+                    put(key, ReasoningInfo(supports, toggleable, options))
                 }
             }
         }.getOrDefault(emptyMap())
@@ -206,8 +215,28 @@ object ModelCatalog {
             supportedInfos.all { it.toggleable == false } -> false
             else -> null
         }
-        return ReasoningInfo(supportsAny, toggleable)
+        val options = if (supportedInfos.isEmpty() || supportedInfos.any { it.options.isNullOrEmpty() }) null
+            else supportedInfos.map { it.options.orEmpty() }.reduce { common, values -> common intersect values }
+        return ReasoningInfo(supportsAny, toggleable, options)
     }
+
+    /** Slider and outgoing requests must use the same actual-model capability policy. */
+    fun reasoningLevels(info: ReasoningInfo?): List<ReasoningEffort> {
+        if (info?.supports == false) return listOf(ReasoningEffort.OFF)
+        return ReasoningEffort.entries.filter { effort ->
+            when (effort) {
+                ReasoningEffort.AUTO -> false
+                ReasoningEffort.OFF -> info?.toggleable != false
+                else -> info?.options.isNullOrEmpty() || effort.apiValue in info!!.options.orEmpty()
+            }
+        }
+    }
+
+    /** Preserve a supported choice; otherwise take its closest available depth, preferring lower ties. */
+    fun resolveReasoningEffort(effort: ReasoningEffort, levels: List<ReasoningEffort>): ReasoningEffort =
+        levels.firstOrNull { it == effort }
+            ?: levels.minByOrNull { kotlin.math.abs(it.ordinal - effort.ordinal) }
+            ?: ReasoningEffort.AUTO
 
     /** 合并键：剥掉 -thinking / -fast / -reasoning / -non-reasoning 后缀；关闭合并时等于原始 id。 */
     fun mergeKey(modelId: String, mergeEnabled: Boolean): String {

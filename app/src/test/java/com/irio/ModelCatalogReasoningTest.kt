@@ -29,9 +29,9 @@ class ModelCatalogReasoningTest {
             }
         """.trimIndent())
 
-        assertEquals(ModelCatalog.ReasoningInfo(true, false), parsed["locked"])
-        assertEquals(ModelCatalog.ReasoningInfo(true, true), parsed["optional"])
-        assertEquals(ModelCatalog.ReasoningInfo(true, null), parsed["unknown"])
+        assertEquals(ModelCatalog.ReasoningInfo(true, false, setOf("none", "high")), parsed["locked"])
+        assertEquals(ModelCatalog.ReasoningInfo(true, true, setOf("high", "low")), parsed["optional"])
+        assertEquals(ModelCatalog.ReasoningInfo(true, null, setOf("high", "low")), parsed["unknown"])
         assertEquals(ModelCatalog.ReasoningInfo(false, null), parsed["plain"])
     }
 
@@ -53,5 +53,57 @@ class ModelCatalogReasoningTest {
 
         // mergeKey：grok-4.20-0309-reasoning 和它的 non-reasoning 变体在同一组
         assertEquals(ModelCatalog.mergeKey("grok-4.20-0309-non-reasoning", true), ModelCatalog.mergeKey("grok-4.20-0309-reasoning", true))
+    }
+
+    @Test
+    fun restrictedEffortsBecomeTheOnlySliderStopsInDepthOrder() {
+        val info = ModelCatalog.ReasoningInfo(true, false, setOf("high", "medium", "low"))
+        assertEquals(listOf(ReasoningEffort.LOW, ReasoningEffort.MEDIUM, ReasoningEffort.HIGH), ModelCatalog.reasoningLevels(info))
+        assertEquals(ReasoningEffort.HIGH, ModelCatalog.resolveReasoningEffort(ReasoningEffort.ULTRA, ModelCatalog.reasoningLevels(info)))
+        assertEquals(ReasoningEffort.LOW, ModelCatalog.resolveReasoningEffort(ReasoningEffort.OFF, ModelCatalog.reasoningLevels(info)))
+    }
+
+    @Test
+    fun optionalThinkingKeepsOffWithoutInventingExtraEffortStops() {
+        val info = ModelCatalog.ReasoningInfo(true, true, setOf("low", "high"))
+        val levels = ModelCatalog.reasoningLevels(info)
+        assertEquals(listOf(ReasoningEffort.OFF, ReasoningEffort.LOW, ReasoningEffort.HIGH), levels)
+        assertEquals(ReasoningEffort.LOW, ModelCatalog.resolveReasoningEffort(ReasoningEffort.MEDIUM, levels))
+        assertEquals(ReasoningEffort.HIGH, ModelCatalog.resolveReasoningEffort(ReasoningEffort.HIGH, levels))
+    }
+
+    @Test
+    fun unsupportedAndSingleDepthModelsHaveOneFixedStop() {
+        assertEquals(listOf(ReasoningEffort.OFF), ModelCatalog.reasoningLevels(ModelCatalog.ReasoningInfo(false, null)))
+        val fixed = ModelCatalog.reasoningLevels(ModelCatalog.ReasoningInfo(true, false, setOf("high")))
+        assertEquals(listOf(ReasoningEffort.HIGH), fixed)
+        assertEquals(ReasoningEffort.HIGH, ModelCatalog.resolveReasoningEffort(ReasoningEffort.MAX, fixed))
+    }
+
+    @Test
+    fun unknownEffortMetadataRetainsAllDepthsWithoutAnAutomaticStop() {
+        val full = ReasoningEffort.entries.filter { it != ReasoningEffort.AUTO }
+        assertEquals(full, ModelCatalog.reasoningLevels(null))
+        assertEquals(full, ModelCatalog.reasoningLevels(ModelCatalog.ReasoningInfo(true, null)))
+        assertEquals(full, ModelCatalog.reasoningLevels(ModelCatalog.ReasoningInfo(true, null, emptySet())))
+        assertEquals(full.filter { it != ReasoningEffort.OFF }, ModelCatalog.reasoningLevels(ModelCatalog.ReasoningInfo(true, false)))
+    }
+
+    @Test
+    fun ultraOnlyAppearsWhenExplicitlySupportedInRestrictedMetadata() {
+        val parsed = ModelCatalog.parseReasoning("""{"model":{"supports":true,"toggleable":false,"options":[" ULTRA ","high",null,42]}}""")
+        assertEquals(setOf("ultra", "high"), parsed.getValue("model").options)
+        assertEquals(listOf(ReasoningEffort.HIGH, ReasoningEffort.ULTRA), ModelCatalog.reasoningLevels(parsed.getValue("model")))
+    }
+
+    @Test
+    fun mergedRestrictedOptionsOnlyKeepDepthsSharedBySupportingVariants() {
+        val merged = ModelCatalog.mergedReasoning(listOf(
+            ModelCatalog.ReasoningInfo(true, false, setOf("low", "high")),
+            ModelCatalog.ReasoningInfo(true, false, setOf("medium", "high")),
+            ModelCatalog.ReasoningInfo(false, null),
+        ))
+        assertEquals(setOf("high"), merged!!.options)
+        assertEquals(listOf(ReasoningEffort.HIGH), ModelCatalog.reasoningLevels(merged))
     }
 }

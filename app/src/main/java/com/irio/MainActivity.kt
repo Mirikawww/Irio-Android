@@ -1132,11 +1132,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         val effectiveReasoningInfo = if (ProviderStore.loadModelsDevReasoning(context)) {
             ModelCatalog.reasoningInfo(context, requestModel, useCatalog = true)
         } else null
-        val requestEffort = when {
-            effectiveReasoningInfo != null && !effectiveReasoningInfo.supports -> ReasoningEffort.OFF
-            effectiveReasoningInfo?.toggleable == false && reasoningEffort == ReasoningEffort.OFF -> ReasoningEffort.AUTO
-            else -> reasoningEffort
-        }
+        val requestEffort = ModelCatalog.resolveReasoningEffort(
+            reasoningEffort, ModelCatalog.reasoningLevels(effectiveReasoningInfo),
+        )
         val requestFast = fastMode
         val requestWebSearch = SearchStore.isWebSearchActive(context)
         val requestSearchProvider = SearchStore.loadProvider(context)
@@ -2724,31 +2722,11 @@ private fun ModelPicker(
         .firstOrNull { it.providerId == activeProviderId && selectedModel in it.variants }
     val selectedDisplay = selectedRow?.display
         ?: ModelCatalog.displayName(context, selectedModel, useModelsDev)
-    val selectedProvider = providersWithModels
-        .firstOrNull { it.id == activeProviderId && selectedModel in it.models }
-        ?: providersWithModels.firstOrNull { selectedModel in it.models }
-    val reasoningInfo = remember(selectedModel, selectedProvider, mergeModels, useModelsDevReasoning) {
-        if (!useModelsDevReasoning || selectedProvider == null) {
-            null
-        } else {
-            if (mergeModels) {
-                val variants = selectedProvider.models.filter {
-                    ModelCatalog.mergeKey(it, true) == ModelCatalog.mergeKey(selectedModel, true)
-                }
-                val infos = variants.mapNotNull { ModelCatalog.reasoningInfo(context, it, useCatalog = true) }
-                ModelCatalog.mergedReasoning(infos)
-            } else {
-                ModelCatalog.reasoningInfo(context, selectedModel, useCatalog = true)
-            }
-        }
+    val reasoningInfo = remember(selectedModel, useModelsDevReasoning) {
+        ModelCatalog.reasoningInfo(context, selectedModel, useCatalog = useModelsDevReasoning)
     }
-    val reasoningLevels = remember(reasoningInfo) {
-        if (reasoningInfo?.supports == false) listOf(ReasoningEffort.OFF)
-        else ReasoningEffort.entries.filter {
-            it != ReasoningEffort.AUTO && (it != ReasoningEffort.OFF || reasoningInfo?.toggleable != false)
-        }
-    }
-    val effectiveEffort = reasoningEffort.takeIf { it in reasoningLevels } ?: reasoningLevels.first()
+    val reasoningLevels = remember(reasoningInfo) { ModelCatalog.reasoningLevels(reasoningInfo) }
+    val effectiveEffort = ModelCatalog.resolveReasoningEffort(reasoningEffort, reasoningLevels)
     DropdownMenu(
         expanded = expanded,
         onExpandedChange = onExpandedChange,
