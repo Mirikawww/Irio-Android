@@ -4,6 +4,8 @@ enum class ProcessEventKind {
     THINKING,
     SEARCH,
     TOOL,
+    /** Visible assistant colored bubble, never a tool status label. */
+    BUBBLE,
 }
 
 data class ProcessEvent(
@@ -26,6 +28,7 @@ data class ProcessEvent(
     val searchQuery: String = "",
     val webDomain: String = "",
     val displayText: String = "",
+    val bubbleColor: String = "",
 )
 
 internal fun searchStatusLabel(query: String, language: AppLanguage = ThemeStore.language): String {

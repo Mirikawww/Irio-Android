@@ -118,7 +118,7 @@ class GeminiApiTest {
                 assertEquals("fixture", request.getHeader("x-goog-api-key"))
                 assertNull(request.getHeader("Authorization"))
                 val body = JSONObject(request.body.readUtf8())
-                assertEquals("be concise", body.getJSONObject("systemInstruction").getJSONArray("parts").getJSONObject(0).getString("text"))
+                assertEquals(ToolRegistry.default().systemPrompt("be concise"), body.getJSONObject("systemInstruction").getJSONArray("parts").getJSONObject(0).getString("text"))
                 assertEquals("user", body.getJSONArray("contents").getJSONObject(0).getString("role"))
                 assertFalse(body.has("stream"))
                 assertFalse(body.has("model"))

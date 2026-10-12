@@ -8,6 +8,12 @@ data class ChatToolRecord(val call: ChatToolCall, val result: String)
 /** 已保存的执行记录作为历史上下文发送，不改界面正文，也不伪造旧记录中没有的 tool_call id/参数。 */
 internal fun ChatMessage.contextText(): String = buildString {
     append(requestText())
+    if (!fromUser && toolRecords.none { it.call.name == ColoredBubbleTool.NAME }) {
+        process.filter { it.kind == ProcessEventKind.BUBBLE }.forEach { bubble ->
+            if (isNotEmpty()) append("\n\n")
+            append(bubble.content)
+        }
+    }
     if (fromUser) return@buildString
     toolRecords.forEach { record ->
         if (isNotEmpty()) append("\n\n")
@@ -24,7 +30,7 @@ internal fun ChatMessage.contextText(): String = buildString {
         val name = when (event.kind) {
             ProcessEventKind.TOOL -> event.toolName.ifBlank { "tool" }
             ProcessEventKind.SEARCH -> WebSearchTool.NAME
-            ProcessEventKind.THINKING -> return@forEach
+            ProcessEventKind.THINKING, ProcessEventKind.BUBBLE -> return@forEach
         }
         val remaining = recordedEvents[name] ?: 0
         if (remaining > 0) {

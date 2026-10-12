@@ -105,6 +105,8 @@ data class ChatStreamUpdate(
     val toolRecord: ChatToolRecord? = null,
     /** 模型为本次工具调用提供的 UI 文案，不作为工具执行参数。 */
     val displayText: String = "",
+    /** Assistant-visible colored output without a tool status row. */
+    val coloredBubbles: List<ColoredBubble> = emptyList(),
 )
 
 data class ToolCallDelta(
@@ -184,6 +186,7 @@ object ChatApi {
     ): ChatCompletionResult {
         val history = (if (toolRegistry.handles(ReactionTool.NAME)) reactionRequestMessages(messages) else messages).toMutableList()
         var searchPages = 0
+        var displayedBubbles = false
         var lastUsage: TokenUsage? = null
         val rounds = ToolStore.clampMaxRounds(maxToolRounds)
         val includeTimestamps = appContext?.let { ToolStore.loadMessageTimestamps(it) } ?: true
@@ -198,7 +201,10 @@ object ChatApi {
             searchMaxResults = searchMaxResults,
             imageGenModel = imageGenModel,
             cancellation = cancellation,
-            onUpdate = onUpdate,
+            onUpdate = { update ->
+                if (update.coloredBubbles.isNotEmpty()) displayedBubbles = true
+                onUpdate(update)
+            },
             appContext = appContext,
             conversationId = conversationId,
             onReaction = onReaction,
@@ -219,6 +225,7 @@ object ChatApi {
                 connectionScope = connectionScope,
                 cancellation = cancellation,
                 onUpdate = onUpdate,
+                allowEmptyCompletion = displayedBubbles,
             )
             if (turn.usage != null) lastUsage = turn.usage
             if (turn.error != null || turn.stopped || turn.toolCalls.isEmpty()) {
@@ -477,6 +484,7 @@ object ChatApi {
         cancellation: ChatRequestCancellation,
         onUpdate: suspend (ChatStreamUpdate) -> Unit,
         http1Retried: Boolean = false,
+        allowEmptyCompletion: Boolean = false,
     ): ChatCompletionResult {
         var delivered = false
         val publish: suspend (ChatStreamUpdate) -> Unit = { update ->
@@ -649,7 +657,10 @@ object ChatApi {
                 streamedContent.isBlank() &&
                     streamedAttachments.isEmpty() &&
                     streamedThinking.isBlank() &&
-                    completedTools.isEmpty() -> ChatCompletionResult(error = tr("端点返回了空回复"))
+                    completedTools.isEmpty() &&
+                    !(allowEmptyCompletion && terminalUpdateSent &&
+                        finishReason !in setOf("length", "max_tokens", "MAX_TOKENS", "tool_calls", "tool_use", "function_call")) ->
+                    ChatCompletionResult(error = tr("端点返回了空回复"))
                 else -> ChatCompletionResult(
                     content = streamedContent.toString(),
                     thinking = streamedThinking.toString(),
@@ -682,6 +693,7 @@ object ChatApi {
                     cancellation = cancellation,
                     onUpdate = onUpdate,
                     http1Retried = true,
+                    allowEmptyCompletion = allowEmptyCompletion,
                 )
             } else {
                 ChatCompletionResult(error = error.message ?: tr("无法连接到端点"))

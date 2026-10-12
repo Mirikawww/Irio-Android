@@ -58,7 +58,7 @@ internal fun hasReplyContent(
 ): Boolean = text.isNotBlank() || attachments.isNotEmpty() || process.any {
     when (it.kind) {
         ProcessEventKind.TOOL -> it.live || it.toolName != ImageGenTool.NAME || it.content != ImageGenTool.STATUS_OK
-        ProcessEventKind.SEARCH -> true
+        ProcessEventKind.SEARCH, ProcessEventKind.BUBBLE -> true
         ProcessEventKind.THINKING -> it.live || it.content.isNotBlank() || it.millis > 0L
     }
 }
@@ -296,6 +296,7 @@ object ConversationStore {
                                                 if (event.searchQuery.isNotBlank()) put("searchQuery", event.searchQuery)
                                                 if (event.webDomain.isNotBlank()) put("webDomain", event.webDomain)
                                                 if (event.displayText.isNotEmpty()) put("displayText", event.displayText)
+                                                if (event.bubbleColor.isNotEmpty()) put("bubbleColor", event.bubbleColor)
                                             }
                                         )
                                     }
@@ -420,6 +421,7 @@ internal fun processEventsFrom(item: JSONObject): List<ProcessEvent> {
                         searchQuery = event.optString("searchQuery"),
                         webDomain = event.optString("webDomain"),
                         displayText = event.optString("displayText"),
+                        bubbleColor = event.optString("bubbleColor"),
                     )
                 )
             }

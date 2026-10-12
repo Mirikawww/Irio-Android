@@ -91,6 +91,17 @@ internal class ProcessTracker {
         )
     }
 
+    fun onColoredBubbles(bubbles: List<ColoredBubble>) {
+        finishThinking()
+        finishLiveTool()
+        bubbles.forEach { bubble ->
+            events += ProcessEvent(
+                id = nextId++, kind = ProcessEventKind.BUBBLE, content = bubble.text,
+                bubbleColor = bubble.color, belowText = outputStarted, textOffset = eventAnchor(),
+            )
+        }
+    }
+
     private fun eventAnchor(): Int = if (outputStarted) outputLength else 0
 
     fun onToolFinished(content: String = "") {

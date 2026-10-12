@@ -1177,6 +1177,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 if (requestImageGenModel.isNotBlank()) add(ImageGenToolProvider())
                 add(TimeToolProvider())
                 add(ReactionToolProvider())
+                add(ColoredBubbleToolProvider())
                 if (MemoryStore.loadEnabled(context)) add(MemoryToolProvider())
                 if (LinuxSandboxPolicy.exposed(
                         LinuxSandboxStore.loadEnabled(LinuxSandboxLayout.of(context.filesDir).stateFile),
@@ -1332,6 +1333,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                         process.onOutputStarted(textLength = streamedText.length)
                                     }
                                 }
+                                if (!cancelled && update.coloredBubbles.isNotEmpty()) process.onColoredBubbles(update.coloredBubbles)
                                 if (update.attachments.isNotEmpty()) {
                                     streamedAttachments = (streamedAttachments + update.attachments)
                                         .distinctBy { it.filePath }
@@ -1362,7 +1364,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 done = update.done,
                                 searchingChanged = update.searching != null,
                                 searchPagesDelta = update.searchPagesDelta,
-                                toolChanged = update.toolActive != null || update.toolRecord != null,
+                                toolChanged = update.toolActive != null || update.toolRecord != null || update.coloredBubbles.isNotEmpty(),
                                 toolOutputChanged = update.toolOutput != null,
                                 toolCallDeltaLength = update.toolCallDeltas.sumOf { it.name.length + it.argumentsDelta.length },
                                 publishedBodyLength = publishedBodyLength,
@@ -1503,7 +1505,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 currentConversation.id == requestConversationId &&
                                 SpeechStore.loadAutoRead(context)
                             ) {
-                                val spoken = speechPlainText(finalMessage.text)
+                                val spoken = speechPlainText(finalMessage.visibleText())
                                 if (spoken.isNotBlank()) {
                                     ensureSpeechNotification()
                                     SpeechPlayer.speak(context, finalMessage.id, spoken)
@@ -1915,7 +1917,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             processSheetState.targetDetent = BottomSheetDetent.FullyExpanded
         },
         onOpenAttachment = ::openAttachment,
-        onCopy = { chatMessage -> clipboard.setText(AnnotatedString(chatMessage.text)) },
+        onCopy = { chatMessage -> clipboard.setText(AnnotatedString(chatMessage.visibleText())) },
         onQuote = { excerpt ->
             pendingQuote = excerpt
             composerFocusRequester.requestFocus()
@@ -2904,7 +2906,7 @@ internal fun MessageRow(
     ) { granted ->
         if (granted) SpeechNotifications.sync(context, SpeechPlayer.playback)
     }
-    val spoken = remember(chatMessage.id, chatMessage.text) { speechPlainText(chatMessage.text) }
+    val spoken = remember(chatMessage.id, chatMessage.text, chatMessage.process) { speechPlainText(chatMessage.visibleText()) }
     val reactionBounce = rememberReactionBounce(
         chatMessage.id,
         if (chatMessage.fromUser) chatMessage.modelReaction else chatMessage.userReaction,
@@ -3008,7 +3010,7 @@ internal fun MessageRow(
                 }
                 if (chatMessage.isError && chatMessage.text.isNotBlank()) {
                     chatMessage.process.forEach { event ->
-                        if (!event.belowText) ProcessEventRow(event, onOpen = onOpenProcess)
+                        if (!event.belowText) ProcessEventRow(event, onOpen = onOpenProcess, onQuote = onQuote)
                     }
                     Box(Modifier.padding(vertical = 2.dp)) {
                         CompositionLocalProvider(
@@ -3025,7 +3027,7 @@ internal fun MessageRow(
                         }
                     }
                     chatMessage.process.forEach { event ->
-                        if (event.belowText) ProcessEventRow(event, onOpen = onOpenProcess)
+                        if (event.belowText) ProcessEventRow(event, onOpen = onOpenProcess, onQuote = onQuote)
                     }
                 } else {
                     // 过程事件锚在它发生时的正文长度上：先说的话、工具、再说的话，完成输出后也不换位。
@@ -3036,7 +3038,7 @@ internal fun MessageRow(
                     pieces.forEachIndexed { index, piece ->
                         when (piece) {
                             is TranscriptPiece.Event -> key("process-${piece.event.id}") {
-                                ProcessEventRow(piece.event, onOpen = onOpenProcess)
+                                ProcessEventRow(piece.event, onOpen = onOpenProcess, onQuote = onQuote)
                             }
                             is TranscriptPiece.Text -> {
                                 val shown = if (seenText) piece.text.trimStart('\n') else piece.text
@@ -3063,7 +3065,7 @@ internal fun MessageRow(
                     }
                     if ((chatMessage.isPending || chatMessage.isStreaming) &&
                         chatMessage.text.isBlank() &&
-                        chatMessage.process.none { it.live }
+                        chatMessage.process.none { it.live || it.kind == ProcessEventKind.BUBBLE }
                     ) {
                         StatusSweepText(tr("请求中"))
                     }
@@ -3162,7 +3164,12 @@ private fun StatusSweepText(label: String) {
 private fun ProcessEventRow(
     event: ProcessEvent,
     onOpen: (ProcessEvent) -> Unit,
+    onQuote: (String) -> Unit = {},
 ) {
+    if (event.kind == ProcessEventKind.BUBBLE) {
+        ColoredBubbleView(event, onQuote)
+        return
+    }
     if (
         !event.live &&
         event.toolName == ImageGenTool.NAME &&
@@ -3184,6 +3191,7 @@ private fun ProcessEventRow(
         ProcessEventKind.THINKING -> if (event.live) null else tr("已思考 %s").format(formatThinkingDuration(event.millis))
         ProcessEventKind.SEARCH -> if (event.live) null else searchCompletedLabel(event.pages, event.searchQuery)
         ProcessEventKind.TOOL -> if (event.live) null else MemoryTool.doneLabel(event.toolName, event.content, event.webDomain)
+        ProcessEventKind.BUBBLE -> null
     }?.let { event.displayText.ifEmpty { it } }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (event.live) {
@@ -3208,6 +3216,7 @@ private fun ProcessEventRow(
                         ProcessEventKind.THINKING -> tr("思考中")
                         ProcessEventKind.SEARCH -> searchStatusLabel(event.searchQuery)
                         ProcessEventKind.TOOL -> MemoryTool.liveLabel(event.toolName, event.webDomain)
+                        ProcessEventKind.BUBBLE -> ""
                     }
                 }
             )

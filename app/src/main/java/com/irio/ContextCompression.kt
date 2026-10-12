@@ -99,6 +99,7 @@ internal fun estimateLiveReplyTokens(
         when (event.kind) {
             ProcessEventKind.THINKING, ProcessEventKind.SEARCH, ProcessEventKind.TOOL ->
                 count += TokenEstimator.count(event.content)
+            ProcessEventKind.BUBBLE -> Unit // Already counted in the tool call arguments.
         }
     }
     return count

@@ -45,7 +45,7 @@ class GeminiInteractionsTest {
                 assertEquals("gemini-3-flash-preview", body.getString("model"))
                 assertTrue(body.getBoolean("stream"))
                 assertFalse(body.getBoolean("store"))
-                assertEquals("system", body.getString("system_instruction"))
+                assertEquals(ToolRegistry.default().systemPrompt("system"), body.getString("system_instruction"))
                 assertEquals("user_input", body.getJSONArray("input").getJSONObject(0).getString("type"))
                 assertEquals("high", body.getJSONObject("generation_config").getString("thinking_level"))
                 val tools = body.getJSONArray("tools")

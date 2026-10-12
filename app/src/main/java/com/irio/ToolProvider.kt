@@ -153,6 +153,7 @@ class ToolRegistry(
                 ImageGenToolProvider(),
                 TimeToolProvider(),
                 ReactionToolProvider(),
+                ColoredBubbleToolProvider(),
             )
         )
     }

@@ -28,6 +28,7 @@ internal fun transcriptTailFollowKey(message: ChatMessage): String {
         process += event.content.length
         process += event.pages
         process += event.toolName.length
+        process += event.bubbleColor.length
         process += if (event.live) 1 else 0
         process += (event.millis % Int.MAX_VALUE).toInt()
     }
