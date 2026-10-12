@@ -24,6 +24,16 @@ internal class GitHubMcpToolProvider(
         }
     }
 
+    override fun systemInstructions(): String? = tools.takeIf { it.isNotEmpty() }?.let {
+        "GitHub MCP tools are available in this request through Irio's configured GitHub integration. " +
+            "Available tool names: " + it.joinToString(", ") { tool -> PREFIX + tool.name } + ". " +
+            "These are callable tools, not instructions for the user to run. For relevant GitHub tasks, " +
+            "use the provided tool definitions and call the appropriate tool before claiming you cannot " +
+            "access GitHub or have no MCP tools. Irio handles authentication; do not ask the user to " +
+            "provide a token in chat. Only use the tools actually listed in this request, and report " +
+            "any permission or connection failure based on the tool result."
+    }
+
     override fun handles(name: String): Boolean = tools.any { PREFIX + it.name == name }
 
     override suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {

@@ -49,6 +49,9 @@ interface ToolProvider {
     /** Model-facing definitions for the selected wire protocol. */
     fun definitions(protocol: ProviderProtocol): List<JSONObject>
 
+    /** Request-scoped instructions describing capabilities supplied by this provider. */
+    fun systemInstructions(): String? = null
+
     /** Stable names owned by this provider; derived from definitions by default. */
     fun toolNames(): Set<String> = ProviderProtocol.entries
         .asSequence()
@@ -107,6 +110,13 @@ class ToolRegistry(
             require(names.add(name)) { "Tool name is duplicated in ${protocol.name}: $name" }
         }.map { if (smartToolHints) SmartToolHints.decorate(it) else it }
     }
+
+    /** Derive capability instructions from the same providers that supply wire definitions. */
+    fun systemPrompt(base: String?): String? = buildList {
+        base?.takeIf { it.isNotBlank() }?.let(::add)
+        registered.values.mapNotNull { it.systemInstructions()?.takeIf(String::isNotBlank) }.forEach(::add)
+        if (smartToolHints) add(SmartToolHints.INSTRUCTIONS)
+    }.joinToString("\n\n").takeIf { it.isNotBlank() }
 
     /** Alias that makes call sites read naturally when building a request body. */
     fun schemas(protocol: ProviderProtocol): List<JSONObject> = definitions(protocol)

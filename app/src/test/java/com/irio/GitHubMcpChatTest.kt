@@ -6,8 +6,51 @@ import okhttp3.mockwebserver.MockWebServer
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
+import java.util.concurrent.TimeUnit
 
 class GitHubMcpChatTest {
+    @Test fun requestsDescribeOnlyConnectedMcpToolsAcrossAllProtocols() = runBlocking {
+        IrioHttp.resetForTests(IrioHttp.defaultClient())
+        try {
+            MockWebServer().use { model ->
+                for (protocol in ProviderProtocol.entries) {
+                    for (connected in listOf(false, true)) {
+                        for (hints in listOf(false, true)) {
+                            model.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(""))
+                            val registry = ToolRegistry(listOf(TimeToolProvider()), smartToolHints = hints)
+                            if (connected) registry.register(GitHubMcpToolProvider(listOf(
+                                McpTool("get_me", "Read profile", JSONObject("{\"type\":\"object\",\"properties\":{}}")),
+                            )) { _, _ -> error("No tool call expected") })
+                            ChatApi.streamChat(
+                                ProviderConfig("fixture", "Fixture", model.url("/v1beta").toString(), "fixture", protocol),
+                                "model", listOf(ChatRequestMessage("user", "Which MCP tools can you use?")),
+                                ReasoningEffort.OFF, false, systemPrompt = "Existing system prompt",
+                                toolRegistry = registry, cancellation = ChatRequestCancellation(), onUpdate = {},
+                            )
+                            val request = JSONObject(model.takeRequest(2, TimeUnit.SECONDS)!!.body.readUtf8())
+                            val prompt = systemPrompt(request, protocol)
+                            assertTrue(prompt.startsWith("Existing system prompt"))
+                            assertEquals("$protocol MCP capability, connected=$connected hints=$hints",
+                                connected, prompt.contains("GitHub MCP"))
+                            assertEquals(connected, prompt.contains("github_mcp_get_me"))
+                            assertEquals(connected, request.getJSONArray("tools").toString().contains("github_mcp_get_me"))
+                            assertFalse(prompt.contains("github_mcp_delete_repository"))
+                            assertEquals(hints, prompt.contains(SmartToolHints.INSTRUCTIONS))
+                        }
+                    }
+                }
+            }
+        } finally { IrioHttp.resetForTests() }
+    }
+
+    private fun systemPrompt(request: JSONObject, protocol: ProviderProtocol): String = when (protocol) {
+        ProviderProtocol.CHAT_COMPLETIONS -> request.getJSONArray("messages").getJSONObject(0).getString("content")
+        ProviderProtocol.RESPONSES -> request.getString("instructions")
+        ProviderProtocol.ANTHROPIC -> request.getString("system")
+        ProviderProtocol.GEMINI -> request.getJSONObject("systemInstruction").getJSONArray("parts").getJSONObject(0).getString("text")
+        ProviderProtocol.GEMINI_INTERACTIONS -> request.getString("system_instruction")
+    }
+
     @Test fun modelCallsTheDiscoveredRemoteToolAndReceivesItsRealResult() = runBlocking {
         MockWebServer().use { mcp ->
             MockWebServer().use { model ->
@@ -33,9 +76,12 @@ class GitHubMcpChatTest {
                     assertEquals("Profile found", result.content)
                     val initial = model.takeRequest().body.readUtf8()
                     assertTrue(initial.contains("github_mcp_get_me"))
+                    assertTrue(systemPrompt(JSONObject(initial), ProviderProtocol.CHAT_COMPLETIONS).contains("GitHub MCP"))
                     assertFalse(initial.contains("credential-fixture"))
                     val continuation = model.takeRequest().body.readUtf8()
                     assertTrue(continuation.contains("octocat profile fixture"))
+                    assertEquals(systemPrompt(JSONObject(initial), ProviderProtocol.CHAT_COMPLETIONS),
+                        systemPrompt(JSONObject(continuation), ProviderProtocol.CHAT_COMPLETIONS))
                     assertEquals(1, updates.mapNotNull { it.toolRecord }.size)
                     repeat(3) { mcp.takeRequest() }
                     val remote = JSONObject(mcp.takeRequest().body.readUtf8())

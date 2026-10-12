@@ -214,9 +214,7 @@ object ChatApi {
                 messages = if (includeTimestamps) history else history.map { it.copy(createdAt = 0L) },
                 reasoningEffort = reasoningEffort,
                 fastMode = fastMode,
-                systemPrompt = if (toolRegistry.smartToolHints) {
-                    listOfNotNull(systemPrompt?.takeIf { it.isNotBlank() }, SmartToolHints.INSTRUCTIONS).joinToString("\n\n")
-                } else systemPrompt,
+                systemPrompt = toolRegistry.systemPrompt(systemPrompt),
                 toolRegistry = toolRegistry,
                 connectionScope = connectionScope,
                 cancellation = cancellation,
