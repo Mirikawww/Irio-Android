@@ -32,8 +32,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.kyant.shapes.RoundedRectangle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bolt
@@ -62,7 +61,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -205,7 +203,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                 .semantics { if (listOpacity() >= 0.5f) invisibleToUser() }) {
             Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(
-                    Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(12.dp))
+                    Modifier.weight(1f).height(44.dp).clip(RoundedRectangle(12.dp))
                         .modelSwitcherClickable { modelsExpanded = !modelsExpanded }
                         .semantics {
                             contentDescription = tr("选择模型")
@@ -221,8 +219,8 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                 Spacer(Modifier.width(6.dp))
                 IconButton(
                     onClick = { onFastModeChange(!fastMode) }, style = ButtonStyle.Ghost,
-                    buttonSize = ButtonSize.Small, shape = CircleShape,
-                    modifier = Modifier.size(36.dp).background(fastBackground, CircleShape)
+                    buttonSize = ButtonSize.Small, shape = ContinuousCapsule,
+                    modifier = Modifier.size(36.dp).background(fastBackground, ContinuousCapsule)
                         .semantics { selected = fastMode; stateDescription = tr(if (fastMode) "开启" else "关闭") },
                 ) {
                     Icon(Icons.Rounded.Bolt, contentDescription = tr("快速"), tint = if (fastMode) accent else content, modifier = Modifier.size(21.dp))
@@ -254,7 +252,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                             val selected = row.providerId == activeProviderId && selectedModel in row.variants
                             Row(
                                 Modifier.fillMaxWidth().heightIn(min = 36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
+                                    .clip(RoundedRectangle(8.dp))
                                     .modelSwitcherClickable {
                                         if (!selected) onSelectedModelChange(row.target, row.providerId)
                                         modelsExpanded = false
@@ -277,7 +275,7 @@ private fun ModelSwitcherToggle(label: String, checked: Boolean, enabled: Boolea
     val content = Theme[colors][onBackgroundColor]
     val muted = Theme[colors][mutedColor]
     Row(
-        Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(10.dp))
+        Modifier.fillMaxWidth().height(44.dp).clip(RoundedRectangle(10.dp))
             .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -519,10 +517,12 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
             val g = thinkingSliderGeometry(size.width, radius, fraction(), rtl)
             val trackHeight = 20.dp.toPx()
             val top = (size.height - trackHeight) / 2f
-            val corner = CornerRadius(trackHeight / 2f)
-            drawRoundRect(trackColor, Offset(0f, top), Size(size.width, trackHeight), corner)
+            val trackSize = Size(size.width, trackHeight)
+            val trackPath = ContinuousCapsule.continuousPath(trackSize, layoutDirection, this).apply {
+                translate(Offset(0f, top))
+            }
+            drawPath(trackPath, trackColor)
             if (g.fillWidth > 0f) {
-                val trackPath = Path().apply { addRoundRect(androidx.compose.ui.geometry.RoundRect(0f, top, size.width, top + trackHeight, corner.x, corner.y)) }
                 clipPath(trackPath) {
                     drawRect(fill, Offset(g.fillStart, top), Size(g.fillWidth, trackHeight))
                     if (ultra && motionAllowed) {
@@ -540,7 +540,7 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
         }
         Box(
             Modifier.offset { IntOffset((geometry().thumbX - radius).roundToInt(), with(density) { 10.dp.roundToPx() }) }
-                .size(24.dp).shadow(2.dp, CircleShape).background(Color.White, CircleShape),
+                .size(24.dp).shadow(2.dp, ContinuousCapsule).background(Color.White, ContinuousCapsule),
         )
         val indicatorInk = if (fill.luminance() > 0.45f) {
             if (displayEffort == ReasoningEffort.OFF) Color.Black else Color(0xFF392500)
@@ -574,10 +574,11 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
     }
 }
 
-private fun thinkingIndicatorPath(size: Size, tipX: Float, bodyTop: Float, tipHeight: Float, shoulder: Float): Path {
+private fun DrawScope.thinkingIndicatorPath(size: Size, tipX: Float, bodyTop: Float, tipHeight: Float, shoulder: Float): Path {
     val g = thinkingIndicatorGeometry(size.width, size.height, tipX, bodyTop, shoulder)
-    val capsule = Path().apply {
-        addRoundRect(androidx.compose.ui.geometry.RoundRect(0f, g.bodyTop, size.width, size.height, g.radius, g.radius))
+    val bodyHeight = (size.height - g.bodyTop).coerceAtLeast(0f)
+    val capsule = ContinuousCapsule.continuousPath(Size(size.width, bodyHeight), layoutDirection, this).apply {
+        translate(Offset(0f, g.bodyTop))
     }
     val pointer = Path().apply {
         moveTo(g.tipX, 0f)

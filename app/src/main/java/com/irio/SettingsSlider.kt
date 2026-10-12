@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -74,7 +72,7 @@ fun SettingsSlider(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(3.dp)
-                            .clip(RoundedCornerShape(100.dp))
+                            .clip(ContinuousCapsule)
                             .background(muted.copy(alpha = 0.28f)),
                     ) {
                         Box(
@@ -90,7 +88,7 @@ fun SettingsSlider(
                 Box(
                     modifier = Modifier
                         .size(16.dp)
-                        .clip(CircleShape)
+                        .clip(ContinuousCapsule)
                         .background(accentFill),
                 )
             },

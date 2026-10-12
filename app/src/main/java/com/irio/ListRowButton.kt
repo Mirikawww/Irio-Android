@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.kyant.shapes.RoundedRectangle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -162,7 +162,7 @@ fun ExperimentalBadge() {
     Text(
         tr("实验性"),
         modifier = Modifier
-            .background(Theme[colors][primaryColor], RoundedCornerShape(4.dp))
+            .background(Theme[colors][primaryColor], RoundedRectangle(4.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp),
         color = Theme[colors][onPrimaryColor],
         fontSize = 12.sp,

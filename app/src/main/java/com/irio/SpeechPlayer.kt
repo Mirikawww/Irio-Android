@@ -26,8 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.kyant.shapes.RoundedRectangle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Forward5
@@ -44,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -598,7 +596,7 @@ internal fun SpeechTransportBar() {
         modifier = Modifier
             .padding(start = 16.dp, bottom = 4.dp)
             .horizontalScroll(rememberScrollState())
-            .background(Theme[colors][secondaryColor], RoundedCornerShape(20.dp))
+            .background(Theme[colors][secondaryColor], RoundedRectangle(20.dp))
             .padding(horizontal = 4.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -675,14 +673,13 @@ private fun SpeechProgress(
             .width(96.dp)
             .height(4.dp),
     ) {
-        val radius = CornerRadius(size.height / 2f, size.height / 2f)
-        drawRoundRect(track, cornerRadius = radius)
+        drawContinuous(track, ContinuousCapsule)
         val width = size.width * fraction
         if (width > 0f) {
-            drawRoundRect(
-                color = fill,
+            drawContinuous(
+                fill,
+                ContinuousCapsule,
                 size = Size(width.coerceAtLeast(size.height), size.height),
-                cornerRadius = radius,
             )
         }
     }
@@ -717,7 +714,7 @@ private fun SpeechTransportButton(
         onClick = onClick,
         style = ButtonStyle.Ghost,
         buttonSize = ButtonSize.Small,
-        shape = CircleShape,
+        shape = ContinuousCapsule,
         modifier = Modifier.size(36.dp),
     ) {
         Icon(

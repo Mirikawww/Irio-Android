@@ -15,9 +15,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -40,9 +39,13 @@ import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kyant.shapes.RoundedRectangle
+import com.kyant.shapes.UnevenRoundedRectangle
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
 import com.composables.ui.theme.backgroundColor
@@ -76,7 +79,6 @@ import com.mikepenz.markdown.model.markdownExtendedSpans
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.unit.Density
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import org.intellij.markdown.MarkdownTokenTypes
@@ -277,10 +279,10 @@ private fun IrioMarkdownCheckBox(content: String, node: ASTNode) {
             color = Color.Transparent,
         )
         Canvas(Modifier.size(18.dp)) {
-            val radius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
+            val box = RoundedRectangle(2.dp)
             val strokeWidth = 1.5.dp.toPx()
             if (checked) {
-                drawRoundRect(color = stroke, cornerRadius = radius, style = Fill)
+                drawContinuous(stroke, box, style = Fill)
                 val check = Path().apply {
                     moveTo(size.width * 0.22f, size.height * 0.52f)
                     lineTo(size.width * 0.42f, size.height * 0.72f)
@@ -292,11 +294,7 @@ private fun IrioMarkdownCheckBox(content: String, node: ASTNode) {
                     style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
                 )
             } else {
-                drawRoundRect(
-                    color = stroke,
-                    cornerRadius = radius,
-                    style = Stroke(width = strokeWidth),
-                )
+                drawContinuous(stroke, box, style = Stroke(width = strokeWidth))
             }
         }
     }
@@ -402,7 +400,6 @@ private class IrioInlineCodeSpanPainter(
     private val horizontalPadding: TextUnit = 4.sp,
     private val verticalPadding: TextUnit = 4.sp,
 ) : ExtendedSpanPainter() {
-    private val path = Path()
 
     override fun decorate(
         span: SpanStyle,
@@ -445,7 +442,7 @@ private class IrioInlineCodeSpanPainter(
         val text = layoutResult.layoutInput.text
         val annotations = text.getStringAnnotations(TAG, start = 0, end = text.length)
         return SpanDrawInstructions {
-            val radius = CornerRadius(cornerRadius.toPx())
+            val radius = with(this) { cornerRadius.toPx().toDp() }
             val fontPx = fontSize.toPx()
             val padH = horizontalPadding.toPx()
             val padV = verticalPadding.toPx()
@@ -459,17 +456,17 @@ private class IrioInlineCodeSpanPainter(
                     padV = padV,
                 )
                 boxes.fastForEachIndexed { index, box ->
-                    path.rewind()
-                    path.addRoundRect(
-                        RoundRect(
-                            rect = box,
-                            topLeft = if (index == 0) radius else CornerRadius.Zero,
-                            bottomLeft = if (index == 0) radius else CornerRadius.Zero,
-                            topRight = if (index == boxes.lastIndex) radius else CornerRadius.Zero,
-                            bottomRight = if (index == boxes.lastIndex) radius else CornerRadius.Zero,
-                        ),
-                    )
-                    drawPath(path = path, color = backgroundColor, style = Fill)
+                    val left = if (index == 0) radius else 0.dp
+                    val right = if (index == boxes.lastIndex) radius else 0.dp
+                    val background = UnevenRoundedRectangle(
+                        topStart = left,
+                        topEnd = right,
+                        bottomEnd = right,
+                        bottomStart = left,
+                    ).continuousPath(Size(box.width, box.height), LayoutDirection.Ltr, this).apply {
+                        translate(Offset(box.left, box.top))
+                    }
+                    drawPath(path = background, color = backgroundColor, style = Fill)
                 }
             }
         }

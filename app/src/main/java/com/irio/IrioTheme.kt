@@ -17,6 +17,9 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import com.kyant.shapes.RoundedRectangle
+import com.kyant.shapes.UnevenRoundedRectangle
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -255,15 +258,16 @@ private val SurfaceOverride: ThemeComposable = buildTheme {
         // outer focus ring so focused fields do not get a second outline.
         ringColor to Color.Transparent,
     )
+    // Touch geometry is pinned above. These match Composables UI touch radii, with G2 corners.
     properties[shapes] = mapOf(
-        smallShape to Theme[shapes][smallShape],
-        mediumShape to Theme[shapes][mediumShape],
-        largeShape to Theme[shapes][largeShape],
-        buttonShape to Theme[shapes][buttonShape],
-        dialogShape to Theme[shapes][dialogShape],
-        sheetShape to Theme[shapes][sheetShape],
-        menuShape to Theme[shapes][menuShape],
-        fieldShape to Theme[shapes][fieldShape],
+        smallShape to RoundedRectangle(6.dp),
+        mediumShape to RoundedRectangle(12.dp),
+        largeShape to RoundedRectangle(16.dp),
+        buttonShape to RoundedRectangle(100.dp),
+        dialogShape to RoundedRectangle(16.dp),
+        sheetShape to UnevenRoundedRectangle(topStart = 24.dp, topEnd = 24.dp),
+        menuShape to RoundedRectangle(16.dp),
+        fieldShape to RoundedRectangle(16.dp),
     )
     properties[shadows] = mapOf(
         raisedShadow to Theme[shadows][raisedShadow],

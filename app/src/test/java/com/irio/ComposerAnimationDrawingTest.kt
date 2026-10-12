@@ -8,7 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.kyant.shapes.RoundedRectangle
+import com.kyant.shapes.UnevenRoundedRectangle
 import androidx.compose.runtime.BroadcastFrameClock
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Recomposer
@@ -51,7 +52,7 @@ class ComposerAnimationDrawingTest {
         val view = ComposeView(controller.get())
         val progress = mutableFloatStateOf(0f)
         val reference = mutableStateOf(true)
-        val shape = mutableStateOf<Shape>(RoundedCornerShape(6.dp))
+        val shape = mutableStateOf<Shape>(RoundedRectangle(6.dp))
         val density = mutableFloatStateOf(1f)
         val ring = Color(0.3f, 0.6f, 0.9f, 0.8f)
         val fill = Color(0.8f, 0.7f, 0.6f, 0.95f)
@@ -94,9 +95,9 @@ class ComposerAnimationDrawingTest {
                 density.floatValue = scale
                 for (outline in listOf(
                     RectangleShape,
-                    RoundedCornerShape(6.dp),
-                    RoundedCornerShape(0.1.dp),
-                    RoundedCornerShape(topStart = 2.dp, topEnd = 12.dp, bottomEnd = 16.dp, bottomStart = 4.dp),
+                    RoundedRectangle(6.dp),
+                    RoundedRectangle(0.1.dp),
+                    UnevenRoundedRectangle(topStart = 2.dp, topEnd = 12.dp, bottomEnd = 16.dp, bottomStart = 4.dp),
                 )) {
                     shape.value = outline
                     for (sample in listOf(0f, 0.17f, 0.5f, 0.85f, 1f)) {

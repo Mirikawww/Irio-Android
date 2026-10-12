@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.maxLength
 import androidx.compose.foundation.text.input.TextFieldLineLimits
@@ -208,7 +207,7 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                             onClick = { providerMenuOpen = !providerMenuOpen },
                             style = ButtonStyle.Ghost,
                             buttonSize = ButtonSize.Small,
-                            shape = CircleShape,
+                            shape = ContinuousCapsule,
                             modifier = Modifier.size(32.dp),
                             interactionSource = interactionSource,
                         ) {
@@ -409,7 +408,7 @@ private fun SystemPromptRow(onClick: () -> Unit) {
             onClick = onClick,
             style = ButtonStyle.Ghost,
             buttonSize = ButtonSize.Small,
-            shape = CircleShape,
+            shape = ContinuousCapsule,
             modifier = Modifier.size(24.dp),
             interactionSource = interactionSource,
         ) {
@@ -540,7 +539,7 @@ private fun ImageGenModelPicker(
                 onClick = { menuOpen = !menuOpen },
                 style = ButtonStyle.Ghost,
                 buttonSize = ButtonSize.Small,
-                shape = CircleShape,
+                shape = ContinuousCapsule,
                 modifier = Modifier.size(32.dp),
                 interactionSource = interactionSource,
             ) {
@@ -691,7 +690,7 @@ private fun TitleModelPicker(
                 onClick = { menuOpen = !menuOpen },
                 style = ButtonStyle.Ghost,
                 buttonSize = ButtonSize.Small,
-                shape = CircleShape,
+                shape = ContinuousCapsule,
                 modifier = Modifier.size(32.dp),
                 interactionSource = interactionSource,
             ) {

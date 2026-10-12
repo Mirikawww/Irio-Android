@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.TextAutoSize
@@ -265,7 +264,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                             onClick = { modeMenuOpen = !modeMenuOpen },
                             style = ButtonStyle.Ghost,
                             buttonSize = ButtonSize.Small,
-                            shape = CircleShape,
+                            shape = ContinuousCapsule,
                             modifier = Modifier.size(32.dp),
                             interactionSource = interactionSource,
                         ) {

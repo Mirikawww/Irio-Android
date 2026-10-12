@@ -110,6 +110,11 @@ dependencies {
 
     // Composables UI
     implementation("com.composables:ui:0.2.0")
+    // G2 continuous corners. The published Android variant depends on Compose Multiplatform
+    // ui 1.12, which would upgrade this app off the Compose BOM; the AAR calls AndroidX directly.
+    implementation("io.github.kyant0:shapes:1.2.1") {
+        exclude(group = "org.jetbrains.compose.ui")
+    }
     implementation("com.composables:composeunstyled-slider:2.7.0")
 
     // Haze progressive blur (chat toolbar)

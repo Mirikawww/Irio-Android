@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -67,7 +66,7 @@ private fun AccentSwatch(color: Color) {
         Box(
             modifier = Modifier
                 .size(12.dp)
-                .background(color, CircleShape),
+                .background(color, ContinuousCapsule),
         )
     }
 }
@@ -170,7 +169,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                             onClick = { languageMenuOpen = !languageMenuOpen },
                             style = ButtonStyle.Ghost,
                             buttonSize = ButtonSize.Small,
-                            shape = CircleShape,
+                            shape = ContinuousCapsule,
                             modifier = Modifier.size(32.dp),
                             interactionSource = interactionSource,
                         ) {
@@ -234,7 +233,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                             onClick = { themeMenuOpen = !themeMenuOpen },
                             style = ButtonStyle.Ghost,
                             buttonSize = ButtonSize.Small,
-                            shape = CircleShape,
+                            shape = ContinuousCapsule,
                             modifier = Modifier.size(32.dp),
                             interactionSource = interactionSource,
                         ) {
@@ -317,7 +316,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                             onClick = { accentMenuOpen = !accentMenuOpen },
                             style = ButtonStyle.Ghost,
                             buttonSize = ButtonSize.Small,
-                            shape = CircleShape,
+                            shape = ContinuousCapsule,
                             modifier = Modifier.size(32.dp),
                             interactionSource = interactionSource,
                         ) {

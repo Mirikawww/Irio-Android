@@ -21,8 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.runtime.Composable
@@ -141,7 +139,7 @@ fun IrioToolbar(
     }
 }
 
-internal val ToolbarCapsuleShape = RoundedCornerShape(50)
+internal val ToolbarCapsuleShape = ContinuousCapsule
 
 /**
  * 圆形图标按钮。强调色只填这个圆，图标用对比色，不跟强调色。
@@ -173,10 +171,10 @@ internal fun AccentCircleIconButton(
         enabled = enabled,
         style = ButtonStyle.Ghost,
         buttonSize = ButtonSize.Small,
-        shape = CircleShape,
+        shape = ContinuousCapsule,
         modifier = modifier
             .size(buttonSize)
-            .background(fill, CircleShape)
+            .background(fill, ContinuousCapsule)
             .semantics { this.contentDescription = contentDescription },
     ) {
         Icon(

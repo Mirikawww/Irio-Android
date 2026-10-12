@@ -14,11 +14,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Outline as ComposeOutline
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.kyant.shapes.RoundedRectangle
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.recyclerview.widget.DiffUtil
@@ -105,7 +110,28 @@ private class ComposeRecyclerView<T : Any>(
         // 把绘制锁在视图矩形里，历史行才不会叠到「新对话」上或从设置按钮底下的缝漏出去。
         outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(view: View, outline: Outline) {
-                outline.setRoundRect(0, 0, view.width, view.height, cornerRadiusPx)
+                val width = view.width
+                val height = view.height
+                if (width <= 0 || height <= 0 || cornerRadiusPx <= 0f) {
+                    outline.setRect(0, 0, width.coerceAtLeast(0), height.coerceAtLeast(0))
+                    return
+                }
+                val density = Density(
+                    view.resources.displayMetrics.density,
+                    view.resources.configuration.fontScale,
+                )
+                val shapeOutline = RoundedRectangle(with(density) { cornerRadiusPx.toDp() }).createOutline(
+                    androidx.compose.ui.geometry.Size(width.toFloat(), height.toFloat()),
+                    LayoutDirection.Ltr,
+                    density,
+                )
+                when (shapeOutline) {
+                    is ComposeOutline.Generic -> outline.setPath(shapeOutline.path.asAndroidPath())
+                    is ComposeOutline.Rounded -> outline.setRoundRect(
+                        0, 0, width, height, shapeOutline.roundRect.topLeftCornerRadius.x,
+                    )
+                    else -> outline.setRect(0, 0, width, height)
+                }
             }
         }
         clipToOutline = true

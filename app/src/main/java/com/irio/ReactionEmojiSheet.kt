@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.kyant.shapes.RoundedRectangle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -79,7 +79,7 @@ internal fun ReactionEmojiSheet(
                             .background(
                                 if (categoryIndex == index) Theme[colors][secondaryColor]
                                 else androidx.compose.ui.graphics.Color.Transparent,
-                                RoundedCornerShape(8.dp),
+                                RoundedRectangle(8.dp),
                             )
                             .clickable { categoryIndex = index }
                             .padding(horizontal = 10.dp, vertical = 8.dp),

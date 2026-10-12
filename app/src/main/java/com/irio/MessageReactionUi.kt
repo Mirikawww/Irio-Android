@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddReaction
 import androidx.compose.runtime.Composable
@@ -64,8 +63,8 @@ internal fun UserBubbleReaction(
                 ) {
                     Box(
                         modifier = Modifier.offset(x = 6.dp).size(30.dp)
-                            .background(bubbleColor, CircleShape)
-                            .border(2.dp, Theme[colors][backgroundColor], CircleShape),
+                            .background(bubbleColor, ContinuousCapsule)
+                            .border(2.dp, Theme[colors][backgroundColor], ContinuousCapsule),
                         contentAlignment = Alignment.Center,
                     ) {
                         BasicText(
@@ -80,8 +79,8 @@ internal fun UserBubbleReaction(
                             maxLines = 1,
                         )
                     }
-                    Box(Modifier.offset(y = 26.dp).size(9.dp).background(bubbleColor, CircleShape))
-                    Box(Modifier.offset(x = (-4).dp, y = 37.dp).size(4.dp).background(bubbleColor, CircleShape))
+                    Box(Modifier.offset(y = 26.dp).size(9.dp).background(bubbleColor, ContinuousCapsule))
+                    Box(Modifier.offset(x = (-4).dp, y = 37.dp).size(4.dp).background(bubbleColor, ContinuousCapsule))
                 }
             }
         }

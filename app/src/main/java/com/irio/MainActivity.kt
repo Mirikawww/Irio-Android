@@ -74,8 +74,7 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.kyant.shapes.RoundedRectangle
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.clearText
@@ -2272,7 +2271,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             .padding(horizontal = 16.dp, vertical = 4.dp)
                             .background(
                                 color = editFill,
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedRectangle(10.dp),
                             )
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -2969,7 +2968,7 @@ internal fun MessageRow(
                                             .widthIn(max = maxWidth * 0.85f)
                                             .background(
                                                 color = bubble.background,
-                                                shape = RoundedCornerShape(16.dp),
+                                                shape = RoundedRectangle(16.dp),
                                             )
                                             .then(
                                                 if (onEdit != null) {
@@ -3440,7 +3439,7 @@ private fun PendingAttachmentChip(
 ) {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedRectangle(12.dp))
             .background(Theme[colors][panelColor])
             .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -3527,7 +3526,7 @@ private fun AttachmentPreview(
             contentDescription = attachment.name,
             modifier = Modifier
                 .size(previewSize.width, previewSize.height)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedRectangle(12.dp))
                 .then(clickable),
             contentScale = ContentScale.Fit,
         )
@@ -3544,7 +3543,7 @@ private fun AttachmentPreview(
                         Modifier
                             .background(
                                 color = Theme[colors][panelColor],
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedRectangle(12.dp),
                             )
                             .padding(horizontal = 10.dp, vertical = 6.dp)
                     } else {
@@ -4445,7 +4444,7 @@ private fun PhotoViewer(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(20.dp)
-                .background(Color.Black.copy(alpha = 0.55f), CircleShape),
+                .background(Color.Black.copy(alpha = 0.55f), ContinuousCapsule),
         ) {
             if (saved) {
                 Icon(

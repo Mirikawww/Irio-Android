@@ -11,7 +11,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
@@ -268,7 +267,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                         details.hide()
                         installation = null
                     } catch (_: Exception) { sheets.detailsError = tr("无法移除 GitHub 集成，请重试") }
-                } }, style = ButtonStyle.Destructive, shape = CircleShape,
+                } }, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
                     modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(tr("移除集成"))
                 }
@@ -350,11 +349,11 @@ private fun GitHubButton(label: String, method: String? = null, modifier: Modifi
     val foreground = if (secondary) Theme[colors][onPanelColor] else if (dark) Color.Black else Color.White
     Button(onClick = onClick, enabled = enabled, style = ButtonStyle.Ghost, contentColor = foreground,
         modifier = modifier.then(if (compact) Modifier.widthIn(min = 88.dp) else Modifier)
-            .heightIn(min = if (compact) 32.dp else 48.dp).clip(CircleShape)
+            .heightIn(min = if (compact) 32.dp else 48.dp).clip(ContinuousCapsule)
             .background(ink.copy(alpha = if (enabled) 1f else 0.4f)),
         buttonSize = if (compact) ButtonSize.Small else ButtonSize.Default,
         contentPadding = PaddingValues(horizontal = if (compact) 24.dp else 16.dp, vertical = if (compact) 6.dp else 12.dp),
-        shape = CircleShape) {
+        shape = ContinuousCapsule) {
         Text(buildAnnotatedString {
             append(label)
             if (method != null) {
@@ -373,7 +372,7 @@ private fun GitHubAccountRow(account: GitHubMcpAccount?, loading: Boolean) {
         Text(tr("登录账号"), Modifier.weight(1f), color = muted, fontSize = 16.sp)
         Row(Modifier.weight(2f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
             if (account != null) {
-                Box(Modifier.size(24.dp).clip(CircleShape).background(Theme[colors][secondaryColor]), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(24.dp).clip(ContinuousCapsule).background(Theme[colors][secondaryColor]), contentAlignment = Alignment.Center) {
                     Text(account.login.take(1).uppercase(), color = muted, fontSize = 14.sp)
                     if (account.avatarUrl.isNotBlank()) {
                         AsyncImage(model = account.avatarUrl, contentDescription = tr("GitHub 头像"),

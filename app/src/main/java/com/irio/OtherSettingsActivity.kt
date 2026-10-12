@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.sp
 
@@ -208,7 +207,7 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                         onClick = { importModeMenuOpen = !importModeMenuOpen },
                         style = ButtonStyle.Ghost,
                         buttonSize = com.composables.ui.components.ButtonSize.Small,
-                        shape = androidx.compose.foundation.shape.CircleShape,
+                        shape = ContinuousCapsule,
                         modifier = Modifier.size(32.dp),
                         interactionSource = interactionSource,
                     ) {

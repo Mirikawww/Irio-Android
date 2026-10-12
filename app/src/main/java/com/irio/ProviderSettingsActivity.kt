@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldBuffer
@@ -348,7 +347,7 @@ internal fun ProtocolPicker(
                 enabled = enabled,
                 style = ButtonStyle.Ghost,
                 buttonSize = ButtonSize.Small,
-                shape = CircleShape,
+                shape = ContinuousCapsule,
                 modifier = Modifier.size(32.dp),
                 interactionSource = interactionSource,
             ) {
