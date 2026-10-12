@@ -65,6 +65,8 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -88,6 +90,8 @@ import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.OpenInFull
+import androidx.compose.material.icons.rounded.CloseFullscreen
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
@@ -171,6 +175,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.ui.components.AlertDialog
@@ -299,6 +304,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     /** 正在编辑的用户消息 id；null = 普通发送模式。 */
     var editingMessageId by remember { mutableStateOf<Long?>(null) }
     var pendingQuote by remember { mutableStateOf("") }
+    var composerFullscreen by rememberSaveable { mutableStateOf(false) }
+    var composerLineCount by remember { mutableIntStateOf(1) }
+    var compactComposerHeightPx by remember { mutableIntStateOf(0) }
     // 未发送的输入按会话分开。当前会话的内容只在输入框里，切走才写入这张表。
     val composerDrafts = remember { mutableMapOf<String, ComposerDraft>() }
     fun swapComposer(fromId: String, toId: String) {
@@ -320,6 +328,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         editingMessageId = restored.editingMessageId
         pendingQuote = restored.quote
         composerStatus = null
+        composerFullscreen = false
     }
     val composerFocusRequester = remember { FocusRequester() }
     LaunchedEffect(currentConversation.id) {
@@ -986,6 +995,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         },
         onNewConversation = { newConversation() },
     )
+
+    BackHandler(enabled = composerFullscreen && !processSheetOpen && viewingPhoto == null && !drawerOpen) {
+        composerFullscreen = false
+    }
 
     fun stopGeneration(conversationId: String = currentConversation.id) {
         val active = generations.values.filter { it.conversationId == conversationId }
@@ -2108,44 +2121,138 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     }
 
     @Composable
-    fun BoxScope.ChatComposerBar() {
-                Column(
+    fun BoxScope.ChatComposerBar(availableHeight: Dp) {
+        val compactHeight = with(LocalDensity.current) { compactComposerHeightPx.toDp() }
+        val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val canSend = (editingMessageId != null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty())) ||
+            (!generatingThisChat && editingMessageId == null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty()))
+
+        @Composable
+        fun AttachmentButton() {
+            DropdownMenu(
+                expanded = attachMenuOpen,
+                onExpandedChange = { attachMenuOpen = it },
+                modifier = Modifier.wrapContentWidth(Alignment.Start),
+                alignment = DropdownMenuAlignment.Start,
+                side = DropdownMenuSide.Top,
+                panel = {
+                    DropdownMenuPanel {
+                        DropdownMenuItem(
+                            onClick = {
+                                attachMenuOpen = false
+                                pickPhotos.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                                )
+                            },
+                            leading = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Photo,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            },
+                        ) { Text(tr("照片")) }
+                        DropdownMenuItem(
+                            onClick = {
+                                attachMenuOpen = false
+                                pickFiles.launch(arrayOf("*/*"))
+                            },
+                            leading = {
+                                Icon(
+                                    imageVector = Icons.Rounded.AttachFile,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            },
+                        ) { Text(tr("文件")) }
+                    }
+                },
+            ) {
+                IconButton(
+                    onClick = { attachMenuOpen = !attachMenuOpen },
+                    style = ButtonStyle.Ghost,
+                    buttonSize = ButtonSize.Small,
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .hazeBlur(
-                            input = HazeInput.Sources(chatHazeState),
-                            style = chatComposerHazeStyle(),
-                        ),
+                        .size(32.dp)
+                        .semantics { contentDescription = tr("添加附件") },
                 ) {
-                    Spacer(Modifier.height(ChatComposerHazeBleed))
-                    Column(
-                        modifier = Modifier
-                            .windowInsetsPadding(
-                                WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)
-                                    .exclude(WindowInsets.ime),
-                            )
-                            .onSizeChanged { composerBarHeightPx = it.height },
-                    ) {
-                if (pendingAttachments.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        pendingAttachments.forEach { attachment ->
-                            PendingAttachmentChip(
-                                attachment = attachment,
-                                onRemove = {
-                                    pendingAttachments = pendingAttachments.filterNot { it == attachment }
-                                },
-                            )
-                        }
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = tr("添加附件"),
+                        modifier = Modifier.size(20.dp),
+                        tint = content,
+                    )
+                }
+            }
+        }
+
+        @Composable
+        fun SendButton() {
+            val sendActive = generatingThisChat || canSend
+            AccentCircleIconButton(
+                onClick = {
+                    if (!generatingThisChat && canSend) composerFullscreen = false
+                    when {
+                        generatingThisChat -> stopGeneration()
+                        editingMessageId != null -> commitEdit()
+                        else -> submitMessage()
+                    }
+                },
+                imageVector = if (generatingThisChat) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward,
+                contentDescription = if (generatingThisChat) tr("停止输出") else "Send message",
+                enabled = sendActive,
+                active = sendActive,
+                iconSize = if (generatingThisChat) 22.dp else 20.dp,
+            )
+        }
+
+        @Composable
+        fun AttachmentChips() {
+            if (pendingAttachments.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    pendingAttachments.forEach { attachment ->
+                        PendingAttachmentChip(
+                            attachment = attachment,
+                            onRemove = {
+                                pendingAttachments = pendingAttachments.filterNot { it == attachment }
+                            },
+                        )
                     }
                 }
+            }
+        }
 
+        AnimatedComposerContainer(
+            expanded = composerFullscreen,
+            availableHeight = availableHeight,
+            compactHeight = compactHeight,
+            hazeState = chatHazeState,
+            onCompactHeightChanged = { compactComposerHeightPx = it },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) { expansion, expandedLayout ->
+            Spacer(Modifier.composerAnimatedHeight(expansion, ChatComposerHazeBleed, 0.dp))
+            Column(
+                modifier = Modifier
+                    .then(
+                        if (expandedLayout) {
+                            // 状态栏留白随展开进度渐入，避免第一帧整体下压。
+                            Modifier.weight(1f).composerAnimatedPadding(expansion, expandedTop = statusBarTop)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .windowInsetsPadding(
+                        WindowInsets.navigationBars.only(WindowInsetsSides.Bottom).exclude(WindowInsets.ime),
+                    )
+                    .onSizeChanged { if (!expandedLayout) composerBarHeightPx = it.height },
+            ) {
+                if (!expandedLayout) AttachmentChips()
                 if (composerStatus != null) {
                     Text(
                         composerStatus!!,
@@ -2209,98 +2316,79 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         onCancel = { pendingQuote = "" },
                     )
                 }
-                val canSend = (editingMessageId != null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty())) ||
-                    (!generatingThisChat && editingMessageId == null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty()))
+
                 ComposerField(
                     state = message,
                     placeholder = "Message",
                     focusRequester = composerFocusRequester,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .then(if (expandedLayout) Modifier.weight(1f) else Modifier)
+                        .composerAnimatedPadding(
+                            progress = expansion,
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 10.dp,
+                            bottom = 10.dp,
+                        ),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                     accessibilityLabel = "Message",
+                    expanded = expandedLayout,
+                    expansion = expansion,
+                    onTextLayout = { if (!expandedLayout) composerLineCount = it.lineCount },
                     lineLimits = TextFieldLineLimits.MultiLine(
                         minHeightInLines = 1,
-                        maxHeightInLines = 4,
+                        maxHeightInLines = if (expandedLayout) Int.MAX_VALUE else 4,
                     ),
-                    leading = {
-                        DropdownMenu(
-                            expanded = attachMenuOpen,
-                            onExpandedChange = { attachMenuOpen = it },
-                            modifier = Modifier.wrapContentWidth(Alignment.Start),
-                            alignment = DropdownMenuAlignment.Start,
-                            side = DropdownMenuSide.Top,
-                            panel = {
-                                DropdownMenuPanel {
-                                    DropdownMenuItem(
-                                        onClick = {
-                                            attachMenuOpen = false
-                                            pickPhotos.launch(
-                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                                            )
-                                        },
-                                        leading = {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Photo,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp),
-                                            )
-                                        },
-                                    ) { Text(tr("照片")) }
-                                    DropdownMenuItem(
-                                        onClick = {
-                                            attachMenuOpen = false
-                                            pickFiles.launch(arrayOf("*/*"))
-                                        },
-                                        leading = {
-                                            Icon(
-                                                imageVector = Icons.Rounded.AttachFile,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp),
-                                            )
-                                        },
-                                    ) { Text(tr("文件")) }
-                                }
-                            },
+                    leading = { AttachmentButton() },
+                    trailing = {
+                        Column(
+                            modifier = if (composerLineCount >= 4) Modifier.height(with(LocalDensity.current) { 80.sp.toDp() }) else Modifier,
+                            verticalArrangement = Arrangement.SpaceBetween,
+                            horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            IconButton(
-                                onClick = { attachMenuOpen = !attachMenuOpen },
-                                style = ButtonStyle.Ghost,
-                                buttonSize = ButtonSize.Small,
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .semantics { contentDescription = tr("添加附件") },
+                            if (composerLineCount >= 4) {
+                                IconButton(
+                                    onClick = {
+                                        attachMenuOpen = false
+                                        composerFullscreen = true
+                                    },
+                                    style = ButtonStyle.Ghost,
+                                    buttonSize = ButtonSize.Small,
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(Icons.Rounded.OpenInFull, contentDescription = tr("全屏输入"), modifier = Modifier.size(18.dp), tint = content)
+                                }
+                            }
+                            SendButton()
+                        }
+                    },
+                    expandedFooter = {
+                        Column(Modifier.fillMaxWidth()) {
+                            AttachmentChips()
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Add,
-                                    contentDescription = tr("添加附件"),
-                                    modifier = Modifier.size(20.dp),
-                                    tint = content,
-                                )
+                                AttachmentButton()
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = { composerFullscreen = false },
+                                        style = ButtonStyle.Ghost,
+                                        buttonSize = ButtonSize.Small,
+                                        modifier = Modifier.size(32.dp),
+                                    ) {
+                                        Icon(Icons.Rounded.CloseFullscreen, contentDescription = tr("收起全屏输入"), modifier = Modifier.size(20.dp), tint = content)
+                                    }
+                                    SendButton()
+                                }
                             }
                         }
                     },
-                    trailing = {
-                        val sendActive = generatingThisChat || canSend
-                        AccentCircleIconButton(
-                            onClick = {
-                                when {
-                                    generatingThisChat -> stopGeneration()
-                                    editingMessageId != null -> commitEdit()
-                                    else -> submitMessage()
-                                }
-                            },
-                            imageVector = if (generatingThisChat) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward,
-                            contentDescription = if (generatingThisChat) tr("停止输出") else "Send message",
-                            enabled = sendActive,
-                            active = sendActive,
-                            iconSize = if (generatingThisChat) 22.dp else 20.dp,
-                        )
-                    }
                 )
-                }
-                }
+            }
+        }
     }
 
     @Composable
@@ -2484,7 +2572,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             containerColor = background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
         ) { paddingValues ->
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
@@ -2539,7 +2627,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     },
                 )
 
-                ChatComposerBar()
+                ChatComposerBar(maxHeight)
 
                 ChatToolbar()
             }

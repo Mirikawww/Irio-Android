@@ -240,6 +240,8 @@ private val English = mapOf(
     "记忆" to "Memory",
     "设置" to "Settings",
     "摘要" to "Summarize",
+    "全屏输入" to "Fullscreen input",
+    "收起全屏输入" to "Collapse fullscreen input",
     "展开" to "Expand",
     "收起" to "Collapse",
     "关闭" to "Off",
