@@ -374,7 +374,12 @@ internal class MessageRecyclerController {
             lastEdge = child.bottom,
             viewportEnd = current.height - current.paddingBottom,
         )
-        if (catchUp == null || catchUp <= 0) {
+        if (catchUp == null || !sample.ready) {
+            idleConfirms = 0
+            bringUnlaidTail(current)
+            return
+        }
+        if (tailChaseSettled(catchUp, instantOpen)) {
             if (idleConfirms < 1) {
                 idleConfirms++
                 postChase()
@@ -390,7 +395,7 @@ internal class MessageRecyclerController {
         val beforeBottom = child.bottom
         programmaticPosts++
         try {
-            current.scrollBy(0, step)
+            scrollByProgrammatic(current, step, allowUpward = instantOpen)
         } finally {
             programmaticPosts--
         }
@@ -530,8 +535,8 @@ internal class MessageRecyclerController {
         scrollRequested = false
     }
 
-    private fun scrollByProgrammatic(view: MessageRecyclerView, dy: Int) {
-        if (dy <= 0) return
+    private fun scrollByProgrammatic(view: MessageRecyclerView, dy: Int, allowUpward: Boolean = false) {
+        if (dy == 0 || (dy < 0 && !allowUpward)) return
         programmaticPosts++
         try {
             view.scrollBy(0, dy)
@@ -546,6 +551,13 @@ internal class MessageRecyclerController {
      */
     private fun bringUnlaidTail(view: MessageRecyclerView) {
         if (gliding) return
+        // 用户接管（拖动/惯性）就停手，不要跟手指抢位置。
+        if (view.scrollState != RecyclerView.SCROLL_STATE_IDLE) {
+            scrollRequested = false
+            chasing = false
+            unlaidWaits = 0
+            return
+        }
         view.tailPrefetch = true
         val sample = view.tailSample()
         val overflow = measuredTailOverflow(
@@ -557,23 +569,28 @@ internal class MessageRecyclerController {
             measurementReady = sample.ready,
         )
         if (overflow != null) {
-            if (overflow <= 0) {
+            if (tailChaseSettled(overflow, instantOpen)) {
                 scrollRequested = false
                 chasing = false
                 return
             }
             unlaidWaits = 0
-            scrollByProgrammatic(view, tailFollowStep(overflow, instantOpen))
+            scrollByProgrammatic(view, tailFollowStep(overflow, instantOpen), allowUpward = instantOpen)
             scrollRequested = true
             chasing = true
             postChase()
             return
         }
         if (unlaidWaits++ >= 24) {
-            unlaidWaits = 0
-            scrollRequested = false
-            chasing = false
-            return
+            // 打开隐藏期列表不可见：跟随 pin 窗口继续等行对齐，不提前放弃；
+            // 窗口过后或非打开跟随，仍按 24 帧收敛，避免空转。
+            val withinPinWindow = openPinUntil != 0L && SystemClock.uptimeMillis() <= openPinUntil
+            if (!instantOpen || !withinPinWindow) {
+                unlaidWaits = 0
+                scrollRequested = false
+                chasing = false
+                return
+            }
         }
         scrollByProgrammatic(
             view,

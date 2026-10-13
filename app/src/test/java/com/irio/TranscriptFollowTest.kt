@@ -117,9 +117,21 @@ class TranscriptFollowTest {
     @Test
     fun openingAConversationJumpsTheWholeDistanceInOneStep() {
         assertEquals(1_800, tailFollowStep(1_800, instant = true))
-        assertEquals(0, tailFollowStep(-5, instant = true))
+        // 打开跳转让尾部落在视口顶：尾部短、底边还在底边之上时必须上滚补齐。
+        assertEquals(-5, tailFollowStep(-5, instant = true))
         assertEquals(smoothFollowStep(1_800), tailFollowStep(1_800, instant = false))
         assertTrue(tailFollowStep(1_800, instant = false) < 1_800)
+    }
+
+    @Test
+    fun openingSettlesOnlyOnExactBottom() {
+        assertTrue(tailChaseSettled(0, instant = true))
+        assertFalse(tailChaseSettled(-5, instant = true))
+        assertFalse(tailChaseSettled(36, instant = true))
+        assertFalse(tailChaseSettled(null, instant = true))
+        assertTrue(tailChaseSettled(0, instant = false))
+        assertTrue(tailChaseSettled(-5, instant = false))
+        assertFalse(tailChaseSettled(36, instant = false))
     }
 
     @Test

@@ -188,9 +188,17 @@ internal const val OpenRevealTimeoutMillis = 800L
 /** 打开会话后持续把尾部贴底的时间窗。覆盖 Markdown/TeX/图片的异步渲染。 */
 internal const val OpenPinWindowMillis = 1_500L
 
-/** 追尾一步的像素。打开会话时一次补齐全部超出量，其余情况按比例逐帧滑。 */
+/** 追尾一步的像素。打开会话时一次补齐全部超出量（含尾部在底边之上的负值上滚），其余情况按比例逐帧滑。 */
 internal fun tailFollowStep(remainingPx: Int, instant: Boolean): Int =
-    if (instant) remainingPx.coerceAtLeast(0) else smoothFollowStep(remainingPx)
+    if (instant) remainingPx else smoothFollowStep(remainingPx)
+
+/**
+ * 追尾是否已经收尾。打开时只有精确贴住（差值为 0）才算完：
+ * 尾部短、跳过去后底边还在视口底边之上时必须继续上滚，不能当成已贴底。
+ * 流式跟随只处理正向超出，0（含）以下都算贴住。
+ */
+internal fun tailChaseSettled(overflow: Int?, instant: Boolean): Boolean =
+    if (instant) overflow == 0 else overflow == null || overflow <= 0
 
 /** 先快后慢，固定时长结束时进度为 1。 */
 internal fun sendScrollEase(t: Float): Float {
