@@ -103,6 +103,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -146,6 +147,13 @@ private fun Modifier.modelSwitcherClickable(onClick: () -> Unit): Modifier = cli
 private val MaxThinkingGold = Color(0xFFFFB400)
 private val UltraThinkingPurple = Color(0xFF9254E8)
 
+/**
+ * 展开后的列表高度贴合内容：模型少时缩回去，不用最小高度硬撑出底部留白。
+ * 模型多时按屏幕高度 55% 封顶（264.dp..420.dp）。
+ */
+internal fun modelSwitcherListHeight(naturalHeight: Dp, screenHeightDp: Int): Dp =
+    naturalHeight.coerceAtMost((screenHeightDp * 0.55f).dp.coerceIn(264.dp, 420.dp))
+
 /** The entire surface changes to the list during the initial fast extension. */
 @Composable
 internal fun DropdownMenuScope.ModelSwitcherPanel(
@@ -186,7 +194,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
             is ModelPickerRow.Gap -> 6
         }
     }.dp + 8.dp
-    val listHeight = naturalHeight.coerceAtMost((configuration.screenHeightDp * 0.55f).dp.coerceIn(264.dp, 420.dp)).coerceAtLeast(compactHeight + 44.dp)
+    val listHeight = modelSwitcherListHeight(naturalHeight, configuration.screenHeightDp)
     val fastBackground by animateColorAsState(if (fastMode) accent.copy(alpha = 0.16f) else content.copy(alpha = 0.08f), tween(160), label = "fast background")
     val listOpacity = { modelSwitcherListOpacity(phase.value) }
     // Prepared in the same composition before the user starts expanding the surface.
@@ -194,7 +202,9 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
     DropdownMenuPanel(modifier = Modifier.width(width)) {
         Box(Modifier.width(width).padding(horizontal = 8.dp, vertical = 6.dp)
             .layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = listHeight.roundToPx()))
+                // 测量上限必须同时容下收起态主面板和展开列表，否则列表矮时会把主面板一起压扁。
+                val measureCap = maxOf(listHeight, compactHeight)
+                val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = measureCap.roundToPx()))
                 val height = compactHeight.roundToPx() + ((listHeight - compactHeight).toPx() * phase.value).roundToInt()
                 layout(placeable.width, height) { placeable.placeRelative(0, 0) }
             }.clipToBounds()) {

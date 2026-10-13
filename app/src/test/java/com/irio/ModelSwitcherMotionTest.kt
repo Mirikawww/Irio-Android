@@ -1,5 +1,6 @@
 package com.irio
 
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,6 +18,18 @@ class ModelSwitcherMotionTest {
         val endingVelocity = modelSwitcherExtension(0.801f) - modelSwitcherExtension(0.799f)
         assertTrue(entryVelocity > endingVelocity * 20f)
         assertEquals(1f, modelSwitcherListOpacity(modelSwitcherExtension(0.2f)), 0.001f)
+    }
+
+    @Test
+    fun shortModelListShrinksInsteadOfLeavingBlankSpace() {
+        // 2 个模型：2*36+8=80.dp，远小于收起态 220.dp，展开后应缩到内容高度。
+        assertEquals(80.dp, modelSwitcherListHeight(80.dp, 800))
+        // 模型多时按屏幕 55% 封顶，封顶区间 264.dp..420.dp。
+        assertEquals(420.dp, modelSwitcherListHeight(1000.dp, 800))
+        assertEquals(330.dp, modelSwitcherListHeight(1000.dp, 600))
+        assertEquals(264.dp, modelSwitcherListHeight(1000.dp, 400))
+        // 内容恰好在封顶内时保持原高度。
+        assertEquals(300.dp, modelSwitcherListHeight(300.dp, 800))
     }
 
     @Test
