@@ -12,7 +12,15 @@ internal fun buildTranscriptPresentation(
     conversationId: String,
     messages: List<ChatMessage>,
 ): TranscriptPresentation {
-    val retryGroups = retryVersionsForSelectedUsers(messages)
+    // 消息量大时线性扫描找归属是 O(N²)：一次建好 id→位置/消息索引，后面全是 O(1)。
+    // putIfAbsent 保持与 firstOrNull/indexOfFirst 一致的“首个匹配”语义。
+    val indexById = HashMap<Long, Int>(messages.size * 2)
+    val messageById = HashMap<Long, ChatMessage>(messages.size * 2)
+    messages.forEachIndexed { index, message ->
+        indexById.putIfAbsent(message.id, index)
+        messageById.putIfAbsent(message.id, message)
+    }
+    val retryGroups = retryVersionsForSelectedUsers(messages, indexById, messageById)
     val editGroups = editVersionsByGroup(messages)
     val selected = messages.filter { message ->
         if (message.summaryState != SummaryState.NONE) {
@@ -20,8 +28,8 @@ internal fun buildTranscriptPresentation(
         } else if (message.fromUser) {
             message.selected
         } else {
-            val ownerId = responseOwnerId(messages, message)
-            val owner = messages.firstOrNull { it.id == ownerId }
+            val ownerId = responseOwnerId(messages, message, indexById)
+            val owner = ownerId?.let { messageById[it] }
             if (owner != null && !owner.selected) {
                 false
             } else {
@@ -33,11 +41,18 @@ internal fun buildTranscriptPresentation(
     return TranscriptPresentation(conversationId, visible, retryGroups, editGroups, selected)
 }
 
-private fun responseOwnerId(messages: List<ChatMessage>, reply: ChatMessage): Long? {
+private fun responseOwnerId(
+    messages: List<ChatMessage>,
+    reply: ChatMessage,
+    indexById: Map<Long, Int>? = null,
+): Long? {
     reply.responseToUserId?.let { return it }
-    val replyIndex = messages.indexOfFirst { it.id == reply.id }
+    val replyIndex = indexById?.get(reply.id) ?: messages.indexOfFirst { it.id == reply.id }
     if (replyIndex < 0) return null
-    return messages.take(replyIndex).lastOrNull { it.fromUser }?.id
+    for (index in replyIndex - 1 downTo 0) {
+        if (messages[index].fromUser) return messages[index].id
+    }
+    return null
 }
 
 internal fun retryVersionsByGroup(messages: List<ChatMessage>): Map<Long, List<ChatMessage>> {
@@ -50,13 +65,17 @@ internal fun retryVersionsByGroup(messages: List<ChatMessage>): Map<Long, List<C
     return groups
 }
 
-private fun retryVersionsForSelectedUsers(messages: List<ChatMessage>): Map<Long, List<ChatMessage>> {
+private fun retryVersionsForSelectedUsers(
+    messages: List<ChatMessage>,
+    indexById: Map<Long, Int>,
+    messageById: Map<Long, ChatMessage>,
+): Map<Long, List<ChatMessage>> {
     return retryVersionsByGroup(messages).mapValues { (_, replies) ->
-        val ownerIds = replies.mapNotNull { responseOwnerId(messages, it) }.distinct()
+        val ownerIds = replies.mapNotNull { responseOwnerId(messages, it, indexById) }.distinct()
         val selectedOwnerId = ownerIds.firstOrNull { ownerId ->
-            messages.firstOrNull { it.id == ownerId }?.selected == true
+            messageById[ownerId]?.selected == true
         }
-        if (selectedOwnerId == null) replies else replies.filter { responseOwnerId(messages, it) == selectedOwnerId }
+        if (selectedOwnerId == null) replies else replies.filter { responseOwnerId(messages, it, indexById) == selectedOwnerId }
     }
 }
 
@@ -90,7 +109,13 @@ internal fun contextMessages(messages: List<ChatMessage>): List<ChatMessage> {
 
 internal fun retryVersions(messages: List<ChatMessage>, message: ChatMessage): List<ChatMessage> {
     if (message.fromUser) return editVersions(messages, message)
-    return retryVersionsForSelectedUsers(messages)[message.groupId].orEmpty()
+    val indexById = HashMap<Long, Int>(messages.size * 2)
+    val messageById = HashMap<Long, ChatMessage>(messages.size * 2)
+    messages.forEachIndexed { index, item ->
+        indexById.putIfAbsent(item.id, index)
+        messageById.putIfAbsent(item.id, item)
+    }
+    return retryVersionsForSelectedUsers(messages, indexById, messageById)[message.groupId].orEmpty()
 }
 
 internal fun editVersions(messages: List<ChatMessage>, message: ChatMessage): List<ChatMessage> {

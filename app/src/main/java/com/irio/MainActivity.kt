@@ -357,6 +357,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var conversationAction by remember { mutableStateOf<ConversationSummary?>(null) }
     var viewingPhoto by remember { mutableStateOf<ChatAttachment?>(null) }
     var generations by remember { mutableStateOf(emptyMap<Long, ActiveGeneration>()) }
+    // 发送前预检（token 估算在后台线程）进行中的回复占位：堵住异步窗口期的重复提交。
+    var preparing by remember { mutableStateOf(emptyMap<Long, String>()) }
     class BackgroundNoticeSink {
         var deliver: (String, List<LinuxBackgroundCommand>) -> Unit = { _, _ -> }
     }
@@ -365,6 +367,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
     fun flushBackgroundNotices(conversationId: String) {
         if (generations.values.any { it.conversationId == conversationId }) return
+        if (preparing.values.any { it == conversationId }) return
         val queued = pendingBackgroundNotices.remove(conversationId)?.toList().orEmpty()
         if (queued.isEmpty()) return
         backgroundNoticeSink.deliver(conversationId, queued)
@@ -427,6 +430,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var pendingConversationScroll by remember { mutableStateOf<String?>(null) }
     var conversationLoadToken by remember { mutableIntStateOf(0) }
     val generatingIds = remember(generations) { generations.values.map { it.conversationId }.toSet() }
+    val preparingIds = remember(preparing) { preparing.values.toSet() }
+    val busyThisChat = currentConversation.id in generatingIds || currentConversation.id in preparingIds
     val groupedConversationRows = remember(conversations, ThemeStore.language) { groupedConversations(conversations) }
     val conversationDrawerRows = remember(groupedConversationRows) {
         buildList {
@@ -1599,92 +1604,123 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
     /** 发送前若估算已到触发线，先插一张交接卡片。失败或目录里没有窗口就不挡住这次发送。 */
     fun sendOrCompress(conversationId: String, source: List<ChatMessage>, reply: ChatMessage) {
-        val window = ModelCatalog.contextWindow(context, selectedModel)
-        val estimate = estimateRequestTokens(modelRequestMessages(source))
-        val compress = !ModelCatalog.isImageModel(context, selectedModel) &&
-            shouldAutoCompress(
-                enabled = ToolStore.loadContextCompression(context),
-                windowTokens = window,
-                triggerPercent = ToolStore.loadCompressionTrigger(context),
-                estimatedTokens = estimate,
-            )
-        val covered = if (source.lastOrNull()?.fromUser == true) source.dropLast(1) else source
-        val plan = if (compress) planCompression(covered) else null
-        if (plan == null) {
-            startGeneration(conversationId, source, reply)
-            return
-        }
-        val card = ChatMessage(
-            id = MessageIds.next(),
-            text = "",
-            fromUser = false,
-            summaryState = SummaryState.RUNNING,
-            isPending = true,
-        )
-        if (currentConversation.id == conversationId) {
-            messages = insertSummaryCard(messages, plan.untilId, card)
-            persistCurrent(messages)
-        }
-        val cancellation = ChatRequestCancellation()
-        val job = scope.launch {
-            val text = runSummary(plan, conversationId, cancellation)
-            withContext(Dispatchers.Main.immediate) {
-                val cancelled = cancellation.isCancelled()
-                finishSummaryCard(conversationId, card, plan, text, cancelled)
-                generations = generations - card.id
-                if (cancelled) {
-                    val next = messagesOf(conversationId).filterNot {
-                        it.id == reply.id && it.text.isBlank() && it.attachments.isEmpty() && it.process.isEmpty()
-                    }
-                    if (currentConversation.id == conversationId) {
-                        messages = next
-                        persistCurrent(messages)
-                    }
-                    flushBackgroundNotices(conversationId)
-                    return@withContext
+        // 同一回复只预检一次；占位同步写入，调用方 guards 据此拦截重复提交。
+        if (reply.id in preparing) return
+        preparing = preparing + (reply.id to conversationId)
+        val requestModel = selectedModel
+        val compressionEnabled = ToolStore.loadContextCompression(context)
+        val compressionTrigger = ToolStore.loadCompressionTrigger(context)
+        scope.launch {
+            try {
+                // jtokkit 估算 + 压缩决策是发送路径最重的同步块，放到后台线程。
+                // source 是调用方传入的不可变快照，跨线程共享安全。
+                val plan = withContext(Dispatchers.Default) {
+                    val window = ModelCatalog.contextWindow(context, requestModel)
+                    val estimate = estimateRequestTokens(modelRequestMessages(source))
+                    val compress = !ModelCatalog.isImageModel(context, requestModel) &&
+                        shouldAutoCompress(
+                            enabled = compressionEnabled,
+                            windowTokens = window,
+                            triggerPercent = compressionTrigger,
+                            estimatedTokens = estimate,
+                        )
+                    val covered = if (source.lastOrNull()?.fromUser == true) source.dropLast(1) else source
+                    if (compress) planCompression(covered) else null
                 }
-                val nextSource = contextMessages(messagesOf(conversationId))
-                    .filterNot { it.id == reply.id || it.isError || it.isPending }
-                startGeneration(conversationId, nextSource, reply)
+                if (plan == null) {
+                    startGeneration(conversationId, source, reply)
+                    return@launch
+                }
+                val card = ChatMessage(
+                    id = MessageIds.next(),
+                    text = "",
+                    fromUser = false,
+                    summaryState = SummaryState.RUNNING,
+                    isPending = true,
+                )
+                if (currentConversation.id == conversationId) {
+                    messages = insertSummaryCard(messages, plan.untilId, card)
+                    persistCurrent(messages)
+                }
+                val cancellation = ChatRequestCancellation()
+                val job = scope.launch {
+                    val text = runSummary(plan, conversationId, cancellation)
+                    withContext(Dispatchers.Main.immediate) {
+                        val cancelled = cancellation.isCancelled()
+                        finishSummaryCard(conversationId, card, plan, text, cancelled)
+                        generations = generations - card.id
+                        if (cancelled) {
+                            val next = messagesOf(conversationId).filterNot {
+                                it.id == reply.id && it.text.isBlank() && it.attachments.isEmpty() && it.process.isEmpty()
+                            }
+                            if (currentConversation.id == conversationId) {
+                                messages = next
+                                persistCurrent(messages)
+                            }
+                            flushBackgroundNotices(conversationId)
+                            return@withContext
+                        }
+                        val nextSource = contextMessages(messagesOf(conversationId))
+                            .filterNot { it.id == reply.id || it.isError || it.isPending }
+                        startGeneration(conversationId, nextSource, reply)
+                    }
+                }
+                generations = generations + (card.id to ActiveGeneration(
+                    conversationId = conversationId,
+                    job = job,
+                    cancellation = cancellation,
+                ))
+            } finally {
+                preparing = preparing - reply.id
             }
         }
-        generations = generations + (card.id to ActiveGeneration(
-            conversationId = conversationId,
-            job = job,
-            cancellation = cancellation,
-        ))
     }
 
     /** 不等触发线，也不接着生成回复。当前可见历史整段压成一道边界。 */
     fun compressNow() {
-        if (generatingThisChat) return
+        if (busyThisChat) return
         val conversationId = currentConversation.id
-        val covered = contextMessages(messages).filterNot { it.isError || it.isPending || it.isStreaming }
-        val plan = planCompression(covered) ?: return
-        val card = ChatMessage(
-            id = MessageIds.next(),
-            text = "",
-            fromUser = false,
-            summaryState = SummaryState.RUNNING,
-            isPending = true,
-        )
-        messages = insertSummaryCard(messages, plan.untilId, card)
-        persistCurrent(messages)
-        val cancellation = ChatRequestCancellation()
-        val job = scope.launch {
-            val text = runSummary(plan, conversationId, cancellation)
-            withContext(Dispatchers.Main.immediate) {
-                val cancelled = cancellation.isCancelled()
-                finishSummaryCard(conversationId, card, plan, text, cancelled)
-                generations = generations - card.id
-                flushBackgroundNotices(conversationId)
+        val snapshot = messages
+        val cardId = MessageIds.next()
+        preparing = preparing + (cardId to conversationId)
+        scope.launch {
+            try {
+                val plan = withContext(Dispatchers.Default) {
+                    planCompression(
+                        contextMessages(snapshot).filterNot { it.isError || it.isPending || it.isStreaming },
+                    )
+                } ?: return@launch
+                if (clearingHistory) return@launch
+                val card = ChatMessage(
+                    id = cardId,
+                    text = "",
+                    fromUser = false,
+                    summaryState = SummaryState.RUNNING,
+                    isPending = true,
+                )
+                if (currentConversation.id == conversationId) {
+                    messages = insertSummaryCard(messages, plan.untilId, card)
+                    persistCurrent(messages)
+                }
+                val cancellation = ChatRequestCancellation()
+                val job = scope.launch {
+                    val text = runSummary(plan, conversationId, cancellation)
+                    withContext(Dispatchers.Main.immediate) {
+                        val cancelled = cancellation.isCancelled()
+                        finishSummaryCard(conversationId, card, plan, text, cancelled)
+                        generations = generations - card.id
+                        flushBackgroundNotices(conversationId)
+                    }
+                }
+                generations = generations + (card.id to ActiveGeneration(
+                    conversationId = conversationId,
+                    job = job,
+                    cancellation = cancellation,
+                ))
+            } finally {
+                preparing = preparing - cardId
             }
         }
-        generations = generations + (card.id to ActiveGeneration(
-            conversationId = conversationId,
-            job = job,
-            cancellation = cancellation,
-        ))
     }
 
     fun deliverBackgroundNotices(conversationId: String, commands: List<LinuxBackgroundCommand>) {
@@ -1739,7 +1775,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
     fun submitMessage() {
         val text = message.text.toString().trim()
-        if (generatingThisChat || (text.isEmpty() && pendingAttachments.isEmpty())) return
+        if (busyThisChat || (text.isEmpty() && pendingAttachments.isEmpty())) return
         val attachments = pendingAttachments
         val userMessage = ChatMessage(
             id = MessageIds.next(),
@@ -1770,7 +1806,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
     /** 点击用户气泡：文本与附件带回输入框进入编辑模式（仅最新一条用户消息）。 */
     fun beginEdit(target: ChatMessage) {
-        if (generatingThisChat) return
+        if (busyThisChat) return
         if (target.id != visibleMessages(messages).lastOrNull { it.fromUser }?.id) return
         editingMessageId = target.id
         message.edit {
@@ -1799,7 +1835,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
      * 版本切换（showEditVersion）与回复切换（showRetryVersion）独立，各自切换各自组。
      */
     fun commitEdit() {
-        if (generatingThisChat) return
+        if (busyThisChat) return
         val targetId = editingMessageId ?: return
         val targetIndex = messages.indexOfFirst { it.id == targetId }
         if (targetIndex < 0) return
@@ -1846,6 +1882,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
     fun retryMessage(assistant: ChatMessage) {
         if (assistant.fromUser || assistant.isPending || assistant.isStreaming) return
+        if (currentConversation.id in preparingIds) return
         generations[assistant.id]?.cancellation?.cancel()
         val groupId = assistant.groupId
         val firstIndex = messages.indexOfFirst { !it.fromUser && it.groupId == groupId }
