@@ -2968,9 +2968,9 @@ internal fun MessageRow(
                                         chatMessage.text,
                                         modifier = Modifier
                                             .widthIn(max = maxWidth * 0.85f)
+                                            .clip(RoundedRectangle(16.dp))
                                             .background(
                                                 color = bubble.background,
-                                                shape = RoundedRectangle(16.dp),
                                             )
                                             .then(
                                                 if (onEdit != null) {
