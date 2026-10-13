@@ -88,6 +88,35 @@ class ResponsesRequestTest {
         assertTrue(updates.any { it.toolActive == true && it.displayText == "查询当地时间" })
     }
 
+    @Test
+    fun toolContinuationKeepsPreCallAssistantText() = runBlocking {
+        val call = JSONObject().put("type", "function_call").put("id", "item-time")
+            .put("call_id", "call-time").put("name", TimeTool.NAME).put("arguments", "{}")
+        val firstStream = "data: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\n" +
+            "data: {\"type\":\"response.output_item.added\",\"item\":$call}\n\n" +
+            "data: {\"type\":\"response.completed\",\"response\":{}}\n\n"
+        server.dispatcher = validatingDispatcher(firstStream = firstStream)
+        val result = ChatApi.streamChat(
+            provider(), "fixture-model", listOf(ChatRequestMessage("user", "now")), ReasoningEffort.OFF, false,
+            toolRegistry = ToolRegistry(listOf(TimeToolProvider())),
+            cancellation = ChatRequestCancellation(), onUpdate = {},
+        )
+        assertNull(result.error)
+        server.takeRequest(2, TimeUnit.SECONDS)!!
+        val continuation = JSONObject(server.takeRequest(2, TimeUnit.SECONDS)!!.body.readUtf8()).getJSONArray("input")
+        val texts = buildList {
+            for (index in 0 until continuation.length()) {
+                val item = continuation.getJSONObject(index)
+                if (item.optString("role") != "assistant") continue
+                val content = item.optJSONArray("content") ?: continue
+                for (partIndex in 0 until content.length()) {
+                    add(content.getJSONObject(partIndex).optString("text"))
+                }
+            }
+        }
+        assertTrue("pre-tool assistant text must reach the continuation round", texts.any { it.contains("partial") })
+    }
+
     private fun provider() = ProviderConfig(
         "fixture", "Fixture", server.url("/v1").toString(), "fixture-key", ProviderProtocol.RESPONSES,
     )

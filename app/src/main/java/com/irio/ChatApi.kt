@@ -1004,12 +1004,16 @@ object ChatApi {
                     .put("call_id", toolCallId)
                     .put("output", text),
             )
-            toolCalls.isNotEmpty() -> toolCalls.map { call ->
-                JSONObject()
-                    .put("type", "function_call")
-                    .put("call_id", call.id)
-                    .put("name", call.name)
-                    .put("arguments", call.arguments)
+            toolCalls.isNotEmpty() -> buildList {
+                // 工具调用前的正文也是上下文：丢掉它，下一轮模型会把已经说过的话再生成一遍。
+                if (text.isNotBlank()) add(toResponsesJson())
+                addAll(toolCalls.map { call ->
+                    JSONObject()
+                        .put("type", "function_call")
+                        .put("call_id", call.id)
+                        .put("name", call.name)
+                        .put("arguments", call.arguments)
+                })
             }
             else -> listOf(toResponsesJson())
         }
