@@ -5,9 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -159,8 +157,8 @@ private fun ProviderDetailScreen(
                         contentAlignment = Alignment.TopStart,
                         transitionSpec = {
                             val forward = targetState.ordinal > initialState.ordinal
-                            val slide = tween<IntOffset>(ProviderPageAnimMillis, easing = FastOutSlowInEasing)
-                            val fade = tween<Float>(ProviderPageAnimMillis, easing = FastOutSlowInEasing)
+                            val slide = irioSpring<IntOffset>(stiffness = 420f)
+                            val fade = irioSpring<Float>(stiffness = 520f)
                             (
                                 slideInHorizontally(slide) { full -> if (forward) full else -full } +
                                     fadeIn(fade)
@@ -337,7 +335,6 @@ private enum class ProviderDetailPage(val label: String) {
     Models("模型"),
 }
 
-private const val ProviderPageAnimMillis = 320
 private val RefreshModelGap = 8.dp
 
 @Composable
@@ -501,7 +498,7 @@ private fun ProviderDetailTabs(
     val pages = ProviderDetailPage.entries
     val progress by animateFloatAsState(
         targetValue = pages.indexOf(selected).toFloat(),
-        animationSpec = tween(ProviderPageAnimMillis, easing = FastOutSlowInEasing),
+        animationSpec = irioSpring<Float>(stiffness = 520f),
         label = "providerTab",
     )
     val selectedFill = Theme[colors][primaryColor]
@@ -528,7 +525,7 @@ private fun ProviderDetailTabs(
                 pages.forEach { page ->
                     val ink by animateColorAsState(
                         if (page == selected) selectedInk else idleInk,
-                        tween(ProviderPageAnimMillis, easing = FastOutSlowInEasing),
+                        irioSpring(),
                         label = "providerTabInk",
                     )
                     Box(

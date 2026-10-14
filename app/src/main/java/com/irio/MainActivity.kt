@@ -26,7 +26,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloatAsState
@@ -420,7 +419,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var drawerStartProgress by remember { mutableStateOf(0f) }
     val drawerOpenProgress by animateFloatAsState(
         targetValue = drawerProgress,
-        animationSpec = if (drawerDragging) snap() else tween(420, easing = FastOutSlowInEasing),
+        animationSpec = if (drawerDragging) snap() else irioSpring<Float>(stiffness = 360f),
         label = "drawerOpenProgress",
     )
     val pageOffset = drawerWidth * drawerOpenProgress

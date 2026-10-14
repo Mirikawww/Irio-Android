@@ -1,8 +1,7 @@
 package com.irio
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.keyframes
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -53,12 +52,8 @@ internal fun rememberReactionBounce(
             if (emoji.isNotEmpty() && event?.emoji == emoji && tracker.claim(messageId, event)) {
                 // Recycled/detached ComposeViews can stop receiving frames midway through scaling.
                 withTimeoutOrNull(600L) {
-                    progress.animateTo(1f, animationSpec = keyframes {
-                        durationMillis = 300
-                        1f at 0 using FastOutSlowInEasing
-                        1.16f at 120 using FastOutSlowInEasing
-                        1f at 300
-                    })
+                    progress.animateTo(1.16f, animationSpec = irioSpring<Float>(stiffness = 8000f))
+                    progress.animateTo(1f, animationSpec = irioSpring<Float>(dampingRatio = 0.82f, stiffness = 4000f))
                 }
             }
         } finally {

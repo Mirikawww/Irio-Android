@@ -97,6 +97,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
+    implementation("androidx.dynamicanimation:dynamicanimation:1.0.0")
+
 
     // Compose BOM
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")

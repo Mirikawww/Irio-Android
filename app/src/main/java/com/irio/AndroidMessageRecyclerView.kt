@@ -4,6 +4,9 @@ import android.content.Context
 import android.graphics.Rect
 import android.os.SystemClock
 import android.view.View
+import androidx.dynamicanimation.animation.DynamicAnimation
+import androidx.dynamicanimation.animation.SpringAnimation
+import androidx.dynamicanimation.animation.SpringForce
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -111,6 +114,7 @@ internal class MessageRecyclerController {
     private var instantOpen = false
     private var openJumpPending = false
     private var openHidden = false
+    private var openRevealSpring: SpringAnimation? = null
     private var alignScheduled = false
     private var chasing = false
     private var chasePosted = false
@@ -202,7 +206,8 @@ internal class MessageRecyclerController {
         } finally {
             programmaticPosts--
         }
-        view.animate().cancel()
+        openRevealSpring?.cancel()
+        openRevealSpring = null
         view.alpha = 0f
         openHidden = true
         openPinUntil = SystemClock.uptimeMillis() + OpenPinWindowMillis
@@ -217,8 +222,15 @@ internal class MessageRecyclerController {
         if (!openHidden) return
         openHidden = false
         val view = recyclerView ?: return
-        view.animate().cancel()
-        view.animate().alpha(1f).setDuration(OpenRevealFadeMillis).start()
+        openRevealSpring?.cancel()
+        openRevealSpring = SpringAnimation(view, DynamicAnimation.ALPHA).apply {
+            setStartValue(view.alpha)
+            setStartVelocity(0f)
+            spring = SpringForce(1f).apply {
+                dampingRatio = SpringForce.DAMPING_RATIO_NO_BOUNCY
+                stiffness = SpringForce.STIFFNESS_MEDIUM
+            }
+        }.also { it.start() }
     }
 
     /** 直接把最后一项排进布局（贴视口顶），之后由追尾一次性补齐超出底边的像素。 */

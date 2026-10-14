@@ -90,14 +90,13 @@ internal class ThinkingParticleField(seed: Int, val count: Int) {
 
 /** Immediate fast arrival with a soft, decelerating finish. */
 internal fun modelSwitcherExtension(phase: Float): Float {
-    val remaining = 1f - phase.coerceIn(0f, 1f)
-    return 1f - remaining * remaining * remaining * remaining
+    return IrioEaseOut.transform(phase.coerceIn(0f, 1f))
 }
 
 /** Finish the whole-panel exchange during the first, fastest portion of the extension. */
 internal fun modelSwitcherListOpacity(extension: Float): Float {
     val p = ((extension - 0.04f) / 0.46f).coerceIn(0f, 1f)
-    return p * p * (3f - 2f * p)
+    return IrioEaseInOut.transform(p)
 }
 
 internal data class ThinkingGlyphFrame(val index: Int, val character: String, val x: Float, val y: Float = 0f, val alpha: Float = 1f)
@@ -105,7 +104,7 @@ internal data class ThinkingGlyphFrame(val index: Int, val character: String, va
 /** [delay] is the fraction of the shared timeline this glyph waits before it starts moving. */
 internal data class ThinkingGlyphRun(val start: ThinkingGlyphFrame, val end: ThinkingGlyphFrame, val delay: Float = 0f) {
     fun frame(progress: Float): ThinkingGlyphFrame {
-        val p = ((progress - delay) / (1f - delay)).coerceIn(0f, 1f)
+        val p = IrioEaseInOut.transform(((progress - delay) / (1f - delay)).coerceIn(0f, 1f))
         return start.copy(
             x = start.x + (end.x - start.x) * p,
             y = start.y + (end.y - start.y) * p,

@@ -1,8 +1,7 @@
 package com.irio
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -20,7 +19,7 @@ internal fun rememberMessageEntranceAlpha(messageId: Long, animate: Boolean): St
                 // RecyclerView rows can lose their frame clock while detached or prefetched.
                 // Opacity must not depend on receiving the final animation frame.
                 withTimeoutOrNull(600L) {
-                    progress.animateTo(1f, animationSpec = tween(150, easing = FastOutSlowInEasing))
+                    progress.animateTo(1f, animationSpec = irioSpring<Float>(stiffness = 1800f))
                 }
             }
         } finally {

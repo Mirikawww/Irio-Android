@@ -3,8 +3,7 @@ package com.irio
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.EaseOut
-import androidx.compose.animation.core.tween
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -274,7 +273,12 @@ internal fun ComposerField(
                             .heightIn(min = minContentHeight)
                             // 换行只长一行高（~20sp）：动画必须短，否则 clipToBounds 会把新行和
                             // 光标裁在框外，快速打字时每个新行都像慢半拍。
-                            .animateContentSize(animationSpec = tween(durationMillis = 90, easing = EaseOut))
+                            .animateContentSize(
+                                animationSpec = irioSpring<androidx.compose.ui.unit.IntSize>(
+                                    dampingRatio = 1f,
+                                    stiffness = 3200f,
+                                ),
+                            )
                             .clipToBounds(),
                         contentAlignment = Alignment.CenterStart,
                     ) {

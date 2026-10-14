@@ -114,8 +114,9 @@ class ModelSwitcherMotionTest {
             val runs = thinkingGlyphRuns(previous, target, direction)
             val incoming = runs.takeLast(target.size).map { it.frame(0.4f) }
             val outgoing = runs.take(previous.size).map { it.frame(0.4f) }
-            incoming.forEach { assertEquals(direction * 0.6f, it.y, 0.001f); assertEquals(0.4f, it.alpha, 0.001f) }
-            outgoing.forEach { assertEquals(-direction * 0.4f, it.y, 0.001f); assertEquals(0.6f, it.alpha, 0.001f) }
+            val eased = IrioEaseInOut.transform(0.4f)
+            incoming.forEach { assertEquals(direction * (1f - eased), it.y, 0.001f); assertEquals(eased, it.alpha, 0.001f) }
+            outgoing.forEach { assertEquals(-direction * eased, it.y, 0.001f); assertEquals(1f - eased, it.alpha, 0.001f) }
         }
     }
 

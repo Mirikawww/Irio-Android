@@ -3,7 +3,7 @@ package com.irio
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -116,7 +116,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
         pairInvalid = true
         shake.snapTo(0f)
         listOf(-10f, 10f, -8f, 8f, -4f, 4f, 0f).forEach { target ->
-            shake.animateTo(target, tween(36))
+            shake.animateTo(target, irioSpring<Float>(stiffness = 2600f, dampingRatio = 0.78f))
         }
     }
 

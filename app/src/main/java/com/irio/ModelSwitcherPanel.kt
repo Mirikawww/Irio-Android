@@ -6,10 +6,10 @@ import android.os.Looper
 import android.provider.Settings
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
+
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -182,8 +182,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
     var modelsExpanded by remember { mutableStateOf(false) }
     val phase = remember { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(modelsExpanded) {
-        phase.animateTo(if (modelsExpanded) 1f else 0f, tween(if (modelsExpanded) 160 else 130,
-            easing = androidx.compose.animation.core.Easing { modelSwitcherExtension(it) }))
+        phase.animateTo(if (modelsExpanded) 1f else 0f, irioSpring<Float>(stiffness = if (modelsExpanded) 900f else 1150f))
     }
     androidx.activity.compose.BackHandler(enabled = modelsExpanded) { modelsExpanded = false }
     val compactHeight = 220.dp
@@ -195,7 +194,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
         }
     }.dp + 8.dp
     val listHeight = modelSwitcherListHeight(naturalHeight, configuration.screenHeightDp)
-    val fastBackground by animateColorAsState(if (fastMode) accent.copy(alpha = 0.16f) else content.copy(alpha = 0.08f), tween(160), label = "fast background")
+    val fastBackground by animateColorAsState(if (fastMode) accent.copy(alpha = 0.16f) else content.copy(alpha = 0.08f), irioSpring(), label = "fast background")
     val listOpacity = { modelSwitcherListOpacity(phase.value) }
     // Prepared in the same composition before the user starts expanding the surface.
     val listOpacityState = remember { androidx.compose.runtime.derivedStateOf { modelSwitcherListOpacity(phase.value) } }
@@ -335,7 +334,7 @@ private fun RollingThinkingLabel(effort: ReasoningEffort, enabled: Boolean, colo
             val finished = withFrameNanos { frame ->
                 if (firstFrame == 0L) firstFrame = frame
                 val time = ((frame - firstFrame) / 180_000_000f).coerceIn(0f, 1f)
-                progress.floatValue = FastOutSlowInEasing.transform(time)
+                progress.floatValue = IrioEaseInOut.transform(time)
                 time >= 1f
             }
             if (finished) break
@@ -421,7 +420,7 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
     }
     val displayEffort = levels[preview.index]
     val showIntelligence = enabled && displayEffort != ReasoningEffort.OFF
-    val iconReveal by animateFloatAsState(if (showIntelligence) 1f else 0f, tween(160, easing = FastOutSlowInEasing), label = "thinking icon reveal")
+    val iconReveal by animateFloatAsState(if (showIntelligence) 1f else 0f, irioSpring<Float>(), label = "thinking icon reveal")
     val motionAllowed = rememberSwitcherMotionAllowed()
     val ultra = enabled && displayEffort == ReasoningEffort.ULTRA
     val clock = rememberParticleClock(ultra && motionAllowed && active)
@@ -433,7 +432,7 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
             displayEffort == ReasoningEffort.MAX -> MaxThinkingGold
             ultra -> UltraThinkingPurple
             else -> accent
-        }, tween(200), label = "thinking color",
+        }, irioSpring(), label = "thinking color",
     )
     val measurer = rememberTextMeasurer(cacheSize = 16)
     val labels = if (enabled) levels.map { tr(it.label) } else listOf(tr("不支持思考"))
@@ -445,11 +444,11 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
     val currentLabel = tr(if (enabled) displayEffort.label else "不支持思考")
     val labelWidth by animateDpAsState(
         with(density) { labelWidths.getValue(currentLabel).toDp() },
-        tween(180, easing = FastOutSlowInEasing), label = "thinking label width",
+        irioSpring(), label = "thinking label width",
     )
     // Icon stays anchored to the leading inset; the same animated width moves the bubble.
     val badgeWidth = labelWidth + 16.dp + 19.dp * iconReveal
-    val position by animateFloatAsState(value, if (dragging) tween(0) else spring(dampingRatio = 0.9f, stiffness = 700f), label = "thinking position")
+    val position by animateFloatAsState(value, if (dragging) snap() else irioSpring(dampingRatio = 0.9f, stiffness = 700f), label = "thinking position")
     val radius = with(density) { 12.dp.toPx() }
     val applySelection by rememberUpdatedState<(Int) -> Unit> { requested ->
         val next = preview.moveTo(requested.coerceIn(0, levels.lastIndex))

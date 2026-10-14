@@ -1,8 +1,6 @@
 package com.irio
 
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.heightIn
@@ -117,7 +115,7 @@ private fun ContextRingCanvas(
     }
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
-        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+        animationSpec = irioSpring<Float>(),
         label = "contextRingProgress",
     )
     Canvas(

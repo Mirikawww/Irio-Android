@@ -1,7 +1,6 @@
 package com.irio
 
-import androidx.compose.animation.core.EaseIn
-import androidx.compose.animation.core.EaseOut
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -211,7 +210,7 @@ internal val ChatComposerHazeBleed = ChatToolbarHazeBleed
 
 /**
  * 毛玻璃：主题色半透明着色 + 模糊，渐变铺满整段 overlay。
- * [bottomStrong] false = 顶栏上强下弱（EaseIn）；true = 输入框下强上弱（EaseOut，曲线镜像）。
+ * 两个边缘使用同一套手写曲线，只反转渐变方向。
  */
 @Composable
 internal fun chatToolbarHazeStyle(): HazeBlurStyle = chatEdgeHazeStyle(bottomStrong = false)
@@ -232,7 +231,7 @@ private fun chatEdgeHazeStyle(bottomStrong: Boolean): HazeBlurStyle {
             )
             progressive(
                 HazeProgressive.verticalGradient(
-                    easing = if (bottomStrong) EaseOut else EaseIn,
+                    easing = IrioEaseOut,
                     startIntensity = if (bottomStrong) 0f else 1f,
                     endIntensity = if (bottomStrong) 1f else 0f,
                 ),

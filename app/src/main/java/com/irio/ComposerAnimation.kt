@@ -1,9 +1,6 @@
 package com.irio
 
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -69,13 +66,9 @@ internal fun AnimatedComposerContainer(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.(State<Float>, Boolean) -> Unit,
 ) {
-    val expandEasing = remember { CubicBezierEasing(0.16f, 1f, 0.3f, 1f) }
     val progress = animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
-        animationSpec = tween(
-            durationMillis = if (expanded) 320 else 280,
-            easing = if (expanded) expandEasing else EaseOutCubic,
-        ),
+        animationSpec = irioSpring<Float>(stiffness = if (expanded) 420f else 560f),
         label = "composerExpansion",
     )
     val expandedLayout by remember(expanded, progress) {

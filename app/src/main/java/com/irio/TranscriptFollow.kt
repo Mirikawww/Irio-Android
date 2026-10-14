@@ -181,8 +181,7 @@ internal suspend fun ScrollState.smoothFollowBottom(
 /** 发送消息时滑到底的时长。按时间走，不按距离，离得远也不会滑很久。 */
 internal const val SendScrollDurationMillis = 300
 
-/** 打开会话：列表隐藏到落底后淡入的淡入时长，以及对齐迟迟不收尾时的兜底显示时限。 */
-internal const val OpenRevealFadeMillis = 120L
+/** 打开会话：对齐迟迟不收尾时的透明度动画兜底显示时限。 */
 internal const val OpenRevealTimeoutMillis = 800L
 
 /** 打开会话后持续把尾部贴底的时间窗。覆盖 Markdown/TeX/图片的异步渲染。 */
@@ -202,9 +201,7 @@ internal fun tailChaseSettled(overflow: Int?, instant: Boolean): Boolean =
 
 /** 先快后慢，固定时长结束时进度为 1。 */
 internal fun sendScrollEase(t: Float): Float {
-    val x = t.coerceIn(0f, 1f)
-    val inv = 1f - x
-    return 1f - inv * inv * inv
+    return IrioEaseOut.transform(t.coerceIn(0f, 1f))
 }
 
 /**
