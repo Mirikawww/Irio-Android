@@ -32,7 +32,7 @@ internal val ProviderProtocol.isGoogleGemini: Boolean
 enum class ReasoningEffort(val label: String, val apiValue: String?) {
     OFF("关闭", "none"),
     AUTO("自动", null), // 仅用于协议内部默认处理，不能作为用户设置保存。
-    MINIMAL("最低", "minimal"),
+    MINIMAL("极低", "minimal"),
     LOW("低", "low"),
     MEDIUM("中", "medium"),
     HIGH("高", "high"),
