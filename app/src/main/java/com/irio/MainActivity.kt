@@ -1773,6 +1773,18 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         deliverBackgroundNotices(conversationId, commands)
     }
 
+    /**
+     * 入场淡入只播一次：260ms 动画结束后标记即失去意义。不清掉的话，
+     * 该行组合被回收重建（滚远再滚回、重进会话）时会从透明重新播一遍，造成闪烁。
+     * 只清自己那次发送的标记，300ms 内重发不会误清新的。
+     */
+    fun clearEntranceMarkerAfterDelay(id: Long) {
+        scope.launch {
+            delay(300)
+            if (newUserMessageId == id) newUserMessageId = null
+        }
+    }
+
     fun submitMessage() {
         val text = message.text.toString().trim()
         if (busyThisChat || (text.isEmpty() && pendingAttachments.isEmpty())) return
@@ -1785,6 +1797,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             quote = pendingQuote,
         )
         newUserMessageId = userMessage.id
+        clearEntranceMarkerAfterDelay(userMessage.id)
         val reply = ChatMessage(
             id = MessageIds.next(),
             text = "",
@@ -1853,6 +1866,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             quote = pendingQuote,
         )
         newUserMessageId = committed.history.last().id
+        clearEntranceMarkerAfterDelay(committed.history.last().id)
         messages = committed.messages
         persistCurrent(messages)
         message.clearText()

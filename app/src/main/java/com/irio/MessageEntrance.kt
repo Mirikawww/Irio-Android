@@ -20,7 +20,7 @@ internal fun rememberMessageEntranceAlpha(messageId: Long, animate: Boolean): St
                 // RecyclerView rows can lose their frame clock while detached or prefetched.
                 // Opacity must not depend on receiving the final animation frame.
                 withTimeoutOrNull(600L) {
-                    progress.animateTo(1f, animationSpec = tween(260, easing = FastOutSlowInEasing))
+                    progress.animateTo(1f, animationSpec = tween(150, easing = FastOutSlowInEasing))
                 }
             }
         } finally {
