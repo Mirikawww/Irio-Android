@@ -59,6 +59,7 @@ class ComposerWrapAnimationTest {
                             placeholder = "",
                             modifier = Modifier.fillMaxWidth(),
                             onTextLayout = { lines = it.lineCount },
+                            animateLineWrap = true,
                             leading = { Box(Modifier.size(16.dp)) },
                             trailing = { Box(Modifier.size(16.dp)) },
                         )

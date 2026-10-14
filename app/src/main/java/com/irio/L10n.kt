@@ -281,6 +281,7 @@ private val English = mapOf(
     "公式大小" to "Formula size",
     "文本淡入" to "Text fade-in",
     "新消息滚动" to "New message scroll",
+    "消息框延展动画" to "Message box stretch animation",
     "思考块" to "Thinking block",
     "模型差异" to "Model diff",
     "模型切换器居左" to "Model selector on the left",

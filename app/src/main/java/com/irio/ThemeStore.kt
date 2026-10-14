@@ -134,6 +134,7 @@ object ThemeStore {
     private const val MODEL_DIFF_KEY = "model_diff"
     private const val MODEL_PICKER_ON_LEFT_KEY = "model_picker_on_left"
     private const val NEW_MESSAGE_SCROLL_KEY = "new_message_scroll"
+    private const val COMPOSER_WRAP_ANIMATION_KEY = "composer_wrap_animation"
     private const val THINKING_BLOCK_KEY = "thinking_block"
     private const val LEGACY_PREFS = "provider_settings"
     private const val LEGACY_KEY = "theme_preference"
@@ -170,6 +171,10 @@ object ThemeStore {
     var newMessageScroll by mutableStateOf(false)
         private set
 
+    /** 输入框换行时平滑延展。实验性，默认关。 */
+    var composerWrapAnimation by mutableStateOf(false)
+        private set
+
     /** 显示思考块（进行中的思考内容和「已思考 x 秒」）。关闭后只剩「思考中」。默认开。 */
     var thinkingBlock by mutableStateOf(true)
         private set
@@ -193,6 +198,7 @@ object ThemeStore {
             modelDiff = appearance.getBoolean(MODEL_DIFF_KEY, false)
             modelPickerOnLeft = appearance.getBoolean(MODEL_PICKER_ON_LEFT_KEY, false)
             newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, false)
+            composerWrapAnimation = appearance.getBoolean(COMPOSER_WRAP_ANIMATION_KEY, false)
             thinkingBlock = appearance.getBoolean(THINKING_BLOCK_KEY, true)
             if (appearance.getString(KEY, null) == null && stored != null) {
                 appearance.edit().putString(KEY, stored).apply()
@@ -268,6 +274,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(NEW_MESSAGE_SCROLL_KEY, enabled)
+            .apply()
+    }
+
+    fun saveComposerWrapAnimation(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (composerWrapAnimation == enabled) return
+        composerWrapAnimation = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(COMPOSER_WRAP_ANIMATION_KEY, enabled)
             .apply()
     }
 

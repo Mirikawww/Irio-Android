@@ -430,6 +430,25 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        Text(tr("消息框延展动画"), color = Theme[colors][onPanelColor])
+                        Spacer(Modifier.width(8.dp))
+                        ExperimentalBadge()
+                    }
+                    Switch(
+                        checked = ThemeStore.composerWrapAnimation,
+                        onCheckedChange = { enabled ->
+                            ThemeStore.saveComposerWrapAnimation(context, enabled)
+                        },
+                    )
+                }
+                Row(
+                    modifier = Modifier.settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text(tr("上下文圆环"), color = Theme[colors][onPanelColor])
                     }
                     Switch(
