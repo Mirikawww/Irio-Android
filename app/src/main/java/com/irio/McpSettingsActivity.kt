@@ -208,7 +208,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                 GitHubLogo(48.dp)
                 Column(Modifier.weight(1f)) {
                     Text("GitHub", color = content, fontWeight = FontWeight.SemiBold)
-                    Text(tr("在对话中管理代码与协作"), fontSize = 13.sp, color = muted)
+                    Text(tr("在对话中管理代码与协作"), fontSize = 13.sp, lineHeight = 18.sp, color = muted)
                 }
                 GitHubButton(if (installation == null) tr("安装") else tr("管理"), enabled = loaded, compact = true,
                     onClick = { details.targetDetent = BottomSheetDetent.FullyExpanded })
@@ -399,7 +399,7 @@ private fun GitHubInfoRow(subtitle: String, label: String, onClick: (() -> Unit)
     } else Theme[colors][onPanelColor]
     Row(Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
         .padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(subtitle, Modifier.weight(1f), color = Theme[colors][mutedColor], fontSize = 16.sp)
+        Text(subtitle, Modifier.weight(1f), color = Theme[colors][mutedColor], fontSize = 16.sp, lineHeight = 20.sp)
         Text(label, color = labelColor, fontSize = 16.sp)
     }
 }
