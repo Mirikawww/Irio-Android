@@ -340,7 +340,9 @@ internal fun RollingGlyphLabel(
         else layout.size.height / 2f - (layout.firstBaseline - AscenderEm / 2f * fontPx)
     }
     val progress = remember { mutableFloatStateOf(1f) }
-    var runs by remember(text, enterFromEmpty) {
+    // Do not key this on text. Replacing the previous glyphs with the destination before the
+    // effect runs skips the jump, and a settled label keeps the haze blur at zero.
+    var runs by remember {
         mutableStateOf(if (enterFromEmpty) emptyList() else targets.map { ThinkingGlyphRun(it, it) })
     }
     LaunchedEffect(targets, animate) {
