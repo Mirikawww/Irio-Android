@@ -358,14 +358,11 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
+                    ExperimentalLabel(
+                        tr("文本淡入"),
+                        color = Theme[colors][onPanelColor],
                         modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(tr("文本淡入"), color = Theme[colors][onPanelColor])
-                        Spacer(Modifier.width(8.dp))
-                        ExperimentalBadge()
-                    }
+                    )
                     Switch(
                         checked = ThemeStore.glyphFade,
                         onCheckedChange = { enabled ->
@@ -410,14 +407,11 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
+                    ExperimentalLabel(
+                        tr("新消息滚动"),
+                        color = Theme[colors][onPanelColor],
                         modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(tr("新消息滚动"), color = Theme[colors][onPanelColor])
-                        Spacer(Modifier.width(8.dp))
-                        ExperimentalBadge()
-                    }
+                    )
                     Switch(
                         checked = ThemeStore.newMessageScroll,
                         onCheckedChange = { enabled ->
@@ -429,14 +423,11 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
+                    ExperimentalLabel(
+                        tr("消息框延展动画"),
+                        color = Theme[colors][onPanelColor],
                         modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(tr("消息框延展动画"), color = Theme[colors][onPanelColor])
-                        Spacer(Modifier.width(8.dp))
-                        ExperimentalBadge()
-                    }
+                    )
                     Switch(
                         checked = ThemeStore.composerWrapAnimation,
                         onCheckedChange = { enabled ->

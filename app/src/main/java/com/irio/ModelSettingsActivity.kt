@@ -251,18 +251,11 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
+                    ExperimentalLabel(
+                        tr("更智能的工具调用提示"),
+                        color = Theme[colors][onBackgroundColor],
                         modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            tr("更智能的工具调用提示"),
-                            modifier = Modifier.weight(1f, fill = false),
-                            color = Theme[colors][onBackgroundColor],
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        ExperimentalBadge()
-                    }
+                    )
                     Switch(
                         checked = smartToolHints,
                         onCheckedChange = { enabled ->
@@ -312,17 +305,11 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
+                    ExperimentalLabel(
+                        tr("上下文压缩"),
+                        color = Theme[colors][onBackgroundColor],
                         modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            tr("上下文压缩"),
-                            color = Theme[colors][onBackgroundColor],
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        ExperimentalBadge()
-                    }
+                    )
                     Switch(
                         checked = contextCompression,
                         onCheckedChange = {
@@ -368,19 +355,11 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
+                    ExperimentalLabel(
+                        tr("使用 OpenRouter 思考数据"),
+                        color = Theme[colors][onBackgroundColor],
                         modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            tr("使用 OpenRouter 思考数据"),
-                            modifier = Modifier.weight(1f),
-                            color = Theme[colors][onBackgroundColor],
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        ExperimentalBadge()
-                    }
-                    Spacer(Modifier.width(8.dp))
+                    )
                     Switch(
                         checked = modelsDevReasoning,
                         onCheckedChange = {
