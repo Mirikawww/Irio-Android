@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -99,6 +100,7 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
     var titleModel by remember { mutableStateOf(ToolStore.loadTitleModel(context)) }
     var messageTimestamps by remember { mutableStateOf(ToolStore.loadMessageTimestamps(context)) }
     var smartToolHints by remember { mutableStateOf(ToolStore.loadSmartToolHints(context)) }
+    var showSmartHintNotice by remember { mutableStateOf(false) }
     var contextCompression by remember { mutableStateOf(ToolStore.loadContextCompression(context)) }
     var compressionTrigger by remember { mutableIntStateOf(ToolStore.loadCompressionTrigger(context)) }
     var compressionTarget by remember { mutableIntStateOf(ToolStore.loadCompressionTarget(context)) }
@@ -160,6 +162,7 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
         title = tr("模型"),
         onBack = onBack,
     ) { topInset, bottomInset ->
+        Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -261,9 +264,15 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                     }
                     Switch(
                         checked = smartToolHints,
-                        onCheckedChange = {
-                            smartToolHints = it
-                            ToolStore.saveSmartToolHints(context, it)
+                        onCheckedChange = { enabled ->
+                            smartToolHints = enabled
+                            ToolStore.saveSmartToolHints(context, enabled)
+                            if (!enabled) {
+                                showSmartHintNotice = false
+                            } else if (ThemeStore.mergeToolCalls) {
+                                ThemeStore.saveMergeToolCalls(context, false)
+                                showSmartHintNotice = true
+                            }
                         },
                     )
                 }
@@ -380,6 +389,13 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
+        }
+        IrioSnackbar(
+            visible = showSmartHintNotice,
+            message = tr("开启更智能的工具调用提示后，将自动关闭合并工具调用显示。"),
+            bottomInset = bottomInset,
+            onDismiss = { showSmartHintNotice = false },
+        )
         }
     }
 

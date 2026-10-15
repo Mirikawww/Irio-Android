@@ -3080,8 +3080,33 @@ internal fun MessageRow(
                         if (event.belowText) ProcessEventRow(event, onOpen = onOpenProcess, onQuote = onQuote)
                     }
                 } else {
-                    // 过程事件锚在它发生时的正文长度上：先说的话、工具、再说的话，完成输出后也不换位。
-                    val pieces = interleaveTranscript(chatMessage.text, chatMessage.process)
+                    // 工具调用可选地压缩为一行摘要，保留摘要在第一条工具事件原本的正文锚点。
+                    val mergeableEvents = chatMessage.process.filter {
+                        it.kind == ProcessEventKind.SEARCH ||
+                            (it.kind == ProcessEventKind.TOOL && it.toolName != ImageGenTool.NAME)
+                    }
+                    val processForRender = if (ThemeStore.mergeToolCalls && mergeableEvents.isNotEmpty()) {
+                        val first = mergeableEvents.first()
+                        val summary = mergedToolSummary(mergeableEvents)
+                        val firstIndex = chatMessage.process.indexOfFirst { it.id == first.id }
+                        buildList {
+                            chatMessage.process.forEachIndexed { index, event ->
+                                if (index == firstIndex) add(first.copy(
+                                    kind = ProcessEventKind.TOOL,
+                                    toolName = MERGED_TOOL_CALLS_NAME,
+                                    content = summary,
+                                    displayText = summary,
+                                    live = mergeableEvents.any { it.live },
+                                ))
+                                if (event.kind != ProcessEventKind.SEARCH && event.kind != ProcessEventKind.TOOL) {
+                                    add(event)
+                                }
+                            }
+                        }
+                    } else {
+                        chatMessage.process
+                    }
+                    val pieces = interleaveTranscript(chatMessage.text, processForRender)
                     val streamingBody = chatMessage.isStreaming || chatMessage.isPending
                     val lastTextIndex = pieces.indexOfLast { it is TranscriptPiece.Text }
                     var seenText = false
@@ -3234,6 +3259,15 @@ private fun ProcessEventRow(
         return
     }
     val muted = Theme[colors][mutedColor]
+    if (event.toolName == MERGED_TOOL_CALLS_NAME) {
+        Text(
+            event.content,
+            color = muted,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(bottom = 2.dp),
+        )
+        return
+    }
     val terminal = event.kind == ProcessEventKind.TOOL && event.toolName == LinuxShellTool.NAME
     val openable = event.toolName != ImageGenTool.NAME &&
         (terminal || (!event.live && event.content.isNotBlank()))

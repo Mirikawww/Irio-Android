@@ -136,6 +136,7 @@ object ThemeStore {
     private const val NEW_MESSAGE_SCROLL_KEY = "new_message_scroll"
     private const val COMPOSER_WRAP_ANIMATION_KEY = "composer_wrap_animation"
     private const val THINKING_BLOCK_KEY = "thinking_block"
+    private const val MERGE_TOOL_CALLS_KEY = "merge_tool_calls"
     private const val LEGACY_PREFS = "provider_settings"
     private const val LEGACY_KEY = "theme_preference"
 
@@ -179,6 +180,10 @@ object ThemeStore {
     var thinkingBlock by mutableStateOf(true)
         private set
 
+    /** 将同一条回复中的工具结果合并为一行。默认关。 */
+    var mergeToolCalls by mutableStateOf(false)
+        private set
+
     @Volatile
     private var loaded = false
 
@@ -200,6 +205,7 @@ object ThemeStore {
             newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, false)
             composerWrapAnimation = appearance.getBoolean(COMPOSER_WRAP_ANIMATION_KEY, false)
             thinkingBlock = appearance.getBoolean(THINKING_BLOCK_KEY, true)
+            mergeToolCalls = appearance.getBoolean(MERGE_TOOL_CALLS_KEY, false)
             if (appearance.getString(KEY, null) == null && stored != null) {
                 appearance.edit().putString(KEY, stored).apply()
             }
@@ -294,6 +300,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(THINKING_BLOCK_KEY, enabled)
+            .apply()
+    }
+
+    fun saveMergeToolCalls(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (mergeToolCalls == enabled) return
+        mergeToolCalls = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(MERGE_TOOL_CALLS_KEY, enabled)
             .apply()
     }
 

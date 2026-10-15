@@ -87,6 +87,8 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var texScalePercent by remember { mutableIntStateOf((ProviderStore.loadTexScale(context) * 100).toInt()) }
     var mergeModels by remember { mutableStateOf(ProviderStore.loadMergeModels(context)) }
+    var mergeToolCalls by remember { mutableStateOf(ThemeStore.mergeToolCalls) }
+    var showMergeWarning by remember { mutableStateOf(false) }
     var openRouterNames by remember { mutableStateOf(ProviderStore.loadModelsDevCatalog(context)) }
     val themePreference = ThemeStore.preference
     val accent = ThemeStore.accent
@@ -100,7 +102,8 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
         title = tr("外观"),
         onBack = onBack,
     ) { topInset, bottomInset ->
-        Column(
+        Box(Modifier.fillMaxSize()) {
+            Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = bottomInset)
@@ -474,6 +477,29 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         },
                     )
                 }
+                Row(
+                    modifier = Modifier.settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("合并工具调用显示"),
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][onPanelColor],
+                    )
+                    Switch(
+                        checked = mergeToolCalls,
+                        onCheckedChange = { enabled ->
+                            mergeToolCalls = enabled
+                            ThemeStore.saveMergeToolCalls(context, enabled)
+                            if (!enabled) {
+                                showMergeWarning = false
+                            } else if (ToolStore.loadSmartToolHints(context)) {
+                                ToolStore.saveSmartToolHints(context, false)
+                                showMergeWarning = true
+                            }
+                        },
+                    )
+                }
                 SettingsSlider(
                     label = tr("公式大小"),
                     value = texScalePercent,
@@ -528,5 +554,12 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 }
             }
         }
+        IrioSnackbar(
+            visible = showMergeWarning,
+            message = tr("开启合并工具调用后，将自动关闭更智能的工具调用提示。"),
+            bottomInset = bottomInset,
+            onDismiss = { showMergeWarning = false },
+        )
     }
+}
 }
