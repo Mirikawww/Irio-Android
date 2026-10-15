@@ -89,6 +89,7 @@ private fun MemorySettingsScreen(onBack: () -> Unit) {
         }
     }
 
+    DismissComposerFocusWhenImeHides()
     SettingsHazeScaffold(
         title = tr("记忆"),
         onBack = onBack,

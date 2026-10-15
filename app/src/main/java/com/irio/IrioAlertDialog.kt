@@ -27,6 +27,8 @@ fun IrioAlertDialog(
         modifier = modifier,
         backgroundColor = backgroundColor,
         contentColor = contentColor,
-        content = content,
-    )
+    ) {
+        DismissComposerFocusWhenImeHides()
+        content()
+    }
 }

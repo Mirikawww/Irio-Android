@@ -158,6 +158,7 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
         }
     }
 
+    DismissComposerFocusWhenImeHides()
     SettingsHazeScaffold(
         title = tr("模型"),
         onBack = onBack,

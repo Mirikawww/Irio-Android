@@ -48,6 +48,7 @@ private fun SystemPromptSettingsScreen(onBack: () -> Unit) {
     val state = rememberTextFieldState(SystemPromptStore.load(context))
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
+    DismissComposerFocusWhenImeHides()
     SettingsHazeScaffold(
         title = tr("系统提示词"),
         onBack = onBack,

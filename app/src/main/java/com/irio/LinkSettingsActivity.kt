@@ -126,6 +126,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
         pairInvalid = false
     }
 
+    DismissComposerFocusWhenImeHides()
     SettingsHazeScaffold(
         title = tr("互连"),
         onBack = onBack,
