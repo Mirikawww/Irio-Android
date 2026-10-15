@@ -7,6 +7,7 @@ import android.provider.Settings
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.animateColorAsState
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 
@@ -296,6 +297,8 @@ private fun ModelSwitcherToggle(label: String, checked: Boolean, enabled: Boolea
 
 /** Every language rolls glyph by glyph, each starting a beat after the previous one. */
 private const val RollStagger = 0.5f
+/** Stiffness matched to the previous 180ms fast-out roll. */
+private const val RollSpringStiffness = 760f
 private const val RollBlurMaxDp = 5f
 private const val RollBleedXDp = 12
 private const val RollBleedYDp = 6
@@ -329,15 +332,8 @@ private fun RollingThinkingLabel(effort: ReasoningEffort, enabled: Boolean, colo
         val visible = runs.map { it.frame(progress.floatValue) }
         runs = thinkingGlyphRuns(visible, targets, direction, RollStagger)
         progress.floatValue = 0f
-        var firstFrame = 0L
-        while (isActive) {
-            val finished = withFrameNanos { frame ->
-                if (firstFrame == 0L) firstFrame = frame
-                val time = ((frame - firstFrame) / 180_000_000f).coerceIn(0f, 1f)
-                progress.floatValue = IrioEaseInOut.transform(time)
-                time >= 1f
-            }
-            if (finished) break
+        Animatable(0f).animateTo(1f, irioSpring(stiffness = RollSpringStiffness)) {
+            progress.floatValue = value
         }
         runs = targets.map { ThinkingGlyphRun(it, it) }
         progress.floatValue = 1f

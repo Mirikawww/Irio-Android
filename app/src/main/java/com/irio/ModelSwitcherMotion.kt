@@ -104,7 +104,7 @@ internal data class ThinkingGlyphFrame(val index: Int, val character: String, va
 /** [delay] is the fraction of the shared timeline this glyph waits before it starts moving. */
 internal data class ThinkingGlyphRun(val start: ThinkingGlyphFrame, val end: ThinkingGlyphFrame, val delay: Float = 0f) {
     fun frame(progress: Float): ThinkingGlyphFrame {
-        val p = IrioEaseInOut.transform(((progress - delay) / (1f - delay)).coerceIn(0f, 1f))
+        val p = ((progress - delay) / (1f - delay)).coerceIn(0f, 1f)
         return start.copy(
             x = start.x + (end.x - start.x) * p,
             y = start.y + (end.y - start.y) * p,
