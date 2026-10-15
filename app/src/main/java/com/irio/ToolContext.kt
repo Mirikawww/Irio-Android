@@ -30,7 +30,7 @@ internal fun ChatMessage.contextText(): String = buildString {
         val name = when (event.kind) {
             ProcessEventKind.TOOL -> event.toolName.ifBlank { "tool" }
             ProcessEventKind.SEARCH -> WebSearchTool.NAME
-            ProcessEventKind.THINKING, ProcessEventKind.BUBBLE -> return@forEach
+            ProcessEventKind.THINKING, ProcessEventKind.BUBBLE, ProcessEventKind.SUBAGENT -> return@forEach
         }
         val remaining = recordedEvents[name] ?: 0
         if (remaining > 0) {

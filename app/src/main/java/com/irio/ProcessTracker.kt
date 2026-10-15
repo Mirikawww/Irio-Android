@@ -91,6 +91,33 @@ internal class ProcessTracker {
         )
     }
 
+    fun onSubagent(json: String) {
+        val snapshot = subagentSnapshot(json) ?: return
+        val existing = events.indexOfFirst { event ->
+            event.kind == ProcessEventKind.SUBAGENT && subagentSnapshot(event.content)?.id == snapshot.id
+        }
+        if (existing >= 0) {
+            events[existing] = events[existing].copy(content = json)
+            return
+        }
+        events += ProcessEvent(
+            id = nextId++,
+            kind = ProcessEventKind.SUBAGENT,
+            content = json,
+            belowText = outputStarted,
+            textOffset = eventAnchor(),
+        )
+    }
+
+    fun refreshSubagents(latest: Map<String, String>) {
+        if (latest.isEmpty()) return
+        events.replaceAll { event ->
+            if (event.kind != ProcessEventKind.SUBAGENT) return@replaceAll event
+            val id = subagentSnapshot(event.content)?.id ?: return@replaceAll event
+            latest[id]?.let { event.copy(content = it) } ?: event
+        }
+    }
+
     fun onColoredBubbles(bubbles: List<ColoredBubble>) {
         finishThinking()
         finishLiveTool()

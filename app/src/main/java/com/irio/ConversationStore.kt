@@ -58,7 +58,7 @@ internal fun hasReplyContent(
 ): Boolean = text.isNotBlank() || attachments.isNotEmpty() || process.any {
     when (it.kind) {
         ProcessEventKind.TOOL -> it.live || it.toolName != ImageGenTool.NAME || it.content != ImageGenTool.STATUS_OK
-        ProcessEventKind.SEARCH, ProcessEventKind.BUBBLE -> true
+        ProcessEventKind.SEARCH, ProcessEventKind.BUBBLE, ProcessEventKind.SUBAGENT -> true
         ProcessEventKind.THINKING -> it.live || it.content.isNotBlank() || it.millis > 0L
     }
 }

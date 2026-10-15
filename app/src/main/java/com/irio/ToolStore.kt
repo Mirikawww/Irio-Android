@@ -22,12 +22,30 @@ object ToolStore {
     private const val VISUALIZE_CONTEXT = "visualize_context"
     private const val COMPRESSION_MODEL = "context_compression_model"
     private const val SMART_TOOL_HINTS = "smart_tool_hints"
+    private const val SUBAGENTS = "subagents"
+    private const val SUBAGENT_MODEL = "subagent_model"
 
     fun loadSmartToolHints(context: Context): Boolean =
         preferences(context).getBoolean(SMART_TOOL_HINTS, false)
 
     fun saveSmartToolHints(context: Context, enabled: Boolean) {
         preferences(context).edit().putBoolean(SMART_TOOL_HINTS, enabled).apply()
+    }
+
+    /** 主模型能否创建子智能体。默认关闭。 */
+    fun loadSubagents(context: Context): Boolean =
+        preferences(context).getBoolean(SUBAGENTS, false)
+
+    fun saveSubagents(context: Context, enabled: Boolean) {
+        preferences(context).edit().putBoolean(SUBAGENTS, enabled).apply()
+    }
+
+    /** 子智能体使用的模型 id。空串表示跟随当前对话模型。 */
+    fun loadSubagentModel(context: Context): String =
+        preferences(context).getString(SUBAGENT_MODEL, "").orEmpty()
+
+    fun saveSubagentModel(context: Context, model: String) {
+        preferences(context).edit().putString(SUBAGENT_MODEL, model).apply()
     }
 
     fun loadMaxRounds(context: Context): Int =

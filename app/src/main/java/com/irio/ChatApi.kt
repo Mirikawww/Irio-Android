@@ -107,6 +107,8 @@ data class ChatStreamUpdate(
     val displayText: String = "",
     /** Assistant-visible colored output without a tool status row. */
     val coloredBubbles: List<ColoredBubble> = emptyList(),
+    /** 已创建的子智能体快照。非空时只显示卡片，不显示工具调用提示。 */
+    val subagentJson: String = "",
 )
 
 data class ToolCallDelta(
@@ -208,6 +210,9 @@ object ChatApi {
             appContext = appContext,
             conversationId = conversationId,
             onReaction = onReaction,
+            registry = toolRegistry,
+            reasoningEffort = reasoningEffort,
+            fastMode = fastMode,
         )
         repeat(rounds) { roundIndex ->
             if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
@@ -238,6 +243,7 @@ object ChatApi {
                 toolCalls = turn.toolCalls,
                 geminiParts = turn.geminiParts,
             )
+            var endTurn = false
             turn.toolCalls.forEach { call ->
                 if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
                 val result = try {
@@ -252,6 +258,7 @@ object ChatApi {
                 onUpdate(ChatStreamUpdate(toolRecord = ChatToolRecord(call, result.text), toolContent = result.text))
                 if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
                 searchPages += result.searchPages
+                endTurn = endTurn || result.endTurn
                 history += ChatRequestMessage(
                     role = "tool",
                     text = result.text,
@@ -259,6 +266,9 @@ object ChatApi {
                     toolName = call.name,
                     geminiFunctionId = call.geminiFunctionId,
                 )
+            }
+            if (endTurn) {
+                return ChatCompletionResult(searchPages = searchPages, usage = lastUsage)
             }
         }
         return ChatCompletionResult(
@@ -1481,6 +1491,8 @@ internal object MemoryTool {
         }
         GET -> tr("读取记忆")
         UPDATE -> tr("写入记忆")
+        SubagentTools.MESSAGE -> tr("联系子智能体")
+        SubagentTools.STOP -> tr("停止子智能体")
         else -> if (name.startsWith(GitHubMcpToolProvider.PREFIX)) GitHubMcpToolProvider.progressLabel(name, completed = false) else tr("调用工具")
     }
 
@@ -1497,6 +1509,8 @@ internal object MemoryTool {
         }
         GET -> tr("已读取记忆")
         UPDATE -> tr("已写入记忆")
+        SubagentTools.MESSAGE -> tr("已联系子智能体")
+        SubagentTools.STOP -> tr("已停止子智能体")
         else -> if (name.startsWith(GitHubMcpToolProvider.PREFIX)) GitHubMcpToolProvider.progressLabel(name, completed = true) else tr("已调用工具")
     }
 

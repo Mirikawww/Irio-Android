@@ -306,23 +306,43 @@ private const val AscenderEm = 0.76f
 /** One draw clock rolls natural-width glyphs together, preserving visible positions on reversal. */
 @Composable
 private fun RollingThinkingLabel(effort: ReasoningEffort, enabled: Boolean, color: Color, direction: Int, animate: Boolean) {
-    val text = tr(if (enabled) effort.label else "不支持思考")
+    RollingGlyphLabel(
+        text = tr(if (enabled) effort.label else "不支持思考"),
+        color = color,
+        direction = direction,
+        animate = animate,
+        style = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp, lineHeight = 20.sp),
+    )
+}
+
+@Composable
+internal fun RollingGlyphLabel(
+    text: String,
+    color: Color,
+    direction: Int,
+    animate: Boolean,
+    style: TextStyle,
+    enterFromEmpty: Boolean = false,
+    wrapContent: Boolean = false,
+) {
     val measurer = rememberTextMeasurer(cacheSize = 64)
     val density = LocalDensity.current
-    val style = remember { TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp, lineHeight = 20.sp) }
     val layout = measurer.measure(AnnotatedString(text), style, maxLines = 1, softWrap = false)
     val targets = remember(text, layout) {
         text.indices.map { index -> ThinkingGlyphFrame(index, text[index].toString(), layout.getBoundingBox(index).left) }
     }
     val isLatin = ThemeStore.language == AppLanguage.EN
+    val fontPx = with(density) { style.fontSize.toPx() }
     // The line box reserves descender room, so Latin ink (ascender..baseline) sits above its centre and
     // reads as misaligned with the icon. Nudge it down to centre that band; CJK fills the box evenly.
-    val opticalShift = remember(layout, isLatin, density) {
+    val opticalShift = remember(layout, isLatin, density, fontPx) {
         if (!isLatin) 0f
-        else layout.size.height / 2f - (layout.firstBaseline - AscenderEm / 2f * with(density) { 17.sp.toPx() })
+        else layout.size.height / 2f - (layout.firstBaseline - AscenderEm / 2f * fontPx)
     }
     val progress = remember { mutableFloatStateOf(1f) }
-    var runs by remember { mutableStateOf(targets.map { ThinkingGlyphRun(it, it) }) }
+    var runs by remember(text, enterFromEmpty) {
+        mutableStateOf(if (enterFromEmpty) emptyList() else targets.map { ThinkingGlyphRun(it, it) })
+    }
     LaunchedEffect(targets, animate) {
         if (!animate) {
             runs = targets.map { ThinkingGlyphRun(it, it) }
@@ -361,9 +381,10 @@ private fun RollingThinkingLabel(effort: ReasoningEffort, enabled: Boolean, colo
     val bleedX = with(density) { RollBleedXDp.dp.roundToPx() }
     val bleedY = with(density) { RollBleedYDp.dp.roundToPx() }
     val textHeight = layout.size.height
+    val textWidth = layout.size.width
     Canvas(Modifier
         .layout { measurable, constraints ->
-            val width = constraints.maxWidth
+            val width = if (wrapContent) textWidth else constraints.maxWidth
             val placeable = measurable.measure(Constraints.fixed(width + 2 * bleedX, textHeight + 2 * bleedY))
             layout(width, textHeight) { placeable.place(-bleedX, -bleedY) }
         }

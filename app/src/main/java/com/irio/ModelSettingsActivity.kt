@@ -100,6 +100,8 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
     var titleModel by remember { mutableStateOf(ToolStore.loadTitleModel(context)) }
     var messageTimestamps by remember { mutableStateOf(ToolStore.loadMessageTimestamps(context)) }
     var smartToolHints by remember { mutableStateOf(ToolStore.loadSmartToolHints(context)) }
+    var subagentsEnabled by remember { mutableStateOf(ToolStore.loadSubagents(context)) }
+    var subagentModel by remember { mutableStateOf(ToolStore.loadSubagentModel(context)) }
     var showSmartHintNotice by remember { mutableStateOf(false) }
     var contextCompression by remember { mutableStateOf(ToolStore.loadContextCompression(context)) }
     var compressionTrigger by remember { mutableIntStateOf(ToolStore.loadCompressionTrigger(context)) }
@@ -270,6 +272,23 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                         },
                     )
                 }
+                SettingsSwitchRow(
+                    label = tr("子智能体"),
+                    checked = subagentsEnabled,
+                    onCheckedChange = { enabled ->
+                        subagentsEnabled = enabled
+                        ToolStore.saveSubagents(context, enabled)
+                    },
+                )
+                TitleModelPicker(
+                    selected = subagentModel,
+                    onSelect = { model ->
+                        subagentModel = model
+                        ToolStore.saveSubagentModel(context, model)
+                    },
+                    label = tr("子智能体默认模型"),
+                    contentDescription = tr("选择子智能体默认模型"),
+                )
                 ImageGenModelPicker(
                     selected = imageGenModel,
                     onSelect = { model ->

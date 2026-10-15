@@ -28,12 +28,17 @@ data class ToolExecutionContext(
     val conversationId: String = "",
     /** 静默更新发起这次请求的对话；返回 false 表示目标已经不可用。 */
     val onReaction: suspend (Long, String) -> Boolean = { _, _ -> false },
+    val registry: ToolRegistry? = null,
+    val reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
+    val fastMode: Boolean = false,
 )
 
 /** Provider-neutral result that can be appended to the next model turn. */
 data class ToolExecutionResult(
     val text: String,
     val searchPages: Int = 0,
+    /** 本轮工具执行完就结束请求，不再开下一轮模型思考。 */
+    val endTurn: Boolean = false,
 )
 
 /**
@@ -108,7 +113,10 @@ class ToolRegistry(
             val name = schemaToolName(schema)
                 ?: error("Tool definition from registry has no name")
             require(names.add(name)) { "Tool name is duplicated in ${protocol.name}: $name" }
-        }.map { if (smartToolHints) SmartToolHints.decorate(it) else it }
+        }.map { schema ->
+            val name = schemaToolName(schema)
+            if (smartToolHints && name !in SubagentTools.QUIET) SmartToolHints.decorate(schema) else schema
+        }
     }
 
     /** Derive capability instructions from the same providers that supply wire definitions. */

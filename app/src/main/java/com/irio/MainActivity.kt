@@ -362,14 +362,33 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         var deliver: (String, List<LinuxBackgroundCommand>) -> Unit = { _, _ -> }
     }
     val backgroundNoticeSink = remember { BackgroundNoticeSink() }
+    class SubagentResultSink {
+        var deliver: (String, List<SubagentSnapshot>) -> Unit = { _, _ -> }
+    }
+    val subagentResultSink = remember { SubagentResultSink() }
     val pendingBackgroundNotices = remember { mutableMapOf<String, MutableList<LinuxBackgroundCommand>>() }
+    val subagentFinishes = remember { SubagentFinishQueue() }
+
+    fun flushSubagentResults(conversationId: String) {
+        if (generations.values.any { it.conversationId == conversationId }) return
+        if (preparing.values.any { it == conversationId }) return
+        val queued = subagentFinishes.take(conversationId)
+        if (queued.isEmpty()) return
+        subagentResultSink.deliver(conversationId, queued)
+    }
 
     fun flushBackgroundNotices(conversationId: String) {
         if (generations.values.any { it.conversationId == conversationId }) return
         if (preparing.values.any { it == conversationId }) return
         val queued = pendingBackgroundNotices.remove(conversationId)?.toList().orEmpty()
-        if (queued.isEmpty()) return
-        backgroundNoticeSink.deliver(conversationId, queued)
+        if (queued.isNotEmpty()) backgroundNoticeSink.deliver(conversationId, queued)
+        flushSubagentResults(conversationId)
+    }
+
+    fun noteSubagentFinished(snapshot: SubagentSnapshot) {
+        if (snapshot.state == SubagentState.RUNNING || snapshot.conversationId.isBlank()) return
+        if (!subagentFinishes.add(snapshot)) return
+        flushSubagentResults(snapshot.conversationId)
     }
 
     fun noteBackgroundFinished(command: LinuxBackgroundCommand) {
@@ -980,6 +999,46 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     val processSheetOpen = processSheetState.targetDetent != BottomSheetDetent.Hidden ||
         reactionSheetState.targetDetent != BottomSheetDetent.Hidden
     DismissComposerFocusWhenImeHides()
+    val persistSubagent by rememberUpdatedState<(SubagentSnapshot) -> Unit> { snapshot ->
+        val json = snapshot.toJson()
+        fun apply(source: List<ChatMessage>): List<ChatMessage> = source.map { message ->
+            var changed = false
+            val process = message.process.map { event ->
+                if (event.kind == ProcessEventKind.SUBAGENT && subagentSnapshot(event.content)?.id == snapshot.id) {
+                    changed = true
+                    event.copy(content = json)
+                } else {
+                    event
+                }
+            }
+            if (changed) message.copy(process = process) else message
+        }
+        if (currentConversation.id == snapshot.conversationId) {
+            val next = apply(messages)
+            if (next != messages) {
+                messages = next
+                persistCurrent(next)
+            }
+        } else {
+            val stored = ConversationStore.load(context, snapshot.conversationId)
+            if (stored != null) {
+                val next = apply(stored.messages)
+                if (next != stored.messages) {
+                    ConversationStore.save(context, stored.copy(messages = next, updatedAt = System.currentTimeMillis()))
+                }
+            }
+        }
+    }
+    DisposableEffect(Unit) {
+        SubagentHub.onChanged = { persistSubagent(it) }
+        SubagentHub.onFinished = { snapshot ->
+            scope.launch(Dispatchers.Main.immediate) { noteSubagentFinished(snapshot) }
+        }
+        onDispose {
+            SubagentHub.onChanged = null
+            SubagentHub.onFinished = null
+        }
+    }
     NavigationBackHandler(
         viewingPhoto = viewingPhoto != null,
         processSheetOpen = processSheetOpen,
@@ -1183,6 +1242,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 add(ReactionToolProvider())
                 add(ColoredBubbleToolProvider())
                 if (MemoryStore.loadEnabled(context)) add(MemoryToolProvider())
+                if (ToolStore.loadSubagents(context)) add(SubagentToolProvider())
                 if (LinuxSandboxPolicy.exposed(
                         LinuxSandboxStore.loadEnabled(LinuxSandboxLayout.of(context.filesDir).stateFile),
                         LinuxSandboxAccess.hasAllFiles(),
@@ -1337,7 +1397,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                         process.onOutputStarted(textLength = streamedText.length)
                                     }
                                 }
-                                if (!cancelled && update.coloredBubbles.isNotEmpty()) process.onColoredBubbles(update.coloredBubbles)
+                                if (!cancelled && update.subagentJson.isNotEmpty()) process.onSubagent(update.subagentJson)
+                            process.refreshSubagents(SubagentHub.jsonById())
+                            if (!cancelled && update.coloredBubbles.isNotEmpty()) process.onColoredBubbles(update.coloredBubbles)
                                 if (update.attachments.isNotEmpty()) {
                                     streamedAttachments = (streamedAttachments + update.attachments)
                                         .distinctBy { it.filePath }
@@ -1368,7 +1430,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 done = update.done,
                                 searchingChanged = update.searching != null,
                                 searchPagesDelta = update.searchPagesDelta,
-                                toolChanged = update.toolActive != null || update.toolRecord != null || update.coloredBubbles.isNotEmpty(),
+                                toolChanged = update.toolActive != null || update.toolRecord != null || update.coloredBubbles.isNotEmpty() || update.subagentJson.isNotEmpty(),
                                 toolOutputChanged = update.toolOutput != null,
                                 toolCallDeltaLength = update.toolCallDeltas.sumOf { it.name.length + it.argumentsDelta.length },
                                 publishedBodyLength = publishedBodyLength,
@@ -1768,8 +1830,64 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         sendOrCompress(conversationId, history, reply)
     }
 
+    fun deliverSubagentResults(conversationId: String, finished: List<SubagentSnapshot>) {
+        if (clearingHistory || finished.isEmpty()) return
+        val stored = if (currentConversation.id == conversationId) {
+            currentConversation.copy(messages = messages)
+        } else {
+            conversationContent(conversationId) ?: return
+        }
+        val notice = ChatMessage(
+            id = MessageIds.next(),
+            text = finished.joinToString("\n\n") { snapshot ->
+                val output = snapshot.lines.lastOrNull { !it.fromUser }?.text.orEmpty()
+                if (snapshot.state == SubagentState.COMPLETED) {
+                    tr("子智能体「%s」已完成。最终输出：\n%s").format(snapshot.name, output.ifBlank { tr("（没有文本输出）") })
+                } else {
+                    tr("子智能体「%s」失败或已被停止。已有输出：\n%s").format(snapshot.name, output.ifBlank { tr("（没有文本输出）") })
+                }
+            },
+            fromUser = true,
+            hidden = true,
+        )
+        val reply = ChatMessage(
+            id = MessageIds.next(),
+            text = "",
+            fromUser = false,
+            isPending = true,
+            responseToUserId = notice.id,
+        )
+        val next = messagesOf(conversationId) + notice + reply
+        if (currentConversation.id == conversationId) {
+            messages = next
+            persistCurrent(messages)
+        } else {
+            val updated = stored.copy(
+                messages = next,
+                updatedAt = System.currentTimeMillis(),
+                title = if (stored.titlePending) ConversationStore.titleFrom(next) else stored.title,
+            )
+            cacheConversationContent(updated)
+            conversations = conversations
+                .filterNot { it.id == updated.id }
+                .plus(updated.summary())
+                .let { list ->
+                    val sorted = list.sortedWith(
+                        compareByDescending<ConversationSummary> { it.pinned }.thenByDescending { it.updatedAt },
+                    )
+                    if (sorted == list) list else sorted
+                }
+            scope.launch(Dispatchers.IO) { ConversationStore.save(context, updated) }
+        }
+        val history = contextMessages(next).filterNot { it.isError || it.isPending }
+        sendOrCompress(conversationId, history, reply)
+    }
+
     backgroundNoticeSink.deliver = { conversationId, commands ->
         deliverBackgroundNotices(conversationId, commands)
+    }
+    subagentResultSink.deliver = { conversationId, finished ->
+        deliverSubagentResults(conversationId, finished)
     }
 
     /**
@@ -3059,8 +3177,8 @@ internal fun MessageRow(
                     )
                 }
                 if (chatMessage.isError && chatMessage.text.isNotBlank()) {
-                    chatMessage.process.forEach { event ->
-                        if (!event.belowText) ProcessEventRow(event, onOpen = onOpenProcess, onQuote = onQuote)
+                    chatMessage.process.filterNot { it.belowText }.let { events ->
+                        ProcessRun(events, onOpen = onOpenProcess, onQuote = onQuote)
                     }
                     Box(Modifier.padding(vertical = 2.dp)) {
                         CompositionLocalProvider(
@@ -3076,60 +3194,40 @@ internal fun MessageRow(
                             }
                         }
                     }
-                    chatMessage.process.forEach { event ->
-                        if (event.belowText) ProcessEventRow(event, onOpen = onOpenProcess, onQuote = onQuote)
+                    chatMessage.process.filter { it.belowText }.let { events ->
+                        ProcessRun(events, onOpen = onOpenProcess, onQuote = onQuote)
                     }
                 } else {
-                    // 工具调用可选地压缩为一行摘要，保留摘要在第一条工具事件原本的正文锚点。
-                    val mergeableEvents = chatMessage.process.filter {
-                        it.kind == ProcessEventKind.SEARCH ||
-                            (it.kind == ProcessEventKind.TOOL && it.toolName != ImageGenTool.NAME)
-                    }
-                    val processForRender = if (ThemeStore.mergeToolCalls && mergeableEvents.isNotEmpty()) {
-                        val first = mergeableEvents.first()
-                        val summary = mergedToolSummary(mergeableEvents)
-                        val firstIndex = chatMessage.process.indexOfFirst { it.id == first.id }
-                        buildList {
-                            chatMessage.process.forEachIndexed { index, event ->
-                                if (index == firstIndex) add(first.copy(
-                                    kind = ProcessEventKind.TOOL,
-                                    toolName = MERGED_TOOL_CALLS_NAME,
-                                    content = summary,
-                                    displayText = summary,
-                                    live = mergeableEvents.any { it.live },
-                                ))
-                                if (event.kind != ProcessEventKind.SEARCH && event.kind != ProcessEventKind.TOOL) {
-                                    add(event)
-                                }
-                            }
-                        }
-                    } else {
-                        chatMessage.process
-                    }
+                    val processForRender = renderedProcessEvents(chatMessage.process, ThemeStore.mergeToolCalls)
                     val pieces = interleaveTranscript(chatMessage.text, processForRender)
                     val streamingBody = chatMessage.isStreaming || chatMessage.isPending
                     val lastTextIndex = pieces.indexOfLast { it is TranscriptPiece.Text }
                     var seenText = false
-                    pieces.forEachIndexed { index, piece ->
-                        when (piece) {
-                            is TranscriptPiece.Event -> key("process-${piece.event.id}") {
-                                ProcessEventRow(piece.event, onOpen = onOpenProcess, onQuote = onQuote)
+                    transcriptRenderRows(pieces).forEach { row ->
+                        when (row) {
+                            is TranscriptRenderRow.Subagents -> key(row.events.joinToString("-") { it.id.toString() }) {
+                                SubagentCapsuleRow(row.events)
                             }
-                            is TranscriptPiece.Text -> {
-                                val shown = if (seenText) piece.text.trimStart('\n') else piece.text
-                                seenText = true
-                                if (shown.isNotBlank()) {
-                                    key("body-$index") {
-                                        Box(Modifier.padding(vertical = 2.dp)) {
-                                            CompositionLocalProvider(
-                                                LocalTextSelectionColors provides Theme[textSelectionColors][defaultTextSelectionColors],
-                                            ) {
-                                                QuoteSelectionContainer(onQuote = onQuote) {
-                                                    AssistantMarkdown(
-                                                        text = shown,
-                                                        streaming = streamingBody && index == lastTextIndex,
-                                                        renderScope = markdownScope,
-                                                    )
+                            is TranscriptRenderRow.Single -> when (val piece = row.piece) {
+                                is TranscriptPiece.Event -> key("process-${piece.event.id}") {
+                                    ProcessEventRow(piece.event, onOpen = onOpenProcess, onQuote = onQuote)
+                                }
+                                is TranscriptPiece.Text -> {
+                                    val shown = if (seenText) piece.text.trimStart('\n') else piece.text
+                                    seenText = true
+                                    if (shown.isNotBlank()) {
+                                        key("body-${row.index}") {
+                                            Box(Modifier.padding(vertical = 2.dp)) {
+                                                CompositionLocalProvider(
+                                                    LocalTextSelectionColors provides Theme[textSelectionColors][defaultTextSelectionColors],
+                                                ) {
+                                                    QuoteSelectionContainer(onQuote = onQuote) {
+                                                        AssistantMarkdown(
+                                                            text = shown,
+                                                            streaming = streamingBody && row.index == lastTextIndex,
+                                                            renderScope = markdownScope,
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -3236,11 +3334,36 @@ private fun StatusSweepText(label: String) {
 }
 
 @Composable
-private fun ProcessEventRow(
+private fun ProcessRun(
+    events: List<ProcessEvent>,
+    onOpen: (ProcessEvent) -> Unit,
+    onQuote: (String) -> Unit,
+) {
+    transcriptRenderRows(events.map { TranscriptPiece.Event(it) }).forEach { row ->
+        when (row) {
+            is TranscriptRenderRow.Subagents -> key(row.events.joinToString("-") { it.id.toString() }) {
+                SubagentCapsuleRow(row.events)
+            }
+            is TranscriptRenderRow.Single -> {
+                val event = (row.piece as TranscriptPiece.Event).event
+                key("process-${event.id}") {
+                    ProcessEventRow(event, onOpen = onOpen, onQuote = onQuote)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ProcessEventRow(
     event: ProcessEvent,
     onOpen: (ProcessEvent) -> Unit,
     onQuote: (String) -> Unit = {},
 ) {
+    if (event.kind == ProcessEventKind.SUBAGENT) {
+        SubagentCapsuleRow(listOf(event), Modifier.padding(vertical = 0.dp))
+        return
+    }
     if (event.kind == ProcessEventKind.BUBBLE) {
         ColoredBubbleView(event, onQuote)
         return
@@ -3275,7 +3398,7 @@ private fun ProcessEventRow(
         ProcessEventKind.THINKING -> if (event.live) null else tr("已思考 %s").format(formatThinkingDuration(event.millis))
         ProcessEventKind.SEARCH -> if (event.live) null else searchCompletedLabel(event.pages, event.searchQuery)
         ProcessEventKind.TOOL -> if (event.live) null else MemoryTool.doneLabel(event.toolName, event.content, event.webDomain)
-        ProcessEventKind.BUBBLE -> null
+        ProcessEventKind.BUBBLE, ProcessEventKind.SUBAGENT -> null
     }?.let { event.displayText.ifEmpty { it } }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (event.live) {
@@ -3300,7 +3423,7 @@ private fun ProcessEventRow(
                         ProcessEventKind.THINKING -> tr("思考中")
                         ProcessEventKind.SEARCH -> searchStatusLabel(event.searchQuery)
                         ProcessEventKind.TOOL -> MemoryTool.liveLabel(event.toolName, event.webDomain)
-                        ProcessEventKind.BUBBLE -> ""
+                        ProcessEventKind.BUBBLE, ProcessEventKind.SUBAGENT -> ""
                     }
                 }
             )
@@ -3400,7 +3523,7 @@ private fun ProcessEventRow(
 }
 
 @Composable
-private fun ProcessEventSheet(
+internal fun ProcessEventSheet(
     event: ProcessEvent?,
     state: BottomSheetState,
     onDismiss: () -> Unit,
@@ -4023,7 +4146,7 @@ private suspend fun prepareFinishedMessage(
 }
 
 @Composable
-private fun AssistantMarkdown(
+internal fun AssistantMarkdown(
     text: String,
     streaming: Boolean,
     renderScope: CoroutineScope,

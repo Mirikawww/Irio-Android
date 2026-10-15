@@ -6,6 +6,8 @@ enum class ProcessEventKind {
     TOOL,
     /** Visible assistant colored bubble, never a tool status label. */
     BUBBLE,
+    /** 子智能体卡片。不是工具状态行。 */
+    SUBAGENT,
 }
 
 data class ProcessEvent(
@@ -36,6 +38,35 @@ internal const val MERGED_TOOL_CALLS_NAME = "__merged_tool_calls__"
 internal fun searchStatusLabel(query: String, language: AppLanguage = ThemeStore.language): String {
     val status = translate(language, "网络搜索中")
     return if (query.isBlank()) status else "$status - $query"
+}
+
+/** 和主对话同一套：合并开关打开时，搜索和工具收成第一条工具锚点上的一行摘要。 */
+internal fun renderedProcessEvents(events: List<ProcessEvent>, mergeToolCalls: Boolean): List<ProcessEvent> {
+    if (!mergeToolCalls) return events
+    val mergeableEvents = events.filter {
+        it.kind == ProcessEventKind.SEARCH ||
+            (it.kind == ProcessEventKind.TOOL && it.toolName != ImageGenTool.NAME)
+    }
+    if (mergeableEvents.isEmpty()) return events
+    val first = mergeableEvents.first()
+    val summary = mergedToolSummary(mergeableEvents)
+    val firstIndex = events.indexOfFirst { it.id == first.id }
+    return buildList {
+        events.forEachIndexed { index, event ->
+            if (index == firstIndex) add(
+                first.copy(
+                    kind = ProcessEventKind.TOOL,
+                    toolName = MERGED_TOOL_CALLS_NAME,
+                    content = summary,
+                    displayText = summary,
+                    live = mergeableEvents.any { it.live },
+                ),
+            )
+            if (event.kind != ProcessEventKind.SEARCH && event.kind != ProcessEventKind.TOOL) {
+                add(event)
+            }
+        }
+    }
 }
 
 internal fun mergedToolSummary(
@@ -96,6 +127,34 @@ internal fun interleaveTranscript(text: String, process: List<ProcessEvent>): Li
     if (cursor < limit) pieces += TranscriptPiece.Text(text.substring(cursor))
     legacyTail.forEach { pieces += TranscriptPiece.Event(it) }
     return pieces
+}
+
+internal sealed class TranscriptRenderRow {
+    data class Single(val index: Int, val piece: TranscriptPiece) : TranscriptRenderRow()
+    data class Subagents(val events: List<ProcessEvent>) : TranscriptRenderRow()
+}
+
+/** 紧挨着的子智能体合成一行，中间一旦插入正文或其他过程就断开。 */
+internal fun transcriptRenderRows(pieces: List<TranscriptPiece>): List<TranscriptRenderRow> {
+    val rows = mutableListOf<TranscriptRenderRow>()
+    val pending = mutableListOf<ProcessEvent>()
+    fun flush() {
+        if (pending.isNotEmpty()) {
+            rows += TranscriptRenderRow.Subagents(pending.toList())
+            pending.clear()
+        }
+    }
+    pieces.forEachIndexed { index, piece ->
+        val event = (piece as? TranscriptPiece.Event)?.event
+        if (event?.kind == ProcessEventKind.SUBAGENT) {
+            pending += event
+        } else {
+            flush()
+            rows += TranscriptRenderRow.Single(index, piece)
+        }
+    }
+    flush()
+    return rows
 }
 
 /** 新一轮正文接在上一轮后面，而不是粘成一段。已有空行则不重复插入。 */
