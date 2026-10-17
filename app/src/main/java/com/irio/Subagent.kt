@@ -27,6 +27,11 @@ internal data class SubagentLine(
     val process: List<ProcessEvent> = emptyList(),
 )
 
+internal fun SubagentLine.visibleText(): String = visibleTranscriptText(text, process)
+
+internal fun SubagentSnapshot.finalOutputText(): String =
+    lines.lastOrNull { !it.fromUser }?.visibleText().orEmpty()
+
 internal data class SubagentSnapshot(
     val id: String,
     val conversationId: String,
@@ -177,6 +182,8 @@ internal class SubagentTurn {
     }
 
     fun text(): String = body
+
+    fun visibleText(): String = visibleTranscriptText(body, tracker.snapshot())
 
     fun process(): List<ProcessEvent> = tracker.snapshot()
 
@@ -413,8 +420,8 @@ internal object SubagentHub {
     fun inspect(conversationId: String, name: String): ToolExecutionResult {
         val session = sessions.values.firstOrNull { it.conversationId == conversationId && it.name == name }
             ?: return ToolExecutionResult(tr("找不到名为「%s」的子智能体。").format(name))
-        val finished = session.lines.filterNot { it.fromUser }.joinToString("\n\n") { it.text }
-        val live = session.liveText
+        val finished = session.lines.filterNot { it.fromUser }.joinToString("\n\n") { it.visibleText() }
+        val live = visibleTranscriptText(session.liveText, session.liveProcess)
         return ToolExecutionResult(
             buildString {
                 append(tr("子智能体「%s」状态：%s").format(session.name, subagentStatusLabel(session.state)))
@@ -478,6 +485,7 @@ internal object SubagentHub {
             }
             turn.finish()
             val text = turn.text()
+            val visibleText = turn.visibleText()
             val reply = settledSubagentLine(text, turn.process())
             val current = sessions[id] ?: return
             fun withReply(lines: List<SubagentLine>): List<SubagentLine> =
@@ -496,7 +504,7 @@ internal object SubagentHub {
                 )
                 return
             }
-            if (text.isNotBlank()) history += ChatRequestMessage(role = "assistant", text = text)
+            if (visibleText.isNotBlank()) history += ChatRequestMessage(role = "assistant", text = visibleText)
             val replied = withReply(current.lines)
             pending = drain(id)
             if (pending.isEmpty()) {

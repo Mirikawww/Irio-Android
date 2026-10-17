@@ -82,6 +82,28 @@ class SubagentTest {
     }
 
     @Test
+    fun finalOutputIncludesColoredBubblesWhenThereIsNoOrdinaryText() {
+        val snapshot = SubagentSnapshot(
+            id = "agent-1",
+            conversationId = "chat-1",
+            name = "气泡助手",
+            createdAt = 1L,
+            state = SubagentState.COMPLETED,
+            lines = listOf(
+                SubagentLine(
+                    fromUser = false,
+                    text = "",
+                    process = listOf(
+                        ProcessEvent(1, ProcessEventKind.BUBBLE, content = "第一段", belowText = true, bubbleColor = "#123456"),
+                        ProcessEvent(2, ProcessEventKind.BUBBLE, content = "第二段", belowText = true, bubbleColor = "#654321"),
+                    ),
+                ),
+            ),
+        )
+        assertEquals("第一段\n\n第二段", snapshot.finalOutputText())
+    }
+
+    @Test
     fun mergedRenderCollapsesToolHintsOntoTheFirstAnchor() {
         val events = listOf(
             ProcessEvent(1, ProcessEventKind.TOOL, toolName = TimeTool.NAME, displayText = "查询当地时间"),

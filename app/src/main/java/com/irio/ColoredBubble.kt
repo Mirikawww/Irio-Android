@@ -15,7 +15,12 @@ import com.kyant.shapes.RoundedRectangle
 
 /** Text copied/read aloud includes bubbles in their visible chronological order. */
 internal fun ChatMessage.visibleText(): String {
-    if (fromUser || process.none { it.kind == ProcessEventKind.BUBBLE }) return text
+    return if (fromUser) text else visibleTranscriptText(text, process)
+}
+
+/** Combine ordinary assistant text and colored bubbles in their display order. */
+internal fun visibleTranscriptText(text: String, process: List<ProcessEvent>): String {
+    if (process.none { it.kind == ProcessEventKind.BUBBLE }) return text
     return interleaveTranscript(text, process).mapNotNull { piece ->
         when (piece) {
             is TranscriptPiece.Text -> piece.text.trim().takeIf { it.isNotEmpty() }

@@ -1830,7 +1830,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         val notice = ChatMessage(
             id = MessageIds.next(),
             text = finished.joinToString("\n\n") { snapshot ->
-                val output = snapshot.lines.lastOrNull { !it.fromUser }?.text.orEmpty()
+                val output = snapshot.finalOutputText()
                 if (snapshot.state == SubagentState.COMPLETED) {
                     tr("子智能体「%s」已完成。最终输出：\n%s").format(snapshot.name, output.ifBlank { tr("（没有文本输出）") })
                 } else {
