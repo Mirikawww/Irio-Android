@@ -542,7 +542,9 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         if (!adjustable) return@awaitEachGesture
-                        dragging = true
+                        down.consume()
+                        var draggingGesture = false
+                        var released = false
                         fun moveTo(x: Float) {
                             val travel = (size.width - radius * 2f).coerceAtLeast(1f)
                             val physical = ((x - radius) / travel).coerceIn(0f, 1f)
@@ -551,13 +553,23 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
                             applySelection(value.roundToInt())
                         }
                         try {
-                            down.consume()
-                            moveTo(down.position.x)
                             do {
                                 val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                                if (change.pressed) moveTo(change.position.x)
-                                change.consume()
-                            } while (change.pressed)
+                                if (change.pressed) {
+                                    val distance = (change.position - down.position).getDistance()
+                                    if (!draggingGesture && distance > viewConfiguration.touchSlop) {
+                                        draggingGesture = true
+                                        dragging = true
+                                    }
+                                    if (draggingGesture) {
+                                        moveTo(change.position.x)
+                                        change.consume()
+                                    }
+                                } else {
+                                    if (!draggingGesture) moveTo(down.position.x)
+                                    released = true
+                                }
+                            } while (!released)
                         } finally {
                             value = preview.index.toFloat()
                             dragging = false
