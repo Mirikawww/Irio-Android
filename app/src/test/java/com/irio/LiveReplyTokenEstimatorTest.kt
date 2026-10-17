@@ -31,7 +31,7 @@ class LiveReplyTokenEstimatorTest {
             tokenizerThread = Thread.currentThread()
             text.length
         }
-        assertEquals(5, estimator.estimateOnWorker(true, "reply", emptyList(), ""))
+        assertEquals(5 to 0, estimator.estimateOnWorker(true, "reply", emptyList(), ""))
         assertNotEquals("Tokenization must be dispatched off the UI caller", callerThread, tokenizerThread)
     }
 
@@ -90,6 +90,22 @@ class LiveReplyTokenEstimatorTest {
             val process = listOf(thinking, search, ProcessEvent(3, ProcessEventKind.TOOL, content = "工具输出$round"))
             assertEquals(estimateLiveReplyTokens(body, process, arguments), estimator.estimate(body, process, arguments))
         }
+    }
+
+    @Test
+    fun workerSeparatesToolUsageFromBodyAndThinkingWithoutRetokenizing() = runBlocking {
+        val counted = mutableListOf<String>()
+        val estimator = LiveReplyTokenEstimator { counted += it; it.length }
+        val process = listOf(
+            ProcessEvent(1, ProcessEventKind.THINKING, content = "thinking"),
+            ProcessEvent(2, ProcessEventKind.SEARCH, content = "search result"),
+            ProcessEvent(3, ProcessEventKind.TOOL, content = "tool result"),
+        )
+        val estimate = estimator.estimateOnWorker(true, "body", process, "arguments")!!
+        val tools = "arguments".length + "search result".length + "tool result".length
+        assertEquals(tools, estimate.second)
+        assertEquals("body".length + "thinking".length, estimate.first - estimate.second)
+        assertEquals(listOf("body", "arguments", "thinking", "search result", "tool result"), counted)
     }
 
     @Test

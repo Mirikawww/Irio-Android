@@ -80,6 +80,19 @@ class ContextMenuLayoutTest {
         assertTrue("Children and gap must fit the reported height", stats.height + 10 + button.height <= result.height)
     }
 
+    @Test
+    fun exactWidthStretchesStatisticsToTheGivenWidth() {
+        val label = FixedMeasurable(60, 24)
+        val value = FixedMeasurable(80, 24)
+        val result = measure(
+            "contextStatMeasurePolicy",
+            listOf(label, value),
+            Constraints(minWidth = 220, maxWidth = 220),
+        )
+        assertEquals(220, result.width)
+        assertTrue(label.width + value.width <= result.width)
+    }
+
     private fun measure(name: String, children: List<Measurable>, constraints: Constraints): MeasureResult {
         val policy = Class.forName("com.irio.ContextRingKt").getDeclaredMethod(name)
             .apply { isAccessible = true }.invoke(null) as MeasurePolicy

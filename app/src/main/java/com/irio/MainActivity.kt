@@ -341,6 +341,11 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var modelMenuOpen by remember { mutableStateOf(false) }
     var contextRingOpen by remember { mutableStateOf(false) }
     var contextCompressionEnabled by remember { mutableStateOf(ToolStore.loadContextCompression(context)) }
+    var contextCompressionTrigger by remember { mutableStateOf(ToolStore.loadCompressionTrigger(context)) }
+    var contextOverheadNonce by remember { mutableStateOf(0) }
+    var contextSystemTokens by remember { mutableStateOf(0) }
+    var contextToolTokens by remember { mutableStateOf("" to 0) }
+    var liveToolTokens by remember { mutableStateOf("" to 0) }
     var visualizeContext by remember { mutableStateOf(ToolStore.loadVisualizeContext(context)) }
     var liveContextEstimate by remember { mutableStateOf("" to 0) }
     var attachMenuOpen by remember { mutableStateOf(false) }
@@ -512,15 +517,33 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         if (generatingThisChat || !ThemeStore.contextRing) return@LaunchedEffect
         val conversationId = currentConversation.id
         val messageSnapshot = messages
-        val apiUsage = currentConversation.tokenUsage
-            ?: messageSnapshot.lastOrNull { !it.fromUser && it.usage != null }?.usage
-        if ((apiUsage?.usedTokens ?: 0) > 0) return@LaunchedEffect
-        val estimate = withContext(Dispatchers.Default) {
-            estimateRequestTokens(modelRequestMessages(contextMessages(messageSnapshot)))
+        val parts = withContext(Dispatchers.Default) {
+            val included = contextMessages(messageSnapshot)
+            estimateRequestTokens(modelRequestMessages(included)) to estimateToolContextTokens(included)
         }
         if (currentConversation.id == conversationId && messages === messageSnapshot) {
-            liveContextEstimate = conversationId to estimate
+            contextToolTokens = conversationId to parts.second
+            // 接口总量也需要配套的本地分类估算，恢复会话时不能只更新工具。
+            liveContextEstimate = conversationId to parts.first
         }
+    }
+    LaunchedEffect(
+        ThemeStore.contextRing,
+        activeProviderId,
+        selectedModel,
+        webSearchEnabled,
+        webSearchAvailable,
+        contextOverheadNonce,
+        providers,
+    ) {
+        if (!ThemeStore.contextRing) return@LaunchedEffect
+        val protocol = providers.firstOrNull { it.id == activeProviderId }?.protocol
+            ?: ProviderProtocol.CHAT_COMPLETIONS
+        val modelId = selectedModel
+        val overhead = withContext(Dispatchers.IO) {
+            loadContextRequestOverhead(context, protocol, modelId)
+        }
+        contextSystemTokens = overhead
     }
     val visibleTranscript = if (presentationReady) transcriptPresentation.visible else emptyList()
     // 压缩记录留在列表里，但只画状态行，不画摘要正文。
@@ -873,6 +896,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     modelsDevCatalog = ProviderStore.loadModelsDevCatalog(context)
                     modelsDevReasoning = ProviderStore.loadModelsDevReasoning(context)
                     contextCompressionEnabled = ToolStore.loadContextCompression(context)
+                    contextCompressionTrigger = ToolStore.loadCompressionTrigger(context)
+                    contextOverheadNonce += 1
                     visualizeContext = ToolStore.loadVisualizeContext(context)
                     val provider = currentProviders.firstOrNull { it.id == currentActiveId }
                     val scopeId = currentConversationId
@@ -1216,52 +1241,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         val requestSearchKey = SearchStore.loadApiKey(context, requestSearchProvider)
         val requestSearchMaxResults = SearchStore.loadMaxResults(context, requestSearchProvider)
         val requestMaxToolRounds = ToolStore.loadMaxRounds(context)
-        val requestMemory = MemoryStore.systemPrompt(context)
-        val requestSystemPrompt = buildString {
-            SystemPromptStore.load(context).trim().takeIf { it.isNotEmpty() }?.let { append(it) }
-            requestMemory?.trim()?.takeIf { it.isNotEmpty() }?.let {
-                if (isNotEmpty()) append("\n\n")
-                append(it)
-            }
-        }.ifBlank { null }
+        val requestSystemPrompt = chatSystemPrompt(context)
         // 双重门槛，任一不满足都不注入 generate_image 工具：
         // ① 对话模型本身是生图模型（它自己能画；且图片渠道普遍不支持 tools，注入必报能力错）；
         // ② 设置里存的生图模型必须在目录判定为真生图模型（过滤规则上线前的旧值——
         //    如曾被选成聊天模型——拿去打 /images/generations 一样报能力错，直接视为未配置）。
-        val requestImageGenModel = ToolStore.loadImageGenModel(context)
-            .takeIf { ModelCatalog.isImageModel(context, it) }
-            .takeUnless { ModelCatalog.isImageModel(context, selectedModel) } ?: ""
-        val requestRegistry = ToolRegistry(
-            buildList {
-                if (requestWebSearch) {
-                    add(WebSearchToolProvider())
-                    add(WebFetchToolProvider())
-                }
-                if (requestImageGenModel.isNotBlank()) add(ImageGenToolProvider())
-                add(TimeToolProvider())
-                add(ReactionToolProvider())
-                add(ColoredBubbleToolProvider())
-                if (MemoryStore.loadEnabled(context)) add(MemoryToolProvider())
-                if (ToolStore.loadSubagents(context)) add(SubagentToolProvider())
-                if (LinuxSandboxPolicy.exposed(
-                        LinuxSandboxStore.loadEnabled(LinuxSandboxLayout.of(context.filesDir).stateFile),
-                        LinuxSandboxAccess.hasAllFiles(),
-                    )
-                ) {
-                    add(
-                        LinuxShellToolProvider(
-                            LinuxSandboxStore.loadCommandsPerCall(
-                                LinuxSandboxLayout.of(context.filesDir).stateFile,
-                            ),
-                            LinuxSandboxStore.loadBackgroundEnabled(
-                                LinuxSandboxLayout.of(context.filesDir).stateFile,
-                            ),
-                        ),
-                    )
-                }
-            },
-            smartToolHints = ToolStore.loadSmartToolHints(context),
-        )
+        val requestImageGenModel = configuredImageGenModel(context, requestModel)
+        val requestRegistry = chatToolRegistry(context, requestWebSearch, requestImageGenModel)
         val requestCancellation = ChatRequestCancellation()
         // 优先用当前内存态的 provider（省一次全量 Keystore 解密解析）；
         // 被选中 provider 被删掉时回落磁盘。
@@ -1339,11 +1325,14 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     ChatCompletionResult(error = tr("请先选择一个可用模型"))
                 } else {
                 val requestMessages = modelRequestMessages(requestSource)
-                val baseContextTokens = withContext(Dispatchers.Default) {
-                    estimateRequestTokens(requestMessages)
+                val baseContext = withContext(Dispatchers.Default) {
+                    estimateRequestTokens(requestMessages) to estimateToolContextTokens(requestSource)
                 }
+                val baseContextTokens = baseContext.first
                 if (currentConversation.id == requestConversationId) {
                     liveContextEstimate = requestConversationId to baseContextTokens
+                    contextToolTokens = requestConversationId to baseContext.second
+                    liveToolTokens = requestConversationId to 0
                 }
                 val liveTokenEstimator = LiveReplyTokenEstimator()
                 val streamedToolCalls = StringBuilder()
@@ -1478,7 +1467,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                     currentConversation = currentConversation.copy(tokenUsage = usage)
                                 }
                                 if (liveTokens != null && currentConversation.id == requestConversationId) {
-                                    liveContextEstimate = requestConversationId to (baseContextTokens + liveTokens)
+                                    liveContextEstimate = requestConversationId to (baseContextTokens + liveTokens.first)
+                                    liveToolTokens = requestConversationId to liveTokens.second
                                 }
                             }
                         },
@@ -2664,14 +2654,36 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             message.summaryState == SummaryState.RUNNING &&
                                 generations[message.id]?.conversationId == currentConversation.id
                         }
-                        val shownUsed = contextRingUsedTokens(
+                        val liveEstimate = liveContextEstimate.takeIf { it.first == currentConversation.id }?.second ?: 0
+                        val generatingReply = generatingThisChat && !compressingThisChat
+                        val occupied = contextRingOccupied(
                             apiUsed = apiUsed,
-                            liveEstimate = liveContextEstimate.takeIf { it.first == currentConversation.id }?.second ?: 0,
-                            generatingReply = generatingThisChat && !compressingThisChat,
+                            liveEstimate = liveEstimate,
+                            generatingReply = generatingReply,
                             compressionEstimate = compressionUsageEstimate(messages),
                         )
                         if (showContextRing) {
                             val showCompression = contextCompressionEnabled
+                            val windowTokens = ModelCatalog.contextWindow(context, selectedModel)
+                            val historicalTools = contextToolTokens.takeIf { it.first == currentConversation.id }?.second ?: 0
+                            val streamingTools = if (generatingReply) {
+                                liveToolTokens.takeIf { it.first == currentConversation.id }?.second ?: 0
+                            } else {
+                                0
+                            }
+                            val breakdown = contextUsageBreakdown(
+                                windowTokens = windowTokens,
+                                occupiedTokens = occupied.tokens,
+                                occupiedIncludesOverhead = occupied.includesOverhead,
+                                systemTokens = contextSystemTokens,
+                                toolTokens = historicalTools + streamingTools,
+                                messageTokens = (liveEstimate - historicalTools - streamingTools).coerceAtLeast(0),
+                                reservedBudget = contextReservedBudget(
+                                    windowTokens = windowTokens,
+                                    compressionEnabled = showCompression,
+                                    triggerPercent = contextCompressionTrigger,
+                                ),
+                            )
                             val canCompress = showCompression && !generatingThisChat && planCompression(
                                 contextMessages(messages).filterNot {
                                     it.isError || it.isPending || it.isStreaming
@@ -2679,8 +2691,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             ) != null
                             ToolbarCapsule {
                                 ContextUsageRing(
-                                    usedTokens = shownUsed,
-                                    windowTokens = ModelCatalog.contextWindow(context, selectedModel),
+                                    breakdown = breakdown,
                                     compressionCount = compressionCount(messages),
                                     showCompression = showCompression,
                                     compressEnabled = canCompress,

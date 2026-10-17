@@ -16,8 +16,11 @@ internal class LiveReplyTokenEstimator(
         streamedText: String,
         process: List<ProcessEvent>,
         toolCallText: String,
-    ): Int? = if (enabled) {
-        withContext(Dispatchers.Default) { estimate(streamedText, process, toolCallText) }
+    ): Pair<Int, Int>? = if (enabled) {
+        withContext(Dispatchers.Default) {
+            val total = estimate(streamedText, process, toolCallText)
+            total to toolTokens(process, toolCallText)
+        }
     } else {
         null
     }
@@ -27,6 +30,17 @@ internal class LiveReplyTokenEstimator(
         processCounts.keys.retainAll(process.map { it.id }.toSet())
         process.forEach { event ->
             count += processCounts.getOrPut(event.id) { CachedCount(countTokens) }.count(event.content)
+        }
+        return count
+    }
+
+    /** 工具参数、工具结果和搜索结果。必须在 [estimate] 之后调用，好复用已经数过的缓存。 */
+    fun toolTokens(process: List<ProcessEvent>, toolCallText: String): Int {
+        var count = toolCallCount.count(toolCallText)
+        process.forEach { event ->
+            if (event.kind == ProcessEventKind.TOOL || event.kind == ProcessEventKind.SEARCH) {
+                count += processCounts.getOrPut(event.id) { CachedCount(countTokens) }.count(event.content)
+            }
         }
         return count
     }

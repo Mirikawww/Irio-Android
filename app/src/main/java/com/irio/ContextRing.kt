@@ -2,20 +2,34 @@ package com.irio
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.IntrinsicMeasurable
@@ -40,17 +54,18 @@ import com.composables.ui.components.DropdownMenu
 import com.composables.ui.components.DropdownMenuAlignment
 import com.composables.ui.components.DropdownMenuPanel
 import com.composables.ui.components.Text
+import com.composables.ui.theme.ColorScheme
+import com.composables.ui.theme.LocalColorScheme
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.primaryColor
 import com.composeunstyled.theme.Theme
 
-/** 用量来自接口 usage，窗口来自 OpenRouter `context_length`。点击弹出共计和已使用。压缩打开时才带压缩次数和压缩按钮。 */
+/** 用量来自接口 usage，窗口来自 OpenRouter `context_length`。点击弹出分段用量。压缩打开时才带压缩次数和压缩按钮。 */
 @Composable
-fun ContextUsageRing(
-    usedTokens: Int,
-    windowTokens: Int,
+internal fun ContextUsageRing(
+    breakdown: ContextUsageBreakdown,
     compressionCount: Int,
     showCompression: Boolean,
     compressEnabled: Boolean,
@@ -69,8 +84,7 @@ fun ContextUsageRing(
         panel = {
             DropdownMenuPanel(minWidth = 0.dp) {
                 ContextRingMenu(
-                    total = contextWindowLabel(windowTokens),
-                    used = formatContextCount(usedTokens),
+                    breakdown = breakdown,
                     compressions = if (showCompression) formatContextCount(compressionCount) else null,
                     compressEnabled = compressEnabled,
                     onCompress = if (showCompression) {
@@ -87,8 +101,8 @@ fun ContextUsageRing(
         },
     ) {
         ContextRingCanvas(
-            usedTokens = usedTokens,
-            windowTokens = windowTokens,
+            usedTokens = breakdown.usedTokens,
+            windowTokens = breakdown.windowTokens,
             size = size,
             strokeWidth = strokeWidth,
             modifier = Modifier
@@ -156,19 +170,62 @@ private fun ContextRingCanvas(
     }
 }
 
+private val ContextSystemColor = Color(0xFF2FBF71)
+private val ContextToolsColor = Color(0xFF5B8DEF)
+private val ContextMessagesColor = Color(0xFFE0B341)
+
+private data class ContextLegendEntry(val label: String, val value: String, val dot: Color?)
+
 @Composable
 private fun ContextRingMenu(
-    total: String,
-    used: String,
+    breakdown: ContextUsageBreakdown,
     compressions: String?,
     compressEnabled: Boolean,
     onCompress: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val measurePolicy = remember { contextRingMenuMeasurePolicy() }
+    val dark = LocalColorScheme.current == ColorScheme.Dark
+    val freeColor = if (dark) Color(0xFF4A4A4A) else Color(0xFFD0D0D0)
+    val reservedColor = if (dark) Color(0xFF8A8A8A) else Color(0xFFB5B5B5)
+    val knownWindow = breakdown.windowTokens > 0
+    val entries = buildList {
+        add(ContextLegendEntry(tr("系统提示"), formatContextCompact(breakdown.systemTokens), ContextSystemColor))
+        add(ContextLegendEntry(tr("工具"), formatContextCompact(breakdown.toolTokens), ContextToolsColor))
+        add(ContextLegendEntry(tr("消息"), formatContextCompact(breakdown.messageTokens), ContextMessagesColor))
+        add(ContextLegendEntry(tr("空闲"), if (knownWindow) formatContextCompact(breakdown.freeTokens) else "—", freeColor))
+        add(ContextLegendEntry(tr("预留"), if (knownWindow) formatContextCompact(breakdown.reservedTokens) else "—", reservedColor))
+        if (compressions != null) add(ContextLegendEntry(tr("压缩次数"), compressions, null))
+    }
     Layout(
         content = {
-            ContextStatTable(total = total, used = used, compressions = compressions)
+            Column(
+                modifier = Modifier.widthIn(min = 220.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ContextStatText(
+                        "${formatContextCompact(breakdown.usedTokens)} / ${
+                            if (knownWindow) formatContextCompact(breakdown.windowTokens) else "—"
+                        }",
+                    )
+                    breakdown.percent?.let { ContextStatText("$it%") }
+                }
+                ContextUsageBar(
+                    segments = listOf(
+                        ContextSystemColor to breakdown.systemTokens,
+                        ContextToolsColor to breakdown.toolTokens,
+                        ContextMessagesColor to breakdown.messageTokens,
+                        freeColor to if (knownWindow) breakdown.freeTokens else 0,
+                        reservedColor to if (knownWindow) breakdown.reservedTokens else 0,
+                    ),
+                )
+                ContextStatTable(entries = entries, modifier = Modifier.fillMaxWidth())
+            }
             if (onCompress != null) {
                 Button(
                     onClick = onCompress,
@@ -186,21 +243,56 @@ private fun ContextRingMenu(
 }
 
 @Composable
-private fun ContextStatTable(total: String, used: String, compressions: String?) {
+private fun ContextUsageBar(segments: List<Pair<Color, Int>>, modifier: Modifier = Modifier) {
+    val total = segments.sumOf { it.second.toLong() }.coerceAtLeast(0L)
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(Theme[colors][mutedColor].copy(alpha = 0.18f)),
+    ) {
+        if (total > 0L) {
+            Row(Modifier.fillMaxSize()) {
+                segments.forEach { (color, tokens) ->
+                    if (tokens > 0) {
+                        val share = (tokens.toDouble() / total.toDouble()).toFloat().coerceAtLeast(0.0001f)
+                        Box(Modifier.weight(share).fillMaxHeight().background(color))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContextStatTable(entries: List<ContextLegendEntry>, modifier: Modifier = Modifier) {
     val measurePolicy = remember { contextStatMeasurePolicy() }
     Layout(
         content = {
-            ContextStatText(tr("共计"))
-            ContextStatText(total)
-            ContextStatText(tr("已使用"))
-            ContextStatText(used)
-            if (compressions != null) {
-                ContextStatText(tr("压缩次数"))
-                ContextStatText(compressions)
+            entries.forEach { entry ->
+                ContextStatLabel(entry.label, entry.dot)
+                ContextStatText(entry.value)
             }
         },
+        modifier = modifier,
         measurePolicy = measurePolicy,
     )
+}
+
+@Composable
+private fun ContextStatLabel(text: String, dot: Color?) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (dot != null) {
+            Box(
+                Modifier
+                    .padding(end = 8.dp)
+                    .size(8.dp)
+                    .background(dot, CircleShape),
+            )
+        }
+        ContextStatText(text)
+    }
 }
 
 @Composable
@@ -290,9 +382,12 @@ private fun contextStatMeasurePolicy(): MeasurePolicy = object : MeasurePolicy {
         val intrinsicWidths = measurables.map { it.maxIntrinsicWidth(Constraints.Infinity) }
         val contentWidth = statTableWidth(intrinsicWidths, preferredGap)
         val width = if (
-            constraints.hasBoundedWidth &&
-            constraints.maxWidth >= contentWidth &&
-            constraints.maxWidth - contentWidth <= 2
+            (constraints.hasFixedWidth && constraints.maxWidth >= contentWidth) ||
+            (
+                constraints.hasBoundedWidth &&
+                    constraints.maxWidth >= contentWidth &&
+                    constraints.maxWidth - contentWidth <= 2
+                )
         ) {
             constraints.maxWidth
         } else {
@@ -391,15 +486,141 @@ internal fun contextWindowLabel(windowTokens: Int): String =
 /**
  * 压缩进行中不改数字。完成后、下一次接口 usage 到来前，用压缩结果的估算。
  * 估算不是压缩目标。生成时用流式估算；结束后优先接口用量，缺失时保留本地估算。
+ * 接口用量已经含系统提示、工具定义和工具上下文。
+ * 本地估算含消息正文和工具上下文，不含系统提示和工具定义。
  */
+internal data class ContextRingOccupied(
+    val tokens: Int,
+    val includesOverhead: Boolean,
+)
+
+internal fun contextRingOccupied(
+    apiUsed: Int,
+    liveEstimate: Int,
+    generatingReply: Boolean,
+    compressionEstimate: Int? = null,
+): ContextRingOccupied = when {
+    generatingReply && liveEstimate > 0 -> ContextRingOccupied(liveEstimate, includesOverhead = false)
+    compressionEstimate != null && compressionEstimate > 0 -> ContextRingOccupied(compressionEstimate, includesOverhead = false)
+    apiUsed > 0 -> ContextRingOccupied(apiUsed, includesOverhead = true)
+    else -> ContextRingOccupied(liveEstimate.coerceAtLeast(0), includesOverhead = false)
+}
+
 internal fun contextRingUsedTokens(
     apiUsed: Int,
     liveEstimate: Int,
     generatingReply: Boolean,
     compressionEstimate: Int? = null,
-): Int = when {
-    generatingReply && liveEstimate > 0 -> liveEstimate
-    compressionEstimate != null && compressionEstimate > 0 -> compressionEstimate
-    apiUsed > 0 -> apiUsed
-    else -> liveEstimate.coerceAtLeast(0)
+): Int = contextRingOccupied(apiUsed, liveEstimate, generatingReply, compressionEstimate).tokens
+
+internal data class ContextUsageBreakdown(
+    val systemTokens: Int,
+    val toolTokens: Int,
+    val messageTokens: Int,
+    val freeTokens: Int,
+    val reservedTokens: Int,
+    val usedTokens: Int,
+    val windowTokens: Int,
+) {
+    val percent: Int?
+        get() = contextUsagePercent(usedTokens, windowTokens)
+}
+
+/** 窗口未知时没有百分比。超过窗口不截成 100，菜单要能看出已经溢出。 */
+internal fun contextUsagePercent(usedTokens: Int, windowTokens: Int): Int? {
+    if (windowTokens <= 0) return null
+    val used = usedTokens.coerceAtLeast(0).toLong()
+    return ((used * 100 + windowTokens / 2) / windowTokens).toInt()
+}
+
+/**
+ * 压缩打开时，触发线以上的窗口是预留：自动压缩会在用满之前动手，这段不计入空闲。
+ * 默认触发 90%，预留就是窗口的 10%。压缩关闭时没有预留。
+ */
+internal fun contextReservedBudget(
+    windowTokens: Int,
+    compressionEnabled: Boolean,
+    triggerPercent: Int,
+): Int {
+    if (!compressionEnabled || windowTokens <= 0) return 0
+    val headroom = (100 - triggerPercent.coerceIn(0, 100)).coerceAtLeast(0)
+    return (windowTokens.toLong() * headroom / 100L).toInt()
+}
+
+/**
+ * 分段加总等于圆环上的已用。系统提示含工具定义，在本地估算之外。
+ * 工具是消息里的执行记录，已经包含在本地估算和接口用量里，不再另加。
+ * 接口只有总量，没有分类；按本地三类估算的比例校准，不能先扣工具再让消息吃余数。
+ * 预留从窗口尾部扣，不跟已用重叠。
+ */
+internal fun contextUsageBreakdown(
+    windowTokens: Int,
+    occupiedTokens: Int,
+    occupiedIncludesOverhead: Boolean,
+    systemTokens: Int,
+    toolTokens: Int,
+    messageTokens: Int,
+    reservedBudget: Int,
+): ContextUsageBreakdown {
+    val window = windowTokens.coerceAtLeast(0)
+    val system = systemTokens.coerceAtLeast(0)
+    val tools = toolTokens.coerceAtLeast(0)
+    val occupied = occupiedTokens.coerceAtLeast(0)
+    val used = if (occupiedIncludesOverhead) {
+        occupied
+    } else {
+        (occupied.toLong() + system).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    }
+    val estimatedMessages = messageTokens.coerceAtLeast(0).toLong()
+    val estimatedContent = tools.toLong() + estimatedMessages
+    val estimatedTotal = system.toLong() + estimatedContent
+    val calibrate = occupiedIncludesOverhead && estimatedTotal > 0L
+    val systemShown = if (calibrate) {
+        (used.toLong() * system / estimatedTotal).toInt()
+    } else {
+        minOf(system, used)
+    }
+    val contentShown = used - systemShown
+    val toolsShown = if (calibrate && estimatedContent > 0L) {
+        (contentShown.toLong() * tools / estimatedContent).toInt()
+    } else {
+        minOf(tools, contentShown)
+    }
+    val messages = contentShown - toolsShown
+    val budget = if (window == 0) 0 else reservedBudget.coerceIn(0, window)
+    val tail = (window - used).coerceAtLeast(0)
+    val reserved = minOf(budget, tail)
+    val free = (tail - reserved).coerceAtLeast(0)
+    return ContextUsageBreakdown(
+        systemTokens = systemShown,
+        toolTokens = toolsShown,
+        messageTokens = messages,
+        freeTokens = free,
+        reservedTokens = reserved,
+        usedTokens = used,
+        windowTokens = window,
+    )
+}
+
+/** 菜单里的紧凑数字：618、4.1K、1M。按 1000 进位，和千分位的 [formatContextCount] 分开。 */
+internal fun formatContextCompact(count: Int): String {
+    val negative = count < 0
+    val body = compactMagnitude(kotlin.math.abs(count.toLong()))
+    return if (negative) "-$body" else body
+}
+
+private fun compactMagnitude(magnitude: Long): String = when {
+    magnitude < 1_000L -> magnitude.toString()
+    magnitude < 1_000_000L -> compactUnit(magnitude, 1_000L, "K")
+    else -> compactUnit(magnitude, 1_000_000L, "M")
+}
+
+private fun compactUnit(magnitude: Long, unit: Long, suffix: String): String {
+    val scaled = (magnitude * 10 + unit / 2) / unit
+    if (scaled >= 10_000L) {
+        return if (suffix == "K") compactMagnitude(1_000_000L) else "${scaled / 10}$suffix"
+    }
+    val whole = scaled / 10
+    val fraction = scaled % 10
+    return if (fraction == 0L) "$whole$suffix" else "$whole.$fraction$suffix"
 }

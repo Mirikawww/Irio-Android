@@ -6,7 +6,18 @@ import org.json.JSONObject
 data class ChatToolRecord(val call: ChatToolCall, val result: String)
 
 /** 已保存的执行记录作为历史上下文发送，不改界面正文，也不伪造旧记录中没有的 tool_call id/参数。 */
-internal fun ChatMessage.contextText(): String = buildString {
+internal fun ChatMessage.contextText(): String {
+    val body = messageBodyText()
+    val tools = toolContextText()
+    return when {
+        body.isEmpty() -> tools
+        tools.isEmpty() -> body
+        else -> "$body\n\n$tools"
+    }
+}
+
+/** 发给模型的正文，不含工具执行记录。 */
+internal fun ChatMessage.messageBodyText(): String = buildString {
     append(requestText())
     if (!fromUser && toolRecords.none { it.call.name == ColoredBubbleTool.NAME }) {
         process.filter { it.kind == ProcessEventKind.BUBBLE }.forEach { bubble ->
@@ -14,39 +25,45 @@ internal fun ChatMessage.contextText(): String = buildString {
             append(bubble.content)
         }
     }
-    if (fromUser) return@buildString
-    toolRecords.forEach { record ->
-        if (isNotEmpty()) append("\n\n")
-        append("[Tool execution record: ")
-        append(record.call.name)
-        append("]\nArguments: ")
-        append(record.call.arguments)
-        append("\nResult:\n")
-        append(record.result)
-    }
-    // 逐条去重，不能按名字跳过所有事件：同一工具后一次调用被停止时仍需保留部分输出。
-    val recordedEvents = toolRecords.groupingBy { it.call.name }.eachCount().toMutableMap()
-    process.filter { !it.live && it.content.isNotBlank() }.forEach { event ->
-        val name = when (event.kind) {
-            ProcessEventKind.TOOL -> event.toolName.ifBlank { "tool" }
-            ProcessEventKind.SEARCH -> WebSearchTool.NAME
-            ProcessEventKind.THINKING, ProcessEventKind.BUBBLE, ProcessEventKind.SUBAGENT -> return@forEach
+}
+
+/** 同一条消息里附带的工具执行记录。用户消息没有这段。 */
+internal fun ChatMessage.toolContextText(): String {
+    if (fromUser) return ""
+    return buildString {
+        toolRecords.forEach { record ->
+            if (isNotEmpty()) append("\n\n")
+            append("[Tool execution record: ")
+            append(record.call.name)
+            append("]\nArguments: ")
+            append(record.call.arguments)
+            append("\nResult:\n")
+            append(record.result)
         }
-        val remaining = recordedEvents[name] ?: 0
-        if (remaining > 0) {
-            recordedEvents[name] = remaining - 1
-            return@forEach
+        // 逐条去重，不能按名字跳过所有事件：同一工具后一次调用被停止时仍需保留部分输出。
+        val recordedEvents = toolRecords.groupingBy { it.call.name }.eachCount().toMutableMap()
+        process.filter { !it.live && it.content.isNotBlank() }.forEach { event ->
+            val name = when (event.kind) {
+                ProcessEventKind.TOOL -> event.toolName.ifBlank { "tool" }
+                ProcessEventKind.SEARCH -> WebSearchTool.NAME
+                ProcessEventKind.THINKING, ProcessEventKind.BUBBLE, ProcessEventKind.SUBAGENT -> return@forEach
+            }
+            val remaining = recordedEvents[name] ?: 0
+            if (remaining > 0) {
+                recordedEvents[name] = remaining - 1
+                return@forEach
+            }
+            if (isNotEmpty()) append("\n\n")
+            append("[Tool execution record: ")
+            append(name)
+            append("]\n")
+            if (event.kind == ProcessEventKind.SEARCH && event.searchQuery.isNotBlank()) {
+                append("Query: ")
+                append(event.searchQuery)
+                append('\n')
+            }
+            append(event.content)
         }
-        if (isNotEmpty()) append("\n\n")
-        append("[Tool execution record: ")
-        append(name)
-        append("]\n")
-        if (event.kind == ProcessEventKind.SEARCH && event.searchQuery.isNotBlank()) {
-            append("Query: ")
-            append(event.searchQuery)
-            append('\n')
-        }
-        append(event.content)
     }
 }
 

@@ -85,6 +85,19 @@ internal fun estimateRequestTokens(messages: List<ChatRequestMessage>): Int {
     }
 }
 
+/** 即将发送的消息里，工具执行记录占多少。压缩边界之前的不发送，不算。 */
+internal fun estimateToolContextTokens(messages: List<ChatMessage>): Int {
+    val boundary = messages.indexOfLast { it.summaryState == SummaryState.SUCCESS }
+    val slice = if (boundary < 0) messages else messages.drop(boundary + 1)
+    return slice.sumOf { message ->
+        if (message.summaryState != SummaryState.NONE || message.isError || message.isPending) {
+            0
+        } else {
+            TokenEstimator.count(message.toolContextText())
+        }
+    }
+}
+
 /**
  * 这一轮的接口 usage 还没到时，圆环在已发送请求之外补上正在生成的内容。
  * 思考、工具参数、工具结果和搜索结果都算。工具名字算在参数文本里，不从过程行再加一遍。
@@ -100,6 +113,17 @@ internal fun estimateLiveReplyTokens(
             ProcessEventKind.THINKING, ProcessEventKind.SEARCH, ProcessEventKind.TOOL ->
                 count += TokenEstimator.count(event.content)
             ProcessEventKind.BUBBLE, ProcessEventKind.SUBAGENT -> Unit
+        }
+    }
+    return count
+}
+
+/** 正在生成的回复里，工具参数、工具结果和搜索结果占多少。正文和思考不算。 */
+internal fun estimateLiveToolTokens(process: List<ProcessEvent>, toolCallText: String): Int {
+    var count = TokenEstimator.count(toolCallText)
+    process.forEach { event ->
+        if (event.kind == ProcessEventKind.TOOL || event.kind == ProcessEventKind.SEARCH) {
+            count += TokenEstimator.count(event.content)
         }
     }
     return count
