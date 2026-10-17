@@ -64,6 +64,14 @@ internal class GitHubMcpToolProvider(
     companion object {
         const val PREFIX = "github_mcp_"
 
+        fun catalogTools(): List<McpTool> = operations.keys.map { name ->
+            McpTool(
+                name = name,
+                description = tr("配置 GitHub MCP 后可用"),
+                inputSchema = JSONObject().put("type", "object").put("properties", JSONObject()),
+            )
+        }
+
         fun progressLabel(name: String, completed: Boolean): String {
             val remoteName = name.removePrefix(PREFIX)
             val operation = operations[remoteName]

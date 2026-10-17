@@ -71,11 +71,12 @@ internal object ToolCatalog {
         val schemas = providers.flatMap { it.definitions(ProviderProtocol.CHAT_COMPLETIONS) } +
             // Keep the background tool visible even when its feature is off.
             if (features.backgroundEnabled) emptyList() else listOf(LinuxBackgroundTool.schemaFor(ProviderProtocol.CHAT_COMPLETIONS))
+        val visibleMcpTools = mcpTools.ifEmpty { GitHubMcpToolProvider.catalogTools() }
         return schemas.map { schema ->
             val function = schema.getJSONObject("function")
             val name = function.getString("name")
             ToolSettingsEntry(name, title(name), function.getString("description"), blockedReason(name, features))
-        } + mcpTools.map { tool ->
+        } + visibleMcpTools.map { tool ->
             val name = GitHubMcpToolProvider.PREFIX + tool.name
             ToolSettingsEntry(
                 name,

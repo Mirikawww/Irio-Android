@@ -21,7 +21,7 @@ class ToolCatalogTest {
     fun catalogContainsEveryBuiltInEvenWhenAllFeaturesAreOff() {
         val expected = (ToolRegistry.default().providers() + listOf(
             MemoryToolProvider(), SubagentToolProvider(), LinuxShellToolProvider(backgroundEnabled = true),
-        )).flatMap { it.toolNames() }.toSet()
+        )).flatMap { it.toolNames() }.toSet() + GitHubMcpToolProvider.catalogTools().map { GitHubMcpToolProvider.PREFIX + it.name }
         val entries = ToolCatalog.entries(ToolFeatureState())
         assertEquals("The settings catalog must include all built-in tools, even unavailable ones", expected, entries.map { it.name }.toSet())
         assertEquals("A tool must appear exactly once", entries.size, entries.map { it.name }.toSet().size)
@@ -64,5 +64,18 @@ class ToolCatalogTest {
         assertTrue(entry.title.isNotBlank())
         val enabled = ToolCatalog.entries(available, mcpTools = listOf(remote)).single { it.name == entry.name }
         assertNull(enabled.blockedReason)
+    }
+
+    @Test
+    fun knownMcpToolsStayListedBeforeIntegrationIsConfigured() {
+        val entries = ToolCatalog.entries(available.copy(githubUsable = false))
+        val known = GitHubMcpToolProvider.catalogTools()
+        assertTrue(known.isNotEmpty())
+        assertTrue(known.all { tool ->
+            entries.any {
+                it.name == GitHubMcpToolProvider.PREFIX + tool.name &&
+                    it.blockedReason == ToolBlockedReason.GITHUB
+            }
+        })
     }
 }
