@@ -2,6 +2,13 @@ package com.irio
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -81,9 +88,6 @@ internal fun ToolSettingsScreen(
     var selectedScope by rememberSaveable { mutableStateOf(ToolSettingsScope.Main) }
     var tabsHeightPx by remember { mutableIntStateOf(0) }
     val tabsHeight = with(LocalDensity.current) { tabsHeightPx.toDp() }
-    val visibleEntries = remember(entries, selectedScope) {
-        if (selectedScope == ToolSettingsScope.Main) entries else entries.filterNot { it.name in SubagentTools.NAMES }
-    }
     fun showNotice(message: String) {
         notice = message
         noticeRestartKey++
@@ -114,50 +118,66 @@ internal fun ToolSettingsScreen(
     Box(Modifier.fillMaxSize().imePadding()) {
         SettingsHazeScaffold(title = tr("工具"), onBack = onBack) { topInset, bottomInset ->
             Box(Modifier.fillMaxSize()) {
-                AndroidComposeRecyclerList(
-                    items = visibleEntries,
-                    key = { it.name },
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        top = topInset + 16.dp,
-                        end = 16.dp,
-                        bottom = tabsHeight + 16.dp,
-                    ),
-                    itemSpacing = 12.dp,
-                ) { entry ->
-                    key(entry.name) {
-                        val draft = drafts.getOrPut(entry.name) {
-                            TextFieldState(preferences.descriptions[entry.name] ?: entry.defaultDescription)
+                AnimatedContent(
+                    targetState = selectedScope,
+                    transitionSpec = {
+                        val forward = targetState == ToolSettingsScope.Subagent
+                        val enter = slideInHorizontally { full -> if (forward) full else -full } + fadeIn()
+                        val exit = slideOutHorizontally { full -> if (forward) -full else full } + fadeOut()
+                        (enter togetherWith exit).using(SizeTransform(clip = true))
+                    },
+                    label = "toolSettingsScope",
+                ) { page ->
+                    val pageEntries = if (page == ToolSettingsScope.Main) {
+                        entries
+                    } else {
+                        entries.filterNot { it.name in SubagentTools.NAMES }
+                    }
+                    AndroidComposeRecyclerList(
+                        items = pageEntries,
+                        key = { it.name },
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            top = topInset + 16.dp,
+                            end = 16.dp,
+                            bottom = tabsHeight + 16.dp,
+                        ),
+                        itemSpacing = 12.dp,
+                    ) { entry ->
+                        key(entry.name) {
+                            val draft = drafts.getOrPut(entry.name) {
+                                TextFieldState(preferences.descriptions[entry.name] ?: entry.defaultDescription)
+                            }
+                            ToolSettingsRow(
+                                entry = entry,
+                                checked = preferences.isEnabled(entry.name),
+                                expanded = expanded[entry.name] == true,
+                                description = draft,
+                                onExpandedChange = { next ->
+                                    if (!next) focus.clearFocus()
+                                    expanded[entry.name] = next
+                                },
+                                onCheckedChange = { enabled ->
+                                    ToolPreferencesStore.saveEnabled(context, entry.name, enabled)
+                                    preferences = ToolPreferencesStore.load(context)
+                                },
+                                onSave = {
+                                    ToolPreferencesStore.saveDescription(context, entry.name, draft.text.toString())
+                                    preferences = ToolPreferencesStore.load(context)
+                                    focus.clearFocus()
+                                    showNotice(tr("工具描述已保存"))
+                                },
+                                onReset = {
+                                    ToolPreferencesStore.resetDescription(context, entry.name)
+                                    draft.edit { replace(0, length, entry.defaultDescription) }
+                                    preferences = ToolPreferencesStore.load(context)
+                                    focus.clearFocus()
+                                    showNotice(tr("已恢复默认描述"))
+                                },
+                                onBlocked = { entry.blockedReason?.let { showNotice(it.message()) } },
+                            )
                         }
-                        ToolSettingsRow(
-                            entry = entry,
-                            checked = preferences.isEnabled(entry.name),
-                            expanded = expanded[entry.name] == true,
-                            description = draft,
-                            onExpandedChange = { next ->
-                                if (!next) focus.clearFocus()
-                                expanded[entry.name] = next
-                            },
-                            onCheckedChange = { enabled ->
-                                ToolPreferencesStore.saveEnabled(context, entry.name, enabled)
-                                preferences = ToolPreferencesStore.load(context)
-                            },
-                            onSave = {
-                                ToolPreferencesStore.saveDescription(context, entry.name, draft.text.toString())
-                                preferences = ToolPreferencesStore.load(context)
-                                focus.clearFocus()
-                                showNotice(tr("工具描述已保存"))
-                            },
-                            onReset = {
-                                ToolPreferencesStore.resetDescription(context, entry.name)
-                                draft.edit { replace(0, length, entry.defaultDescription) }
-                                preferences = ToolPreferencesStore.load(context)
-                                focus.clearFocus()
-                                showNotice(tr("已恢复默认描述"))
-                            },
-                            onBlocked = { entry.blockedReason?.let { showNotice(it.message()) } },
-                        )
                     }
                 }
                 IrioSnackbar(
