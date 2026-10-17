@@ -55,14 +55,39 @@ internal fun BoxScope.IrioSnackbar(
 ) {
     val dismiss by rememberUpdatedState(onDismiss)
     val scope = rememberCoroutineScope()
+    var displayedMessage by remember { mutableStateOf(message) }
+    var replacing by remember { mutableStateOf(false) }
+    var wasVisible by remember { mutableStateOf(visible) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var swipeOff by remember { mutableStateOf(false) }
-    LaunchedEffect(visible) {
+    LaunchedEffect(visible, message) {
+        if (!visible) {
+            displayedMessage = message
+            replacing = false
+            wasVisible = false
+            return@LaunchedEffect
+        }
+        if (!wasVisible) {
+            displayedMessage = message
+            replacing = false
+            wasVisible = true
+            return@LaunchedEffect
+        }
+        if (displayedMessage == message) return@LaunchedEffect
+        replacing = true
+        delay(EXIT_DURATION_MS.toLong())
         if (!visible) return@LaunchedEffect
+        displayedMessage = message
+        offsetX = 0f
+        swipeOff = false
+        replacing = false
+    }
+    LaunchedEffect(visible, displayedMessage, replacing) {
+        if (!visible || replacing) return@LaunchedEffect
         offsetX = 0f
         swipeOff = false
         delay(5_000L)
-        if (!swipeOff && abs(offsetX) < 1f) dismiss()
+        if (!replacing && !swipeOff && abs(offsetX) < 1f) dismiss()
     }
     Box(
         modifier = Modifier
@@ -71,7 +96,7 @@ internal fun BoxScope.IrioSnackbar(
             .fillMaxWidth(),
     ) {
         AnimatedVisibility(
-            visible = visible,
+            visible = visible && !replacing,
             enter = slideInVertically(initialOffsetY = { it }) + scaleIn(
                 initialScale = 0.35f,
                 animationSpec = irioSpring(),
@@ -79,14 +104,14 @@ internal fun BoxScope.IrioSnackbar(
             exit = if (swipeOff) {
                 ExitTransition.None
             } else {
-                slideOutVertically(targetOffsetY = { it }) + scaleOut(
+                slideOutVertically(targetOffsetY = { it }, animationSpec = tween(EXIT_DURATION_MS)) + scaleOut(
                     targetScale = 0.35f,
-                    animationSpec = tween(180),
+                    animationSpec = tween(EXIT_DURATION_MS),
                 )
             },
         ) {
             Text(
-                message,
+                if (visible && !wasVisible) message else displayedMessage,
                 modifier = Modifier
                     .graphicsLayer { translationX = offsetX }
                     .pointerInput(Unit) {
@@ -131,3 +156,5 @@ internal fun BoxScope.IrioSnackbar(
         }
     }
 }
+
+private const val EXIT_DURATION_MS = 180

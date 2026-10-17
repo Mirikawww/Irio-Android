@@ -37,6 +37,59 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33], manifest = Config.NONE)
 class ToolSettingsSnackbarTest {
     @Test
+    fun newMessageCompletesTheOldExitBeforeEntering() = runTest {
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        val clock = BroadcastFrameClock()
+        val recomposer = Recomposer(coroutineContext + clock)
+        val runner = launch(clock) { recomposer.runRecomposeAndApplyChanges() }
+        val view = ComposeView(controller.get())
+        val visible = mutableStateOf(true)
+        val message = mutableStateOf("旧提示")
+        var time = 0L
+        try {
+            controller.get().setContentView(view)
+            view.setParentCompositionContext(recomposer)
+            view.setContent {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    AppTheme {
+                        Box(Modifier.fillMaxSize()) {
+                            IrioSnackbar(visible.value, message.value, 0.dp, onDismiss = { visible.value = false })
+                        }
+                    }
+                }
+            }
+            fun frame() {
+                Snapshot.sendApplyNotifications()
+                advanceTimeBy(16L)
+                runCurrent()
+                time += 16_000_000L
+                clock.sendFrame(time)
+                runCurrent()
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+                view.requestLayout()
+                view.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(640, View.MeasureSpec.EXACTLY))
+                view.layout(0, 0, 360, 640)
+            }
+            repeat(8) { frame() }
+            assertNotNull(textNode(view, "旧提示"))
+
+            message.value = "新提示"
+            repeat(8) { frame() }
+            assertNotNull("The old message must remain during its exit animation", textNode(view, "旧提示"))
+            assertNull("The new message must wait for the old exit", textNode(view, "新提示"))
+
+            repeat(20) { frame() }
+            assertNull("The old message must finish exiting", textNode(view, "旧提示"))
+            assertNotNull("The new message must enter after the old exit", textNode(view, "新提示"))
+        } finally {
+            view.disposeComposition()
+            recomposer.close()
+            runner.cancel()
+            controller.pause().stop().destroy()
+        }
+    }
+
+    @Test
     fun toolNoticeUsesTheSharedSnackbarEntranceAndKeepsTextDuringExit() = runTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val clock = BroadcastFrameClock()
