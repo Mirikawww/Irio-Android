@@ -207,6 +207,8 @@ private val English = mapOf(
     "GitHub 登录失败（HTTP %d）" to "GitHub sign-in failed (HTTP %d)",
     "GitHub 授权已取消，可重新登录" to "GitHub authorization was denied. You can sign in again.",
     "GitHub 授权码已过期，请重试" to "GitHub authorization code expired. Try again.",
+    "GitHub 刷新响应无效" to "Invalid GitHub token refresh response",
+    "GitHub 刷新令牌已失效，请重新登录" to "GitHub refresh token expired. Sign in again.",
     "请在 Irio 的 GitHub 应用设置中启用 Device Flow" to "Enable Device Flow in Irio's GitHub application settings",
     "GitHub Client ID 无效" to "Invalid GitHub Client ID",
     "GitHub 登录失败，请重试" to "GitHub sign-in failed. Try again.",

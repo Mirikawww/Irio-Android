@@ -7,10 +7,25 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 
 class GitHubMcpStoreTest {
+    @Test fun rollingRefreshReplacesAccessAndRefreshTokensBeforeExpiry() = kotlinx.coroutines.runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("""{"access_token":"new-access","expires_in":28800,"refresh_token":"new-refresh","refresh_token_expires_in":15897600,"token_type":"bearer"}"""))
+            val store = GitHubMcpStore(File(temp.root, "refresh.json"), secretKey = { key }, refreshAuth = { GitHubDeviceAuth(server.url("/")) })
+            val tools = listOf(McpTool("get_me", "", JSONObject("{\"type\":\"object\"}")))
+            store.save(GitHubMcpInstallation(GitHubCredential("old-access", 1, "old-refresh", Long.MAX_VALUE), "OAuth", tools))
+            val refreshed = store.refreshIfNeeded()!!
+            assertEquals("new-access", refreshed.credential.accessToken)
+            assertEquals("new-refresh", refreshed.credential.refreshToken)
+            assertEquals("new-access", store.load()!!.credential.accessToken)
+            assertEquals("old-refresh", server.takeRequest().body.readUtf8().substringAfter("refresh_token=").substringBefore("&"))
+        }
+    }
     @Test fun legacyInstallationCanAcquireAccountDataWithoutResettingDisabledState() {
-        val store = GitHubMcpStore(File(temp.root, "legacy.json")) { key }
+        val store = GitHubMcpStore(File(temp.root, "legacy.json"), secretKey = { key })
         val tools = listOf(McpTool("get_me", "", JSONObject("{\"type\":\"object\"}")))
         store.save(GitHubMcpInstallation(GitHubCredential("legacy-token", 123), "OAuth", tools, enabled = false))
         assertNull(store.load()!!.account)
@@ -24,7 +39,7 @@ class GitHubMcpStoreTest {
     }
 
     @Test fun staleProfileResponsesCannotRestoreARemovedInstallationOrChangeAnotherAccount() {
-        val store = GitHubMcpStore(File(temp.root, "stale.json")) { key }
+        val store = GitHubMcpStore(File(temp.root, "stale.json"), secretKey = { key })
         val tools = listOf(McpTool("get_me", "", JSONObject("{\"type\":\"object\"}")))
         val oldAccount = GitHubMcpAccount("old", "", "old@example.test")
         val newAccount = GitHubMcpAccount("new", "", "new@example.test")
@@ -40,11 +55,11 @@ class GitHubMcpStoreTest {
 
     @Test fun accountSurvivesReopenAndEnableChangesWithoutExposingCredentials() {
         val file = File(temp.root, "account.json")
-        val store = GitHubMcpStore(file) { key }
+        val store = GitHubMcpStore(file, secretKey = { key })
         val account = GitHubMcpAccount("octocat", "https://avatars.githubusercontent.com/u/1", "primary@example.test")
         val tools = listOf(McpTool("get_me", "Read profile", JSONObject("{\"type\":\"object\"}")))
         store.save(GitHubMcpInstallation(GitHubCredential("secret-fixture"), "PAT", tools, account = account))
-        assertEquals(account, GitHubMcpStore(file) { key }.load()!!.account)
+        assertEquals(account, GitHubMcpStore(file, secretKey = { key }).load()!!.account)
         store.setEnabled(false)
         assertEquals(account, store.load()!!.account)
         assertFalse(store.load()!!.enabled)
@@ -52,7 +67,7 @@ class GitHubMcpStoreTest {
     }
 
     @Test fun onlyEnabledValidInstallationsRegisterWithTheRealRequestRegistry() = kotlinx.coroutines.runBlocking {
-        val store = GitHubMcpStore(File(temp.root, "registry.json")) { key }
+        val store = GitHubMcpStore(File(temp.root, "registry.json"), secretKey = { key })
         val cancellation = ChatRequestCancellation()
         assertNull(store.toolProvider(cancellation))
         store.save(GitHubMcpInstallation(GitHubCredential("fixture"), "PAT", listOf(
@@ -79,12 +94,14 @@ class GitHubMcpStoreTest {
 
     @Test fun installationSurvivesReopenWithoutPlaintextCredentialsOnDisk() {
         val file = File(temp.root, "github.json")
-        val store = GitHubMcpStore(file) { key }
+        val store = GitHubMcpStore(file, secretKey = { key })
         val tool = McpTool("get_me", "Read profile", JSONObject("{\"type\":\"object\",\"properties\":{}}"))
-        store.save(GitHubMcpInstallation(GitHubCredential("secret-fixture"), "PAT", listOf(tool)))
+        store.save(GitHubMcpInstallation(GitHubCredential("secret-fixture", 123, "refresh-fixture", 456), "OAuth", listOf(tool)))
         assertFalse(file.readText().contains("secret-fixture"))
-        val reopened = GitHubMcpStore(file) { key }.load()!!
+        val reopened = GitHubMcpStore(file, secretKey = { key }).load()!!
         assertEquals("secret-fixture", reopened.credential.accessToken)
+        assertEquals("refresh-fixture", reopened.credential.refreshToken)
+        assertEquals(456L, reopened.credential.refreshTokenExpiresAt)
         assertEquals("get_me", reopened.tools.single().name)
         assertTrue(reopened.enabled)
         store.setEnabled(false)
@@ -95,11 +112,11 @@ class GitHubMcpStoreTest {
 
     @Test fun expiredOrUnreadableCredentialsNeverBecomeUsable() {
         val file = File(temp.root, "github.json")
-        val store = GitHubMcpStore(file) { key }
+        val store = GitHubMcpStore(file, secretKey = { key })
         store.save(GitHubMcpInstallation(GitHubCredential("fixture", 1), "OAuth", listOf(
             McpTool("get_me", "", JSONObject("{\"type\":\"object\"}")))))
         assertFalse(store.load()!!.usable())
         val otherKey = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
-        assertNull(GitHubMcpStore(file) { otherKey }.load())
+        assertNull(GitHubMcpStore(file, secretKey = { otherKey }).load())
     }
 }

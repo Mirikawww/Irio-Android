@@ -8,6 +8,7 @@ import okhttp3.mockwebserver.MockWebServer
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -44,13 +45,16 @@ class GitHubDeviceAuthTest {
             server.enqueue(MockResponse().setBody("""{"device_code":"device-fixture","user_code":"ABCD-EFGH","verification_uri":"https://github.com/login/device","expires_in":900,"interval":5}"""))
             server.enqueue(MockResponse().setBody("""{"error":"authorization_pending"}"""))
             server.enqueue(MockResponse().setBody("""{"error":"slow_down","interval":10}"""))
-            server.enqueue(MockResponse().setBody("""{"access_token":"oauth-fixture","token_type":"bearer"}"""))
+            server.enqueue(MockResponse().setBody("""{"access_token":"oauth-fixture","expires_in":28800,"refresh_token":"refresh-fixture","refresh_token_expires_in":15897600,"token_type":"bearer"}"""))
             val auth = GitHubDeviceAuth(baseUrl = server.url("/"))
             val code = auth.requestCode()
             assertEquals("ABCD-EFGH", code.userCode)
             val started = testScheduler.currentTime
             val credential = auth.awaitToken(code)
             assertEquals("oauth-fixture", credential.accessToken)
+            assertEquals("refresh-fixture", credential.refreshToken)
+            assertTrue(credential.expiresAt > System.currentTimeMillis())
+            assertTrue(credential.refreshTokenExpiresAt > credential.expiresAt)
             assertEquals(20_000L, testScheduler.currentTime - started)
             val request = server.takeRequest()
             val body = request.body.readUtf8()
@@ -58,7 +62,7 @@ class GitHubDeviceAuthTest {
             assertFalse(body.contains("client_secret"))
             org.junit.Assert.assertTrue(body.contains("client_id=Ov23liyvVnA5MQa4yO4T"))
             val scopes = java.net.URLDecoder.decode(body.substringAfter("scope=").substringBefore("&"), "UTF-8")
-            assertEquals("repo read:org user:email", scopes)
+            assertEquals("repo read:org user:email offline_access", scopes)
             repeat(3) { assertFalse(server.takeRequest().body.readUtf8().contains("client_secret")) }
         }
     }
