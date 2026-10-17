@@ -2272,7 +2272,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         onClick = {
                             context.startActivity(Intent(context, SettingsActivity::class.java))
                         },
-                        onLongClick = { clearHistoryDialogOpen = true },
+                        // 空抽屉没有可删除的历史会话，不提供“删除全部历史”的长按入口。
+                        onLongClick = conversations
+                            .takeIf { it.isNotEmpty() }
+                            ?.let { { clearHistoryDialogOpen = true } },
                     )
                 }
             }
