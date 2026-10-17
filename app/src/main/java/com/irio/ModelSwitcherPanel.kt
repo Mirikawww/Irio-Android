@@ -365,6 +365,11 @@ internal fun RollingGlyphLabel(
             measurer.measure(AnnotatedString(it), style, maxLines = 1, softWrap = false)
         }
     }
+    val glyphBaselineOffsets = remember(layout, glyphLayouts) {
+        glyphLayouts.mapValues { (_, glyphLayout) ->
+            layout.firstBaseline - glyphLayout.firstBaseline
+        }
+    }
     // Haze styles are immutable, so the radius is quantized to half-dp steps to keep restyling cheap.
     val blurRadius by remember {
         derivedStateOf { (thinkingBlurFraction(runs, progress.floatValue) * RollBlurMaxDp * 2f).roundToInt() / 2f }
@@ -407,8 +412,15 @@ internal fun RollingGlyphLabel(
             runs.forEach { run ->
                 val glyph = run.frame(phase)
                 if (glyph.alpha > 0.01f) {
-                    drawText(glyphLayouts.getValue(glyph.character), color = color,
-                        topLeft = Offset(glyph.x, glyph.y * textHeight + opticalShift), alpha = glyph.alpha)
+                    drawText(
+                        glyphLayouts.getValue(glyph.character),
+                        color = color,
+                        topLeft = Offset(
+                            glyph.x,
+                            glyph.y * textHeight + opticalShift + glyphBaselineOffsets.getValue(glyph.character),
+                        ),
+                        alpha = glyph.alpha,
+                    )
                 }
             }
         }
