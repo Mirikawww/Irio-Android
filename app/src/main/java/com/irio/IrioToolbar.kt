@@ -1,6 +1,7 @@
 package com.irio
 
 
+import androidx.compose.animation.core.Easing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -208,9 +209,12 @@ internal val ChatToolbarHazeBleed = 28.dp
 /** 输入框上方再留一段，模糊淡出不要贴着字段顶边。 */
 internal val ChatComposerHazeBleed = ChatToolbarHazeBleed
 
+/** Reverse the curve as well as the intensities so the top mirrors the unchanged bottom. */
+private val ChatToolbarHazeEasing = Easing { 1f - IrioEaseOut.transform(1f - it) }
+
 /**
  * 毛玻璃：主题色半透明着色 + 模糊，渐变铺满整段 overlay。
- * 两个边缘使用同一套手写曲线，只反转渐变方向。
+ * 顶部与底部的曲线和渐变方向互为镜像。
  */
 @Composable
 internal fun chatToolbarHazeStyle(): HazeBlurStyle = chatEdgeHazeStyle(bottomStrong = false)
@@ -231,7 +235,7 @@ private fun chatEdgeHazeStyle(bottomStrong: Boolean): HazeBlurStyle {
             )
             progressive(
                 HazeProgressive.verticalGradient(
-                    easing = IrioEaseOut,
+                    easing = if (bottomStrong) IrioEaseOut else ChatToolbarHazeEasing,
                     startIntensity = if (bottomStrong) 0f else 1f,
                     endIntensity = if (bottomStrong) 1f else 0f,
                 ),
