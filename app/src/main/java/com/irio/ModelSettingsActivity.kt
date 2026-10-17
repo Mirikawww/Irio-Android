@@ -412,7 +412,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
         }
         IrioSnackbar(
             visible = showSmartHintNotice,
-            message = tr("开启更智能的工具调用提示后，将自动关闭合并工具调用显示。"),
+            message = tr("开启更智能的工具调用提示后，将自动关闭合并工具调用显示"),
             bottomInset = bottomInset,
             onDismiss = { showSmartHintNotice = false },
         )

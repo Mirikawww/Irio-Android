@@ -8,15 +8,15 @@ internal enum class ToolBlockedReason {
     WEB_SEARCH, SEARCH_KEY, IMAGE_MODEL, MEMORY, SUBAGENTS, LINUX, STORAGE, LINUX_BACKGROUND, GITHUB;
 
     fun message(): String = tr(when (this) {
-        WEB_SEARCH -> "请先在对话中开启「网络搜索」。"
-        SEARCH_KEY -> "请先在「模型」中配置搜索提供商的 API 密钥。"
-        IMAGE_MODEL -> "请先在「模型」中配置图片生成模型。"
-        MEMORY -> "请先在「记忆」中开启记忆。"
-        SUBAGENTS -> "请先在「模型」中开启「子智能体」。"
-        LINUX -> "请先在「Linux 沙盒」中开启「启用 Linux 沙盒」。"
-        STORAGE -> "请先在「Linux 沙盒」中授予所有文件访问权限。"
-        LINUX_BACKGROUND -> "请先在「Linux 沙盒」中开启「后台命令」。"
-        GITHUB -> "请先在「MCP」中登录 GitHub 并开启「在对话中启用」。"
+        WEB_SEARCH -> "请先在对话中开启「网络搜索」"
+        SEARCH_KEY -> "请先在「模型」中配置搜索提供商的 API 密钥"
+        IMAGE_MODEL -> "请先在「模型」中配置图片生成模型"
+        MEMORY -> "请先在「记忆」中开启记忆"
+        SUBAGENTS -> "请先在「模型」中开启「子智能体」"
+        LINUX -> "请先在「Linux 沙盒」中开启「启用 Linux 沙盒」"
+        STORAGE -> "请先在「Linux 沙盒」中授予所有文件访问权限"
+        LINUX_BACKGROUND -> "请先在「Linux 沙盒」中开启「后台命令」"
+        GITHUB -> "请先在「MCP」中登录 GitHub 并开启「在对话中启用」"
     })
 }
 

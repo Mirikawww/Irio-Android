@@ -201,7 +201,7 @@ internal class WebSearchToolProvider : ToolProvider {
         context: ToolExecutionContext,
     ): ToolExecutionResult = withContext(Dispatchers.IO) {
         if (!context.webSearch || context.searchApiKey.isBlank()) {
-            return@withContext ToolExecutionResult(tr("搜索工具当前不可用：请先启用网页搜索并配置密钥。"))
+            return@withContext ToolExecutionResult(tr("搜索工具当前不可用：请先启用网页搜索并配置密钥"))
         }
         val query = ToolArguments.value(call.arguments, "query")
         context.onUpdate(ChatStreamUpdate(searching = true, searchQuery = query))
@@ -240,7 +240,7 @@ internal class WebFetchToolProvider : ToolProvider {
         context: ToolExecutionContext,
     ): ToolExecutionResult = withContext(Dispatchers.IO) {
         if (!context.webSearch || context.searchApiKey.isBlank()) {
-            return@withContext ToolExecutionResult(tr("网页读取工具当前不可用：请先启用网页搜索并配置密钥。"))
+            return@withContext ToolExecutionResult(tr("网页读取工具当前不可用：请先启用网页搜索并配置密钥"))
         }
         val url = ToolArguments.value(call.arguments, "url")
         context.onUpdate(
@@ -289,7 +289,7 @@ internal class ImageGenToolProvider : ToolProvider {
                     toolContent = ImageGenTool.STATUS_FAILED,
                 ),
             )
-            return@withContext ToolExecutionResult(tr("图片生成工具当前不可用：请先配置图片生成模型。"))
+            return@withContext ToolExecutionResult(tr("图片生成工具当前不可用：请先配置图片生成模型"))
         }
         if (context.cancellation.isCancelled()) return@withContext ToolExecutionResult(tr("图片生成已停止"))
         context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = ImageGenTool.NAME))

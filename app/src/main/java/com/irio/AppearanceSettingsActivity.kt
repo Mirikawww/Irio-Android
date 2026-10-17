@@ -545,7 +545,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
         }
         IrioSnackbar(
             visible = showMergeWarning,
-            message = tr("开启合并工具调用后，将自动关闭更智能的工具调用提示。"),
+            message = tr("开启合并工具调用后，将自动关闭更智能的工具调用提示"),
             bottomInset = bottomInset,
             onDismiss = { showMergeWarning = false },
         )
