@@ -12,4 +12,12 @@ class ToolStoreTest {
         assertEquals(100, ToolStore.clampCompressionPercent(101))
         assertEquals(90, ToolStore.clampCompressionPercent(90))
     }
+
+    @Test
+    fun zeroIsTheUnlimitedToolRoundSliderValue() {
+        assertEquals(0, ToolStore.MAX_ROUNDS_MIN)
+        assertEquals(0, ToolStore.clampMaxRounds(-1))
+        assertEquals(0, ToolStore.clampMaxRounds(0))
+        assertEquals(25, ToolStore.clampMaxRounds(26))
+    }
 }

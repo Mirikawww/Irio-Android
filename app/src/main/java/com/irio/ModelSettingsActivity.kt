@@ -261,6 +261,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     value = maxRounds,
                     valueRange = ToolStore.MAX_ROUNDS_MIN..ToolStore.MAX_ROUNDS_MAX,
                     onValueChange = { maxRounds = it },
+                    valueLabel = { if (it == ToolStore.MAX_ROUNDS_MIN) tr("无限") else it.toString() },
                 )
                 Row(
                     modifier = Modifier.settingsSwitchRow(),

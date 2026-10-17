@@ -214,7 +214,8 @@ object ChatApi {
             reasoningEffort = reasoningEffort,
             fastMode = fastMode,
         )
-        repeat(rounds) { roundIndex ->
+        var roundIndex = 0
+        while (rounds == ToolStore.MAX_ROUNDS_MIN || roundIndex < rounds) {
             if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
             if (roundIndex > 0) {
                 onUpdate(ChatStreamUpdate(newRound = true))
@@ -270,6 +271,7 @@ object ChatApi {
             if (endTurn) {
                 return ChatCompletionResult(searchPages = searchPages, usage = lastUsage)
             }
+            roundIndex++
         }
         return ChatCompletionResult(
             stopped = cancellation.isCancelled(),

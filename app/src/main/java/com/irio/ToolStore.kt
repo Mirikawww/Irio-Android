@@ -3,7 +3,8 @@ package com.irio
 import android.content.Context
 
 object ToolStore {
-    const val MAX_ROUNDS_MIN = 1
+    /** Zero means no local round limit; positive values cap the number of tool rounds. */
+    const val MAX_ROUNDS_MIN = 0
     const val MAX_ROUNDS_MAX = 25
     const val MAX_ROUNDS_DEFAULT = 4
     const val COMPRESSION_PERCENT_MIN = 1
