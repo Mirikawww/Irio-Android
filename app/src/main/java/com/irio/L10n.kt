@@ -314,6 +314,7 @@ private val English = mapOf(
     "消息框延展动画" to "Message box stretch animation",
     "思考块" to "Thinking block",
     "合并工具调用显示" to "Merge tool calls",
+    "主模型" to "Main model",
     "配置 GitHub MCP 后可用" to "Available after GitHub MCP is configured",
     "开启合并工具调用后，将自动关闭更智能的工具调用提示" to "Enabling merged tool calls automatically turns off smarter tool-call labels",
     "开启更智能的工具调用提示后，将自动关闭合并工具调用显示" to "Enabling smarter tool-call labels automatically turns off merged tool calls",
