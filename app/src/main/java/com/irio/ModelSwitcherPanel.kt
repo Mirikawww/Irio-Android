@@ -13,6 +13,7 @@ import androidx.compose.animation.core.snap
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -138,12 +139,23 @@ import kotlinx.coroutines.isActive
 
 /** The explicit overload also supports legacy indications supplied by nested themes. */
 @Composable
-private fun Modifier.modelSwitcherClickable(onClick: () -> Unit): Modifier = clickable(
-    interactionSource = remember { MutableInteractionSource() },
-    indication = LocalIndication.current,
-    role = Role.Button,
-    onClick = onClick,
-)
+private fun Modifier.modelSwitcherClickable(shape: androidx.compose.ui.graphics.Shape, onClick: () -> Unit): Modifier {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressedBackground = if (pressed) {
+        Theme[colors][onBackgroundColor].copy(alpha = 0.08f)
+    } else {
+        Color.Transparent
+    }
+    return background(pressedBackground, shape)
+        .clip(shape)
+        .clickable(
+            interactionSource = interactionSource,
+            indication = LocalIndication.current,
+            role = Role.Button,
+            onClick = onClick,
+        )
+}
 
 private val MaxThinkingGold = Color(0xFFFFB400)
 private val UltraThinkingPurple = Color(0xFF9254E8)
@@ -213,8 +225,8 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                 .semantics { if (listOpacity() >= 0.5f) invisibleToUser() }) {
             Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(
-                    Modifier.weight(1f).height(44.dp).clip(RoundedRectangle(12.dp))
-                        .modelSwitcherClickable { modelsExpanded = !modelsExpanded }
+                    Modifier.weight(1f).height(44.dp)
+                        .modelSwitcherClickable(RoundedRectangle(12.dp)) { modelsExpanded = !modelsExpanded }
                         .semantics {
                             contentDescription = tr("选择模型")
                             stateDescription = tr(if (modelsExpanded) "收起模型" else "展开模型")
@@ -262,8 +274,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                             val selected = row.providerId == activeProviderId && selectedModel in row.variants
                             Row(
                                 Modifier.fillMaxWidth().heightIn(min = 36.dp)
-                                    .clip(RoundedRectangle(8.dp))
-                                    .modelSwitcherClickable {
+                                    .modelSwitcherClickable(RoundedRectangle(8.dp)) {
                                         if (!selected) onSelectedModelChange(row.target, row.providerId)
                                         modelsExpanded = false
                                     }.semantics { this.selected = selected }
