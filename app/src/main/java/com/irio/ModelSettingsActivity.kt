@@ -110,25 +110,17 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
     var compressionModel by remember { mutableStateOf(ToolStore.loadCompressionModel(context)) }
 
     val currentProvider by rememberUpdatedState(provider)
-    val currentMaxResults by rememberUpdatedState(maxResults)
-    val currentMaxRounds by rememberUpdatedState(maxRounds)
     val currentMessageTimestamps by rememberUpdatedState(messageTimestamps)
     val currentContextCompression by rememberUpdatedState(contextCompression)
-    val currentCompressionTrigger by rememberUpdatedState(compressionTrigger)
-    val currentCompressionTarget by rememberUpdatedState(compressionTarget)
     val currentVisualizeContext by rememberUpdatedState(visualizeContext)
     val currentCompressionModel by rememberUpdatedState(compressionModel)
     val lifecycleOwner = LocalLifecycleOwner.current
 
     fun persistCurrent() {
         SearchStore.saveApiKey(context, apiKey.text.toString(), currentProvider)
-        SearchStore.saveMaxResults(context, currentMaxResults, currentProvider)
         SearchStore.saveProvider(context, currentProvider)
-        ToolStore.saveMaxRounds(context, currentMaxRounds)
         ToolStore.saveMessageTimestamps(context, currentMessageTimestamps)
         ToolStore.saveContextCompression(context, currentContextCompression)
-        ToolStore.saveCompressionTrigger(context, currentCompressionTrigger)
-        ToolStore.saveCompressionTarget(context, currentCompressionTarget)
         ToolStore.saveVisualizeContext(context, currentVisualizeContext)
         ToolStore.saveCompressionModel(context, currentCompressionModel)
     }
@@ -239,7 +231,11 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     label = tr("单次搜索上限"),
                     value = maxResults,
                     valueRange = provider.maxResultsMin..provider.maxResultsMax,
-                    onValueChange = { maxResults = provider.clampMaxResults(it) },
+                    onValueChange = {
+                        val next = provider.clampMaxResults(it)
+                        maxResults = next
+                        SearchStore.saveMaxResults(context, next, provider)
+                    },
                 )
             }
             ListRowButton(
@@ -260,7 +256,10 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     label = tr("单轮工具调用"),
                     value = maxRounds,
                     valueRange = ToolStore.MAX_ROUNDS_MIN..ToolStore.MAX_ROUNDS_MAX,
-                    onValueChange = { maxRounds = it },
+                    onValueChange = {
+                        maxRounds = it
+                        ToolStore.saveMaxRounds(context, it)
+                    },
                     valueLabel = { if (it == ToolStore.MAX_ROUNDS_MIN) tr("无限") else it.toString() },
                 )
                 Row(
@@ -365,14 +364,22 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     value = compressionTrigger,
                     valueRange = ToolStore.COMPRESSION_PERCENT_MIN..ToolStore.COMPRESSION_PERCENT_MAX,
                     valueLabel = { "$it%" },
-                    onValueChange = { compressionTrigger = ToolStore.clampCompressionPercent(it) },
+                    onValueChange = {
+                        val next = ToolStore.clampCompressionPercent(it)
+                        compressionTrigger = next
+                        ToolStore.saveCompressionTrigger(context, next)
+                    },
                 )
                 SettingsSlider(
                     label = tr("压缩目标"),
                     value = compressionTarget,
                     valueRange = ToolStore.COMPRESSION_PERCENT_MIN..ToolStore.COMPRESSION_PERCENT_MAX,
                     valueLabel = { "$it%" },
-                    onValueChange = { compressionTarget = ToolStore.clampCompressionPercent(it) },
+                    onValueChange = {
+                        val next = ToolStore.clampCompressionPercent(it)
+                        compressionTarget = next
+                        ToolStore.saveCompressionTarget(context, next)
+                    },
                 )
                 SettingsSwitchRow(
                     label = tr("可视化上下文"),

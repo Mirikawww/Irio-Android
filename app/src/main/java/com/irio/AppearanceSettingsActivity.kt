@@ -497,11 +497,9 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     valueRange = 60..160,
                     onValueChange = { percent ->
                         texScalePercent = percent
+                        ProviderStore.saveTexScale(context, percent / 100f)
                     },
                     valueLabel = { "$it%" },
-                    onValueChangeFinished = {
-                        ProviderStore.saveTexScale(context, texScalePercent / 100f)
-                    },
                 )
                 Row(
                     modifier = Modifier.settingsSwitchRow(),
