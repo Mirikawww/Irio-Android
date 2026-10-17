@@ -52,6 +52,7 @@ internal fun BoxScope.IrioSnackbar(
     message: String,
     bottomInset: Dp,
     onDismiss: () -> Unit,
+    restartKey: Int = 0,
 ) {
     val dismiss by rememberUpdatedState(onDismiss)
     val scope = rememberCoroutineScope()
@@ -82,7 +83,7 @@ internal fun BoxScope.IrioSnackbar(
         swipeOff = false
         replacing = false
     }
-    LaunchedEffect(visible, displayedMessage, replacing) {
+    LaunchedEffect(visible, displayedMessage, replacing, restartKey) {
         if (!visible || replacing) return@LaunchedEffect
         offsetX = 0f
         swipeOff = false

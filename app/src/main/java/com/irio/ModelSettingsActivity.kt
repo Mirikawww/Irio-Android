@@ -103,6 +103,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
     var subagentsEnabled by remember { mutableStateOf(ToolStore.loadSubagents(context)) }
     var subagentModel by remember { mutableStateOf(ToolStore.loadSubagentModel(context)) }
     var showSmartHintNotice by remember { mutableStateOf(false) }
+    var smartHintNoticeRestartKey by remember { mutableIntStateOf(0) }
     var contextCompression by remember { mutableStateOf(ToolStore.loadContextCompression(context)) }
     var compressionTrigger by remember { mutableIntStateOf(ToolStore.loadCompressionTrigger(context)) }
     var compressionTarget by remember { mutableIntStateOf(ToolStore.loadCompressionTarget(context)) }
@@ -280,6 +281,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                                 showSmartHintNotice = false
                             } else if (ThemeStore.mergeToolCalls) {
                                 ThemeStore.saveMergeToolCalls(context, false)
+                                smartHintNoticeRestartKey++
                                 showSmartHintNotice = true
                             }
                         },
@@ -415,6 +417,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
             message = tr("开启更智能的工具调用提示后，将自动关闭合并工具调用显示"),
             bottomInset = bottomInset,
             onDismiss = { showSmartHintNotice = false },
+            restartKey = smartHintNoticeRestartKey,
         )
         }
     }

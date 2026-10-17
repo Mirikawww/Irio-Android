@@ -89,6 +89,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
     var mergeModels by remember { mutableStateOf(ProviderStore.loadMergeModels(context)) }
     var mergeToolCalls by remember { mutableStateOf(ThemeStore.mergeToolCalls) }
     var showMergeWarning by remember { mutableStateOf(false) }
+    var mergeWarningRestartKey by remember { mutableIntStateOf(0) }
     var openRouterNames by remember { mutableStateOf(ProviderStore.loadModelsDevCatalog(context)) }
     val themePreference = ThemeStore.preference
     val accent = ThemeStore.accent
@@ -486,6 +487,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                 showMergeWarning = false
                             } else if (ToolStore.loadSmartToolHints(context)) {
                                 ToolStore.saveSmartToolHints(context, false)
+                                mergeWarningRestartKey++
                                 showMergeWarning = true
                             }
                         },
@@ -548,6 +550,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
             message = tr("开启合并工具调用后，将自动关闭更智能的工具调用提示"),
             bottomInset = bottomInset,
             onDismiss = { showMergeWarning = false },
+            restartKey = mergeWarningRestartKey,
         )
     }
 }

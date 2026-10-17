@@ -77,6 +77,7 @@ internal fun ToolSettingsScreen(
     val drafts = remember { mutableMapOf<String, TextFieldState>() }
     var notice by remember { mutableStateOf("") }
     var noticeVisible by remember { mutableStateOf(false) }
+    var noticeRestartKey by remember { mutableIntStateOf(0) }
     var selectedScope by rememberSaveable { mutableStateOf(ToolSettingsScope.Main) }
     var tabsHeightPx by remember { mutableIntStateOf(0) }
     val tabsHeight = with(LocalDensity.current) { tabsHeightPx.toDp() }
@@ -85,6 +86,7 @@ internal fun ToolSettingsScreen(
     }
     fun showNotice(message: String) {
         notice = message
+        noticeRestartKey++
         noticeVisible = true
     }
     DisposableEffect(lifecycleOwner, context) {
@@ -163,6 +165,7 @@ internal fun ToolSettingsScreen(
                     message = notice,
                     bottomInset = tabsHeight,
                     onDismiss = { noticeVisible = false },
+                    restartKey = noticeRestartKey,
                 )
                 Box(
                     Modifier
