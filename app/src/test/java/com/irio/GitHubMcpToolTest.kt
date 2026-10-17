@@ -28,7 +28,11 @@ class GitHubMcpToolTest {
             "get_file_contents" to "读取 GitHub 文件内容",
             "create_or_update_file" to "创建或更新 GitHub 文件",
             "get_release_by_tag" to "按标签读取 GitHub 发布",
-            "assign_copilot_to_issue" to "分配 GitHub Issue 给 Copilot",
+            "assign_copilot_to_issue" to "分配 GitHub 议题给 Copilot",
+            "list_issues" to "读取 GitHub 议题列表",
+            "list_pull_requests" to "读取 GitHub 拉取请求列表",
+            "ui_get" to "读取 GitHub 界面数据",
+            "run_secret_scanning" to "运行 GitHub 密钥扫描",
         )
         for ((remoteName, live) in labels) {
             val name = GitHubMcpToolProvider.PREFIX + remoteName

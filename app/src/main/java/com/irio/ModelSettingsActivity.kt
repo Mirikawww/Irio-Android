@@ -85,7 +85,7 @@ class ModelSettingsActivity : ComponentActivity() {
 }
 
 @Composable
-private fun ModelSettingsScreen(onBack: () -> Unit) {
+internal fun ModelSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
@@ -242,6 +242,19 @@ private fun ModelSettingsScreen(onBack: () -> Unit) {
                     onValueChange = { maxResults = provider.clampMaxResults(it) },
                 )
             }
+            ListRowButton(
+                label = tr("工具"),
+                onClick = { context.startActivity(Intent(context, ToolSettingsActivity::class.java)) },
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                trailing = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = Theme[colors][onPanelColor],
+                    )
+                },
+            )
             SettingsSectionCard {
                 SettingsSlider(
                     label = tr("单轮工具调用"),

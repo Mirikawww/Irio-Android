@@ -54,6 +54,7 @@ internal fun chatToolRegistry(
         }
     },
     smartToolHints = ToolStore.loadSmartToolHints(context),
+    preferences = ToolPreferencesStore.load(context),
 )
 
 /** 系统提示和工具定义算在一起。定义在请求里是单独的 tools 字段，菜单归到系统提示。 */

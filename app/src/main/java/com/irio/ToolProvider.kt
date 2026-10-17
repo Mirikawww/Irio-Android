@@ -57,6 +57,9 @@ interface ToolProvider {
     /** Request-scoped instructions describing capabilities supplied by this provider. */
     fun systemInstructions(): String? = null
 
+    /** Names actually exposed in this request, for providers that enumerate their capabilities. */
+    fun systemInstructions(enabledTools: Set<String>): String? = systemInstructions()
+
     /** Stable names owned by this provider; derived from definitions by default. */
     fun toolNames(): Set<String> = ProviderProtocol.entries
         .asSequence()
@@ -81,6 +84,7 @@ interface ToolProvider {
 class ToolRegistry(
     providers: Iterable<ToolProvider> = emptyList(),
     val smartToolHints: Boolean = false,
+    val preferences: ToolPreferences = ToolPreferences(),
 ) {
     private val registered = LinkedHashMap<String, ToolProvider>()
     private val owners = LinkedHashMap<String, String>()
@@ -113,16 +117,24 @@ class ToolRegistry(
             val name = schemaToolName(schema)
                 ?: error("Tool definition from registry has no name")
             require(names.add(name)) { "Tool name is duplicated in ${protocol.name}: $name" }
-        }.map { schema ->
+        }.filter { schema -> preferences.isEnabled(schemaToolName(schema)!!) }.map { schema ->
             val name = schemaToolName(schema)
-            if (smartToolHints && name !in SubagentTools.QUIET) SmartToolHints.decorate(schema) else schema
+            // A provider may reuse schemas; neither user descriptions nor hints may mutate them.
+            val copy = JSONObject(schema.toString())
+            preferences.descriptions[name]?.let { description ->
+                (copy.optJSONObject("function") ?: copy).put("description", description)
+            }
+            if (smartToolHints && name !in SubagentTools.QUIET) SmartToolHints.decorate(copy) else copy
         }
     }
 
     /** Derive capability instructions from the same providers that supply wire definitions. */
     fun systemPrompt(base: String?): String? = buildList {
         base?.takeIf { it.isNotBlank() }?.let(::add)
-        registered.values.mapNotNull { it.systemInstructions()?.takeIf(String::isNotBlank) }.forEach(::add)
+        registered.values.mapNotNull { provider ->
+            val enabled = provider.toolNames().filterTo(linkedSetOf(), preferences::isEnabled)
+            if (enabled.isEmpty()) null else provider.systemInstructions(enabled)?.takeIf(String::isNotBlank)
+        }.forEach(::add)
         if (smartToolHints) add(SmartToolHints.INSTRUCTIONS)
     }.joinToString("\n\n").takeIf { it.isNotBlank() }
 
@@ -130,11 +142,15 @@ class ToolRegistry(
     fun schemas(protocol: ProviderProtocol): List<JSONObject> = definitions(protocol)
 
     fun providerFor(name: String): ToolProvider? =
-        registered.values.firstOrNull { it.handles(name) }
+        if (preferences.isEnabled(name)) registered.values.firstOrNull { it.handles(name) } else null
 
     fun handles(name: String): Boolean = providerFor(name) != null
 
     suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {
+        // Reject stale or hallucinated calls before dispatch, callbacks, or any provider side effects.
+        if (!preferences.isEnabled(call.name)) {
+            return ToolExecutionResult("Tool ${call.name} is disabled by user preferences.")
+        }
         val provider = providerFor(call.name)
             ?: return ToolExecutionResult(tr("未知工具 %s").format(call.name))
         val displayText = if (smartToolHints) SmartToolHints.displayText(call.arguments) else ""

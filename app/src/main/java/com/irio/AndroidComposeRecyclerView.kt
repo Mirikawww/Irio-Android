@@ -201,7 +201,7 @@ private class RecyclerSpacingDecoration(var spacing: Int) : RecyclerView.ItemDec
 }
 
 private class ComposeListAdapter<T : Any>(
-    keyOf: (T) -> Any,
+    private val keyOf: (T) -> Any,
     content: @Composable (T) -> Unit,
 ) : ListAdapter<T, ComposeListViewHolder<T>>(
     object : DiffUtil.ItemCallback<T>() {
@@ -216,7 +216,7 @@ private class ComposeListAdapter<T : Any>(
         ComposeListViewHolder(ComposeView(parent.context), contentState)
 
     override fun onBindViewHolder(holder: ComposeListViewHolder<T>, position: Int) {
-        holder.bind(getItem(position))
+        holder.bind(getItem(position), keyOf(getItem(position)))
     }
 
     override fun onViewRecycled(holder: ComposeListViewHolder<T>) {
@@ -234,6 +234,7 @@ private class ComposeListViewHolder<T : Any>(
     private val contentState: androidx.compose.runtime.MutableState<(@Composable (T) -> Unit)>,
 ) : RecyclerView.ViewHolder(composeView) {
     private var item by mutableStateOf<T?>(null)
+    private var boundKey: Any? = null
 
     init {
         composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
@@ -245,11 +246,23 @@ private class ComposeListViewHolder<T : Any>(
         }
     }
 
-    fun bind(next: T) {
+    fun bind(next: T, key: Any) {
+        val identityChanged = boundKey != key
+        if (identityChanged) composeView.disposeComposition()
+        boundKey = key
         item = next
+        if (identityChanged) {
+            // RecyclerView measures immediately after binding, before the next Compose
+            // frame. Recreate only on identity changes so that traversal cannot reuse
+            // another item's text, remembered animations, or measured height.
+            if (composeView.isAttachedToWindow) composeView.createComposition()
+            composeView.requestLayout()
+        }
     }
 
     fun clear() {
+        composeView.disposeComposition()
+        boundKey = null
         item = null
     }
 }

@@ -270,7 +270,11 @@ internal object SubagentTools {
 }
 
 internal fun ToolRegistry.withoutSubagents(): ToolRegistry =
-    ToolRegistry(providers().filter { it.id != SubagentToolProvider.ID }, smartToolHints = smartToolHints)
+    ToolRegistry(
+        providers().filter { it.id != SubagentToolProvider.ID },
+        smartToolHints = smartToolHints,
+        preferences = preferences,
+    )
 
 internal class SubagentToolProvider : ToolProvider {
     override val id: String = ID

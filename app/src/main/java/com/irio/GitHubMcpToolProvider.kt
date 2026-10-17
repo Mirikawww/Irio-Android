@@ -24,7 +24,10 @@ internal class GitHubMcpToolProvider(
         }
     }
 
-    override fun systemInstructions(): String? = tools.takeIf { it.isNotEmpty() }?.let {
+    override fun systemInstructions(): String? = systemInstructions(toolNames())
+
+    override fun systemInstructions(enabledTools: Set<String>): String? =
+        tools.filter { PREFIX + it.name in enabledTools }.takeIf { it.isNotEmpty() }?.let {
         "GitHub MCP tools are available in this request through Irio's configured GitHub integration. " +
             "Available tool names: " + it.joinToString(", ") { tool -> PREFIX + tool.name } + ". " +
             "These are callable tools, not instructions for the user to run. For relevant GitHub tasks, " +
@@ -95,30 +98,32 @@ internal class GitHubMcpToolProvider(
             "get_latest_release" to "读取 GitHub 最新发布",
             "get_release_by_tag" to "按标签读取 GitHub 发布",
             "list_repository_collaborators" to "读取 GitHub 仓库协作者",
-            "get_label" to "读取 GitHub Issue 标签",
-            "list_label" to "读取 GitHub Issue 标签列表",
-            "label_write" to "修改 GitHub Issue 标签",
-            "issue_read" to "读取 GitHub Issue 详情",
-            "issue_write" to "创建或更新 GitHub Issue",
-            "list_issues" to "读取 GitHub Issue 列表",
-            "search_issues" to "搜索 GitHub Issue",
-            "list_issue_fields" to "读取 GitHub Issue 字段",
-            "list_issue_types" to "读取 GitHub Issue 类型",
-            "sub_issue_write" to "修改 GitHub 子 Issue",
-            "add_issue_comment" to "添加 GitHub Issue 评论",
-            "update_issue_comment" to "更新 GitHub Issue 评论",
-            "pull_request_read" to "读取 GitHub Pull Request 详情",
-            "create_pull_request" to "创建 GitHub Pull Request",
-            "list_pull_requests" to "读取 GitHub Pull Request 列表",
-            "search_pull_requests" to "搜索 GitHub Pull Request",
-            "merge_pull_request" to "合并 GitHub Pull Request",
-            "update_pull_request" to "更新 GitHub Pull Request",
-            "update_pull_request_branch" to "更新 GitHub Pull Request 分支",
+            "get_label" to "读取 GitHub 议题标签",
+            "list_label" to "读取 GitHub 议题标签列表",
+            "label_write" to "修改 GitHub 议题标签",
+            "issue_read" to "读取 GitHub 议题详情",
+            "issue_write" to "创建或更新 GitHub 议题",
+            "list_issues" to "读取 GitHub 议题列表",
+            "search_issues" to "搜索 GitHub 议题",
+            "list_issue_fields" to "读取 GitHub 议题字段",
+            "list_issue_types" to "读取 GitHub 议题类型",
+            "sub_issue_write" to "修改 GitHub 子议题",
+            "add_issue_comment" to "添加 GitHub 议题评论",
+            "update_issue_comment" to "更新 GitHub 议题评论",
+            "pull_request_read" to "读取 GitHub 拉取请求详情",
+            "create_pull_request" to "创建 GitHub 拉取请求",
+            "list_pull_requests" to "读取 GitHub 拉取请求列表",
+            "search_pull_requests" to "搜索 GitHub 拉取请求",
+            "merge_pull_request" to "合并 GitHub 拉取请求",
+            "update_pull_request" to "更新 GitHub 拉取请求",
+            "update_pull_request_branch" to "更新 GitHub 拉取请求分支",
             "pull_request_review_write" to "提交或修改 GitHub 代码审查",
             "add_comment_to_pending_review" to "添加 GitHub 待提交审查评论",
-            "add_reply_to_pull_request_comment" to "回复 GitHub Pull Request 评论",
+            "add_reply_to_pull_request_comment" to "回复 GitHub 拉取请求评论",
             "request_copilot_review" to "请求 GitHub Copilot 审查",
-            "assign_copilot_to_issue" to "分配 GitHub Issue 给 Copilot",
+            "assign_copilot_to_issue" to "分配 GitHub 议题给 Copilot",
+            "ui_get" to "读取 GitHub 界面数据",
+            "run_secret_scanning" to "运行 GitHub 密钥扫描",
             "actions_get" to "读取 GitHub Actions 详情",
             "actions_list" to "读取 GitHub Actions 列表",
             "actions_run_trigger" to "触发 GitHub Actions 工作流",
