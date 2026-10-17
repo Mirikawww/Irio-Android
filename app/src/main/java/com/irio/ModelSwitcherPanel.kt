@@ -429,6 +429,7 @@ internal fun RollingGlyphLabel(
 
 @Composable
 private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, supportedLevels: List<ReasoningEffort>, onEffortChange: (ReasoningEffort) -> Unit, active: Boolean = true) {
+    val darkTheme = LocalResolvedTheme.current.isDark
     val levels = supportedLevels.ifEmpty { listOf(ReasoningEffort.OFF) }
     val adjustable = enabled && levels.size > 1
     val selectedIndex = levels.indexOf(effort).coerceAtLeast(0)
@@ -583,7 +584,7 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
                 .size(24.dp).shadow(2.dp, ContinuousCapsule).background(Color.White, ContinuousCapsule),
         )
         val indicatorInk = if (fill.luminance() > 0.45f) {
-            if (displayEffort == ReasoningEffort.OFF) Color.Black else Color(0xFF392500)
+            if (darkTheme || displayEffort == ReasoningEffort.OFF) Color.Black else Color(0xFF392500)
         } else Color.White
         Box(
             Modifier.offset {
