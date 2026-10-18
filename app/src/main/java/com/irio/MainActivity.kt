@@ -18,6 +18,7 @@ import android.content.SharedPreferences
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.OpenableColumns
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -26,6 +27,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloatAsState
@@ -34,8 +37,15 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -73,6 +83,7 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import com.kyant.shapes.RoundedRectangle
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.input.TextFieldLineLimits
@@ -95,6 +106,7 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Refresh
@@ -110,6 +122,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -185,6 +198,7 @@ import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 import com.composables.ui.components.BottomSheet
 import com.composables.ui.components.BottomSheetDetent
 import com.composables.ui.components.BottomSheetState
@@ -202,9 +216,12 @@ import com.composables.ui.components.IconButton
 import com.composables.ui.components.Text
 import com.composables.ui.components.rememberBottomSheetState
 import com.composables.ui.theme.backgroundColor
+import com.composables.ui.theme.borderColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.defaultTextSelectionColors
 import com.composables.ui.theme.destructiveColor
+import com.composables.ui.theme.fieldColor
+import com.composables.ui.theme.fieldShape
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPanelColor
@@ -212,6 +229,7 @@ import com.composables.ui.theme.onPrimaryColor
 import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.secondaryColor
+import com.composables.ui.theme.shapes
 import com.composables.ui.theme.textSelectionColors
 import com.composeunstyled.ProvideTextStyle
 import com.composeunstyled.theme.Theme
@@ -289,6 +307,15 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         }
     }
     val message = rememberTextFieldState()
+    var sttRecording by remember { mutableStateOf(false) }
+    var sttTranscribing by remember { mutableStateOf(false) }
+    var sttWaveformLevels by remember { mutableStateOf(emptyList<Float>()) }
+    var sttRecordingStartedAt by remember { mutableLongStateOf(0L) }
+    var sttRecordingElapsedMillis by remember { mutableLongStateOf(0L) }
+    val sttRecorder = remember { SttRecorder(context.applicationContext) }
+    DisposableEffect(Unit) {
+        onDispose { sttRecorder.cancel() }
+    }
     // 抽屉列表只持轻量摘要（无正文）；正文按需从磁盘取并常驻缓存（见 [conversationContent]）。
     var conversations by remember { mutableStateOf(emptyList<ConversationSummary>()) }
     var currentConversation by remember {
@@ -299,6 +326,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var pendingAttachments by remember { mutableStateOf(emptyList<ChatAttachment>()) }
     var clearingHistory by remember { mutableStateOf(false) }
     var composerStatus by remember { mutableStateOf<String?>(null) }
+    var sttProviderSnackbarVisible by remember { mutableStateOf(false) }
+    var sttProviderSnackbarRestartKey by remember { mutableIntStateOf(0) }
     /** 正在编辑的用户消息 id；null = 普通发送模式。 */
     var editingMessageId by remember { mutableStateOf<Long?>(null) }
     var pendingQuote by remember { mutableStateOf("") }
@@ -329,6 +358,84 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         composerFullscreen = false
     }
     val composerFocusRequester = remember { FocusRequester() }
+    fun showSttProviderSnackbar() {
+        composerStatus = null
+        sttProviderSnackbarVisible = true
+        sttProviderSnackbarRestartKey++
+    }
+    fun startSttRecording() {
+        if (sttTranscribing || sttRecording) return
+        if (SttStore.loadActiveProvider(context) == null) {
+            showSttProviderSnackbar()
+            return
+        }
+        if (sttRecorder.start()) {
+            sttRecording = true
+            sttRecordingStartedAt = SystemClock.elapsedRealtime()
+            sttRecordingElapsedMillis = 0L
+            sttWaveformLevels = emptyList()
+            composerStatus = null
+        } else {
+            composerStatus = tr("无法开始录音")
+        }
+    }
+    fun finishSttRecording() {
+        if (!sttRecording) return
+        sttRecording = false
+        val file = sttRecorder.stop()
+        if (file == null) {
+            composerStatus = tr("录音为空")
+            return
+        }
+        val provider = SttStore.loadActiveProvider(context)
+        if (provider == null) {
+            file.delete()
+            showSttProviderSnackbar()
+            return
+        }
+        sttTranscribing = true
+        composerStatus = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { SttClient.transcribe(file, provider) }
+            file.delete()
+            sttTranscribing = false
+            if (result.error != null) {
+                composerStatus = result.error
+            } else if (result.text.isNotBlank()) {
+                val needsSpace = message.text.isNotEmpty() && !message.text.last().isWhitespace()
+                message.edit {
+                    if (needsSpace) append(" ")
+                    append(result.text)
+                }
+                composerFocusRequester.requestFocus()
+            }
+        }
+    }
+    val requestRecordAudio = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) startSttRecording() else composerStatus = tr("需要麦克风权限才能使用 STT")
+    }
+    fun toggleSttRecording() {
+        when {
+            sttTranscribing -> Unit
+            sttRecording -> finishSttRecording()
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED -> startSttRecording()
+            else -> requestRecordAudio.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+    LaunchedEffect(sttRecording) {
+        if (sttRecording) {
+            while (true) {
+                val amplitude = withContext(Dispatchers.IO) { sttRecorder.sampleAmplitude() }
+                val level = sqrt((amplitude / 32_767f).coerceIn(0f, 1f))
+                sttWaveformLevels = (sttWaveformLevels + level).takeLast(64)
+                sttRecordingElapsedMillis = SystemClock.elapsedRealtime() - sttRecordingStartedAt
+                delay(70)
+            }
+        }
+    }
     LaunchedEffect(currentConversation.id) {
         reactionSheetState.targetDetent = BottomSheetDetent.Hidden
         reactionTarget = null
@@ -2349,8 +2456,24 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         }
 
         @Composable
+        fun SttButton() {
+            AccentCircleIconButton(
+                onClick = ::toggleSttRecording,
+                imageVector = if (sttRecording) Icons.Rounded.Stop else Icons.Rounded.Mic,
+                contentDescription = if (sttRecording) tr("停止录音") else tr("语音输入"),
+                enabled = !sttTranscribing,
+                active = !sttTranscribing,
+                iconSize = 20.dp,
+            )
+        }
+
+        @Composable
         fun SendButton() {
             val sendActive = generatingThisChat || canSend
+            if (!generatingThisChat && !canSend) {
+                SttButton()
+                return
+            }
             AccentCircleIconButton(
                 onClick = {
                     if (!generatingThisChat && canSend) composerFullscreen = false
@@ -2386,6 +2509,76 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             },
                         )
                     }
+                }
+            }
+        }
+
+        @Composable
+        fun RecordingComposerField(
+            expansionProgress: androidx.compose.runtime.State<Float>,
+            modifier: Modifier = Modifier,
+        ) {
+            val shape = Theme[shapes][fieldShape]
+            val waveColor = Theme[colors][primaryColor]
+            val fillColor = Theme[colors][fieldColor]
+            val outlineColor = Theme[colors][borderColor]
+            val totalSeconds = (sttRecordingElapsedMillis / 1_000L).toInt()
+            val timer = "%02d:%02d".format(totalSeconds / 60, totalSeconds % 60)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(modifier)
+                    .composerAnimatedPadding(
+                        progress = expansionProgress,
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 10.dp,
+                        bottom = 10.dp,
+                    )
+                    .heightIn(min = 64.dp)
+                    .background(fillColor, shape)
+                    .border(1.dp, outlineColor, shape)
+                    .clip(shape)
+                    .semantics { contentDescription = "${tr("正在录音")} $timer" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .size(8.dp)
+                            .background(Color(0xFFFF453A), CircleShape),
+                    )
+                    Text(timer, color = content, fontSize = 13.sp)
+                    Canvas(
+                        Modifier
+                            .weight(1f)
+                            .height(32.dp),
+                    ) {
+                        val barWidth = 2.dp.toPx()
+                        val gap = 3.dp.toPx()
+                        val slotWidth = barWidth + gap
+                        val barCount = (size.width / slotWidth).toInt().coerceAtLeast(1)
+                        val values = sttWaveformLevels.takeLast(barCount)
+                        val centerY = size.height / 2f
+                        values.forEachIndexed { index, value ->
+                            val x = size.width - (values.size - index - 0.5f) * slotWidth
+                            val height = (3.dp.toPx() + value * 24.dp.toPx()).coerceAtMost(size.height)
+                            drawLine(
+                                color = waveColor,
+                                start = Offset(x, centerY - height / 2f),
+                                end = Offset(x, centerY + height / 2f),
+                                strokeWidth = barWidth,
+                                cap = StrokeCap.Round,
+                            )
+                        }
+                    }
+                    SttButton()
                 }
             }
         }
@@ -2479,76 +2672,97 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     )
                 }
 
-                ComposerField(
-                    state = message,
-                    placeholder = "Message",
-                    focusRequester = composerFocusRequester,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(if (expandedLayout) Modifier.weight(1f) else Modifier)
-                        .composerAnimatedPadding(
-                            progress = expansion,
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = 10.dp,
-                            bottom = 10.dp,
-                        ),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                    accessibilityLabel = "Message",
-                    expanded = expandedLayout,
-                    expansion = expansion,
-                    onTextLayout = { if (!expandedLayout) composerLineCount = it.lineCount },
-                    lineLimits = TextFieldLineLimits.MultiLine(
-                        minHeightInLines = 1,
-                        maxHeightInLines = if (expandedLayout) Int.MAX_VALUE else 4,
-                    ),
-                    leading = { AttachmentButton() },
-                    trailing = {
-                        Column(
-                            modifier = if (composerLineCount >= 4) Modifier.height(with(LocalDensity.current) { 80.sp.toDp() }) else Modifier,
-                            verticalArrangement = Arrangement.SpaceBetween,
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            if (composerLineCount >= 4) {
-                                IconButton(
-                                    onClick = {
-                                        attachMenuOpen = false
-                                        composerFullscreen = true
-                                    },
-                                    style = ButtonStyle.Ghost,
-                                    buttonSize = ButtonSize.Small,
-                                    modifier = Modifier.size(32.dp),
-                                ) {
-                                    Icon(Icons.Rounded.OpenInFull, contentDescription = tr("全屏输入"), modifier = Modifier.size(18.dp), tint = content)
-                                }
-                            }
-                            SendButton()
-                        }
+                AnimatedContent(
+                    targetState = sttRecording,
+                    transitionSpec = {
+                        (fadeIn(tween(180)) + expandVertically(
+                            expandFrom = Alignment.CenterVertically,
+                            animationSpec = tween(220),
+                        )).togetherWith(
+                            fadeOut(tween(120)) + shrinkVertically(
+                                shrinkTowards = Alignment.CenterVertically,
+                                animationSpec = tween(180),
+                            ),
+                        ).using(SizeTransform(clip = false))
                     },
-                    expandedFooter = {
-                        Column(Modifier.fillMaxWidth()) {
-                            AttachmentChips()
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                    label = "composer-recording-transition",
+                ) { recording ->
+                    if (recording) {
+                        RecordingComposerField(
+                            expansionProgress = expansion,
+                            modifier = if (expandedLayout) Modifier.weight(1f) else Modifier,
+                        )
+                    } else ComposerField(
+                        state = message,
+                        placeholder = "Message",
+                        focusRequester = composerFocusRequester,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (expandedLayout) Modifier.weight(1f) else Modifier)
+                            .composerAnimatedPadding(
+                                progress = expansion,
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 10.dp,
+                                bottom = 10.dp,
+                            ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                        accessibilityLabel = "Message",
+                        expanded = expandedLayout,
+                        expansion = expansion,
+                        onTextLayout = { if (!expandedLayout) composerLineCount = it.lineCount },
+                        lineLimits = TextFieldLineLimits.MultiLine(
+                            minHeightInLines = 1,
+                            maxHeightInLines = if (expandedLayout) Int.MAX_VALUE else 4,
+                        ),
+                        leading = { AttachmentButton() },
+                        trailing = {
+                            Column(
+                                modifier = if (composerLineCount >= 4) Modifier.height(with(LocalDensity.current) { 80.sp.toDp() }) else Modifier,
+                                verticalArrangement = Arrangement.SpaceBetween,
+                                horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                AttachmentButton()
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                if (composerLineCount >= 4) {
                                     IconButton(
-                                        onClick = { composerFullscreen = false },
+                                        onClick = {
+                                            attachMenuOpen = false
+                                            composerFullscreen = true
+                                        },
                                         style = ButtonStyle.Ghost,
                                         buttonSize = ButtonSize.Small,
                                         modifier = Modifier.size(32.dp),
                                     ) {
-                                        Icon(Icons.Rounded.CloseFullscreen, contentDescription = tr("收起全屏输入"), modifier = Modifier.size(20.dp), tint = content)
+                                        Icon(Icons.Rounded.OpenInFull, contentDescription = tr("全屏输入"), modifier = Modifier.size(18.dp), tint = content)
                                     }
-                                    SendButton()
+                                }
+                                SendButton()
+                            }
+                        },
+                        expandedFooter = {
+                            Column(Modifier.fillMaxWidth()) {
+                                AttachmentChips()
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    AttachmentButton()
+                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(
+                                            onClick = { composerFullscreen = false },
+                                            style = ButtonStyle.Ghost,
+                                            buttonSize = ButtonSize.Small,
+                                            modifier = Modifier.size(32.dp),
+                                        ) {
+                                            Icon(Icons.Rounded.CloseFullscreen, contentDescription = tr("收起全屏输入"), modifier = Modifier.size(20.dp), tint = content)
+                                        }
+                                        SendButton()
+                                    }
                                 }
                             }
-                        }
-                    },
-                )
+                        },
+                    )
+                }
             }
         }
     }
@@ -2816,6 +3030,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 ChatComposerBar(maxHeight)
 
                 ChatToolbar()
+                IrioSnackbar(
+                    visible = sttProviderSnackbarVisible,
+                    message = tr("请先在「TTS/STT」中配置 STT 提供商"),
+                    bottomInset = composerBarHeight + 16.dp,
+                    onDismiss = { sttProviderSnackbarVisible = false },
+                    restartKey = sttProviderSnackbarRestartKey,
+                )
             }
 
         }

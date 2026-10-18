@@ -437,6 +437,7 @@ object LinkRuntime {
             ))
             .put("lastOpenedId", ConversationStore.loadLastOpenedId(context).orEmpty())
             .put("providers", ProviderStore.snapshot(context))
+            .put("stt", SttStore.snapshot(context))
             .put("search", SearchStore.snapshot(context))
     }
 
@@ -447,10 +448,12 @@ object LinkRuntime {
         if (overwrite) {
             ConversationStore.replaceAll(context, conversations, last)
             json.optJSONObject("providers")?.let { ProviderStore.applySnapshot(context, it, true) }
+            json.optJSONObject("stt")?.let { SttStore.applySnapshot(context, it, true) }
             json.optJSONObject("search")?.let { SearchStore.applySnapshot(context, it, true) }
         } else {
             ConversationStore.importCoexist(context, conversations)
             json.optJSONObject("providers")?.let { ProviderStore.applySnapshot(context, it, false) }
+            json.optJSONObject("stt")?.let { SttStore.applySnapshot(context, it, false) }
             json.optJSONObject("search")?.let { SearchStore.applySnapshot(context, it, false) }
         }
     }

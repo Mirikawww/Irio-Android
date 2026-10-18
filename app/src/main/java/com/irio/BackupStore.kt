@@ -13,6 +13,7 @@ data class BackupImportResult(
     val message: String,
     val conversationCount: Int = 0,
     val providerRestored: Boolean = false,
+    val sttRestored: Boolean = false,
     val searchRestored: Boolean = false,
     val missing: List<String> = emptyList(),
 )
@@ -34,6 +35,9 @@ object BackupStore {
             zip.putNextEntry(ZipEntry("provider_snapshot.json"))
             zip.write(ProviderStore.snapshot(context).toString().toByteArray())
             zip.closeEntry()
+            zip.putNextEntry(ZipEntry("stt_snapshot.json"))
+            zip.write(SttStore.snapshot(context).toString().toByteArray())
+            zip.closeEntry()
             zip.putNextEntry(ZipEntry("search_snapshot.json"))
             zip.write(SearchStore.snapshot(context).toString().toByteArray())
             zip.closeEntry()
@@ -45,6 +49,7 @@ object BackupStore {
         try {
             var valid = false
             var providerSnapshot: String? = null
+            var sttSnapshot: String? = null
             var searchSnapshot: String? = null
             ZipInputStream(input).use { zip ->
                 while (true) {
@@ -56,6 +61,8 @@ object BackupStore {
                         valid = zip.readBytes().toString(Charsets.UTF_8) == FORMAT
                     } else if (relative == "provider_snapshot.json") {
                         providerSnapshot = zip.readBytes().toString(Charsets.UTF_8)
+                    } else if (relative == "stt_snapshot.json") {
+                        sttSnapshot = zip.readBytes().toString(Charsets.UTF_8)
                     } else if (relative == "search_snapshot.json") {
                         searchSnapshot = zip.readBytes().toString(Charsets.UTF_8)
                     } else if (!entry.isDirectory && !isAttachment(relative) && !isSandboxRootfs(relative)) {
@@ -70,7 +77,7 @@ object BackupStore {
             var conversationCount = 0
             stage.walkTopDown().filter { it.isFile }.forEach { staged ->
                 val relativePath = staged.relativeTo(stage).path.replace('\\', '/')
-                if (isAttachment(relativePath) || isSandboxRootfs(relativePath) || relativePath == "provider_snapshot.json" || relativePath == "search_snapshot.json") return@forEach
+                if (isAttachment(relativePath) || isSandboxRootfs(relativePath) || relativePath == "provider_snapshot.json" || relativePath == "stt_snapshot.json" || relativePath == "search_snapshot.json") return@forEach
                 val target = File(context.dataDir, relativePath)
                 if (overwrite || !target.exists()) {
                     target.parentFile?.mkdirs()
@@ -79,17 +86,21 @@ object BackupStore {
                 if (relativePath.startsWith("files/conversations/") && relativePath.endsWith(".json")) conversationCount++
             }
             val providerRestored = providerSnapshot != null
+            val sttRestored = sttSnapshot != null
             val searchRestored = searchSnapshot != null
             providerSnapshot?.let { ProviderStore.applySnapshot(context, org.json.JSONObject(it), overwrite) }
+            sttSnapshot?.let { SttStore.applySnapshot(context, org.json.JSONObject(it), overwrite) }
             searchSnapshot?.let { SearchStore.applySnapshot(context, org.json.JSONObject(it), overwrite) }
             return BackupImportResult(
                 success = true,
                 message = tr("恢复完成"),
                 conversationCount = conversationCount,
                 providerRestored = providerRestored,
+                sttRestored = sttRestored,
                 searchRestored = searchRestored,
                 missing = buildList {
                     if (!providerRestored) add(tr("提供商数据"))
+                    if (!sttRestored) add(tr("STT 提供商数据"))
                     if (!searchRestored) add(tr("搜索提供商数据"))
                 },
             )

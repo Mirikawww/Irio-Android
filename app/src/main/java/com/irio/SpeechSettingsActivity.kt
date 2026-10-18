@@ -5,21 +5,25 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,9 +32,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.DropdownMenu
@@ -65,9 +73,62 @@ private fun SpeechSettingsScreen(onBack: () -> Unit) {
     var voices by remember { mutableStateOf<List<SpeechVoice>?>(null) }
     var missing by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
+    val savedSttProvider = remember {
+        SttStore.loadActiveProvider(context) ?: SttStore.loadProviders(context).firstOrNull()
+    }
+    var providerKind by remember { mutableStateOf(savedSttProvider?.kind ?: SttProviderKind.GROQ) }
+    var providerMenuOpen by remember { mutableStateOf(false) }
+    var providerModel by remember {
+        mutableStateOf(savedSttProvider?.model ?: SttStore.defaultModel(SttProviderKind.GROQ))
+    }
+    var providerModelMenuOpen by remember { mutableStateOf(false) }
+    var providerLanguage by remember { mutableStateOf(savedSttProvider?.language ?: "en") }
+    var providerLanguageMenuOpen by remember { mutableStateOf(false) }
+    val providerApiKey = rememberTextFieldState(savedSttProvider?.apiKey.orEmpty())
+    val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(Unit) {
         val listed = SpeechPlayer.loadVoices(context)
         if (listed == null) missing = true else voices = listed
+    }
+    fun persistSttProvider() {
+        val saved = SttStore.loadProviders(context).firstOrNull { it.kind == providerKind }
+        val config = SttProviderConfig(
+            id = saved?.id ?: java.util.UUID.randomUUID().toString(),
+            kind = providerKind,
+            name = providerKind.label,
+            apiKey = providerApiKey.text.toString(),
+            model = providerModel,
+            enabled = saved?.enabled ?: true,
+            language = providerLanguage,
+        )
+        SttStore.saveProvider(
+            context,
+            config,
+        )
+        if (config.enabled) SttStore.saveActiveProvider(context, config.id)
+    }
+    fun switchProvider(next: SttProviderKind) {
+        if (next == providerKind) {
+            providerMenuOpen = false
+            return
+        }
+        persistSttProvider()
+        providerKind = next
+        providerMenuOpen = false
+        val saved = SttStore.loadProviders(context).firstOrNull { it.kind == next }
+        providerApiKey.edit { replace(0, length, saved?.apiKey.orEmpty()) }
+        providerModel = saved?.model ?: SttStore.defaultModel(next)
+        providerLanguage = saved?.language ?: "en"
+    }
+    DisposableEffect(lifecycleOwner, providerApiKey) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) persistSttProvider()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            persistSttProvider()
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
     val selected = when {
         missing -> tr("未找到系统朗读引擎")
@@ -102,6 +163,240 @@ private fun SpeechSettingsScreen(onBack: () -> Unit) {
                     menuOpen = false
                 },
             )
+            Spacer(Modifier.height(16.dp))
+            SttSettingsSectionCard {
+                SttProviderMenu(
+                    provider = providerKind,
+                    expanded = providerMenuOpen,
+                    onExpandedChange = { providerMenuOpen = it },
+                    onSelect = ::switchProvider,
+                )
+                Column(Modifier.padding(vertical = 8.dp)) {
+                    ProviderField(
+                        label = tr("%s API 密钥").format(providerKind.label),
+                        state = providerApiKey,
+                        keyboardType = KeyboardType.Password,
+                        mask = true,
+                        trailingSpace = false,
+                    )
+                }
+                SttModelMenu(
+                    provider = providerKind,
+                    model = providerModel,
+                    expanded = providerModelMenuOpen,
+                    onExpandedChange = { providerModelMenuOpen = it },
+                    onSelect = {
+                        providerModel = it
+                        persistSttProvider()
+                    },
+                )
+                if (providerKind == SttProviderKind.GLADIA && providerModel == "solaria-3") {
+                    SttLanguageMenu(
+                        language = providerLanguage,
+                        expanded = providerLanguageMenuOpen,
+                        onExpandedChange = { providerLanguageMenuOpen = it },
+                        onSelect = {
+                            providerLanguage = it
+                            persistSttProvider()
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SttSettingsSectionCard(
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+            .padding(horizontal = 16.dp, vertical = SettingsCardInset),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+    ) { content() }
+}
+
+@Composable
+private fun SttProviderMenu(
+    provider: SttProviderKind,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onSelect: (SttProviderKind) -> Unit,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onExpandedChange = onExpandedChange,
+        modifier = Modifier.fillMaxWidth(),
+        alignment = DropdownMenuAlignment.End,
+        panel = {
+            DropdownMenuPanel {
+                    SttProviderKind.entries.forEach { option ->
+                        DropdownMenuItem(
+                            onClick = { onSelect(option); onExpandedChange(false) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(option.label, color = Theme[colors][onPanelColor]) }
+                }
+            }
+        },
+    ) {
+        val interactionSource = remember { MutableInteractionSource() }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = { onExpandedChange(!expanded) },
+                )
+                .settingsDropdownInset(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(tr("STT 提供商"), color = Theme[colors][onPanelColor])
+                Text(provider.label, color = Theme[colors][mutedColor], fontSize = 13.sp)
+            }
+            IconButton(
+                onClick = { onExpandedChange(!expanded) },
+                style = ButtonStyle.Ghost,
+                buttonSize = ButtonSize.Small,
+                shape = ContinuousCapsule,
+                modifier = Modifier.size(32.dp),
+                interactionSource = interactionSource,
+            ) {
+                Icon(
+                    Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = tr("选择提供商"),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SttModelMenu(
+    provider: SttProviderKind,
+    model: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onExpandedChange = onExpandedChange,
+        modifier = Modifier.fillMaxWidth(),
+        alignment = DropdownMenuAlignment.End,
+        panel = {
+            DropdownMenuPanel {
+                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                    SttStore.models(provider).forEach { option ->
+                        DropdownMenuItem(
+                            onClick = { onSelect(option); onExpandedChange(false) },
+                            modifier = Modifier.fillMaxWidth(),
+                            leading = {
+                                if (option == model) Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                else Spacer(Modifier.size(16.dp))
+                            },
+                        ) { Text(option) }
+                    }
+                }
+            }
+        },
+    ) {
+        val interactionSource = remember { MutableInteractionSource() }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = { onExpandedChange(!expanded) },
+                )
+                .settingsDropdownInset(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(tr("模型"), color = Theme[colors][onPanelColor])
+                Text(model, color = Theme[colors][mutedColor], fontSize = 13.sp)
+            }
+            IconButton(
+                onClick = { onExpandedChange(!expanded) },
+                style = ButtonStyle.Ghost,
+                buttonSize = ButtonSize.Small,
+                shape = ContinuousCapsule,
+                modifier = Modifier.size(32.dp),
+                interactionSource = interactionSource,
+            ) {
+                Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = tr("选择模型"), modifier = Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
+private val GladiaLanguages = listOf(
+    "en" to "English",
+    "fr" to "Français",
+    "de" to "Deutsch",
+    "es" to "Español",
+    "it" to "Italiano",
+)
+
+@Composable
+private fun SttLanguageMenu(
+    language: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onExpandedChange = onExpandedChange,
+        modifier = Modifier.fillMaxWidth(),
+        alignment = DropdownMenuAlignment.End,
+        panel = {
+            DropdownMenuPanel {
+                GladiaLanguages.forEach { (code, label) ->
+                    DropdownMenuItem(
+                        onClick = { onSelect(code); onExpandedChange(false) },
+                        modifier = Modifier.fillMaxWidth(),
+                        leading = {
+                            if (code == language) Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                            else Spacer(Modifier.size(16.dp))
+                        },
+                    ) { Text(label) }
+                }
+            }
+        },
+    ) {
+        val interactionSource = remember { MutableInteractionSource() }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = { onExpandedChange(!expanded) },
+                )
+                .settingsDropdownInset(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(tr("语言"), color = Theme[colors][onPanelColor])
+                Text(GladiaLanguages.first { it.first == language }.second, color = Theme[colors][mutedColor], fontSize = 13.sp)
+            }
+            IconButton(
+                onClick = { onExpandedChange(!expanded) },
+                style = ButtonStyle.Ghost,
+                buttonSize = ButtonSize.Small,
+                shape = ContinuousCapsule,
+                modifier = Modifier.size(32.dp),
+                interactionSource = interactionSource,
+            ) {
+                Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = tr("选择语言"), modifier = Modifier.size(20.dp))
+            }
         }
     }
 }
