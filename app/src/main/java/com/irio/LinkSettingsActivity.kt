@@ -226,7 +226,6 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                             .fillMaxWidth()
                             .background(Theme[colors][panelColor], ContinuousCapsule),
                         style = ButtonStyle.Ghost,
-                        buttonSize = ButtonSize.Small,
                         contentColor = Theme[colors][onPanelColor],
                     ) { Text(tr("刷新端口")) }
                 }
