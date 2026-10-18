@@ -76,6 +76,7 @@ import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPanelColor
+import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
@@ -221,8 +222,12 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                 ) { Text(tr("配对")) }
                     Button(
                         onClick = { LinkRuntime.refreshPort() },
-                        modifier = Modifier.fillMaxWidth(),
-                        style = ButtonStyle.Secondary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Theme[colors][panelColor], ContinuousCapsule),
+                        style = ButtonStyle.Ghost,
+                        buttonSize = ButtonSize.Small,
+                        contentColor = Theme[colors][onPanelColor],
                     ) { Text(tr("刷新端口")) }
                 }
                 LinkCard(verticalPadding = SettingsCardInset, spacing = 0.dp) {
