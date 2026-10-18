@@ -37,6 +37,7 @@ internal fun chatToolRegistry(
         add(TimeToolProvider())
         add(ReactionToolProvider())
         add(ColoredBubbleToolProvider())
+        add(HistoryToolProvider())
         if (MemoryStore.loadEnabled(context)) add(MemoryToolProvider())
         if (ToolStore.loadSubagents(context)) add(SubagentToolProvider())
         val sandbox = LinuxSandboxLayout.of(context.filesDir).stateFile

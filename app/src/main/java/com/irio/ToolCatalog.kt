@@ -105,6 +105,7 @@ internal object ToolCatalog {
         WebFetchTool.NAME -> "读取网页"
         ImageGenTool.NAME -> "生成图片"
         TimeTool.NAME -> "获取时间"
+        HistoryTool.NAME -> "查询历史会话"
         ReactionTool.NAME -> "表情回应"
         ColoredBubbleTool.NAME -> "发送彩色气泡"
         MemoryTool.GET -> "读取记忆"

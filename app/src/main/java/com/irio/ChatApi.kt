@@ -1486,6 +1486,7 @@ internal object MemoryTool {
     fun liveLabel(name: String, webDomain: String = ""): String = when (name) {
         ImageGenTool.NAME -> tr("图片生成中")
         TimeTool.NAME -> tr("获取时间")
+        HistoryTool.NAME -> tr("查询历史会话")
         LinuxShellTool.NAME -> tr("运行命令中")
         LinuxBackgroundTool.NAME -> tr("处理后台命令")
         WebFetchTool.NAME -> tr("浏览网页中").let { status ->
@@ -1508,6 +1509,7 @@ internal object MemoryTool {
             else -> tr("图片生成已停止")
         }
         TimeTool.NAME -> tr("已获取时间")
+        HistoryTool.NAME -> HistoryTool.doneLabel(content)
         LinuxShellTool.NAME -> tr("已运行命令")
         LinuxBackgroundTool.NAME -> tr("已处理后台命令")
         WebFetchTool.NAME -> tr("已浏览网页").let { status ->

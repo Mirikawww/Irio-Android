@@ -178,6 +178,7 @@ class ToolRegistry(
                 TimeToolProvider(),
                 ReactionToolProvider(),
                 ColoredBubbleToolProvider(),
+                HistoryToolProvider(),
             )
         )
     }

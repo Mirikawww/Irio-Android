@@ -70,6 +70,46 @@ class ToolPreferencesChatTest {
         } finally { IrioHttp.resetForTests() }
     }
 
+    @Test fun historyToolIsInjectedIntoActualChatRequestsAcrossAllProtocols() = runBlocking {
+        val context = RuntimeEnvironment.getApplication() as Context
+        org.robolectric.shadows.ShadowEnvironment.addExternalDir(context.cacheDir.resolve("external").absolutePath)
+        ToolPreferencesStore.saveDescription(context, HistoryTool.NAME, "Custom history description")
+        IrioHttp.resetForTests(IrioHttp.defaultClient())
+        try {
+            MockWebServer().use { model ->
+                for (enabled in listOf(true, false)) {
+                    ToolPreferencesStore.saveEnabled(context, HistoryTool.NAME, enabled)
+                    for (hints in listOf(false, true)) {
+                        ToolStore.saveSmartToolHints(context, hints)
+                        for (protocol in ProviderProtocol.entries) {
+                            val registry = chatToolRegistry(context, webSearch = false, imageGenModel = "")
+                            model.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(""))
+                            ChatApi.streamChat(
+                                ProviderConfig("fixture", "Fixture", model.url("/v1beta").toString(), "fixture", protocol),
+                                "model", listOf(ChatRequestMessage("user", "Look up an earlier conversation")), ReasoningEffort.OFF, false,
+                                toolRegistry = registry, systemPrompt = "base", appContext = context,
+                                cancellation = ChatRequestCancellation(), onUpdate = {},
+                            )
+                            val request = JSONObject(model.takeRequest(2, TimeUnit.SECONDS)!!.body.readUtf8())
+                            val tools = request.getJSONArray("tools").toString()
+                            assertEquals("Actual $protocol request must match history enabled=$enabled hints=$hints",
+                                enabled, tools.contains("\"${HistoryTool.NAME}\""))
+                            assertEquals(enabled, tools.contains("Custom history description"))
+                            assertEquals(enabled, prompt(request, protocol).contains("query_history"))
+                            if (enabled) {
+                                assertTrue(tools.contains("offset"))
+                                assertTrue(tools.contains("limit"))
+                            }
+                            val expected = estimateSystemPromptTokens(registry.systemPrompt(chatSystemPrompt(context)),
+                                registry.schemas(protocol).joinToString("\n") { it.toString() })
+                            assertEquals(expected, loadContextRequestOverhead(context, protocol, modelId = ""))
+                        }
+                    }
+                }
+            }
+        } finally { IrioHttp.resetForTests() }
+    }
+
     private fun prompt(request: JSONObject, protocol: ProviderProtocol): String = when (protocol) {
         ProviderProtocol.CHAT_COMPLETIONS -> request.getJSONArray("messages").getJSONObject(0).getString("content")
         ProviderProtocol.RESPONSES -> request.getString("instructions")

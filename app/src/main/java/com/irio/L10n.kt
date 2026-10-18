@@ -135,6 +135,10 @@ private val TodoistProgressEnglish = mapOf(
 ).flatMap { (action, forms) -> listOf(action to forms.first, "已$action" to forms.second) }.toMap()
 
 private val English = mapOf(
+    "查询历史会话" to "Query conversation history",
+    "已查询历史会话" to "Queried conversation history",
+    "历史会话查询失败" to "Conversation history query failed",
+    "历史会话查询已停止" to "Conversation history query stopped",
     "读取网页" to "Read web page",
     "生成图片" to "Generate image",
     "表情回应" to "React to message",
