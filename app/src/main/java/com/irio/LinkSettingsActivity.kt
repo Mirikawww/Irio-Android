@@ -222,7 +222,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     Button(
                         onClick = { LinkRuntime.refreshPort() },
                         modifier = Modifier.fillMaxWidth(),
-                        style = ButtonStyle.Primary,
+                        style = ButtonStyle.Secondary,
                     ) { Text(tr("刷新端口")) }
                 }
                 LinkCard(verticalPadding = SettingsCardInset, spacing = 0.dp) {
