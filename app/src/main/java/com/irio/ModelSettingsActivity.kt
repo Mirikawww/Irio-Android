@@ -340,7 +340,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ExperimentalLabel(
+                    Text(
                         tr("上下文压缩"),
                         color = Theme[colors][onBackgroundColor],
                         modifier = Modifier.weight(1f),
