@@ -10,6 +10,10 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -78,6 +84,7 @@ internal fun ToolSettingsRow(
     onSave: () -> Unit,
     onReset: () -> Unit,
     onBlocked: () -> Unit,
+    descriptionScrollState: ScrollState = rememberScrollState(),
 ) {
     LocalResolvedTheme.current
     val available = entry.blockedReason == null
@@ -168,7 +175,28 @@ internal fun ToolSettingsRow(
                 Text(tr("工具描述"), color = content, fontSize = 14.sp, lineHeight = 20.sp)
                 TextField(
                     state = description,
-                    modifier = Modifier.fillMaxWidth().then(rememberInputFieldBorder()),
+                    scrollState = descriptionScrollState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(rememberInputFieldBorder())
+                        .pointerInput(view, descriptionScrollState) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                if (descriptionScrollState.maxValue > 0) {
+                                    // Reserve the native gesture before RecyclerView sees its
+                                    // first MOVE, without consuming the text field's events.
+                                    val parent = view.parent
+                                    parent?.requestDisallowInterceptTouchEvent(true)
+                                    try {
+                                        do {
+                                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                                        } while (event.changes.any { it.pressed })
+                                    } finally {
+                                        parent?.requestDisallowInterceptTouchEvent(false)
+                                    }
+                                }
+                            }
+                        },
                     accessibilityLabel = "${entry.title} · ${tr("工具描述")}",
                     textStyle = FieldTextStyle,
                     fontSize = 16.sp,
