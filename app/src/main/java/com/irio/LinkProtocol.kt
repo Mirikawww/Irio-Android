@@ -16,6 +16,7 @@ import java.util.UUID
 
 object LinkProtocol {
     const val PORT = 17432
+    const val PORT_SPAN = 100
     const val HELLO = "IRIO"
     private const val MAX_FRAME = 32 * 1024 * 1024
 
@@ -106,7 +107,7 @@ object LinkProtocol {
         return server
     }
 
-    fun portCandidates(current: Int, span: Int = 20): List<Int> {
+    fun portCandidates(current: Int, span: Int = PORT_SPAN): List<Int> {
         val last = PORT + span
         val avoid = if (current in PORT..last) current else PORT
         return (PORT..last).filter { it != avoid }.shuffled()
