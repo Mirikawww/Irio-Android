@@ -158,7 +158,7 @@ private fun SubagentCapsule(snapshot: SubagentSnapshot) {
     val indicatorScale = if (live.state == SubagentState.RUNNING) breathe else completionScale.value
     val labelColor by animateColorAsState(
         if (live.state == SubagentState.RUNNING) Theme[colors][onBackgroundColor]
-        else Theme[colors][onPrimaryColor],
+        else Color.White,
         irioSpring(),
         label = "subagent label color",
     )
@@ -195,7 +195,7 @@ private fun SubagentCapsule(snapshot: SubagentSnapshot) {
                 )
             }
             .semantics { contentDescription = label }
-            .padding(start = 8.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(indicatorGap.value.dp),
     ) {
