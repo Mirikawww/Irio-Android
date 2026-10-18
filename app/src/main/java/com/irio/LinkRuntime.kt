@@ -64,7 +64,7 @@ object LinkRuntime {
         LinkStore.save(context, settings)
         _state.update { it.copy(settings = settings, status = null) }
         if (enabled) {
-            startServerLocked(context, settings)
+            refreshPort()
         } else {
             stopServer()
             _state.update { it.copy(connections = emptyMap()) }
