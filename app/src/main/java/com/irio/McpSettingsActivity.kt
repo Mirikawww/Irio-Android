@@ -263,7 +263,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
         if (loginSheet.targetDetent != BottomSheetDetent.Hidden) clearLogin()
         else details.targetDetent = BottomSheetDetent.Hidden
     }
-    SettingsHazeScaffold(title = "MCP", onBack = onBack, titleTrailing = { ExperimentalBadge() }) { top, bottom ->
+    SettingsHazeScaffold(title = "MCP", onBack = onBack) { top, bottom ->
         Column(Modifier.fillMaxSize().padding(bottom = bottom).verticalScroll(rememberScrollState())
             .padding(top = top).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(Modifier.fillMaxWidth().background(Theme[colors][secondaryColor], Theme[shapes][largeShape])

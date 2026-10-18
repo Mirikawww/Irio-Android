@@ -107,7 +107,6 @@ private fun SettingsScreen(onBack: () -> Unit) {
                 ListRowButton(
                     label = "MCP",
                     iconPainter = painterResource(R.drawable.ic_mcp),
-                    experimental = true,
                     onClick = { context.startActivity(Intent(context, McpSettingsActivity::class.java)) },
                 )
                 Spacer(Modifier.height(12.dp))
