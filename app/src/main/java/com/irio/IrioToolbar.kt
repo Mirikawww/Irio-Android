@@ -263,6 +263,7 @@ internal fun SettingsTitleCapsule(
     modifier: Modifier = Modifier,
     titleTrailing: (@Composable () -> Unit)? = null,
     onHeightChanged: (Int) -> Unit = {},
+    titleFontWeight: FontWeight = FontWeight.Medium,
 ) {
     val content = Theme[colors][onBackgroundColorToken]
     Box(
@@ -298,7 +299,7 @@ internal fun SettingsTitleCapsule(
                     color = content,
                     fontSize = 18.sp,
                     lineHeight = 22.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = titleFontWeight,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -323,6 +324,7 @@ fun SettingsHazeBar(
     titleTrailing: (@Composable () -> Unit)? = null,
     belowChrome: @Composable ColumnScope.() -> Unit = {},
     onChromeHeightChanged: (Int) -> Unit = {},
+    titleFontWeight: FontWeight = FontWeight.Medium,
 ) {
     Column(
         modifier = modifier
@@ -337,6 +339,7 @@ fun SettingsHazeBar(
                 title = title,
                 onBack = onBack,
                 titleTrailing = titleTrailing,
+                titleFontWeight = titleFontWeight,
             )
             belowChrome()
         }
@@ -356,6 +359,7 @@ fun SettingsHazeScaffold(
     modifier: Modifier = Modifier,
     titleTrailing: (@Composable () -> Unit)? = null,
     belowChrome: @Composable ColumnScope.() -> Unit = {},
+    titleFontWeight: FontWeight = FontWeight.Medium,
     content: @Composable (topInset: Dp, bottomInset: Dp) -> Unit,
 ) {
     val hazeState = rememberHazeState()
@@ -375,6 +379,7 @@ fun SettingsHazeScaffold(
             hazeState = hazeState,
             titleTrailing = titleTrailing,
             belowChrome = belowChrome,
+            titleFontWeight = titleFontWeight,
             onChromeHeightChanged = { chromePx.intValue = it },
             modifier = Modifier
                 .align(Alignment.TopCenter)

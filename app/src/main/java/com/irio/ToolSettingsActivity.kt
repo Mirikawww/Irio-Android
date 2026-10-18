@@ -46,6 +46,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.composables.ui.components.Text
@@ -116,7 +117,7 @@ internal fun ToolSettingsScreen(
     }
     DismissComposerFocusWhenImeHides()
     Box(Modifier.fillMaxSize().imePadding()) {
-        SettingsHazeScaffold(title = tr("工具"), onBack = onBack) { topInset, bottomInset ->
+        SettingsHazeScaffold(title = tr("工具"), onBack = onBack, titleFontWeight = FontWeight.Normal) { topInset, bottomInset ->
             Box(Modifier.fillMaxSize()) {
                 AnimatedContent(
                     targetState = selectedScope,

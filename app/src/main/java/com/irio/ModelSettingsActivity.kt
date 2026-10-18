@@ -241,6 +241,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
             }
             ListRowButton(
                 label = tr("工具"),
+                labelFontWeight = FontWeight.Normal,
                 onClick = { context.startActivity(Intent(context, ToolSettingsActivity::class.java)) },
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 trailing = {

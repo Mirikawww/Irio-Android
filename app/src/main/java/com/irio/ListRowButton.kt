@@ -62,6 +62,7 @@ fun ListRowButton(
     onLongClick: (() -> Unit)? = null,
     experimental: Boolean = false,
     iconPainter: Painter? = null,
+    labelFontWeight: FontWeight? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val contentColor = if (style == ButtonStyle.Ghost) {
@@ -90,7 +91,7 @@ fun ListRowButton(
             Spacer(Modifier.width(12.dp))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label)
+            Text(label, fontWeight = labelFontWeight)
             if (experimental) {
                 Spacer(Modifier.width(8.dp))
                 ExperimentalBadge()

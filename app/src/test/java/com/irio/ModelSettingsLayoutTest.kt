@@ -11,7 +11,10 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -58,6 +61,14 @@ class ModelSettingsLayoutTest {
                 it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == tr(text) }
             }
             assertEquals("Tools must align with adjacent settings titles", title("单轮工具调用").boundsInRoot.left, title("工具").boundsInRoot.left, 0.5f)
+            val layouts = mutableListOf<TextLayoutResult>()
+            title("工具").config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
+            assertEquals("The Tools entry must use normal weight, not inherit the Button's medium weight",
+                FontWeight.Normal, layouts.single().layoutInput.style.fontWeight)
+            layouts.clear()
+            title("模型").config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
+            assertEquals("The Models page heading must remain unchanged", FontWeight.Medium,
+                layouts.single().layoutInput.style.fontWeight)
         } finally {
             view.disposeComposition()
             recomposer.close()
