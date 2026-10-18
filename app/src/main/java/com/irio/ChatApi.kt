@@ -1495,7 +1495,11 @@ internal object MemoryTool {
         UPDATE -> tr("写入记忆")
         SubagentTools.MESSAGE -> tr("联系子智能体")
         SubagentTools.STOP -> tr("停止子智能体")
-        else -> if (name.startsWith(GitHubMcpToolProvider.PREFIX)) GitHubMcpToolProvider.progressLabel(name, completed = false) else tr("调用工具")
+        else -> when {
+            name.startsWith(GitHubMcpToolProvider.PREFIX) -> GitHubMcpToolProvider.progressLabel(name, completed = false)
+            name.startsWith(TodoistMcpToolProvider.PREFIX) -> TodoistMcpToolProvider.progressLabel(name, completed = false)
+            else -> tr("调用工具")
+        }
     }
 
     fun doneLabel(name: String, content: String = "", webDomain: String = ""): String = when (name) {
@@ -1513,7 +1517,11 @@ internal object MemoryTool {
         UPDATE -> tr("已写入记忆")
         SubagentTools.MESSAGE -> tr("已联系子智能体")
         SubagentTools.STOP -> tr("已停止子智能体")
-        else -> if (name.startsWith(GitHubMcpToolProvider.PREFIX)) GitHubMcpToolProvider.progressLabel(name, completed = true) else tr("已调用工具")
+        else -> when {
+            name.startsWith(GitHubMcpToolProvider.PREFIX) -> GitHubMcpToolProvider.progressLabel(name, completed = true)
+            name.startsWith(TodoistMcpToolProvider.PREFIX) -> TodoistMcpToolProvider.progressLabel(name, completed = true)
+            else -> tr("已调用工具")
+        }
     }
 
     fun getSchema(protocol: ProviderProtocol): JSONObject =

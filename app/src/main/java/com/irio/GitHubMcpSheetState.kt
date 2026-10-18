@@ -6,7 +6,7 @@ import androidx.compose.runtime.setValue
 import com.composables.ui.components.BottomSheetDetent
 import com.composables.ui.components.BottomSheetState
 
-internal enum class GitHubLogin { PAT, OAuth }
+internal enum class GitHubLogin { PAT, OAuth, TODOIST }
 
 /** Keeps the parent installation and its selected authentication sheet together. */
 internal class GitHubMcpSheetState(

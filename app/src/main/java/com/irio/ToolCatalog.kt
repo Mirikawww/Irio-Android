@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal enum class ToolBlockedReason {
-    WEB_SEARCH, SEARCH_KEY, IMAGE_MODEL, MEMORY, SUBAGENTS, LINUX, STORAGE, LINUX_BACKGROUND, GITHUB;
+    WEB_SEARCH, SEARCH_KEY, IMAGE_MODEL, MEMORY, SUBAGENTS, LINUX, STORAGE, LINUX_BACKGROUND, GITHUB, TODOIST;
 
     fun message(): String = tr(when (this) {
         WEB_SEARCH -> "请先在对话中开启「网络搜索」"
@@ -17,6 +17,7 @@ internal enum class ToolBlockedReason {
         STORAGE -> "请先在「Linux 沙盒」中授予所有文件访问权限"
         LINUX_BACKGROUND -> "请先在「Linux 沙盒」中开启「后台命令」"
         GITHUB -> "请先在「MCP」中登录 GitHub 并开启「在对话中启用」"
+        TODOIST -> "请先在「MCP」中连接 Todoist 并开启「在对话中启用」"
     })
 }
 
@@ -30,6 +31,7 @@ internal data class ToolFeatureState(
     val storageAllowed: Boolean = false,
     val backgroundEnabled: Boolean = false,
     val githubUsable: Boolean = false,
+    val todoistUsable: Boolean = false,
 )
 
 internal data class ToolSettingsEntry(
@@ -44,6 +46,7 @@ internal object ToolCatalog {
     suspend fun load(context: Context): List<ToolSettingsEntry> = withContext(Dispatchers.IO) {
         val sandbox = LinuxSandboxLayout.of(context.filesDir).stateFile
         val github = GitHubMcpStore.of(context).load()
+        val todoist = TodoistMcpStore.of(context).load()
         val features = ToolFeatureState(
             searchEnabled = SearchStore.loadWebSearchEnabled(context),
             searchConfigured = SearchStore.hasApiKey(context),
@@ -54,14 +57,16 @@ internal object ToolCatalog {
             storageAllowed = LinuxSandboxAccess.hasAllFiles(),
             backgroundEnabled = LinuxSandboxStore.loadBackgroundEnabled(sandbox),
             githubUsable = github?.usable() == true,
+            todoistUsable = todoist?.usable() == true,
         )
-        entries(features, LinuxSandboxStore.loadCommandsPerCall(sandbox), github?.tools.orEmpty())
+        entries(features, LinuxSandboxStore.loadCommandsPerCall(sandbox), github?.tools.orEmpty(), todoist?.tools.orEmpty())
     }
 
     fun entries(
         features: ToolFeatureState,
         commandsPerCall: Int = LinuxSandboxStore.COMMANDS_UNLIMITED,
         mcpTools: List<McpTool> = emptyList(),
+        todoistMcpTools: List<McpTool> = emptyList(),
     ): List<ToolSettingsEntry> {
         val providers = ToolRegistry.default().providers() + listOf(
             MemoryToolProvider(),
@@ -83,6 +88,14 @@ internal object ToolCatalog {
                 GitHubMcpToolProvider.progressLabel(name, completed = false),
                 tool.description,
                 if (features.githubUsable) null else ToolBlockedReason.GITHUB,
+            )
+        } + todoistMcpTools.map { tool ->
+            val name = TodoistMcpToolProvider.PREFIX + tool.name
+            ToolSettingsEntry(
+                name,
+                TodoistMcpToolProvider.displayName(tool.name),
+                tool.description,
+                if (features.todoistUsable) null else ToolBlockedReason.TODOIST,
             )
         }
     }

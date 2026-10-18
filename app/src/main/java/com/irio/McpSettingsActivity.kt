@@ -62,16 +62,21 @@ class McpSettingsActivity : ComponentActivity() {
     }
 }
 
+private enum class McpIntegration { GITHUB, TODOIST }
+
 @Composable
 private fun McpSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val store = remember { GitHubMcpStore.of(context.applicationContext) }
+    val todoistStore = remember { TodoistMcpStore.of(context.applicationContext) }
     val scope = rememberCoroutineScope()
     val details = rememberBottomSheetState()
     val loginSheet = rememberBottomSheetState()
     val sheets = remember(details, loginSheet) { GitHubMcpSheetState(details, loginSheet) }
     var installation by remember { mutableStateOf<GitHubMcpInstallation?>(null) }
+    var todoistInstallation by remember { mutableStateOf<TodoistMcpInstallation?>(null) }
+    var selectedIntegration by remember { mutableStateOf(McpIntegration.GITHUB) }
     var loaded by remember { mutableStateOf(false) }
     val login = sheets.login
     // Tokens must not enter savedInstanceState, clipboard, logs or backup files.
@@ -81,6 +86,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
     val detailsError = sheets.detailsError
     var busy by remember { mutableStateOf(false) }
     var accountLoading by remember { mutableStateOf(false) }
+    var todoistAccountLoading by remember { mutableStateOf(false) }
     var job by remember { mutableStateOf<Job?>(null) }
     var cancellation by remember { mutableStateOf<ChatRequestCancellation?>(null) }
     var dismissJob by remember { mutableStateOf<Job?>(null) }
@@ -89,13 +95,14 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
 
     LaunchedEffect(store) {
         installation = withContext(Dispatchers.IO) { store.load() }
+        todoistInstallation = withContext(Dispatchers.IO) { todoistStore.load() }
         loaded = true
     }
-    val accountCancellation = remember(details.targetDetent, installation?.credential?.accessToken) { ChatRequestCancellation() }
+    val accountCancellation = remember(selectedIntegration, details.targetDetent, installation?.credential?.accessToken) { ChatRequestCancellation() }
     DisposableEffect(accountCancellation) { onDispose { accountCancellation.cancel() } }
     LaunchedEffect(accountCancellation) {
         val current = installation ?: return@LaunchedEffect
-        if (details.targetDetent == BottomSheetDetent.Hidden || current.account != null) return@LaunchedEffect
+        if (selectedIntegration != McpIntegration.GITHUB || details.targetDetent == BottomSheetDetent.Hidden || current.account != null) return@LaunchedEffect
         accountLoading = true
         try {
             val account = withContext(Dispatchers.IO) {
@@ -113,6 +120,32 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
         } finally {
             accountCancellation.cancel()
             accountLoading = false
+        }
+    }
+    val todoistAccountCancellation = remember(selectedIntegration, details.targetDetent, todoistInstallation?.clientId) {
+        ChatRequestCancellation()
+    }
+    DisposableEffect(todoistAccountCancellation) { onDispose { todoistAccountCancellation.cancel() } }
+    LaunchedEffect(todoistAccountCancellation) {
+        val current = todoistInstallation ?: return@LaunchedEffect
+        if (selectedIntegration != McpIntegration.TODOIST || details.targetDetent == BottomSheetDetent.Hidden || current.account != null) return@LaunchedEffect
+        todoistAccountLoading = true
+        try {
+            val updated = withContext(Dispatchers.IO) {
+                val latest = todoistStore.refreshIfNeeded() ?: error(tr("无法读取 Todoist 登录账号"))
+                val account = TodoistAccountClient(latest.credential.accessToken, cancellation = todoistAccountCancellation).load()
+                coroutineContext.ensureActive()
+                check(!todoistAccountCancellation.isCancelled())
+                todoistStore.updateAccount(latest.credential.accessToken, account)
+            }
+            if (updated != null && todoistInstallation?.clientId == updated.clientId) todoistInstallation = updated
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            if (!todoistAccountCancellation.isCancelled()) sheets.detailsError = tr("无法读取 Todoist 登录账号")
+        } finally {
+            todoistAccountCancellation.cancel()
+            todoistAccountLoading = false
         }
     }
     fun cancelLoginWork() {
@@ -149,6 +182,11 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
         resetLoginContent()
         sheets.openLogin(kind)
     }
+    fun openTodoist() {
+        selectedIntegration = McpIntegration.TODOIST
+        sheets.detailsError = null
+        details.targetDetent = BottomSheetDetent.FullyExpanded
+    }
     suspend fun install(credential: GitHubCredential, kind: GitHubLogin, cancel: ChatRequestCancellation) {
         val saved = withContext(Dispatchers.IO) {
             val tools = GitHubMcpClient(credential.accessToken, cancellation = cancel).listTools()
@@ -169,6 +207,31 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
         if (busy) return
         sheets.loginError = null
         busy = true
+        if (kind == GitHubLogin.TODOIST) {
+            job = scope.launch {
+                try {
+                    val result = TodoistMcpOAuth().authorize { url ->
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    }
+                    val tools = withContext(Dispatchers.IO) {
+                        TodoistMcpClient(result.credential.accessToken).listTools()
+                    }
+                    val saved = TodoistMcpInstallation(result.clientId, result.credential, tools)
+                    withContext(Dispatchers.IO) { todoistStore.save(saved) }
+                    todoistInstallation = saved
+                    sheets.detailsError = null
+                    job = null
+                    clearLogin()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    if (login == GitHubLogin.TODOIST) sheets.loginError = tr("Todoist 登录或连接失败，请检查网络后重试")
+                } finally {
+                    busy = false
+                }
+            }
+            return
+        }
         val auth = GitHubDeviceAuth()
         val cancel = auth.cancellation
         cancellation = cancel
@@ -210,15 +273,82 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                     Text("GitHub", color = content, fontWeight = FontWeight.SemiBold)
                     Text(tr("在对话中管理代码与协作"), fontSize = 13.sp, lineHeight = 18.sp, color = muted)
                 }
-                GitHubButton(if (installation == null) tr("安装") else tr("管理"), enabled = loaded, compact = true,
-                    onClick = { details.targetDetent = BottomSheetDetent.FullyExpanded })
+                 GitHubButton(if (installation == null) tr("安装") else tr("管理"), enabled = loaded, compact = true,
+                     onClick = {
+                         selectedIntegration = McpIntegration.GITHUB
+                         sheets.detailsError = null
+                         details.targetDetent = BottomSheetDetent.FullyExpanded
+                     })
+            }
+            Row(Modifier.fillMaxWidth().background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                .padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TodoistLogo(48.dp)
+                Column(Modifier.weight(1f)) {
+                    Text("Todoist", color = content, fontWeight = FontWeight.SemiBold)
+                    Text(tr("在对话中管理任务和项目"), fontSize = 13.sp, lineHeight = 18.sp, color = muted)
+                }
+                 TodoistButton(if (todoistInstallation == null) tr("安装") else tr("管理"), enabled = loaded, compact = true,
+                     onClick = ::openTodoist)
             }
         }
     }
     BottomSheet(state = details, onDismissRequest = { details.targetDetent = BottomSheetDetent.Hidden },
         contentPadding = PaddingValues(top = 32.dp, bottom = 16.dp)) {
         SheetBody {
-            GitHubLogo(80.dp, Modifier.align(Alignment.CenterHorizontally))
+            if (selectedIntegration == McpIntegration.GITHUB) GitHubLogo(80.dp, Modifier.align(Alignment.CenterHorizontally))
+             else TodoistLogo(80.dp, Modifier.align(Alignment.CenterHorizontally))
+            if (selectedIntegration == McpIntegration.TODOIST) {
+                Text("Todoist", Modifier.fillMaxWidth(), color = content, fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Text(
+                    tr("连接 Todoist 官方 MCP，在对话中管理任务和项目。授权后，模型可在授权范围内读取或修改 Todoist 数据。"),
+                    modifier = Modifier.padding(horizontal = 24.dp), color = content, fontSize = 16.sp, lineHeight = 24.sp,
+                )
+                Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+                    Text(tr("信息"), color = content, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    GitHubInfoRow(tr("开发者"), "Doist Inc.")
+                    GitHubInfoDivider()
+                    GitHubInfoRow(tr("官网"), "todoist.com", onClick = {
+                        if (!openGitHubPage(context, "https://todoist.com")) sheets.detailsError = tr("未找到可打开网页的浏览器")
+                    })
+                    todoistInstallation?.let { current ->
+                        GitHubInfoDivider()
+                        GitHubInfoRow(tr("授权方式"), "OAuth")
+                        GitHubInfoDivider()
+                        TodoistAccountRow(current.account, todoistAccountLoading)
+                        GitHubInfoDivider()
+                        GitHubInfoRow(tr("工具数量"), current.tools.size.toString())
+                    }
+                }
+                todoistInstallation?.let { current ->
+                    Row(Modifier.padding(horizontal = 24.dp).fillMaxWidth()
+                        .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                        .padding(horizontal = 16.dp, vertical = 8.dp).heightIn(min = 48.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text(tr("在对话中启用"), color = content, modifier = Modifier.weight(1f))
+                        Switch(checked = current.enabled, onCheckedChange = { enabled ->
+                            scope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) { todoistStore.setEnabled(enabled) }
+                                    todoistInstallation = withContext(Dispatchers.IO) { todoistStore.load() }
+                                } catch (_: Exception) { sheets.detailsError = tr("Todoist 集成设置保存失败，请重试") }
+                            }
+                        })
+                    }
+                    Button(onClick = { scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) { todoistStore.remove() }
+                            todoistInstallation = null
+                        } catch (_: Exception) { sheets.detailsError = tr("无法移除 Todoist 集成，请重试") }
+                    } }, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
+                        modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
+                        Text(tr("移除集成"))
+                    }
+                 } ?: TodoistButton(tr("安装"), method = "OAuth",
+                     modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth(),
+                     onClick = { openLogin(GitHubLogin.TODOIST) })
+                if (sheets.detailsError != null) Text(sheets.detailsError!!, Modifier.padding(horizontal = 24.dp), color = content)
+            } else {
             Text("GitHub", Modifier.fillMaxWidth(), color = content, fontSize = 24.sp,
                 fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             Text(tr("连接 GitHub 官方 MCP，在对话中查阅仓库和代码、管理 Issue 与 Pull Request、查看 Actions 与发布信息。可用工具和操作范围取决于你的账户权限。"),
@@ -275,13 +405,20 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
             if (detailsError != null) {
                 Text(detailsError, Modifier.padding(horizontal = 24.dp), color = content)
             }
+            }
         }
     }
     if (login != null) BottomSheet(state = loginSheet, onDismissRequest = { clearLogin() },
         contentPadding = PaddingValues(start = 24.dp, top = 32.dp, end = 24.dp, bottom = 16.dp)) {
         SheetBody {
-            GitHubLogo(64.dp, Modifier.align(Alignment.CenterHorizontally))
-            Text(if (login == GitHubLogin.PAT) tr("使用 PAT 登录") else tr("使用 OAuth 登录"),
+            if (login == GitHubLogin.TODOIST) {
+                TodoistLogo(64.dp, Modifier.align(Alignment.CenterHorizontally))
+            } else GitHubLogo(64.dp, Modifier.align(Alignment.CenterHorizontally))
+            Text(when (login) {
+                GitHubLogin.PAT -> tr("使用 PAT 登录")
+                GitHubLogin.OAuth -> tr("使用 OAuth 登录")
+                GitHubLogin.TODOIST -> tr("使用 OAuth 登录")
+            },
                 Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
                 color = content, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             if (login == GitHubLogin.PAT) {
@@ -317,9 +454,20 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
             }
             error?.let { Text(it, color = content, fontSize = 14.sp) }
             if (deviceCode == null || !busy) {
-                GitHubButton(if (busy) tr("验证连接中") else if (login == GitHubLogin.PAT) tr("登录并安装") else tr("获取授权码"),
-                    modifier = Modifier.fillMaxWidth(), enabled = !busy && (login != GitHubLogin.PAT || pat.text.isNotBlank()),
-                    onClick = { deviceCode = null; startLogin() })
+                val actionLabel = when {
+                    busy && login == GitHubLogin.TODOIST -> tr("正在连接")
+                    busy -> tr("验证连接中")
+                    login == GitHubLogin.PAT -> tr("登录并安装")
+                    login == GitHubLogin.TODOIST -> tr("打开 Todoist 授权")
+                    else -> tr("获取授权码")
+                }
+                if (login == GitHubLogin.TODOIST) {
+                    TodoistButton(actionLabel, modifier = Modifier.fillMaxWidth(), enabled = !busy,
+                        onClick = { startLogin() })
+                } else {
+                    GitHubButton(actionLabel, modifier = Modifier.fillMaxWidth(), enabled = !busy && (login != GitHubLogin.PAT || pat.text.isNotBlank()),
+                        onClick = { deviceCode = null; startLogin() })
+                }
             }
             GitHubButton(tr("取消"), modifier = Modifier.fillMaxWidth(), secondary = true, onClick = { clearLogin() })
         }
@@ -331,6 +479,11 @@ private fun SheetBody(content: @Composable ColumnScope.() -> Unit) {
     val maxHeight = with(LocalDensity.current) { (LocalWindowInfo.current.containerSize.height * 0.85f).toDp() }
     Column(Modifier.fillMaxWidth().heightIn(max = maxHeight).imePadding().navigationBarsPadding()
         .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
+}
+
+@Composable
+private fun TodoistLogo(size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
+    Image(painterResource(R.drawable.ic_todoist), contentDescription = "Todoist", modifier = modifier.size(size))
 }
 
 @Composable
@@ -361,6 +514,67 @@ private fun GitHubButton(label: String, method: String? = null, modifier: Modifi
                 withStyle(SpanStyle(color = foreground.copy(alpha = 0.7f))) { append(method) }
             }
         }, color = foreground, fontSize = 16.sp)
+    }
+}
+
+@Composable
+private fun TodoistButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    compact: Boolean = false,
+    onClick: () -> Unit,
+    method: String? = null,
+    content: @Composable RowScope.() -> Unit = {
+        Text(buildAnnotatedString {
+            append(label)
+            if (method != null) {
+                append(" ")
+                withStyle(SpanStyle(color = Color.White.copy(alpha = 0.7f))) { append(method) }
+            }
+        }, color = Color.White, fontSize = 16.sp)
+    },
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        style = ButtonStyle.Ghost,
+        contentColor = Color.White,
+        modifier = modifier.then(if (compact) Modifier.widthIn(min = 88.dp) else Modifier)
+            .heightIn(min = if (compact) 32.dp else 48.dp).clip(ContinuousCapsule)
+            .background(Color(0xFFE44232).copy(alpha = if (enabled) 1f else 0.4f)),
+        buttonSize = if (compact) ButtonSize.Small else ButtonSize.Default,
+        contentPadding = PaddingValues(horizontal = if (compact) 24.dp else 16.dp, vertical = if (compact) 6.dp else 12.dp),
+        shape = ContinuousCapsule,
+        content = content,
+    )
+}
+
+@Composable
+private fun TodoistAccountRow(account: TodoistMcpAccount?, loading: Boolean) {
+    val content = Theme[colors][onPanelColor]
+    val muted = Theme[colors][mutedColor]
+    Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(tr("登录账号"), Modifier.weight(1f), color = muted, fontSize = 16.sp, lineHeight = 20.sp)
+        Row(Modifier.weight(2f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            if (account != null) {
+                Box(Modifier.size(24.dp).clip(ContinuousCapsule).background(Theme[colors][secondaryColor]), contentAlignment = Alignment.Center) {
+                    Text(account.name.ifBlank { account.email }.take(1).uppercase(), color = muted, fontSize = 14.sp)
+                    if (account.avatarUrl.isNotBlank()) {
+                        AsyncImage(model = account.avatarUrl, contentDescription = tr("Todoist 头像"),
+                            contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+            }
+            val label = when {
+                account == null -> tr(if (loading) "读取中" else "账号暂不可用")
+                account.email.isNotBlank() -> account.email
+                else -> account.name
+            }
+            Text(label, modifier = Modifier.weight(1f, fill = false), color = content, fontSize = 16.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 

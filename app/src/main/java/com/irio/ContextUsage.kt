@@ -82,6 +82,9 @@ internal suspend fun loadContextRequestOverhead(
     runCatching {
         GitHubMcpStore.of(context).toolProvider(ChatRequestCancellation())?.let(registry::register)
     }
+    runCatching {
+        TodoistMcpStore.of(context).toolProvider(ChatRequestCancellation())?.let(registry::register)
+    }
     val schemas = registry.schemas(protocol).joinToString("\n") { it.toString() }
     estimateSystemPromptTokens(registry.systemPrompt(chatSystemPrompt(context)), schemas)
 }

@@ -78,4 +78,17 @@ class ToolCatalogTest {
             }
         })
     }
+
+    @Test
+    fun discoveredTodoistToolsRemainVisibleAndExplainWhenIntegrationIsUnavailable() {
+        val remote = McpTool("get_tasks", "List my Todoist tasks", JSONObject("""{"type":"object","properties":{}}"""))
+        val entry = ToolCatalog.entries(ToolFeatureState(), todoistMcpTools = listOf(remote))
+            .single { it.name == TodoistMcpToolProvider.PREFIX + "get_tasks" }
+        assertEquals("读取 Todoist 任务列表", entry.title)
+        assertEquals("List my Todoist tasks", entry.defaultDescription)
+        assertEquals(ToolBlockedReason.TODOIST, entry.blockedReason)
+        val enabled = ToolCatalog.entries(available.copy(todoistUsable = true), todoistMcpTools = listOf(remote))
+            .single { it.name == entry.name }
+        assertNull(enabled.blockedReason)
+    }
 }

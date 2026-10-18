@@ -1365,6 +1365,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             var appliedFinal = false
             try {
                 GitHubMcpStore.of(context).toolProvider(requestCancellation)?.let(requestRegistry::register)
+                TodoistMcpStore.of(context).toolProvider(requestCancellation)?.let(requestRegistry::register)
                 val provider = requestProvider
                 var streamedText = ""
                 var roundBreakPending = false
