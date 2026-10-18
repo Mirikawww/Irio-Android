@@ -398,7 +398,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ExperimentalLabel(
+                    Text(
                         tr("使用 OpenRouter 思考数据"),
                         color = Theme[colors][onBackgroundColor],
                         modifier = Modifier.weight(1f),
