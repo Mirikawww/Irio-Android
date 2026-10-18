@@ -69,7 +69,7 @@ internal fun AndroidMessageList(
     callbacks: AndroidMessageCallbacks,
     onVisibleRangeChanged: (first: Int, last: Int) -> Unit,
     onScrollStateChanged: (scrollState: Int) -> Unit,
-    onUserScrollSample: () -> Unit,
+    onUserScrollSample: (scrollDeltaY: Int) -> Unit,
 ) {
     AndroidView(
         modifier = modifier,
@@ -648,7 +648,7 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
     private val messageAdapter = AndroidMessageAdapter()
     var onVisibleRangeChanged: ((first: Int, last: Int) -> Unit)? = null
     var onScrollStateChanged: ((scrollState: Int) -> Unit)? = null
-    var onUserScrollSample: (() -> Unit)? = null
+    var onUserScrollSample: ((scrollDeltaY: Int) -> Unit)? = null
     var tailPrefetch: Boolean = false
         set(value) {
             if (field == value) return
@@ -683,12 +683,12 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
                 onScrollStateChanged?.invoke(newState)
                 notifyVisibleRange()
                 // 手指拖动或惯性结束时采一次。程序 scrollBy 不改变 scroll state。
-                if (newState == RecyclerView.SCROLL_STATE_IDLE) onUserScrollSample?.invoke()
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) onUserScrollSample?.invoke(0)
             }
 
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 notifyVisibleRange()
-                if (scrollState != RecyclerView.SCROLL_STATE_IDLE) onUserScrollSample?.invoke()
+                if (scrollState != RecyclerView.SCROLL_STATE_IDLE) onUserScrollSample?.invoke(dy)
             }
         })
     }

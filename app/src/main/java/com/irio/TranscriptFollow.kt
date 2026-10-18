@@ -21,6 +21,20 @@ internal fun shouldSnapTranscriptToBottom(
     return stickToBottom
 }
 
+/**
+ * 用户向上滚动即表示要阅读历史，即使距离底部仍在 slack 容差内也不能重新吸底。
+ * 只有用户向下滚回贴底区域时才恢复贴底锁；空闲采样不改变用户已经表达的意图。
+ */
+internal fun transcriptBottomLockAfterUserScroll(
+    current: Boolean,
+    deltaY: Int,
+    pinned: Boolean?,
+): Boolean = when {
+    deltaY < 0 -> false
+    deltaY > 0 -> pinned ?: current
+    else -> current
+}
+
 /** 尾部内容变了才需要重新贴底。长度不变的重组不要滚动。 */
 internal fun transcriptTailFollowKey(message: ChatMessage): String {
     var process = 0

@@ -2801,11 +2801,14 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             streamingDeferActive.set(true)
                         }
                     },
-                    onUserScrollSample = {
+                    onUserScrollSample = { scrollDeltaY ->
                         if (!messageRecyclerController.isProgrammaticScroll()) {
-                            messageRecyclerController.isPinnedToBottom(transcriptBottomSlackPx)?.let { pinned ->
-                                stickToBottom = pinned
+                            val pinned = if (scrollDeltaY > 0) {
+                                messageRecyclerController.isPinnedToBottom(transcriptBottomSlackPx)
+                            } else {
+                                null
                             }
+                            stickToBottom = transcriptBottomLockAfterUserScroll(stickToBottom, scrollDeltaY, pinned)
                         }
                     },
                 )

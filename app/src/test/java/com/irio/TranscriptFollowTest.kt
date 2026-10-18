@@ -48,6 +48,18 @@ class TranscriptFollowTest {
     }
 
     @Test
+    fun tinyUpwardUserScrollDisablesBottomLockEvenInsideSlack() {
+        assertFalse(transcriptBottomLockAfterUserScroll(current = true, deltaY = -2, pinned = true))
+        assertFalse(transcriptBottomLockAfterUserScroll(current = false, deltaY = 0, pinned = true))
+    }
+
+    @Test
+    fun downwardUserScrollCanRestoreBottomLockWhenPinned() {
+        assertTrue(transcriptBottomLockAfterUserScroll(current = false, deltaY = 3, pinned = true))
+        assertFalse(transcriptBottomLockAfterUserScroll(current = false, deltaY = 3, pinned = false))
+    }
+
+    @Test
     fun tailKeyChangesWhenStreamingTextOrFinishChanges() {
         val streaming = ChatMessage(id = 7, text = "hello", fromUser = false, isStreaming = true)
         val grown = streaming.copy(text = "hello!")
