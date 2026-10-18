@@ -67,7 +67,7 @@ class SpeechSettingsActivity : ComponentActivity() {
 }
 
 @Composable
-private fun SpeechSettingsScreen(onBack: () -> Unit) {
+internal fun SpeechSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var voiceId by remember { mutableStateOf(SpeechStore.loadVoiceId(context)) }
     var voices by remember { mutableStateOf<List<SpeechVoice>?>(null) }
@@ -138,6 +138,7 @@ private fun SpeechSettingsScreen(onBack: () -> Unit) {
     }
     val canPick = !missing && voices != null
 
+    DismissComposerFocusWhenImeHides()
     SettingsHazeScaffold(
         title = "TTS/STT",
         onBack = onBack,

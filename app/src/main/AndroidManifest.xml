@@ -90,7 +90,8 @@
             android:exported="false"
             android:label="TTS/STT"
             android:screenOrientation="portrait"
-            android:theme="@style/AppTheme" />
+            android:theme="@style/AppTheme"
+            android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".McpSettingsActivity"
             android:exported="false"
