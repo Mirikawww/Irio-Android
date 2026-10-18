@@ -424,7 +424,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ExperimentalLabel(
+                    Text(
                         tr("消息框延展动画"),
                         color = Theme[colors][onPanelColor],
                         modifier = Modifier.weight(1f),
