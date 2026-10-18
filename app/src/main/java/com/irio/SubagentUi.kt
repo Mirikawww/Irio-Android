@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
@@ -107,10 +109,39 @@ private fun SubagentCapsule(snapshot: SubagentSnapshot) {
     val fresh = remember(snapshot.id) { SubagentHub.isFresh(snapshot.id) }
     val reveal = remember(snapshot.id) { Animatable(if (fresh) 0f else 1f) }
     val fraction by reveal.asState()
+    val completionFill = remember(snapshot.id) { Animatable(if (live.state == SubagentState.RUNNING) 0f else 1f) }
+    val completionScale = remember(snapshot.id) { Animatable(1f) }
+    val completionAlpha = remember(snapshot.id) { Animatable(if (live.state == SubagentState.RUNNING) 1f else 0f) }
+    val indicatorWidth = remember(snapshot.id) { Animatable(if (live.state == SubagentState.RUNNING) 8f else 0f) }
+    val indicatorGap = remember(snapshot.id) { Animatable(if (live.state == SubagentState.RUNNING) 6f else 0f) }
+    var previousState by remember(snapshot.id) { mutableStateOf(live.state) }
     LaunchedEffect(snapshot.id) {
         if (!fresh) return@LaunchedEffect
         reveal.animateTo(1f, irioSpring())
         SubagentHub.settle(snapshot.id)
+    }
+    LaunchedEffect(snapshot.id, live.state) {
+        val wasRunning = previousState == SubagentState.RUNNING
+        if (live.state == SubagentState.RUNNING) {
+            completionFill.snapTo(0f)
+            completionScale.snapTo(1f)
+            completionAlpha.snapTo(1f)
+            indicatorWidth.snapTo(8f)
+            indicatorGap.snapTo(6f)
+        } else if (wasRunning) {
+            completionScale.animateTo(4f, tween(180, easing = IrioEaseOut))
+            completionFill.animateTo(1f, tween(280, easing = IrioEaseOut))
+            completionAlpha.animateTo(0f, tween(120, easing = IrioEaseInOut))
+            indicatorWidth.animateTo(0f, tween(180, easing = IrioEaseInOut))
+            indicatorGap.animateTo(0f, tween(180, easing = IrioEaseInOut))
+        } else {
+            completionFill.snapTo(1f)
+            completionScale.snapTo(1f)
+            completionAlpha.snapTo(0f)
+            indicatorWidth.snapTo(0f)
+            indicatorGap.snapTo(0f)
+        }
+        previousState = live.state
     }
     val breathe = if (live.state == SubagentState.RUNNING) {
         val transition = rememberInfiniteTransition(label = "subagent breathe")
@@ -124,6 +155,13 @@ private fun SubagentCapsule(snapshot: SubagentSnapshot) {
     } else {
         1f
     }
+    val indicatorScale = if (live.state == SubagentState.RUNNING) breathe else completionScale.value
+    val labelColor by animateColorAsState(
+        if (live.state == SubagentState.RUNNING) Theme[colors][onBackgroundColor]
+        else Theme[colors][onPrimaryColor],
+        irioSpring(),
+        label = "subagent label color",
+    )
     val label = "${live.name}，${subagentStatusLabel(live.state)}"
     val nameStyle = remember {
         TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 20.sp)
@@ -141,7 +179,15 @@ private fun SubagentCapsule(snapshot: SubagentSnapshot) {
                 }
             }
             .clip(ContinuousCapsule)
-            .background(tint.copy(alpha = 0.16f))
+            .drawBehind {
+                drawRect(tint.copy(alpha = 0.16f))
+                if (completionFill.value > 0f) {
+                    drawRect(
+                        tint,
+                        size = size.copy(width = size.width * completionFill.value.coerceIn(0f, 1f)),
+                    )
+                }
+            }
             .clickable {
                 SubagentHub.hydrate(live)
                 context.startActivity(
@@ -151,21 +197,23 @@ private fun SubagentCapsule(snapshot: SubagentSnapshot) {
             .semantics { contentDescription = label }
             .padding(start = 8.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(indicatorGap.value.dp),
     ) {
         Box(
             Modifier
-                .size(8.dp)
+                .width(indicatorWidth.value.dp)
+                .height(8.dp)
                 .graphicsLayer {
-                    scaleX = breathe
-                    scaleY = breathe
+                    scaleX = indicatorScale
+                    scaleY = indicatorScale
+                    alpha = completionAlpha.value
                 }
                 .clip(CircleShape)
                 .background(tint),
         )
         RollingGlyphLabel(
             text = live.name,
-            color = Theme[colors][onBackgroundColor],
+            color = labelColor,
             direction = 1,
             animate = fresh,
             style = nameStyle,
