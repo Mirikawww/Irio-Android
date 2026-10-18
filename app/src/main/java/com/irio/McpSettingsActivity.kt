@@ -337,7 +337,7 @@ private fun SheetBody(content: @Composable ColumnScope.() -> Unit) {
 private fun GitHubLogo(size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
     val dark = Theme[colors][backgroundColor].luminance() < 0.5f
     Image(painterResource(R.drawable.ic_github), contentDescription = null,
-        modifier = modifier.size(size).background(Theme[colors][secondaryColor], Theme[shapes][largeShape]).padding(size * 0.2f),
+        modifier = modifier.size(size),
         colorFilter = ColorFilter.tint(if (dark) Color.White else Color.Black))
 }
 
