@@ -304,7 +304,10 @@ internal class SubagentToolProvider : ToolProvider {
         val name = ToolArguments.value(call.arguments, "name").trim()
         if (name.isEmpty()) return ToolExecutionResult(tr("子智能体需要一个名称。"))
         return when (call.name) {
-            SubagentTools.CREATE -> SubagentHub.create(name, ToolArguments.value(call.arguments, "task").trim(), context)
+            SubagentTools.CREATE -> {
+                context.onUpdate(ChatStreamUpdate(notifyTool = SubagentTools.CREATE))
+                SubagentHub.create(name, ToolArguments.value(call.arguments, "task").trim(), context)
+            }
             SubagentTools.MESSAGE -> {
                 context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = call.name))
                 try {
@@ -321,7 +324,10 @@ internal class SubagentToolProvider : ToolProvider {
                     context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name))
                 }
             }
-            SubagentTools.INSPECT -> SubagentHub.inspect(context.conversationId, name)
+            SubagentTools.INSPECT -> {
+                context.onUpdate(ChatStreamUpdate(notifyTool = SubagentTools.INSPECT))
+                SubagentHub.inspect(context.conversationId, name)
+            }
             else -> ToolExecutionResult(tr("未知工具 %s").format(call.name))
         }
     }

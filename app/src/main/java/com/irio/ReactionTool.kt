@@ -61,6 +61,8 @@ internal class ReactionToolProvider : ToolProvider {
         if (context.cancellation.isCancelled() || !context.onReaction(messageId, emoji)) {
             return ToolExecutionResult("Reaction target is no longer available")
         }
+        // 对话里不出现过程行。后台通知仍要显示这一步。
+        context.onUpdate(ChatStreamUpdate(notifyTool = ReactionTool.NAME))
         // Deliberately no toolActive/searching/ProcessEvent updates: reactions are silent UI metadata.
         return ToolExecutionResult(JSONObject().put("message_id", rawId).put("emoji", emoji).toString())
     }

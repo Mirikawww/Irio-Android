@@ -274,10 +274,18 @@ import java.util.concurrent.atomic.AtomicBoolean
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ReplyOpenRequest.publish(intent)
+        ReplyLiveNotice.install(this)
         LinkRuntime.ensure(this)
         setIrioContent {
             MainScreen(restoreLastOpened = savedInstanceState != null)
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        ReplyOpenRequest.publish(intent)
     }
 }
 
@@ -845,6 +853,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     ) { granted ->
         if (granted) SpeechNotifications.sync(context, SpeechPlayer.playback)
     }
+    val requestReplyNotification = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
     fun ensureSpeechNotification() {
         if (
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
@@ -1111,6 +1122,14 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         }
     }
 
+    LaunchedEffect(ReplyOpenRequest.conversationId, conversations) {
+        val id = ReplyOpenRequest.conversationId ?: return@LaunchedEffect
+        val summary = conversations.firstOrNull { it.id == id } ?: return@LaunchedEffect
+        ReplyOpenRequest.clear()
+        ReplyNotifications.cancel(context, id)
+        openConversation(summary)
+    }
+
     fun newConversation(closeDrawer: Boolean = true) {
         SpeechPlayer.stop()
         val previous = currentConversation
@@ -1334,6 +1353,12 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         requestSource: List<ChatMessage>,
         reply: ChatMessage,
     ) {
+        ReplyNotifications.requestPermissionIfNeeded(
+            granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED,
+        ) {
+            requestReplyNotification.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
         SpeechPlayer.stop()
         val requestModel = selectedModel
         val effectiveReasoningInfo = if (ProviderStore.loadModelsDevReasoning(context)) {
@@ -1376,6 +1401,21 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 var streamedAttachments = emptyList<ChatAttachment>()
                 var toolRecords = emptyList<ChatToolRecord>()
                 val process = ProcessTracker()
+                var notice = tr("响应中")
+                fun noticeTitle(): String {
+                    val stored = if (currentConversation.id == requestConversationId) {
+                        currentConversation.title
+                    } else {
+                        conversationContent(requestConversationId)?.title ?: "新对话"
+                    }
+                    return displayConversationTitle(stored)
+                }
+                fun pushNotice(text: String, finished: Boolean) {
+                    if (text == notice && !finished) return
+                    notice = text
+                    ReplyLiveNotice.publish(context, requestConversationId, noticeTitle(), text, finished)
+                }
+                pushNotice(notice, finished = false)
                 var lastPublishAt = 0L
                 var publishedBodyLength = 0
                 var publishedThinking = false
@@ -1401,6 +1441,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         } else null
                     } else null
                     process.onToolStarted(ImageGenTool.NAME)
+                    pushNotice(MemoryTool.liveLabel(ImageGenTool.NAME), finished = false)
                     replaceInConversation(
                         requestConversationId,
                         reply.id,
@@ -1477,6 +1518,14 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         },
                         onUpdate = update@{ update ->
                             update.toolRecord?.let { toolRecords = toolRecords + it }
+                            val advanced = advanceReplyNotice(notice, update)
+                            if (advanced != notice) {
+                                notice = advanced
+                                val step = advanced
+                                withContext(Dispatchers.Main.immediate) {
+                                    ReplyLiveNotice.publish(context, requestConversationId, noticeTitle(), step, finished = false)
+                                }
+                            }
                             val cancelled = requestCancellation.isCancelled()
                             val terminalState = update.searching == false || update.toolActive == false || update.done
                             if (!cancelled || terminalState || update.attachments.isNotEmpty()) {
@@ -1649,6 +1698,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 if (!clearingHistory) {
                     Snapshot.withMutableSnapshot {
                         if (finalMessage == null) {
+                            ReplyLiveNotice.dismiss(context, requestConversationId)
                             if (currentConversation.id == requestConversationId) {
                                 messages = messages.filterNot { it.id == reply.id }
                                 persistCurrent(messages)
@@ -1671,6 +1721,15 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 userText = requestSource.lastOrNull { it.fromUser && !it.hidden }?.text.orEmpty(),
                                 assistantText = finalMessage.text,
                             )
+                            val completed = result.error == null && !result.stopped
+                            if (completed) {
+                                val preview = replyNotificationPreview(finalMessage.text).ifEmpty {
+                                    if (finalMessage.attachments.any { it.isImage }) tr("已生成图片") else ""
+                                }
+                                pushNotice(preview.ifEmpty { tr("完成") }, finished = true)
+                            } else {
+                                ReplyLiveNotice.dismiss(context, requestConversationId)
+                            }
                             if (
                                 result.error == null && !result.stopped &&
                                 currentConversation.id == requestConversationId &&

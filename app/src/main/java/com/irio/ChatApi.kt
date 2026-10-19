@@ -111,6 +111,11 @@ data class ChatStreamUpdate(
     val subagentJson: String = "",
     /** Full-width, anchored user-visible images; separate from model visual input. */
     val displayedImages: String = "",
+    /**
+     * 后台通知用的工具名。界面不为此增加过程行。
+     * 展示图片、创建/查看子智能体、表情回应这些调用在对话里没有状态提示。
+     */
+    val notifyTool: String = "",
 )
 
 data class ToolCallDelta(
@@ -1498,7 +1503,12 @@ internal object MemoryTool {
     fun liveLabel(name: String, webDomain: String = ""): String = when (name) {
         ImageGenTool.NAME -> tr("图片生成中")
         CommonsImageTools.SEARCH -> tr("图片搜索中")
+        CommonsImageTools.SHOW -> tr("展示图片")
         CommonsImageTools.VIEW -> tr("查看图片中")
+        ReactionTool.NAME -> tr("表情回应")
+        ColoredBubbleTool.NAME -> tr("发送彩色气泡")
+        SubagentTools.CREATE -> tr("创建子智能体")
+        SubagentTools.INSPECT -> tr("查看子智能体")
         TimeTool.NAME -> tr("获取时间")
         HistoryTool.NAME -> tr("查询历史会话")
         LinuxShellTool.NAME -> tr("运行命令中")
