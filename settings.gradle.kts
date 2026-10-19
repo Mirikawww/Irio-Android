@@ -19,3 +19,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Irio-Android"
 include(":app")
+include(":markdown-renderer-code")

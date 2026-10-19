@@ -135,6 +135,7 @@ object ThemeStore {
     private const val MODEL_PICKER_ON_LEFT_KEY = "model_picker_on_left"
     private const val NEW_MESSAGE_SCROLL_KEY = "new_message_scroll"
     private const val COMPOSER_WRAP_ANIMATION_KEY = "composer_wrap_animation"
+    private const val CODE_BLOCK_WRAP_KEY = "code_block_wrap"
     private const val THINKING_BLOCK_KEY = "thinking_block"
     private const val MERGE_TOOL_CALLS_KEY = "merge_tool_calls"
     private const val LEGACY_PREFS = "provider_settings"
@@ -176,6 +177,10 @@ object ThemeStore {
     var composerWrapAnimation by mutableStateOf(false)
         private set
 
+    /** 代码块按气泡宽度自动换行。默认关，超长行横向滚动。 */
+    var codeBlockWrap by mutableStateOf(false)
+        private set
+
     /** 显示思考块（进行中的思考内容和「已思考 x 秒」）。关闭后只剩「思考中」。默认开。 */
     var thinkingBlock by mutableStateOf(true)
         private set
@@ -204,6 +209,7 @@ object ThemeStore {
             modelPickerOnLeft = appearance.getBoolean(MODEL_PICKER_ON_LEFT_KEY, false)
             newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, false)
             composerWrapAnimation = appearance.getBoolean(COMPOSER_WRAP_ANIMATION_KEY, false)
+            codeBlockWrap = appearance.getBoolean(CODE_BLOCK_WRAP_KEY, false)
             thinkingBlock = appearance.getBoolean(THINKING_BLOCK_KEY, true)
             mergeToolCalls = appearance.getBoolean(MERGE_TOOL_CALLS_KEY, false)
             if (appearance.getString(KEY, null) == null && stored != null) {
@@ -290,6 +296,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(COMPOSER_WRAP_ANIMATION_KEY, enabled)
+            .apply()
+    }
+
+    fun saveCodeBlockWrap(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (codeBlockWrap == enabled) return
+        codeBlockWrap = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(CODE_BLOCK_WRAP_KEY, enabled)
             .apply()
     }
 

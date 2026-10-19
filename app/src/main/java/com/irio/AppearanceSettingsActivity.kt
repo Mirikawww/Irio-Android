@@ -440,6 +440,22 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Text(
+                        tr("代码块自动换行"),
+                        color = Theme[colors][onPanelColor],
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(
+                        checked = ThemeStore.codeBlockWrap,
+                        onCheckedChange = { enabled ->
+                            ThemeStore.saveCodeBlockWrap(context, enabled)
+                        },
+                    )
+                }
+                Row(
+                    modifier = Modifier.settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Row(
                         modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically,

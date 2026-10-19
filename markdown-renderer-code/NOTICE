@@ -1,0 +1,14 @@
+multiplatform-markdown-renderer-code
+Copyright 2022 Mike Penz
+https://github.com/mikepenz/multiplatform-markdown-renderer
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+Vendored from tag v0.46.0 and modified by Irio.
+MarkdownHighlightedCode, MarkdownHighlightedCodeFence, and MarkdownHighlightedCodeBlock
+accept softWrap. When softWrap is true, code lines wrap to the block width instead of
+scrolling horizontally. The default remains horizontal scrolling.
+
+Parts of the markdown composer are based on Erik Hellman's work:
+https://github.com/ErikHellman/MarkdownComposer
+https://www.hellsoft.se/rendering-markdown-with-jetpack-compose/
+Copyright (c) 2021 Erik Hellman, MIT License. See LICENSE.
