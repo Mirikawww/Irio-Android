@@ -20,6 +20,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import com.mikepenz.markdown.annotator.DefaultAnnotatorSettings
 import com.mikepenz.markdown.annotator.buildMarkdownAnnotatedString
 import com.mikepenz.markdown.compose.LocalMarkdownAnnotator
+import com.mikepenz.markdown.compose.LocalMarkdownColors
 import com.mikepenz.markdown.compose.LocalMarkdownTypography
 import com.mikepenz.markdown.compose.LocalReferenceLinkHandler
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
@@ -270,13 +271,16 @@ internal fun FadingMarkdownAnnotated(
     val typography = LocalMarkdownTypography.current
     val linkStyle = typography.textLink
     val codeStyle = typography.codeSpanStyle
+    val colors = LocalMarkdownColors.current
+    val highlightStyle = SpanStyle(color = colors.highlightText, background = colors.highlightBackground)
     val annotator = LocalMarkdownAnnotator.current
     val references = LocalReferenceLinkHandler.current
     val uriHandler = LocalUriHandler.current
-    val settings = remember(linkStyle, codeStyle, annotator, references, uriHandler) {
+    val settings = remember(linkStyle, codeStyle, highlightStyle, annotator, references, uriHandler) {
         DefaultAnnotatorSettings(
             linkTextSpanStyle = linkStyle,
             codeSpanStyle = codeStyle,
+            highlightSpanStyle = highlightStyle,
             annotator = annotator,
             referenceLinkHandler = references,
             linkInteractionListener = LinkInteractionListener { link ->

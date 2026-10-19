@@ -1,7 +1,7 @@
 [versions]
-agp = "9.3.1"
-kotlin = "2.4.10"
-okhttp = "4.12.0"
+agp = "9.4.1"
+kotlin = "2.4.21"
+okhttp = "5.5.0"
 
 [libraries]
 
