@@ -5,11 +5,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal enum class ToolBlockedReason {
-    WEB_SEARCH, SEARCH_KEY, IMAGE_MODEL, MEMORY, SUBAGENTS, LINUX, STORAGE, LINUX_BACKGROUND, GITHUB, TODOIST;
+    WEB_SEARCH, SEARCH_KEY, IMAGE_SEARCH_KEY, IMAGE_MODEL, MEMORY, SUBAGENTS, LINUX, STORAGE, LINUX_BACKGROUND, GITHUB, TODOIST;
 
     fun message(): String = tr(when (this) {
         WEB_SEARCH -> "请先在对话中开启「网络搜索」"
-        SEARCH_KEY -> "请先在「模型」中配置搜索提供商的 API 密钥"
+        SEARCH_KEY -> "请先在「搜索」中配置搜索提供商的 API 密钥"
+        IMAGE_SEARCH_KEY -> "请先在「搜索」中配置 SerpAPI 的 API 密钥"
         IMAGE_MODEL -> "请先在「模型」中配置图片生成模型"
         MEMORY -> "请先在「记忆」中开启记忆"
         SUBAGENTS -> "请先在「模型」中开启「子智能体」"
@@ -24,6 +25,7 @@ internal enum class ToolBlockedReason {
 internal data class ToolFeatureState(
     val searchEnabled: Boolean = false,
     val searchConfigured: Boolean = false,
+    val imageSearchConfigured: Boolean = false,
     val imageConfigured: Boolean = false,
     val memoryEnabled: Boolean = false,
     val subagentsEnabled: Boolean = false,
@@ -50,6 +52,7 @@ internal object ToolCatalog {
         val features = ToolFeatureState(
             searchEnabled = SearchStore.loadWebSearchEnabled(context),
             searchConfigured = SearchStore.hasApiKey(context),
+            imageSearchConfigured = SearchStore.hasImageApiKey(context),
             imageConfigured = ToolStore.loadImageGenModel(context).let { it.isNotBlank() && ModelCatalog.isImageModel(context, it) },
             memoryEnabled = MemoryStore.loadEnabled(context),
             subagentsEnabled = ToolStore.loadSubagents(context),
@@ -103,6 +106,9 @@ internal object ToolCatalog {
     private fun title(name: String): String = tr(when (name) {
         WebSearchTool.NAME -> "网络搜索"
         WebFetchTool.NAME -> "读取网页"
+        CommonsImageTools.SEARCH -> "搜索图片"
+        CommonsImageTools.SHOW -> "展示图片"
+        CommonsImageTools.VIEW -> "查看图片"
         ImageGenTool.NAME -> "生成图片"
         TimeTool.NAME -> "获取时间"
         HistoryTool.NAME -> "查询历史会话"
@@ -123,6 +129,11 @@ internal object ToolCatalog {
         WebSearchTool.NAME, WebFetchTool.NAME -> when {
             !features.searchEnabled -> ToolBlockedReason.WEB_SEARCH
             !features.searchConfigured -> ToolBlockedReason.SEARCH_KEY
+            else -> null
+        }
+        CommonsImageTools.SEARCH, CommonsImageTools.SHOW, CommonsImageTools.VIEW -> when {
+            !features.searchEnabled -> ToolBlockedReason.WEB_SEARCH
+            !features.imageSearchConfigured -> ToolBlockedReason.IMAGE_SEARCH_KEY
             else -> null
         }
         ImageGenTool.NAME -> if (features.imageConfigured) null else ToolBlockedReason.IMAGE_MODEL

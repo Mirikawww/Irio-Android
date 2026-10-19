@@ -178,6 +178,10 @@ internal class SubagentTurn {
             tracker.finishAll()
             changed = true
         }
+        if (update.displayedImages.isNotEmpty()) {
+            tracker.onDisplayedImages(update.displayedImages)
+            changed = true
+        }
         return changed
     }
 
@@ -464,6 +468,8 @@ internal object SubagentHub {
                     searchProvider = context.searchProvider,
                     searchApiKey = context.searchApiKey,
                     searchMaxResults = context.searchMaxResults,
+                    imageSearchApiKey = context.imageSearchApiKey,
+                    imageSearchMaxResults = context.imageSearchMaxResults,
                     systemPrompt = registry.systemPrompt(null),
                     imageGenModel = context.imageGenModel,
                     toolRegistry = registry,

@@ -45,7 +45,7 @@ internal fun renderedProcessEvents(events: List<ProcessEvent>, mergeToolCalls: B
     if (!mergeToolCalls) return events
     val mergeableEvents = events.filter {
         it.kind == ProcessEventKind.SEARCH ||
-            (it.kind == ProcessEventKind.TOOL && it.toolName != ImageGenTool.NAME)
+            (it.kind == ProcessEventKind.TOOL && it.toolName !in setOf(ImageGenTool.NAME, CommonsImageTools.SHOW))
     }
     if (mergeableEvents.isEmpty()) return events
     val first = mergeableEvents.first()
@@ -62,7 +62,7 @@ internal fun renderedProcessEvents(events: List<ProcessEvent>, mergeToolCalls: B
                     live = mergeableEvents.any { it.live },
                 ),
             )
-            if (event.kind != ProcessEventKind.SEARCH && event.kind != ProcessEventKind.TOOL) {
+            if ((event.kind != ProcessEventKind.SEARCH && event.kind != ProcessEventKind.TOOL) || event.toolName == CommonsImageTools.SHOW) {
                 add(event)
             }
         }
@@ -79,7 +79,7 @@ internal fun mergedToolSummary(
         .sumOf { event -> event.content.lineSequence().count { it.startsWith("$ ") }.coerceAtLeast(1) }
     val times = events.count { it.kind == ProcessEventKind.TOOL && it.toolName == TimeTool.NAME }
     val pagesRead = events.count { it.kind == ProcessEventKind.TOOL && it.toolName == WebFetchTool.NAME }
-    val known = setOf(LinuxShellTool.NAME, TimeTool.NAME, WebFetchTool.NAME, ImageGenTool.NAME)
+    val known = setOf(LinuxShellTool.NAME, TimeTool.NAME, WebFetchTool.NAME, ImageGenTool.NAME, CommonsImageTools.SHOW)
     val otherTools = events.count { it.kind == ProcessEventKind.TOOL && it.toolName !in known }
     if (searchEvents.isNotEmpty()) add(translate(language, "搜索了 %d 个网页").format(pages))
     if (commands > 0) add(translate(language, "运行了 %d 个命令").format(commands))

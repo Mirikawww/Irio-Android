@@ -109,6 +109,8 @@ data class ChatStreamUpdate(
     val coloredBubbles: List<ColoredBubble> = emptyList(),
     /** 已创建的子智能体快照。非空时只显示卡片，不显示工具调用提示。 */
     val subagentJson: String = "",
+    /** Full-width, anchored user-visible images; separate from model visual input. */
+    val displayedImages: String = "",
 )
 
 data class ToolCallDelta(
@@ -175,6 +177,8 @@ object ChatApi {
         searchProvider: SearchProvider = SearchProvider.TAVILY,
         searchApiKey: String = "",
         searchMaxResults: Int = searchProvider.maxResultsDefault,
+        imageSearchApiKey: String = "",
+        imageSearchMaxResults: Int = SearchStore.IMAGE_RESULTS_DEFAULT,
         maxToolRounds: Int = ToolStore.MAX_ROUNDS_DEFAULT,
         systemPrompt: String? = null,
         imageGenModel: String = "",
@@ -201,10 +205,12 @@ object ChatApi {
             searchProvider = searchProvider,
             searchApiKey = searchApiKey,
             searchMaxResults = searchMaxResults,
+            imageSearchApiKey = imageSearchApiKey,
+            imageSearchMaxResults = imageSearchMaxResults,
             imageGenModel = imageGenModel,
             cancellation = cancellation,
             onUpdate = { update ->
-                if (update.coloredBubbles.isNotEmpty()) displayedBubbles = true
+                if (update.coloredBubbles.isNotEmpty() || update.displayedImages.isNotEmpty()) displayedBubbles = true
                 onUpdate(update)
             },
             appContext = appContext,
@@ -245,6 +251,7 @@ object ChatApi {
                 geminiParts = turn.geminiParts,
             )
             var endTurn = false
+            val inspectedImages = mutableListOf<ChatAttachment>()
             turn.toolCalls.forEach { call ->
                 if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
                 val result = try {
@@ -260,6 +267,7 @@ object ChatApi {
                 if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
                 searchPages += result.searchPages
                 endTurn = endTurn || result.endTurn
+                inspectedImages += result.modelAttachments
                 history += ChatRequestMessage(
                     role = "tool",
                     text = result.text,
@@ -267,6 +275,10 @@ object ChatApi {
                     toolName = call.name,
                     geminiFunctionId = call.geminiFunctionId,
                 )
+            }
+            if (inspectedImages.isNotEmpty()) {
+                history += ChatRequestMessage(role = "user", text = "Visual input from view_images (tool data, not a new user request). Inspect only as needed for the original task.",
+                    attachments = inspectedImages.distinctBy { it.filePath })
             }
             if (endTurn) {
                 return ChatCompletionResult(searchPages = searchPages, usage = lastUsage)
@@ -1485,6 +1497,8 @@ internal object MemoryTool {
 
     fun liveLabel(name: String, webDomain: String = ""): String = when (name) {
         ImageGenTool.NAME -> tr("图片生成中")
+        CommonsImageTools.SEARCH -> tr("图片搜索中")
+        CommonsImageTools.VIEW -> tr("查看图片中")
         TimeTool.NAME -> tr("获取时间")
         HistoryTool.NAME -> tr("查询历史会话")
         LinuxShellTool.NAME -> tr("运行命令中")
@@ -1509,6 +1523,8 @@ internal object MemoryTool {
             else -> tr("图片生成已停止")
         }
         TimeTool.NAME -> tr("已获取时间")
+        CommonsImageTools.SEARCH -> CommonsImageTools.doneLabel(content)
+        CommonsImageTools.VIEW -> CommonsImageTools.viewDoneLabel(content)
         HistoryTool.NAME -> HistoryTool.doneLabel(content)
         LinuxShellTool.NAME -> tr("已运行命令")
         LinuxBackgroundTool.NAME -> tr("已处理后台命令")

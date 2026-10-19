@@ -27,11 +27,13 @@ internal fun chatToolRegistry(
     context: Context,
     webSearch: Boolean,
     imageGenModel: String,
+    imageSearch: Boolean = webSearch && SearchStore.hasImageApiKey(context),
 ): ToolRegistry = ToolRegistry(
     buildList {
         if (webSearch) {
             add(WebSearchToolProvider())
             add(WebFetchToolProvider())
+            if (imageSearch) add(CommonsImageToolProvider())
         }
         if (imageGenModel.isNotBlank()) add(ImageGenToolProvider())
         add(TimeToolProvider())

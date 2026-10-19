@@ -89,10 +89,6 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
-    var provider by remember { mutableStateOf(SearchStore.loadProvider(context)) }
-    var providerMenuOpen by remember { mutableStateOf(false) }
-    val apiKey = rememberTextFieldState(SearchStore.loadApiKey(context, provider))
-    var maxResults by remember { mutableIntStateOf(SearchStore.loadMaxResults(context, provider)) }
     var maxRounds by remember { mutableIntStateOf(ToolStore.loadMaxRounds(context)) }
     var modelsDevReasoning by remember { mutableStateOf(ProviderStore.loadModelsDevReasoning(context)) }
     var imageGenModel by remember { mutableStateOf(ToolStore.loadImageGenModel(context)) }
@@ -110,7 +106,6 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
     var visualizeContext by remember { mutableStateOf(ToolStore.loadVisualizeContext(context)) }
     var compressionModel by remember { mutableStateOf(ToolStore.loadCompressionModel(context)) }
 
-    val currentProvider by rememberUpdatedState(provider)
     val currentMessageTimestamps by rememberUpdatedState(messageTimestamps)
     val currentContextCompression by rememberUpdatedState(contextCompression)
     val currentVisualizeContext by rememberUpdatedState(visualizeContext)
@@ -118,31 +113,13 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
 
     fun persistCurrent() {
-        SearchStore.saveApiKey(context, apiKey.text.toString(), currentProvider)
-        SearchStore.saveProvider(context, currentProvider)
         ToolStore.saveMessageTimestamps(context, currentMessageTimestamps)
         ToolStore.saveContextCompression(context, currentContextCompression)
         ToolStore.saveVisualizeContext(context, currentVisualizeContext)
         ToolStore.saveCompressionModel(context, currentCompressionModel)
     }
 
-    fun switchProvider(next: SearchProvider) {
-        if (next == provider) {
-            providerMenuOpen = false
-            return
-        }
-        SearchStore.saveApiKey(context, apiKey.text.toString(), provider)
-        SearchStore.saveMaxResults(context, maxResults, provider)
-        SearchStore.saveProvider(context, next)
-        provider = next
-        providerMenuOpen = false
-        apiKey.edit {
-            replace(0, length, SearchStore.loadApiKey(context, next))
-        }
-        maxResults = SearchStore.loadMaxResults(context, next)
-    }
-
-    DisposableEffect(lifecycleOwner, apiKey) {
+    DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) persistCurrent()
         }
@@ -169,76 +146,6 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                 .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SettingsSectionCard {
-                DropdownMenu(
-                    expanded = providerMenuOpen,
-                    onExpandedChange = { providerMenuOpen = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    alignment = DropdownMenuAlignment.End,
-                    panel = {
-                        DropdownMenuPanel {
-                            SearchProvider.entries.forEach { option ->
-                                DropdownMenuItem(
-                                    onClick = { switchProvider(option) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) { Text(tr(option.label), color = Theme[colors][onPanelColor]) }
-                            }
-                        }
-                    },
-                ) {
-                    val interactionSource = remember { MutableInteractionSource() }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(
-                                interactionSource = interactionSource,
-                                indication = null,
-                                onClick = { providerMenuOpen = !providerMenuOpen },
-                            )
-                            .settingsDropdownInset(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(tr("搜索提供商"), color = Theme[colors][onPanelColor])
-                            Text(tr(provider.label), color = Theme[colors][mutedColor], fontSize = 13.sp)
-                        }
-                        IconButton(
-                            onClick = { providerMenuOpen = !providerMenuOpen },
-                            style = ButtonStyle.Ghost,
-                            buttonSize = ButtonSize.Small,
-                            shape = ContinuousCapsule,
-                            modifier = Modifier.size(32.dp),
-                            interactionSource = interactionSource,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = tr("选择搜索提供方"),
-                                tint = Theme[colors][onPanelColor],
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
-                }
-                Column(Modifier.padding(vertical = 8.dp)) {
-                    ProviderField(
-                        label = tr("%s API 密钥").format(tr(provider.label)),
-                        state = apiKey,
-                        keyboardType = KeyboardType.Password,
-                        mask = true,
-                        trailingSpace = false,
-                    )
-                }
-                SettingsSlider(
-                    label = tr("单次搜索上限"),
-                    value = maxResults,
-                    valueRange = provider.maxResultsMin..provider.maxResultsMax,
-                    onValueChange = {
-                        val next = provider.clampMaxResults(it)
-                        maxResults = next
-                        SearchStore.saveMaxResults(context, next, provider)
-                    },
-                )
-            }
             ListRowButton(
                 label = tr("工具"),
                 labelFontWeight = FontWeight.Normal,
@@ -770,7 +677,7 @@ private fun SettingsSwitchRow(
 }
 
 @Composable
-private fun SettingsSectionCard(
+internal fun SettingsSectionCard(
     content: @Composable () -> Unit,
 ) {
     Column(

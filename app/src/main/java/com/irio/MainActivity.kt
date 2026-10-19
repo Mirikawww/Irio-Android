@@ -1347,6 +1347,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         val requestSearchProvider = SearchStore.loadProvider(context)
         val requestSearchKey = SearchStore.loadApiKey(context, requestSearchProvider)
         val requestSearchMaxResults = SearchStore.loadMaxResults(context, requestSearchProvider)
+        val requestImageSearchKey = SearchStore.loadImageApiKey(context)
+        val requestImageSearchMaxResults = SearchStore.loadImageMaxResults(context)
         val requestMaxToolRounds = ToolStore.loadMaxRounds(context)
         val requestSystemPrompt = chatSystemPrompt(context)
         // 双重门槛，任一不满足都不注入 generate_image 工具：
@@ -1354,7 +1356,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         // ② 设置里存的生图模型必须在目录判定为真生图模型（过滤规则上线前的旧值——
         //    如曾被选成聊天模型——拿去打 /images/generations 一样报能力错，直接视为未配置）。
         val requestImageGenModel = configuredImageGenModel(context, requestModel)
-        val requestRegistry = chatToolRegistry(context, requestWebSearch, requestImageGenModel)
+        val requestRegistry = chatToolRegistry(
+            context, requestWebSearch, requestImageGenModel, imageSearch = requestImageSearchKey.isNotBlank(),
+        )
         val requestCancellation = ChatRequestCancellation()
         // 优先用当前内存态的 provider（省一次全量 Keystore 解密解析）；
         // 被选中 provider 被删掉时回落磁盘。
@@ -1455,6 +1459,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         searchProvider = requestSearchProvider,
                         searchApiKey = requestSearchKey,
                         searchMaxResults = requestSearchMaxResults,
+                        imageSearchApiKey = requestImageSearchKey,
+                        imageSearchMaxResults = requestImageSearchMaxResults,
                         maxToolRounds = requestMaxToolRounds,
                         systemPrompt = requestSystemPrompt,
                         imageGenModel = requestImageGenModel,
@@ -1495,8 +1501,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                     }
                                 }
                                 if (!cancelled && update.subagentJson.isNotEmpty()) process.onSubagent(update.subagentJson)
-                            process.refreshSubagents(SubagentHub.jsonById())
-                            if (!cancelled && update.coloredBubbles.isNotEmpty()) process.onColoredBubbles(update.coloredBubbles)
+                                process.refreshSubagents(SubagentHub.jsonById())
+                                if (!cancelled && update.coloredBubbles.isNotEmpty()) process.onColoredBubbles(update.coloredBubbles)
+                                if (!cancelled && update.displayedImages.isNotEmpty()) process.onDisplayedImages(update.displayedImages)
                                 if (update.attachments.isNotEmpty()) {
                                     streamedAttachments = (streamedAttachments + update.attachments)
                                         .distinctBy { it.filePath }
@@ -1527,7 +1534,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 done = update.done,
                                 searchingChanged = update.searching != null,
                                 searchPagesDelta = update.searchPagesDelta,
-                                toolChanged = update.toolActive != null || update.toolRecord != null || update.coloredBubbles.isNotEmpty() || update.subagentJson.isNotEmpty(),
+                                toolChanged = update.toolActive != null || update.toolRecord != null || update.coloredBubbles.isNotEmpty() || update.subagentJson.isNotEmpty() || update.displayedImages.isNotEmpty(),
                                 toolOutputChanged = update.toolOutput != null,
                                 toolCallDeltaLength = update.toolCallDeltas.sumOf { it.name.length + it.argumentsDelta.length },
                                 publishedBodyLength = publishedBodyLength,
@@ -3477,7 +3484,7 @@ internal fun MessageRow(
                     }
                     if ((chatMessage.isPending || chatMessage.isStreaming) &&
                         chatMessage.text.isBlank() &&
-                        chatMessage.process.none { it.live || it.kind == ProcessEventKind.BUBBLE }
+                        chatMessage.process.none { it.live || it.kind == ProcessEventKind.BUBBLE || it.toolName == CommonsImageTools.SHOW }
                     ) {
                         StatusSweepText(tr("请求中"))
                     }
@@ -3599,6 +3606,10 @@ internal fun ProcessEventRow(
     onOpen: (ProcessEvent) -> Unit,
     onQuote: (String) -> Unit = {},
 ) {
+    if (event.toolName == CommonsImageTools.SHOW) {
+        CommonsImageBlock(event.content)
+        return
+    }
     if (event.kind == ProcessEventKind.SUBAGENT) {
         SubagentCapsuleRow(listOf(event), Modifier.padding(vertical = 0.dp))
         return
@@ -4834,7 +4845,7 @@ private fun AssistantActions(
 }
 
 @Composable
-private fun PhotoViewer(
+internal fun PhotoViewer(
     attachment: ChatAttachment,
     onDismiss: () -> Unit,
 ) {

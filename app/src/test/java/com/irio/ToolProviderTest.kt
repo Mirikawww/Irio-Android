@@ -76,13 +76,18 @@ class ToolProviderTest {
     fun defaultRegistryExposesStableBuiltInsAndRuntimeGatesExecution() = runBlocking {
         val registry = ToolRegistry.default()
         val names = registry.definitions(ProviderProtocol.RESPONSES).map { it.optString("name") }
-        assertEquals(listOf("web_search", "web_fetch", "generate_image", "get_time", "react_to_message", "send_colored_bubbles", "query_history"), names)
+        assertEquals(listOf("web_search", "web_fetch", "image_search", "show_images", "view_images", "generate_image", "get_time", "react_to_message", "send_colored_bubbles", "query_history"), names)
 
         val disabledSearch = registry.execute(
             ChatToolCall("search", WebSearchTool.NAME, "{\"query\":\"kotlin\"}"),
             ToolExecutionContext(provider = provider, model = "model"),
         )
         assertTrue(disabledSearch.text.contains("当前不可用"))
+        val disabledImages = registry.execute(
+            ChatToolCall("images", CommonsImageTools.SEARCH, "{\"query\":\"panda\"}"),
+            ToolExecutionContext(provider = provider, model = "model"),
+        )
+        assertTrue(disabledImages.text.contains("当前不可用"))
 
         val imageEvents = mutableListOf<ChatStreamUpdate>()
         val disabledImage = registry.execute(

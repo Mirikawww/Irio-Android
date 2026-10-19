@@ -42,7 +42,12 @@ object SearchStore {
     private const val EXA_ENCRYPTED_KEY = "exa_encrypted_key"
     private const val TAVILY_MAX_RESULTS = "max_results"
     private const val EXA_MAX_RESULTS = "exa_max_results"
+    private const val SERPAPI_ENCRYPTED_KEY = "serpapi_encrypted_key"
+    private const val IMAGE_MAX_RESULTS = "image_max_results"
     private const val KEY_ALIAS = "irio_tavily_key"
+    const val IMAGE_RESULTS_MIN = 1
+    const val IMAGE_RESULTS_MAX = 10
+    const val IMAGE_RESULTS_DEFAULT = 5
 
     private val listeners = mutableListOf<() -> Unit>()
 
@@ -97,6 +102,29 @@ object SearchStore {
 
     fun hasApiKey(context: Context): Boolean = loadApiKey(context).isNotBlank()
 
+    fun loadImageApiKey(context: Context): String {
+        val encrypted = preferences(context).getString(SERPAPI_ENCRYPTED_KEY, null) ?: return ""
+        return decrypt(encrypted).orEmpty()
+    }
+
+    fun saveImageApiKey(context: Context, apiKey: String) {
+        val trimmed = apiKey.trim()
+        val editor = preferences(context).edit()
+        if (trimmed.isBlank()) editor.remove(SERPAPI_ENCRYPTED_KEY) else editor.putString(SERPAPI_ENCRYPTED_KEY, encrypt(trimmed))
+        editor.apply()
+        notifyChanged()
+    }
+
+    fun hasImageApiKey(context: Context): Boolean = loadImageApiKey(context).isNotBlank()
+
+    fun loadImageMaxResults(context: Context): Int =
+        preferences(context).getInt(IMAGE_MAX_RESULTS, IMAGE_RESULTS_DEFAULT).coerceIn(IMAGE_RESULTS_MIN, IMAGE_RESULTS_MAX)
+
+    fun saveImageMaxResults(context: Context, value: Int) {
+        preferences(context).edit().putInt(IMAGE_MAX_RESULTS, value.coerceIn(IMAGE_RESULTS_MIN, IMAGE_RESULTS_MAX)).apply()
+        notifyChanged()
+    }
+
     fun loadWebSearchEnabled(context: Context): Boolean =
         preferences(context).getBoolean(WEB_SEARCH, false)
 
@@ -134,6 +162,8 @@ object SearchStore {
             put("${provider.id}MaxResults", loadMaxResults(context, provider))
         }
         put("webSearchEnabled", loadWebSearchEnabled(context))
+        put("serpapiApiKey", loadImageApiKey(context))
+        put("imageMaxResults", loadImageMaxResults(context))
     }
 
     /** 应用对端搜索设置：覆盖=全量镜像；共存=本机没有可用密钥时才补密钥（提供商跟着密钥走）。 */
@@ -154,6 +184,8 @@ object SearchStore {
                 )
             }
             if (json.has("webSearchEnabled")) saveWebSearchEnabled(context, json.optBoolean("webSearchEnabled"))
+            if (json.has("serpapiApiKey")) saveImageApiKey(context, json.optString("serpapiApiKey"))
+            if (json.has("imageMaxResults")) saveImageMaxResults(context, json.optInt("imageMaxResults", IMAGE_RESULTS_DEFAULT))
         } else if (SearchProvider.entries.none { loadApiKey(context, it).isNotBlank() }) {
             val preferred = json.optString("provider").takeIf { it.isNotBlank() }
                 ?.let { SearchProvider.fromId(it) }
@@ -163,6 +195,9 @@ object SearchStore {
                 saveProvider(context, preferred)
                 saveApiKey(context, remoteKeys[preferred].orEmpty(), preferred)
             }
+        }
+        if (!overwrite && loadImageApiKey(context).isBlank() && json.optString("serpapiApiKey").isNotBlank()) {
+            saveImageApiKey(context, json.optString("serpapiApiKey"))
         }
     }
 

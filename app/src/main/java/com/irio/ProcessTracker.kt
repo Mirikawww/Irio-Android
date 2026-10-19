@@ -131,6 +131,15 @@ internal class ProcessTracker {
 
     private fun eventAnchor(): Int = if (outputStarted) outputLength else 0
 
+    /** Visible image output is anchored like a bubble, never a tool-status lifecycle. */
+    fun onDisplayedImages(content: String) {
+        if (content.isBlank()) return
+        finishThinking()
+        finishLiveTool()
+        events += ProcessEvent(id = nextId++, kind = ProcessEventKind.TOOL,
+            toolName = CommonsImageTools.SHOW, content = content, belowText = outputStarted, textOffset = eventAnchor())
+    }
+
     fun onToolFinished(content: String = "") {
         finishLiveTool(content)
     }

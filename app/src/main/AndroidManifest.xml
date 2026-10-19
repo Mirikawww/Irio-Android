@@ -72,6 +72,13 @@
             android:theme="@style/AppTheme"
             android:windowSoftInputMode="adjustResize" />
         <activity
+            android:name=".SearchSettingsActivity"
+            android:exported="false"
+            android:label="搜索"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name=".ModelSettingsActivity"
             android:exported="false"
             android:label="模型"

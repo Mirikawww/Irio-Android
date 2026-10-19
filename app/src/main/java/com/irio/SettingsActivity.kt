@@ -18,6 +18,7 @@ import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.Terminal
@@ -85,6 +86,14 @@ private fun SettingsScreen(onBack: () -> Unit) {
                     icon = Icons.Rounded.SmartToy,
                     onClick = {
                         context.startActivity(Intent(context, ModelSettingsActivity::class.java))
+                    },
+                )
+                Spacer(Modifier.height(12.dp))
+                ListRowButton(
+                    label = tr("搜索"),
+                    icon = Icons.Rounded.Search,
+                    onClick = {
+                        context.startActivity(Intent(context, SearchSettingsActivity::class.java))
                     },
                 )
                 Spacer(Modifier.height(12.dp))

@@ -8,6 +8,7 @@ class ToolCatalogTest {
     private val available = ToolFeatureState(
         searchEnabled = true,
         searchConfigured = true,
+        imageSearchConfigured = true,
         imageConfigured = true,
         memoryEnabled = true,
         subagentsEnabled = true,
@@ -33,6 +34,9 @@ class ToolCatalogTest {
         fun blocked(name: String, state: ToolFeatureState) = ToolCatalog.entries(state).single { it.name == name }.blockedReason
         assertEquals(ToolBlockedReason.WEB_SEARCH, blocked(WebSearchTool.NAME, ToolFeatureState()))
         assertEquals(ToolBlockedReason.SEARCH_KEY, blocked(WebFetchTool.NAME, available.copy(searchConfigured = false)))
+        assertEquals(ToolBlockedReason.WEB_SEARCH, blocked(CommonsImageTools.SEARCH, ToolFeatureState()))
+        assertEquals(ToolBlockedReason.WEB_SEARCH, blocked(CommonsImageTools.VIEW, available.copy(searchEnabled = false)))
+        assertEquals(ToolBlockedReason.IMAGE_SEARCH_KEY, blocked(CommonsImageTools.SHOW, available.copy(imageSearchConfigured = false)))
         assertEquals(ToolBlockedReason.IMAGE_MODEL, blocked(ImageGenTool.NAME, ToolFeatureState()))
         assertEquals(ToolBlockedReason.MEMORY, blocked(MemoryTool.UPDATE, ToolFeatureState()))
         for (name in SubagentTools.NAMES) assertEquals(ToolBlockedReason.SUBAGENTS, blocked(name, ToolFeatureState()))

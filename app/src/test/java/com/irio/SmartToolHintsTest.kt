@@ -177,12 +177,16 @@ class SmartToolHintsTest {
             .register(GitHubMcpToolProvider(listOf(McpTool("echo", "Echo", JSONObject("""{"type":"object","properties":{}}""")))) { _, _ -> "fixture" })
         val registry = ToolRegistry(original.providers(), smartToolHints = true)
         ProviderProtocol.entries.forEach { protocol ->
-            registry.schemas(protocol).forEach { schema ->
+            registry.schemas(protocol).forEach schemaLoop@{ schema ->
                 val definition = schema.optJSONObject("function") ?: schema
                 val parameters = definition.optJSONObject("input_schema")
                     ?: definition.optJSONObject("parametersJsonSchema")
                     ?: definition.getJSONObject("parameters")
                 val hint = parameters.optJSONObject("properties")?.optJSONObject("_display_text")
+                if (definition.optString("name") == CommonsImageTools.SHOW) {
+                    assertNull("Silent image output must not advertise a tool status hint", hint)
+                    return@schemaLoop
+                }
                 assertNotNull("Missing UI hint for $protocol: $schema", hint)
                 assertEquals("string", hint!!.getString("type"))
                 assertTrue(hint.getString("description").contains("10"))

@@ -64,6 +64,10 @@ class ToolPreferencesChatTest {
                     assertFalse(prompt.contains("github_mcp_hidden"))
                     assertTrue(prompt.contains("github_mcp_visible"))
                     assertFalse("Feature availability gates must remain intact", tools.contains("\"${WebSearchTool.NAME}\""))
+                    assertFalse(tools.contains("\"${CommonsImageTools.SEARCH}\""))
+                    assertFalse(tools.contains("\"${CommonsImageTools.SHOW}\""))
+                    assertFalse(tools.contains("\"${CommonsImageTools.VIEW}\""))
+                    assertFalse(prompt.contains("image_search"))
                     assertFalse(tools.contains("\"${ImageGenTool.NAME}\""))
                 }
             }

@@ -62,7 +62,7 @@ internal fun ChatMessage.toolContextText(): String {
                 append(event.searchQuery)
                 append('\n')
             }
-            append(event.content)
+            append(if (event.toolName == CommonsImageTools.SHOW) CommonsImageTools.publicResult(event.content) else event.content)
         }
     }
 }

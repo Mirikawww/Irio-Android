@@ -21,6 +21,8 @@ data class ToolExecutionContext(
     val searchProvider: SearchProvider = SearchProvider.TAVILY,
     val searchApiKey: String = "",
     val searchMaxResults: Int = searchProvider.maxResultsDefault,
+    val imageSearchApiKey: String = "",
+    val imageSearchMaxResults: Int = SearchStore.IMAGE_RESULTS_DEFAULT,
     val imageGenModel: String = "",
     val cancellation: ChatRequestCancellation = ChatRequestCancellation(),
     val onUpdate: suspend (ChatStreamUpdate) -> Unit = {},
@@ -39,6 +41,8 @@ data class ToolExecutionResult(
     val searchPages: Int = 0,
     /** 本轮工具执行完就结束请求，不再开下一轮模型思考。 */
     val endTurn: Boolean = false,
+    /** Explicit visual inspection only; display-only images must never populate this. */
+    val modelAttachments: List<ChatAttachment> = emptyList(),
 )
 
 /**
@@ -124,7 +128,7 @@ class ToolRegistry(
             preferences.descriptions[name]?.let { description ->
                 (copy.optJSONObject("function") ?: copy).put("description", description)
             }
-            if (smartToolHints && name !in SubagentTools.QUIET) SmartToolHints.decorate(copy) else copy
+            if (smartToolHints && name !in SubagentTools.QUIET && name != CommonsImageTools.SHOW) SmartToolHints.decorate(copy) else copy
         }
     }
 
@@ -174,6 +178,7 @@ class ToolRegistry(
             listOf(
                 WebSearchToolProvider(),
                 WebFetchToolProvider(),
+                CommonsImageToolProvider(),
                 ImageGenToolProvider(),
                 TimeToolProvider(),
                 ReactionToolProvider(),
