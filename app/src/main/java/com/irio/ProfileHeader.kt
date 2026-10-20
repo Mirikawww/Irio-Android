@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -85,7 +86,11 @@ import kotlinx.coroutines.withContext
 private val ProfileAvatarSize = 72.dp
 
 @Composable
-internal fun SettingsProfileHeader(onPickAvatar: () -> Unit, onEditName: () -> Unit) {
+internal fun SettingsProfileHeader(
+    onPickAvatar: () -> Unit,
+    onEditName: () -> Unit,
+    searchField: @Composable () -> Unit,
+) {
     val context = LocalContext.current
     val name = ProfileStore.name
     val shown = if (name == PROFILE_DEFAULT_NAME) tr(name) else name
@@ -120,22 +125,23 @@ internal fun SettingsProfileHeader(onPickAvatar: () -> Unit, onEditName: () -> U
             }
         }
         Spacer(Modifier.width(14.dp))
-        Text(
-            shown,
-            modifier = Modifier
-                .weight(1f)
-                .clickable(
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                shown,
+                modifier = Modifier.clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = onEditName,
                 ),
-            color = Theme[colors][onBackgroundColor],
-            fontSize = 20.sp,
-            lineHeight = 24.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+                color = Theme[colors][onBackgroundColor],
+                fontSize = 20.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            searchField()
+        }
     }
     IrioAlertDialog(
         visible = confirmDelete,

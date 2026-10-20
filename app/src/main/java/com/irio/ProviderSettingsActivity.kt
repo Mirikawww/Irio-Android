@@ -176,6 +176,7 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
                 )
             }
             ListRowButton(
+                searchId = "provider.add",
                 label = tr("添加提供商"),
                 icon = Icons.Rounded.Add,
                 onClick = {

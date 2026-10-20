@@ -4,11 +4,19 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,6 +55,7 @@ import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.Icon
 import com.composables.ui.components.IconButton
 import com.composables.ui.components.Text
+import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
 import com.composeunstyled.theme.Theme
@@ -68,6 +77,17 @@ internal fun SettingsScreen(onBack: () -> Unit) {
     val softwareInfo = remember { androidSoftwareInfo(context) }
     var editingName by remember { mutableStateOf(false) }
     var cropSource by remember { mutableStateOf<Bitmap?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchExpanded by remember { mutableStateOf(false) }
+    var searchAnchor by remember { mutableStateOf(Rect.Zero) }
+    val searchFocus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val background = Theme[colors][backgroundColor]
+    val searchProgress by animateFloatAsState(
+        targetValue = if (searchExpanded) 1f else 0f,
+        animationSpec = tween(280),
+        label = "settingsSearchFade",
+    )
     val pickAvatar = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
@@ -76,7 +96,13 @@ internal fun SettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    BackHandler(enabled = searchExpanded) {
+        focusManager.clearFocus()
+        searchQuery = ""
+        searchExpanded = false
+    }
+    Box(Modifier.fillMaxSize().background(background)) {
+    Box(Modifier.graphicsLayer { alpha = 1f - searchProgress }) {
     SettingsHazeScaffold(
         title = tr("设置"),
         onBack = onBack,
@@ -100,6 +126,16 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                         )
                     },
                     onEditName = { editingName = true },
+                    searchField = {
+                        SettingsSearchSlot(
+                            showField = !searchExpanded && searchProgress <= 0f,
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            onExpanded = { searchExpanded = true },
+                            focusRequester = searchFocus,
+                            onBounds = { searchAnchor = it },
+                        )
+                    },
                 )
                 Spacer(Modifier.height(20.dp))
                 ListRowButton(
@@ -191,6 +227,24 @@ internal fun SettingsScreen(onBack: () -> Unit) {
             )
         }
     }
+    }
+    SettingsSearchOverlay(
+        query = searchQuery,
+        onQueryChange = { searchQuery = it },
+        expanded = searchExpanded,
+        anchor = searchAnchor,
+        onExpanded = { searchExpanded = true },
+        onDismiss = {
+            focusManager.clearFocus()
+            searchQuery = ""
+            searchExpanded = false
+        },
+        onResult = { hit ->
+            focusManager.clearFocus()
+            context.openSettingsSearch(hit)
+        },
+        focusRequester = searchFocus,
+    )
     ProfileNameDialog(visible = editingName, onDismiss = { editingName = false })
     cropSource?.let { source ->
         AvatarCropScreen(source = source, onDismiss = { cropSource = null })

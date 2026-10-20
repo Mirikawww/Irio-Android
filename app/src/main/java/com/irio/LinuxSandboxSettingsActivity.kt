@@ -197,6 +197,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .settingsRow()
                     .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                    .settingsSearchAnchor("linux.enabled", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -225,13 +226,13 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                 )
             }
             if (enabled && !allFiles) {
-                ListRowButton(label = tr("授予权限"), onClick = {
+                ListRowButton(searchId = "linux.permission", label = tr("授予权限"), onClick = {
                     awaitingPermission = true
                     openPermissionSettings()
                 })
             }
             if (offerRebuild) {
-                ListRowButton(label = tr("用安装包里的版本重新准备"), onClick = { confirmRebuild = true })
+                ListRowButton(searchId = "linux.rebuild", label = tr("用安装包里的版本重新准备"), onClick = { confirmRebuild = true })
             }
             Column(
                 modifier = Modifier
@@ -240,6 +241,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                     .padding(horizontal = 16.dp, vertical = SettingsCardInset),
             ) {
                 SettingsSlider(
+                    modifier = Modifier.settingsSearchAnchor("linux.commands", edge = SettingsSearchEdge.All),
                     label = tr("单次命令数"),
                     value = commandsPerCall,
                     valueRange = LinuxSandboxStore.COMMANDS_UNLIMITED..LinuxSandboxStore.COMMANDS_MAX,
@@ -257,6 +259,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .settingsRow()
                     .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                    .settingsSearchAnchor("linux.background", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -273,7 +276,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
             Button(
                 onClick = { confirmDelete = true },
                 enabled = LinuxSandboxPolicy.canDelete(installed, preparing = showPrepare, deleting = deleting),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.settingsSearchAnchor("linux.delete", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp).fillMaxWidth(),
                 style = ButtonStyle.Destructive,
             ) { Text(tr("删除 Linux 沙盒")) }
         }

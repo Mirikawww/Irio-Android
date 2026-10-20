@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -155,6 +156,7 @@ internal fun SpeechSettingsScreen(onBack: () -> Unit) {
                 .padding(top = topInset)
                 .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
+            Box(Modifier.settingsSearchAnchor("speech.voice")) {
             VoiceMenu(
                 expanded = menuOpen && canPick,
                 onExpandedChange = { if (canPick) menuOpen = it },
@@ -168,9 +170,11 @@ internal fun SpeechSettingsScreen(onBack: () -> Unit) {
                     menuOpen = false
                 },
             )
+            }
             Spacer(Modifier.height(12.dp))
             SttSettingsSectionCard {
                 SettingsSlider(
+                    modifier = Modifier.settingsSearchAnchor("speech.rate", edge = SettingsSearchEdge.All),
                     label = tr("朗读速度"),
                     value = (speechRate * 10).roundToInt(),
                     valueRange = (SpeechStore.MIN_SPEECH_RATE * 10).toInt()..(SpeechStore.MAX_SPEECH_RATE * 10).toInt(),
@@ -183,12 +187,14 @@ internal fun SpeechSettingsScreen(onBack: () -> Unit) {
             }
             Spacer(Modifier.height(16.dp))
             SttSettingsSectionCard {
+                Box(Modifier.settingsSearchAnchor("speech.provider", edge = SettingsSearchEdge.Top)) {
                 SttProviderMenu(
                     provider = providerKind,
                     expanded = providerMenuOpen,
                     onExpandedChange = { providerMenuOpen = it },
                     onSelect = ::switchProvider,
                 )
+                }
                 Column(Modifier.padding(vertical = 8.dp)) {
                     ProviderField(
                         label = tr("%s API 密钥").format(providerKind.label),
@@ -198,6 +204,14 @@ internal fun SpeechSettingsScreen(onBack: () -> Unit) {
                         trailingSpace = false,
                     )
                 }
+                Box(Modifier.settingsSearchAnchor(
+                    "speech.model",
+                    edge = if (providerKind == SttProviderKind.GLADIA && providerModel == "solaria-3") {
+                        SettingsSearchEdge.Flat
+                    } else {
+                        SettingsSearchEdge.Bottom
+                    },
+                )) {
                 SttModelMenu(
                     provider = providerKind,
                     model = providerModel,
@@ -208,7 +222,9 @@ internal fun SpeechSettingsScreen(onBack: () -> Unit) {
                         persistSttProvider()
                     },
                 )
+                }
                 if (providerKind == SttProviderKind.GLADIA && providerModel == "solaria-3") {
+                    Box(Modifier.settingsSearchAnchor("speech.language", edge = SettingsSearchEdge.Bottom)) {
                     SttLanguageMenu(
                         language = providerLanguage,
                         expanded = providerLanguageMenuOpen,
@@ -218,6 +234,7 @@ internal fun SpeechSettingsScreen(onBack: () -> Unit) {
                             persistSttProvider()
                         },
                     )
+                    }
                 }
             }
         }

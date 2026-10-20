@@ -125,8 +125,9 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
     var themeMenuOpen by remember { mutableStateOf(false) }
     var accentMenuOpen by remember { mutableStateOf(false) }
     var languageMenuOpen by remember { mutableStateOf(false) }
-    var glassExpanded by remember { mutableStateOf(false) }
-    var longTextPasteExpanded by remember { mutableStateOf(false) }
+    val searchTarget = context.settingsSearchTarget()
+    var glassExpanded by remember { mutableStateOf(searchTarget.startsWith("appearance.glass.")) }
+    var longTextPasteExpanded by remember { mutableStateOf(searchTarget == "appearance.paste.threshold") }
 
     SettingsHazeScaffold(
         title = tr("外观与偏好"),
@@ -152,7 +153,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 DropdownMenu(
                     expanded = languageMenuOpen,
                     onExpandedChange = { languageMenuOpen = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().settingsSearchAnchor("appearance.language", edge = SettingsSearchEdge.Top),
                     alignment = DropdownMenuAlignment.End,
                     panel = {
                         DropdownMenuPanel {
@@ -218,7 +219,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 DropdownMenu(
                     expanded = themeMenuOpen,
                     onExpandedChange = { themeMenuOpen = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().settingsSearchAnchor("appearance.theme"),
                     alignment = DropdownMenuAlignment.End,
                     panel = {
                         DropdownMenuPanel {
@@ -282,7 +283,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 DropdownMenu(
                     expanded = accentMenuOpen,
                     onExpandedChange = { accentMenuOpen = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().settingsSearchAnchor("appearance.accent"),
                     alignment = DropdownMenuAlignment.End,
                     panel = {
                         DropdownMenuPanel {
@@ -363,7 +364,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     }
                 }
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.amoled").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -378,6 +379,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 }
                 Row(
                     modifier = Modifier
+                        .settingsSearchAnchor("appearance.background", edge = SettingsSearchEdge.Bottom)
                         .fillMaxWidth()
                         .alpha(if (ChatBackgroundEnabled) 1f else Theme[alphas][disabledAlpha]),
                     verticalAlignment = Alignment.CenterVertically,
@@ -429,6 +431,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 val glassInteraction = remember { MutableInteractionSource() }
                 Row(
                     modifier = Modifier
+                        .settingsSearchAnchor("appearance.glass", edge = SettingsSearchEdge.Top)
                         .fillMaxWidth()
                         .clickable(
                             interactionSource = glassInteraction,
@@ -478,7 +481,18 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                             onCheckedChange = { enabled ->
                                 ThemeStore.saveGlassSurface(context, surface, enabled)
                             },
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            modifier = Modifier
+                                .settingsSearchAnchor(
+                                    when (surface) {
+                                        GlassSurface.USER_BUBBLE -> "appearance.glass.bubble"
+                                        GlassSurface.SIDEBAR_BUTTON -> "appearance.glass.sidebar"
+                                        GlassSurface.CONTEXT_RING -> "appearance.glass.ring"
+                                        GlassSurface.MODEL_SWITCHER -> "appearance.glass.switcher"
+                                        GlassSurface.COMPOSER -> "appearance.glass.composer"
+                                    },
+                                )
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
                             accessibilityLabel = label,
                         ) {
                             Text(label, color = Theme[colors][onPanelColor])
@@ -494,6 +508,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 val pasteInteraction = remember { MutableInteractionSource() }
                 Row(
                     modifier = Modifier
+                        .settingsSearchAnchor("appearance.paste")
                         .fillMaxWidth()
                         .clickable(
                             interactionSource = pasteInteraction,
@@ -537,6 +552,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     exit = shrinkVertically(animationSpec = irioSpring(), shrinkTowards = Alignment.Top) + fadeOut(animationSpec = irioSpring()),
                 ) {
                     SettingsSlider(
+                        modifier = Modifier.settingsSearchAnchor("appearance.paste.threshold"),
                         label = tr("字符阈值"),
                         value = ThemeStore.longTextPasteThreshold,
                         valueRange = LongTextPaste.MIN_THRESHOLD..LongTextPaste.MAX_THRESHOLD,
@@ -546,7 +562,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.glyph").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ExperimentalLabel(
@@ -562,7 +578,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.diff").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
@@ -579,7 +595,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.pickerLeft").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -595,7 +611,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.scroll").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ExperimentalLabel(
@@ -611,7 +627,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.composerAnim").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -627,7 +643,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.enter").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -643,7 +659,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.wrap").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -659,7 +675,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.ring").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
@@ -676,7 +692,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.thinking").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -692,7 +708,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.mergeTools").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -716,6 +732,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 SettingsSlider(
+                    modifier = Modifier.settingsSearchAnchor("appearance.math"),
                     label = tr("公式大小"),
                     value = texScalePercent,
                     valueRange = 60..160,
@@ -726,7 +743,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     valueLabel = { "$it%" },
                 )
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.mergeModels").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -743,7 +760,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                    modifier = Modifier.settingsSearchAnchor("appearance.names", edge = SettingsSearchEdge.Bottom).fillMaxWidth().padding(vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(

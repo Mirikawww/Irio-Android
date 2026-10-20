@@ -35,6 +35,7 @@ fun SettingsSlider(
     valueLabel: ((Int) -> String)? = null,
     onValueChangeFinished: (() -> Unit)? = null,
     step: Int = 1,
+    modifier: Modifier = Modifier,
 ) {
     require(step > 0)
     val content = Theme[colors][onBackgroundColor]
@@ -45,7 +46,7 @@ fun SettingsSlider(
     val current = value.coerceIn(min, max)
     val interactionSource = remember { MutableInteractionSource() }
     Column(
-        modifier = Modifier.settingsSliderInset(),
+        modifier = modifier.settingsSliderInset(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(

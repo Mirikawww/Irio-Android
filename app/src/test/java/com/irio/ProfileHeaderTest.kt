@@ -103,7 +103,7 @@ class ProfileHeaderTest {
             controller.get().setContentView(host)
             host.setContent {
                 CompositionLocalProvider(LocalDensity provides Density(1f)) {
-                    AppTheme { SettingsProfileHeader(onPickAvatar = {}, onEditName = {}) }
+                    AppTheme { SettingsProfileHeader(onPickAvatar = {}, onEditName = {}, searchField = {}) }
                 }
             }
             repeat(8) { index ->

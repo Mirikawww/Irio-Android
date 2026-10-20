@@ -266,7 +266,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
     SettingsHazeScaffold(title = "MCP", onBack = onBack) { top, bottom ->
         Column(Modifier.fillMaxSize().padding(bottom = bottom).verticalScroll(rememberScrollState())
             .padding(top = top).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(Modifier.fillMaxWidth().background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+            Row(Modifier.fillMaxWidth().background(Theme[colors][secondaryColor], Theme[shapes][largeShape]).settingsSearchAnchor("mcp.github", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
                 .padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 GitHubLogo(48.dp)
                 Column(Modifier.weight(1f)) {
@@ -280,7 +280,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                          details.targetDetent = BottomSheetDetent.FullyExpanded
                      })
             }
-            Row(Modifier.fillMaxWidth().background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+            Row(Modifier.fillMaxWidth().background(Theme[colors][secondaryColor], Theme[shapes][largeShape]).settingsSearchAnchor("mcp.todoist", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
                 .padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TodoistLogo(48.dp)
                 Column(Modifier.weight(1f)) {

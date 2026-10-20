@@ -144,7 +144,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
         ) {
             LinkCard(verticalPadding = 7.dp, spacing = 0.dp) {
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("link.enabled", edge = SettingsSearchEdge.All, verticalOutset = 7.dp).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(tr("启用互连"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
@@ -252,6 +252,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     val interactionSource = remember { MutableInteractionSource() }
                     Row(
                         modifier = Modifier
+                            .settingsSearchAnchor("link.mode", edge = SettingsSearchEdge.Top)
                             .fillMaxWidth()
                             .clickable(
                                 interactionSource = interactionSource,
@@ -283,7 +284,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     }
                 }
                     Row(
-                        modifier = Modifier.settingsSwitchRow(),
+                        modifier = Modifier.settingsSearchAnchor("link.auto").settingsSwitchRow(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(tr("自动同步数据"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])

@@ -147,6 +147,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             ListRowButton(
+                searchId = "model.tools",
                 label = tr("工具"),
                 labelFontWeight = FontWeight.Normal,
                 onClick = { context.startActivity(Intent(context, ToolSettingsActivity::class.java)) },
@@ -162,6 +163,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
             )
             SettingsSectionCard {
                 SettingsSlider(
+                    modifier = Modifier.settingsSearchAnchor("model.rounds", edge = SettingsSearchEdge.Top),
                     label = tr("单轮工具调用"),
                     value = maxRounds,
                     valueRange = ToolStore.MAX_ROUNDS_MIN..ToolStore.MAX_ROUNDS_MAX,
@@ -172,7 +174,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     valueLabel = { if (it == ToolStore.MAX_ROUNDS_MIN) tr("无限") else it.toString() },
                 )
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("model.smart").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -196,6 +198,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 SettingsSwitchRow(
+                    modifier = Modifier.settingsSearchAnchor("model.subagents"),
                     label = tr("子智能体"),
                     checked = subagentsEnabled,
                     onCheckedChange = { enabled ->
@@ -209,6 +212,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                         subagentModel = model
                         ToolStore.saveSubagentModel(context, model)
                     },
+                    modifier = Modifier.settingsSearchAnchor("model.subagentModel"),
                     label = tr("子智能体默认模型"),
                     contentDescription = tr("选择子智能体默认模型"),
                 )
@@ -225,6 +229,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                         titleModel = model
                         ToolStore.saveTitleModel(context, model)
                     },
+                    modifier = Modifier.settingsSearchAnchor("model.title", edge = SettingsSearchEdge.Bottom),
                 )
             }
             SettingsSectionCard {
@@ -234,6 +239,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     },
                 )
                 SettingsSwitchRow(
+                    modifier = Modifier.settingsSearchAnchor("model.timestamps", edge = SettingsSearchEdge.Bottom),
                     label = tr("消息时间戳"),
                     checked = messageTimestamps,
                     onCheckedChange = {
@@ -244,7 +250,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
             }
             SettingsSectionCard {
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("model.compression", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -266,10 +272,12 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                         compressionModel = model
                         ToolStore.saveCompressionModel(context, model)
                     },
+                    modifier = Modifier.settingsSearchAnchor("model.compressionModel"),
                     label = tr("压缩模型"),
                     contentDescription = tr("选择压缩模型"),
                 )
                 SettingsSlider(
+                    modifier = Modifier.settingsSearchAnchor("model.trigger"),
                     label = tr("触发时机"),
                     value = compressionTrigger,
                     valueRange = ToolStore.COMPRESSION_PERCENT_MIN..ToolStore.COMPRESSION_PERCENT_MAX,
@@ -281,6 +289,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     },
                 )
                 SettingsSlider(
+                    modifier = Modifier.settingsSearchAnchor("model.target"),
                     label = tr("压缩目标"),
                     value = compressionTarget,
                     valueRange = ToolStore.COMPRESSION_PERCENT_MIN..ToolStore.COMPRESSION_PERCENT_MAX,
@@ -292,6 +301,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     },
                 )
                 SettingsSwitchRow(
+                    modifier = Modifier.settingsSearchAnchor("model.visualize", edge = SettingsSearchEdge.Bottom),
                     label = tr("可视化上下文"),
                     checked = visualizeContext,
                     onCheckedChange = {
@@ -302,7 +312,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
             }
             SettingsSectionCard {
                 Row(
-                    modifier = Modifier.settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("model.reasoning", edge = SettingsSearchEdge.All).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -337,6 +347,7 @@ private fun SystemPromptRow(onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier
+            .settingsSearchAnchor("model.prompt", edge = SettingsSearchEdge.Top)
             .fillMaxWidth()
             .clickable(
                 interactionSource = interactionSource,
@@ -463,6 +474,7 @@ private fun ImageGenModelPicker(
         val interactionSource = remember { MutableInteractionSource() }
         Row(
             modifier = Modifier
+                .settingsSearchAnchor("model.image")
                 .fillMaxWidth()
                 .clickable(
                     interactionSource = interactionSource,
@@ -508,6 +520,7 @@ private fun TitleModelPicker(
     onSelect: (String) -> Unit,
     label: String = tr("标题生成模型"),
     contentDescription: String = tr("选择标题生成模型"),
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
@@ -534,7 +547,7 @@ private fun TitleModelPicker(
     DropdownMenu(
         expanded = menuOpen,
         onExpandedChange = { menuOpen = it },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         alignment = DropdownMenuAlignment.End,
         // 与主页模型选择器同款式：固定 200dp 宽面板 + 提供商分组小字标签 + 选中 Check。
         // 面板会对内容做 width(IntrinsicSize.Max) 固有测量，LazyColumn 不支持固有测量会直接崩溃，
@@ -658,9 +671,10 @@ private fun SettingsSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     enabled: Boolean = true,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier.settingsSwitchRow(),
+        modifier = modifier.settingsSwitchRow(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

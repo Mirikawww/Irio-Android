@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -64,6 +65,7 @@ fun ListRowButton(
     iconPainter: Painter? = null,
     labelFontWeight: FontWeight? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
+    searchId: String? = null,
 ) {
     val contentColor = if (style == ButtonStyle.Ghost) {
         Theme[colors][onBackgroundColor]
@@ -101,6 +103,20 @@ fun ListRowButton(
         if (trailing != null) {
             Spacer(Modifier.width(8.dp))
             trailing()
+        }
+    }
+    val buttonContent: @Composable RowScope.() -> Unit = {
+        Box(Modifier.fillMaxWidth()) {
+            if (searchId != null) {
+                Box(
+                    Modifier.matchParentSize().settingsSearchAnchor(
+                        searchId,
+                        edge = SettingsSearchEdge.All,
+                        verticalOutset = 0.dp,
+                    ),
+                )
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, content = content)
         }
     }
     var longPressConsumed by remember { mutableStateOf(false) }
@@ -145,7 +161,7 @@ fun ListRowButton(
             buttonSize = ButtonSize.Large,
             contentColor = contentColor,
             contentPadding = contentPadding,
-            content = content,
+            content = if (searchId == null) content else buttonContent,
         )
     } else {
         Button(
@@ -156,7 +172,7 @@ fun ListRowButton(
             shape = shape,
             buttonSize = ButtonSize.Large,
             contentColor = contentColor,
-            content = content,
+            content = if (searchId == null) content else buttonContent,
         )
     }
 }

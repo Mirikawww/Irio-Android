@@ -109,7 +109,7 @@ internal fun SearchSettingsScreen(onBack: () -> Unit) {
                 DropdownMenu(
                     expanded = providerMenuOpen,
                     onExpandedChange = { providerMenuOpen = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().settingsSearchAnchor("search.provider", edge = SettingsSearchEdge.Top),
                     alignment = DropdownMenuAlignment.End,
                     panel = {
                         DropdownMenuPanel {
@@ -161,6 +161,7 @@ internal fun SearchSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 SettingsSlider(
+                    modifier = Modifier.settingsSearchAnchor("search.limit", edge = SettingsSearchEdge.Bottom),
                     label = tr("单次搜索上限"),
                     value = maxResults,
                     valueRange = provider.maxResultsMin..provider.maxResultsMax,
@@ -172,7 +173,7 @@ internal fun SearchSettingsScreen(onBack: () -> Unit) {
                 )
             }
             SettingsSectionCard {
-                Column(Modifier.fillMaxWidth().settingsDropdownInset()) {
+                Column(Modifier.settingsSearchAnchor("search.image", edge = SettingsSearchEdge.Top).fillMaxWidth().settingsDropdownInset()) {
                     Text(tr("图片搜索提供商"), color = Theme[colors][onPanelColor])
                     Text("SerpAPI", color = Theme[colors][mutedColor], fontSize = 13.sp)
                 }
@@ -186,6 +187,7 @@ internal fun SearchSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 SettingsSlider(
+                    modifier = Modifier.settingsSearchAnchor("search.imageLimit", edge = SettingsSearchEdge.Bottom),
                     label = tr("单次搜索上限"),
                     value = imageMaxResults,
                     valueRange = SearchStore.IMAGE_RESULTS_MIN..SearchStore.IMAGE_RESULTS_MAX,

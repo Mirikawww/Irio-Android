@@ -127,12 +127,14 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                 .padding(16.dp),
         ) {
             ListRowButton(
+                searchId = "other.history",
                 label = tr("删除所有历史"),
                 icon = Icons.Rounded.DeleteSweep,
                 onClick = { showClearHistoryDialog = true },
             )
             Spacer(Modifier.height(12.dp))
             ListRowButton(
+                searchId = "other.export",
                 label = tr("导出数据"),
                 icon = Icons.Rounded.Upload,
                 experimental = true,
@@ -140,6 +142,7 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
             )
             Spacer(Modifier.height(12.dp))
             ListRowButton(
+                searchId = "other.import",
                 label = tr("导入数据"),
                 icon = Icons.Rounded.Download,
                 experimental = true,

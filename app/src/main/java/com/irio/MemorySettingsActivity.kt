@@ -108,6 +108,7 @@ private fun MemorySettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .settingsRow()
                     .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                    .settingsSearchAnchor("memory.enabled", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
