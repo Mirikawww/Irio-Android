@@ -34,7 +34,9 @@ fun SettingsSlider(
     onValueChange: (Int) -> Unit,
     valueLabel: ((Int) -> String)? = null,
     onValueChangeFinished: (() -> Unit)? = null,
+    step: Int = 1,
 ) {
+    require(step > 0)
     val content = Theme[colors][onBackgroundColor]
     val accentFill = Theme[colors][primaryColor]
     val muted = Theme[colors][mutedColor]
@@ -55,10 +57,12 @@ fun SettingsSlider(
         }
         UnstyledSlider(
             value = current.toFloat(),
-            onValueChange = { onValueChange(it.roundToInt().coerceIn(min, max)) },
+            onValueChange = {
+                onValueChange((min + ((it - min) / step).roundToInt() * step).coerceIn(min, max))
+            },
             onValueChangeFinished = onValueChangeFinished,
             valueRange = min.toFloat()..max.toFloat(),
-            steps = (max - min - 1).coerceAtLeast(0),
+            steps = ((max - min) / step - 1).coerceAtLeast(0),
             interactionSource = interactionSource,
             modifier = Modifier.fillMaxWidth(),
             track = { state ->

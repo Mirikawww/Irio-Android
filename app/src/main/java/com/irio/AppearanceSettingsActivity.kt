@@ -44,6 +44,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.ui.components.Button
@@ -124,6 +126,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
     var accentMenuOpen by remember { mutableStateOf(false) }
     var languageMenuOpen by remember { mutableStateOf(false) }
     var glassExpanded by remember { mutableStateOf(false) }
+    var longTextPasteExpanded by remember { mutableStateOf(false) }
 
     SettingsHazeScaffold(
         title = tr("外观与偏好"),
@@ -482,6 +485,65 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         }
                     }
                     }
+                }
+                val pasteArrow by animateFloatAsState(
+                    targetValue = if (longTextPasteExpanded) 180f else 0f,
+                    animationSpec = irioSpring(),
+                    label = "long text paste expansion arrow",
+                )
+                val pasteInteraction = remember { MutableInteractionSource() }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = pasteInteraction,
+                            indication = null,
+                            onClick = { longTextPasteExpanded = !longTextPasteExpanded },
+                        )
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("粘贴长文本为文件"),
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][onPanelColor],
+                    )
+                    Switch(
+                        checked = ThemeStore.longTextPaste,
+                        onCheckedChange = { ThemeStore.saveLongTextPaste(context, it) },
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp)
+                            .semantics { contentDescription = tr("粘贴长文本为文件") },
+                    )
+                    IconButton(
+                        onClick = { longTextPasteExpanded = !longTextPasteExpanded },
+                        style = ButtonStyle.Ghost,
+                        buttonSize = ButtonSize.Small,
+                        shape = ContinuousCapsule,
+                        modifier = Modifier.size(32.dp),
+                        interactionSource = pasteInteraction,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = if (longTextPasteExpanded) tr("收起") else tr("展开"),
+                            tint = Theme[colors][onPanelColor],
+                            modifier = Modifier.size(20.dp).rotate(pasteArrow),
+                        )
+                    }
+                }
+                AnimatedVisibility(
+                    visible = longTextPasteExpanded,
+                    enter = expandVertically(animationSpec = irioSpring(), expandFrom = Alignment.Top) + fadeIn(animationSpec = irioSpring()),
+                    exit = shrinkVertically(animationSpec = irioSpring(), shrinkTowards = Alignment.Top) + fadeOut(animationSpec = irioSpring()),
+                ) {
+                    SettingsSlider(
+                        label = tr("字符阈值"),
+                        value = ThemeStore.longTextPasteThreshold,
+                        valueRange = LongTextPaste.MIN_THRESHOLD..LongTextPaste.MAX_THRESHOLD,
+                        step = LongTextPaste.STEP,
+                        onValueChange = { ThemeStore.saveLongTextPasteThreshold(context, it) },
+                        valueLabel = { tr("%d 个字符").format(it) },
+                    )
                 }
                 Row(
                     modifier = Modifier.settingsSwitchRow(),

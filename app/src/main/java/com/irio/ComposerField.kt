@@ -5,6 +5,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.animation.animateContentSize
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -118,6 +119,7 @@ internal fun ComposerField(
     onTextLayout: (TextLayoutResult) -> Unit = {},
     expandedFooter: (@Composable () -> Unit)? = null,
     onEnterSend: (() -> Unit)? = null,
+    onPasteAsAttachment: ((String) -> Boolean)? = null,
 ) {
     val shape = Theme[shapes][fieldShape]
     val contentColor = Theme[colors][onFieldColor]
@@ -132,6 +134,14 @@ internal fun ComposerField(
         }
     }
     val sendOnEnter = onEnterSend != null
+    val pasteCallback = rememberUpdatedState(onPasteAsAttachment)
+    val pasteReceiver = remember {
+        LongTextPasteReceiver(
+            enabled = { ThemeStore.longTextPaste && pasteCallback.value != null },
+            threshold = { ThemeStore.longTextPasteThreshold },
+            onAttach = { pasteCallback.value?.invoke(it) == true },
+        )
+    }
     // Keep the editor composition alive across layouts: its focus collector cannot replay
     // the FocusInteraction that was emitted before an expansion/collapse.
     val editor = remember {
@@ -167,6 +177,7 @@ internal fun ComposerField(
         BasicTextField(
             state = state,
             modifier = modifier
+                .then(if (onPasteAsAttachment != null) Modifier.contentReceiver(pasteReceiver) else Modifier)
                 .then(
                     if (sendOnEnter) {
                         Modifier.onPreviewKeyEvent { event ->

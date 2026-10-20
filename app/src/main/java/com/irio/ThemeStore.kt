@@ -149,6 +149,8 @@ object ThemeStore {
     private const val NEW_MESSAGE_SCROLL_KEY = "new_message_scroll"
     private const val COMPOSER_WRAP_ANIMATION_KEY = "composer_wrap_animation"
     private const val ENTER_TO_SEND_KEY = "enter_to_send"
+    private const val LONG_TEXT_PASTE_KEY = "long_text_paste"
+    private const val LONG_TEXT_PASTE_THRESHOLD_KEY = "long_text_paste_threshold"
     private const val GLASS_SURFACES_KEY = "glass_surfaces"
     private const val CODE_BLOCK_WRAP_KEY = "code_block_wrap"
     private const val THINKING_BLOCK_KEY = "thinking_block"
@@ -196,6 +198,12 @@ object ThemeStore {
     var enterToSend by mutableStateOf(false)
         private set
 
+    var longTextPaste by mutableStateOf(false)
+        private set
+
+    var longTextPasteThreshold by mutableStateOf(LongTextPaste.DEFAULT_THRESHOLD)
+        private set
+
     /** 勾选后对应表面从纯色改为毛玻璃。默认全关。 */
     var glassSurfaces by mutableStateOf(emptySet<GlassSurface>())
         private set
@@ -233,6 +241,10 @@ object ThemeStore {
             newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, false)
             composerWrapAnimation = appearance.getBoolean(COMPOSER_WRAP_ANIMATION_KEY, false)
             enterToSend = appearance.getBoolean(ENTER_TO_SEND_KEY, false)
+            longTextPaste = appearance.getBoolean(LONG_TEXT_PASTE_KEY, false)
+            longTextPasteThreshold = LongTextPaste.normalizeThreshold(
+                appearance.getInt(LONG_TEXT_PASTE_THRESHOLD_KEY, LongTextPaste.DEFAULT_THRESHOLD),
+            )
             glassSurfaces = appearance.getStringSet(GLASS_SURFACES_KEY, emptySet())
                 .orEmpty()
                 .mapNotNull(GlassSurface::fromStored)
@@ -346,6 +358,20 @@ object ThemeStore {
             .edit()
             .putBoolean(ENTER_TO_SEND_KEY, enabled)
             .apply()
+    }
+
+    fun saveLongTextPaste(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        longTextPaste = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(LONG_TEXT_PASTE_KEY, enabled).apply()
+    }
+
+    fun saveLongTextPasteThreshold(context: Context, value: Int) {
+        ensureLoaded(context)
+        longTextPasteThreshold = LongTextPaste.normalizeThreshold(value)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putInt(LONG_TEXT_PASTE_THRESHOLD_KEY, longTextPasteThreshold).apply()
     }
 
     fun saveCodeBlockWrap(context: Context, enabled: Boolean) {

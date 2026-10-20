@@ -333,6 +333,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var messages by remember { mutableStateOf(currentConversation.messages) }
     var newUserMessageId by remember { mutableStateOf<Long?>(null) }
     var pendingAttachments by remember { mutableStateOf(emptyList<ChatAttachment>()) }
+    var writingPastedText by remember { mutableStateOf(emptySet<String>()) }
     var clearingHistory by remember { mutableStateOf(false) }
     var composerStatus by remember { mutableStateOf<String?>(null) }
     var sttProviderSnackbarVisible by remember { mutableStateOf(false) }
@@ -841,6 +842,51 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 else -> null
             }
         }
+    }
+
+    fun pasteTextAsAttachment(text: String): Boolean {
+        if (clearingHistory) return false
+        if (attachmentSlots(pendingAttachments) + 1f > ChatApi.MAX_ATTACHMENT_SLOTS) {
+            composerStatus = tr("附件数量超过 15 个槽位（照片和视频各算半个）")
+            return false // Leave the clipboard text to the editor's normal paste path.
+        }
+        val attachment = LongTextPaste.attachment(File(context.filesDir, "attachments"))
+        val conversationId = currentConversation.id
+        pendingAttachments = pendingAttachments + attachment
+        writingPastedText = writingPastedText + attachment.filePath
+        scope.launch {
+            try {
+                val written = withContext(Dispatchers.IO) {
+                    runCatching { LongTextPaste.write(attachment, text) }.isSuccess
+                }
+                val active = currentConversation.id == conversationId
+                val draft = if (active) {
+                    ComposerDraft(message.text.toString(), pendingAttachments, editingMessageId, pendingQuote)
+                } else {
+                    composerDrafts[conversationId]
+                }
+                val retained = draft != null && attachment in draft.attachments
+                val overLimit = retained && attachmentBytes(draft.attachments) > ChatApi.MAX_ATTACHMENT_BYTES_TOTAL
+                if (retained && (!written || overLimit)) {
+                    val restored = restoreFailedTextPaste(draft, attachment, text)
+                    if (active) {
+                        pendingAttachments = restored.attachments
+                        message.edit { append(text) }
+                        composerStatus = if (overLimit) tr("附件总大小超过 5GB")
+                            else tr("文本文件创建失败，已保留原文")
+                    } else {
+                        composerDrafts[conversationId] = restored
+                    }
+                }
+                if (!retained || !written || overLimit) {
+                    withContext(Dispatchers.IO) { File(attachment.filePath).delete() }
+                }
+            } finally {
+                writingPastedText = writingPastedText - attachment.filePath
+            }
+        }
+        composerStatus = null
+        return true
     }
 
     val pickPhotos = rememberLauncherForActivityResult(
@@ -2068,6 +2114,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     }
 
     fun submitMessage() {
+        if (pendingAttachments.any { it.filePath in writingPastedText }) return
         val text = message.text.toString().trim()
         if (busyThisChat || (text.isEmpty() && pendingAttachments.isEmpty())) return
         val attachments = pendingAttachments
@@ -2130,6 +2177,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
      * 版本切换（showEditVersion）与回复切换（showRetryVersion）独立，各自切换各自组。
      */
     fun commitEdit() {
+        if (pendingAttachments.any { it.filePath in writingPastedText }) return
         if (busyThisChat) return
         val targetId = editingMessageId ?: return
         val targetIndex = messages.indexOfFirst { it.id == targetId }
@@ -2461,8 +2509,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     fun BoxScope.ChatComposerBar(availableHeight: Dp) {
         val compactHeight = with(LocalDensity.current) { compactComposerHeightPx.toDp() }
         val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val canSend = (editingMessageId != null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty())) ||
-            (!generatingThisChat && editingMessageId == null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty()))
+        val canSend = pendingAttachments.none { it.filePath in writingPastedText } &&
+            ((editingMessageId != null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty())) ||
+                (!generatingThisChat && editingMessageId == null && (message.text.isNotBlank() || pendingAttachments.isNotEmpty())))
 
         @Composable
         fun AttachmentButton() {
@@ -2763,6 +2812,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         )
                     } else ComposerField(
                         state = message,
+                        onPasteAsAttachment = ::pasteTextAsAttachment,
                         placeholder = "Message",
                         focusRequester = composerFocusRequester,
                         modifier = Modifier

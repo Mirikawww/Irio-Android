@@ -135,6 +135,10 @@ private val TodoistProgressEnglish = mapOf(
 ).flatMap { (action, forms) -> listOf(action to forms.first, "已$action" to forms.second) }.toMap()
 
 private val English = mapOf(
+    "粘贴长文本为文件" to "Paste long text as file",
+    "字符阈值" to "Character threshold",
+    "%d 个字符" to "%d characters",
+    "文本文件创建失败，已保留原文" to "Couldn't create the text file. The original text has been kept.",
     "查询历史会话" to "Query conversation history",
     "已查询历史会话" to "Queried conversation history",
     "历史会话查询失败" to "Conversation history query failed",
