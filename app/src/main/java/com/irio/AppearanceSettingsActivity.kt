@@ -126,7 +126,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
     var glassExpanded by remember { mutableStateOf(false) }
 
     SettingsHazeScaffold(
-        title = tr("外观"),
+        title = tr("外观与偏好"),
         onBack = onBack,
     ) { topInset, bottomInset ->
         Box(Modifier.fillMaxSize()) {

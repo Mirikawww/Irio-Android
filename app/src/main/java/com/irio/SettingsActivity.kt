@@ -120,7 +120,7 @@ private fun SettingsScreen(onBack: () -> Unit) {
                 )
                 Spacer(Modifier.height(12.dp))
                 ListRowButton(
-                    label = tr("外观"),
+                    label = tr("外观与偏好"),
                     icon = Icons.Rounded.Palette,
                     onClick = {
                         context.startActivity(Intent(context, AppearanceSettingsActivity::class.java))

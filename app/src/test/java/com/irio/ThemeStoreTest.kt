@@ -73,7 +73,8 @@ class ThemeStoreTest {
         assertEquals("Compression target", translate(AppLanguage.EN, "压缩目标"))
         assertEquals("Visualize context", translate(AppLanguage.EN, "可视化上下文"))
         assertEquals("%d messages", translate(AppLanguage.EN, "%d 条"))
-        assertEquals("外观", translate(AppLanguage.ZH_CN, "外观"))
+        assertEquals("外观与偏好", translate(AppLanguage.ZH_CN, "外观与偏好"))
+        assertEquals("Appearance and preferences", translate(AppLanguage.EN, "外观与偏好"))
         assertEquals("Chat background", translate(AppLanguage.EN, "聊天背景"))
         assertEquals("New chat", translate(AppLanguage.EN, "新对话"))
     }

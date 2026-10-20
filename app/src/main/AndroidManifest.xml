@@ -128,7 +128,7 @@
         <activity
             android:name=".AppearanceSettingsActivity"
             android:exported="false"
-            android:label="外观"
+            android:label="外观与偏好"
             android:screenOrientation="portrait"
             android:theme="@style/AppTheme" />
         <activity
