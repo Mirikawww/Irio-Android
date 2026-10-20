@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.SideEffect
@@ -183,6 +185,7 @@ internal fun observeIrioTheme() {
     ThemeStore.preference
     ThemeStore.autoAmoled
     ThemeStore.accent
+    ThemeStore.appFont
 }
 
 @Composable
@@ -286,6 +289,8 @@ private val SurfaceOverride: ThemeComposable = buildTheme {
         defaultTextSelectionColorsToken to Theme[textSelectionColors][defaultTextSelectionColorsToken],
     )
     defaultIndication = Theme[indications][defaultIndicationToken]
-    defaultTextStyle = LocalTextStyle.current
+    // 显式写上字体，避免上一帧已经提供的衬线样式在切回非衬线时被原样读回来。
+    val appFontFamily = rememberAppFontFamily() ?: FontFamily.Default
+    defaultTextStyle = LocalTextStyle.current.merge(TextStyle(fontFamily = appFontFamily))
     defaultContentColor = LocalContentColor.current
 }

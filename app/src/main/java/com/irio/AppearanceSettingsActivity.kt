@@ -10,9 +10,15 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,10 +75,89 @@ import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPanelColor
+import com.composables.ui.theme.panelColor
+import com.composables.ui.theme.onPrimaryColor
+import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 import kotlinx.coroutines.launch
+
+@Composable
+private fun FontChoiceTabs() {
+    val context = LocalContext.current
+    val selected = ThemeStore.appFont
+    val pages = AppFont.entries
+    val progress by animateFloatAsState(
+        targetValue = pages.indexOf(selected).toFloat(),
+        animationSpec = irioSpring<Float>(stiffness = 520f),
+        label = "fontChoiceTab",
+    )
+    val selectedFill = Theme[colors][primaryColor]
+    val selectedInk = Theme[colors][onPrimaryColor]
+    val idleInk = Theme[colors][onBackgroundColor]
+    Box(
+        modifier = Modifier
+            .semantics { contentDescription = tr("字体") }
+            .clip(ContinuousCapsule)
+            .background(Theme[colors][panelColor], ContinuousCapsule)
+            .padding(4.dp),
+    ) {
+        Layout(
+            content = {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .clip(ContinuousCapsule)
+                        .background(selectedFill),
+                )
+                pages.forEach { page ->
+                    val ink by animateColorAsState(
+                        if (page == selected) selectedInk else idleInk,
+                        irioSpring(),
+                        label = "fontChoiceTabInk",
+                    )
+                    Box(
+                        modifier = Modifier
+                            .height(26.dp)
+                            .clip(ContinuousCapsule)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { ThemeStore.saveAppFont(context, page) },
+                            )
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            tr(page.label),
+                            color = ink,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            },
+        ) { measurables, constraints ->
+            val count = measurables.size - 1
+            val loose = constraints.copy(minWidth = 0, minHeight = 0)
+            val labels = Array(count) { index -> measurables[index + 1].measure(loose) }
+            val segment = labels.maxOf { it.width }
+            val height = labels.maxOf { it.height }
+            val indicator = measurables[0].measure(Constraints.fixed(segment, height))
+            val width = segment * count
+            layout(width, height) {
+                indicator.placeRelative((progress * segment).toInt(), 0)
+                labels.forEachIndexed { index, label ->
+                    val x = index * segment + (segment - label.width) / 2
+                    label.placeRelative(x, (height - label.height) / 2)
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun AccentSwatch(color: Color) {
@@ -150,10 +235,23 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     .padding(horizontal = 16.dp, vertical = SettingsCardInset),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
+                Row(
+                    modifier = Modifier
+                        .settingsSearchAnchor("appearance.font", edge = SettingsSearchEdge.Top)
+                        .settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("字体"),
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][onPanelColor],
+                    )
+                    FontChoiceTabs()
+                }
                 DropdownMenu(
                     expanded = languageMenuOpen,
                     onExpandedChange = { languageMenuOpen = it },
-                    modifier = Modifier.fillMaxWidth().settingsSearchAnchor("appearance.language", edge = SettingsSearchEdge.Top),
+                    modifier = Modifier.fillMaxWidth().settingsSearchAnchor("appearance.language"),
                     alignment = DropdownMenuAlignment.End,
                     panel = {
                         DropdownMenuPanel {

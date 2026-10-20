@@ -238,6 +238,9 @@ private val settingsSearchEntries = listOf(
     item("appearance.glass.switcher", "模型切换器", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.glass.composer", "消息框、语音框", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.userAvatar", "显示用户头像", "外观与偏好", AppearanceSettingsActivity::class.java),
+    item("appearance.font", "字体", "外观与偏好", AppearanceSettingsActivity::class.java),
+    item("appearance.font.sans", "非衬线体", "外观与偏好", AppearanceSettingsActivity::class.java, anchor = "appearance.font"),
+    item("appearance.font.serif", "衬线体", "外观与偏好", AppearanceSettingsActivity::class.java, anchor = "appearance.font"),
     item("appearance.paste", "粘贴长文本为文件", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.paste.threshold", "字符阈值", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.glyph", "文本淡入", "外观与偏好", AppearanceSettingsActivity::class.java),
@@ -308,5 +311,10 @@ private val settingsSearchEntries = listOf(
 private fun page(id: String, title: String, destination: Class<out Activity>) =
     SettingsSearchEntry(id, title, "设置", destination, anchor = null)
 
-private fun item(id: String, title: String, page: String, destination: Class<out Activity>) =
-    SettingsSearchEntry(id, title, page, destination, anchor = id)
+private fun item(
+    id: String,
+    title: String,
+    page: String,
+    destination: Class<out Activity>,
+    anchor: String = id,
+) = SettingsSearchEntry(id, title, page, destination, anchor = anchor)

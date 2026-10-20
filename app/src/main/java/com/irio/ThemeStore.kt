@@ -157,6 +157,7 @@ object ThemeStore {
     private const val THINKING_BLOCK_KEY = "thinking_block"
     private const val MERGE_TOOL_CALLS_KEY = "merge_tool_calls"
     private const val SHOW_USER_AVATAR_KEY = "show_user_avatar"
+    private const val APP_FONT_KEY = "app_font"
     private const val LEGACY_PREFS = "provider_settings"
     private const val LEGACY_KEY = "theme_preference"
 
@@ -233,6 +234,10 @@ object ThemeStore {
     var showUserAvatar by mutableStateOf(false)
         private set
 
+    /** 界面字体。衬线体是 Lora 可变字体。默认非衬线。 */
+    var appFont by mutableStateOf(AppFont.SANS)
+        private set
+
     @Volatile
     private var loaded = false
 
@@ -267,6 +272,7 @@ object ThemeStore {
             thinkingBlock = appearance.getBoolean(THINKING_BLOCK_KEY, true)
             mergeToolCalls = appearance.getBoolean(MERGE_TOOL_CALLS_KEY, false)
             showUserAvatar = appearance.getBoolean(SHOW_USER_AVATAR_KEY, false)
+            appFont = AppFont.fromStored(appearance.getString(APP_FONT_KEY, null))
             if (appearance.getString(KEY, null) == null && stored != null) {
                 appearance.edit().putString(KEY, stored).apply()
             }
@@ -456,6 +462,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(SHOW_USER_AVATAR_KEY, enabled)
+            .apply()
+    }
+
+    fun saveAppFont(context: Context, value: AppFont) {
+        ensureLoaded(context)
+        if (appFont == value) return
+        appFont = value
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(APP_FONT_KEY, value.stored)
             .apply()
     }
 }

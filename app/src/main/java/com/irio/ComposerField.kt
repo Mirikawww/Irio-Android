@@ -55,6 +55,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -123,7 +124,10 @@ internal fun ComposerField(
 ) {
     val shape = Theme[shapes][fieldShape]
     val contentColor = Theme[colors][onFieldColor]
-    val textStyle = ComposerTextStyle.copy(color = contentColor)
+    val textStyle = ComposerTextStyle.copy(
+        color = contentColor,
+        fontFamily = rememberAppFontFamily() ?: FontFamily.Default,
+    )
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
     val onEnterSendState = rememberUpdatedState(onEnterSend)

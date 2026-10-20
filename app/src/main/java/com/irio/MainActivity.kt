@@ -3630,6 +3630,7 @@ internal fun MessageRow(
                                             .padding(horizontal = 14.dp, vertical = UserBubblePaddingVertical),
                                         fontSize = 16.sp,
                                         lineHeight = UserBubbleLineHeight,
+                                        fontFamily = rememberAppFontFamily() ?: FontFamily.Default,
                                         color = bubble.content,
                                     )
                                 }
@@ -4515,16 +4516,17 @@ internal fun AssistantMarkdown(
     // texScale 只在进入组合时读一次：不再监听 ProviderStore 全局变化——
     // 否则模型切换/思考档位保存会让屏幕上每条消息都重组（切换卡顿的主要来源之一）。
     val texScale = remember { ProviderStore.loadTexScale(context) }
-    val bodyStyle = TextStyle(fontSize = 17.sp, lineHeight = 26.sp, color = contentColor)
+    val appFont = rememberAppFontFamily()
+    val bodyStyle = TextStyle(fontSize = 17.sp, lineHeight = 26.sp, color = contentColor, fontFamily = appFont)
     val inlineCode = irioInlineCodeStyle()
     val codeBlock = irioCodeBlockStyle()
     val typography = markdownTypography(
-        h1 = TextStyle(fontSize = 24.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold, color = contentColor),
-        h2 = TextStyle(fontSize = 22.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, color = contentColor),
-        h3 = TextStyle(fontSize = 20.sp, lineHeight = 31.sp, fontWeight = FontWeight.Bold, color = contentColor),
-        h4 = TextStyle(fontSize = 18.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold, color = contentColor),
-        h5 = TextStyle(fontSize = 17.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold, color = contentColor),
-        h6 = TextStyle(fontSize = 17.sp, lineHeight = 30.sp, fontWeight = FontWeight.Medium, color = contentColor),
+        h1 = TextStyle(fontSize = 24.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold, color = contentColor, fontFamily = appFont),
+        h2 = TextStyle(fontSize = 22.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, color = contentColor, fontFamily = appFont),
+        h3 = TextStyle(fontSize = 20.sp, lineHeight = 31.sp, fontWeight = FontWeight.Bold, color = contentColor, fontFamily = appFont),
+        h4 = TextStyle(fontSize = 18.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold, color = contentColor, fontFamily = appFont),
+        h5 = TextStyle(fontSize = 17.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold, color = contentColor, fontFamily = appFont),
+        h6 = TextStyle(fontSize = 17.sp, lineHeight = 30.sp, fontWeight = FontWeight.Medium, color = contentColor, fontFamily = appFont),
         text = bodyStyle,
         paragraph = bodyStyle,
         quote = bodyStyle,
