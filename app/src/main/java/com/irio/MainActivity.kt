@@ -2784,6 +2784,16 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             minHeightInLines = 1,
                             maxHeightInLines = if (expandedLayout) Int.MAX_VALUE else 4,
                         ),
+                        onEnterSend = if (ThemeStore.enterToSend) {
+                            {
+                                if (!generatingThisChat && canSend) {
+                                    composerFullscreen = false
+                                    if (editingMessageId != null) commitEdit() else submitMessage()
+                                }
+                            }
+                        } else {
+                            null
+                        },
                         leading = { AttachmentButton() },
                         trailing = {
                             Column(

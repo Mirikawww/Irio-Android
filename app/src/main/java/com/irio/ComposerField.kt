@@ -4,6 +4,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.animation.animateContentSize
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -19,6 +20,13 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.KeyboardActionHandler
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.input.TextFieldDecorator
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
@@ -85,6 +93,7 @@ internal val ComposerTextStyle = TextStyle(
  * 单行时与 32dp 按钮中线对齐；整行按底部对齐，换行后发送和附件留在最后一行。
  * 展开后正文独占宽度，底部操作层悬浮在编辑区域上，并留出相应高度避免遮挡光标。
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ComposerField(
     state: TextFieldState,
@@ -108,12 +117,21 @@ internal fun ComposerField(
     animateLineWrap: Boolean = ThemeStore.composerWrapAnimation,
     onTextLayout: (TextLayoutResult) -> Unit = {},
     expandedFooter: (@Composable () -> Unit)? = null,
+    onEnterSend: (() -> Unit)? = null,
 ) {
     val shape = Theme[shapes][fieldShape]
     val contentColor = Theme[colors][onFieldColor]
     val textStyle = ComposerTextStyle.copy(color = contentColor)
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
+    val onEnterSendState = rememberUpdatedState(onEnterSend)
+    val enterSession = remember { EnterToSendSession() }
+    val enterTransformation = remember(enterSession, onEnterSendState) {
+        EnterToSendTransformation(enterSession) {
+            onEnterSendState.value?.let(enterSession::request)
+        }
+    }
+    val sendOnEnter = onEnterSend != null
     // Keep the editor composition alive across layouts: its focus collector cannot replay
     // the FocusInteraction that was emitted before an expansion/collapse.
     val editor = remember {
@@ -150,6 +168,24 @@ internal fun ComposerField(
             state = state,
             modifier = modifier
                 .then(
+                    if (sendOnEnter) {
+                        Modifier.onPreviewKeyEvent { event ->
+                            if (event.key != Key.Enter) return@onPreviewKeyEvent false
+                            if (event.isShiftPressed) {
+                                if (event.type == KeyEventType.KeyDown) enterSession.allowNextNewline = true
+                                return@onPreviewKeyEvent false
+                            }
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent true
+                            if (event.nativeKeyEvent.repeatCount > 0) return@onPreviewKeyEvent true
+                            enterSession.allowNextNewline = false
+                            onEnterSendState.value?.let(enterSession::request)
+                            true
+                        }
+                    } else {
+                        Modifier
+                    },
+                )
+                .then(
                     if (focusRequester != null) {
                         Modifier.focusRequester(focusRequester)
                     } else {
@@ -175,8 +211,20 @@ internal fun ComposerField(
                 ),
             enabled = enabled,
             textStyle = textStyle,
-            keyboardOptions = keyboardOptions,
-            onKeyboardAction = onKeyboardAction,
+            keyboardOptions = if (sendOnEnter) {
+                keyboardOptions.copy(imeAction = ImeAction.Send)
+            } else {
+                keyboardOptions
+            },
+            onKeyboardAction = if (sendOnEnter) {
+                KeyboardActionHandler {
+                    if (enterSession.allowNextNewline) return@KeyboardActionHandler
+                    onEnterSendState.value?.let(enterSession::request)
+                }
+            } else {
+                onKeyboardAction
+            },
+            inputTransformation = if (sendOnEnter) enterTransformation else null,
             lineLimits = lineLimits,
             onTextLayout = { getResult ->
                 getResult()?.let {

@@ -569,6 +569,22 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
+                        tr("按 Enter 发送"),
+                        color = Theme[colors][onPanelColor],
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(
+                        checked = ThemeStore.enterToSend,
+                        onCheckedChange = { enabled ->
+                            ThemeStore.saveEnterToSend(context, enabled)
+                        },
+                    )
+                }
+                Row(
+                    modifier = Modifier.settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
                         tr("代码块自动换行"),
                         color = Theme[colors][onPanelColor],
                         modifier = Modifier.weight(1f),

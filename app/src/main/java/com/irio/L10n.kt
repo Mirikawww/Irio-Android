@@ -502,6 +502,7 @@ private val English = mapOf(
     "文本淡入" to "Text fade-in",
     "新消息滚动" to "New message scroll",
     "消息框延展动画" to "Message box stretch animation",
+    "按 Enter 发送" to "Send with Enter",
     "代码块自动换行" to "Wrap code blocks",
     "思考块" to "Thinking block",
     "合并工具调用显示" to "Merge tool calls",

@@ -148,6 +148,7 @@ object ThemeStore {
     private const val MODEL_PICKER_ON_LEFT_KEY = "model_picker_on_left"
     private const val NEW_MESSAGE_SCROLL_KEY = "new_message_scroll"
     private const val COMPOSER_WRAP_ANIMATION_KEY = "composer_wrap_animation"
+    private const val ENTER_TO_SEND_KEY = "enter_to_send"
     private const val GLASS_SURFACES_KEY = "glass_surfaces"
     private const val CODE_BLOCK_WRAP_KEY = "code_block_wrap"
     private const val THINKING_BLOCK_KEY = "thinking_block"
@@ -191,6 +192,10 @@ object ThemeStore {
     var composerWrapAnimation by mutableStateOf(false)
         private set
 
+    /** 回车发送，而不是换行。默认关。 */
+    var enterToSend by mutableStateOf(false)
+        private set
+
     /** 勾选后对应表面从纯色改为毛玻璃。默认全关。 */
     var glassSurfaces by mutableStateOf(emptySet<GlassSurface>())
         private set
@@ -227,6 +232,7 @@ object ThemeStore {
             modelPickerOnLeft = appearance.getBoolean(MODEL_PICKER_ON_LEFT_KEY, false)
             newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, false)
             composerWrapAnimation = appearance.getBoolean(COMPOSER_WRAP_ANIMATION_KEY, false)
+            enterToSend = appearance.getBoolean(ENTER_TO_SEND_KEY, false)
             glassSurfaces = appearance.getStringSet(GLASS_SURFACES_KEY, emptySet())
                 .orEmpty()
                 .mapNotNull(GlassSurface::fromStored)
@@ -329,6 +335,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(COMPOSER_WRAP_ANIMATION_KEY, enabled)
+            .apply()
+    }
+
+    fun saveEnterToSend(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (enterToSend == enabled) return
+        enterToSend = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(ENTER_TO_SEND_KEY, enabled)
             .apply()
     }
 
