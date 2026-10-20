@@ -3,6 +3,7 @@ package com.irio
 
 import androidx.compose.animation.core.Easing
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,9 +27,11 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,6 +63,8 @@ import com.composeunstyled.LocalTextStyle
 import com.composeunstyled.ProvideContentColor
 import com.composeunstyled.ProvideTextStyle
 import com.composeunstyled.theme.Theme
+import dev.chrisbanes.haze.ExperimentalHazeApi
+import dev.chrisbanes.haze.HazeFeatureFlags
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.HazeState
@@ -186,15 +191,57 @@ internal fun AccentCircleIconButton(
     }
 }
 
+internal val LocalChatHazeState = staticCompositionLocalOf<HazeState?> { null }
+
+/** 读的是挂上效果时的值，要在第一帧组合之前打开。 */
+@OptIn(ExperimentalHazeApi::class)
+internal fun enableIrioGlassBackdrop() {
+    HazeFeatureFlags.isPlatformBackdropEnabled = true
+}
+
+@Composable
+internal fun Modifier.irioSolidOrGlass(
+    enabled: Boolean,
+    color: Color,
+    shape: Shape,
+    haze: HazeState? = LocalChatHazeState.current,
+    border: Boolean = false,
+): Modifier {
+    if (!enabled) return background(color, shape)
+    // 直接模糊这个控件背后已经画好的像素。用户气泡在消息列表里面，不能把那一层当模糊源。
+    val glass = clip(shape).hazeBlur(
+        input = HazeInput.Backdrop(fallback = haze?.let { HazeInput.Sources(it) }),
+        style = rememberIrioGlassStyle(color),
+    )
+    return if (border) glass.border(1.dp, Color.Black, shape) else glass
+}
+
+@Composable
+private fun rememberIrioGlassStyle(tint: Color): HazeBlurStyle {
+    val frost = if (tint.luminance() >= 0.5f) 0.12f else 0.08f
+    return remember(tint, frost) {
+        HazeBlurStyle {
+            blurRadius(16.dp)
+            noiseFactor(0.04f)
+            backgroundColor(Color.Transparent)
+            colorEffects(listOf(HazeColorEffect.tint(tint.copy(alpha = frost))))
+        }
+    }
+}
+
 @Composable
 internal fun ToolbarCapsule(
     modifier: Modifier = Modifier,
+    glass: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     Box(
-        modifier = modifier
-            .clip(ToolbarCapsuleShape)
-            .background(Theme[colors][panelColor]),
+        modifier = modifier.irioSolidOrGlass(
+            glass,
+            Theme[colors][panelColor],
+            ToolbarCapsuleShape,
+            border = glass,
+        ),
         contentAlignment = Alignment.Center,
     ) {
         content()

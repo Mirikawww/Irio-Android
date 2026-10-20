@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -131,6 +132,7 @@ internal fun ComposerField(
     val showGhosts by remember(progress) { derivedStateOf { progress.value < 0.6f } }
     val ringColor = if (focused) Theme[colors][primaryColor] else Theme[colors][borderColor]
     val fillColor = Theme[colors][fieldColor]
+    val glass = !fullyExpanded && GlassSurface.COMPOSER in ThemeStore.glassSurfaces
     val footerBackground = Theme[colors][backgroundColorToken]
     val buttonGap = 8.dp
     val compactStart = contentPadding.calculateLeftPadding(layoutDirection) +
@@ -156,7 +158,13 @@ internal fun ComposerField(
                 )
                 .then(
                     if (fullyExpanded) Modifier else Modifier
-                        .composerAnimatedDecoration(progress, ringColor, fillColor, shape),
+                        .composerAnimatedDecoration(
+                            progress,
+                            ringColor,
+                            if (glass) Color.Transparent else fillColor,
+                            shape,
+                        )
+                        .then(if (glass) Modifier.irioSolidOrGlass(true, fillColor, shape) else Modifier),
                 )
                 .then(
                     if (accessibilityLabel != null) {

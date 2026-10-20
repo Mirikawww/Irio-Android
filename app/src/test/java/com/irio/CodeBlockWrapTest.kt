@@ -31,6 +31,23 @@ class CodeBlockWrapTest {
     }
 
     @Test
+    fun glassSurfacesDefaultOffAndPersist() {
+        val context = RuntimeEnvironment.getApplication()
+        val previous = ThemeStore.glassSurfaces
+        try {
+            ThemeStore.saveGlassSurface(context, GlassSurface.COMPOSER, true)
+            assertTrue(GlassSurface.COMPOSER in ThemeStore.glassSurfaces)
+            ThemeStore.saveGlassSurface(context, GlassSurface.COMPOSER, false)
+            assertFalse(GlassSurface.COMPOSER in ThemeStore.glassSurfaces)
+        } finally {
+            previous.forEach { ThemeStore.saveGlassSurface(context, it, true) }
+            GlassSurface.entries
+                .filter { it !in previous }
+                .forEach { ThemeStore.saveGlassSurface(context, it, false) }
+        }
+    }
+
+    @Test
     fun englishLabel() {
         assertEquals("Wrap code blocks", translate(AppLanguage.EN, "代码块自动换行"))
     }

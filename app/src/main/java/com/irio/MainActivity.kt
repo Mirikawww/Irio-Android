@@ -277,6 +277,7 @@ class MainActivity : ComponentActivity() {
         ReplyOpenRequest.publish(intent)
         ReplyLiveNotice.install(this)
         LinkRuntime.ensure(this)
+        enableIrioGlassBackdrop()
         setIrioContent {
             MainScreen(restoreLastOpened = savedInstanceState != null)
         }
@@ -2589,6 +2590,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             val waveColor = Theme[colors][primaryColor]
             val fillColor = Theme[colors][fieldColor]
             val outlineColor = Theme[colors][borderColor]
+            val glass = GlassSurface.COMPOSER in ThemeStore.glassSurfaces
             val totalSeconds = (sttRecordingElapsedMillis / 1_000L).toInt()
             val timer = "%02d:%02d".format(totalSeconds / 60, totalSeconds % 60)
             Box(
@@ -2603,7 +2605,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         bottom = 10.dp,
                     )
                     .heightIn(min = 64.dp)
-                    .background(fillColor, shape)
+                    .irioSolidOrGlass(glass, fillColor, shape)
                     .border(1.dp, outlineColor, shape)
                     .clip(shape)
                     .semantics { contentDescription = "${tr("正在录音")} $timer" },
@@ -2840,7 +2842,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
         @Composable
         fun ToolbarModelPicker() {
-            ToolbarCapsule {
+            ToolbarCapsule(glass = GlassSurface.MODEL_SWITCHER in ThemeStore.glassSurfaces) {
                 ModelPicker(
                     alignLeft = modelPickerOnLeft,
                     selectedModel = selectedModel,
@@ -2911,7 +2913,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     contentColor = content,
                     compact = true,
                     leading = {
-                        ToolbarCapsule {
+                        ToolbarCapsule(glass = GlassSurface.SIDEBAR_BUTTON in ThemeStore.glassSurfaces) {
                             IconButton(
                                 onClick = { drawerProgress = if (drawerOpen) 0f else 1f },
                                 style = ButtonStyle.Ghost,
@@ -2973,7 +2975,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                     it.isError || it.isPending || it.isStreaming
                                 },
                             ) != null
-                            ToolbarCapsule {
+                            ToolbarCapsule(glass = GlassSurface.CONTEXT_RING in ThemeStore.glassSurfaces) {
                                 ContextUsageRing(
                                     breakdown = breakdown,
                                     compressionCount = compressionCount(messages),
@@ -2992,6 +2994,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 }
     }
 
+    CompositionLocalProvider(LocalChatHazeState provides chatHazeState) {
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
@@ -3048,6 +3051,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     modifier = Modifier
                         .fillMaxSize()
                         .hazeSource(chatHazeState)
+                        .background(background)
                         .padding(horizontal = 16.dp),
                     contentPaddingTop = toolbarContentPaddingPx,
                     contentPaddingBottom = composerContentPaddingPx,
@@ -3173,6 +3177,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 backgroundSheetState.targetDetent = BottomSheetDetent.Hidden
             },
         )
+    }
     }
 }
 
@@ -3441,9 +3446,12 @@ internal fun MessageRow(
                                         chatMessage.text,
                                         modifier = Modifier
                                             .widthIn(max = maxWidth * 0.85f)
-                                            .clip(RoundedRectangle(16.dp))
-                                            .background(
-                                                color = bubble.background,
+                                            .irioSolidOrGlass(
+                                                GlassSurface.USER_BUBBLE in ThemeStore.glassSurfaces,
+                                                bubble.background,
+                                                RoundedRectangle(16.dp),
+                                                haze = null,
+                                                border = true,
                                             )
                                             .then(
                                                 if (onEdit != null) {

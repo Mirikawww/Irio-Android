@@ -2,6 +2,12 @@ package com.irio
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -30,11 +36,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.ui.components.Button
+import com.composables.ui.components.Checkbox
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.DropdownMenu
@@ -98,6 +106,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
     var themeMenuOpen by remember { mutableStateOf(false) }
     var accentMenuOpen by remember { mutableStateOf(false) }
     var languageMenuOpen by remember { mutableStateOf(false) }
+    var glassExpanded by remember { mutableStateOf(false) }
 
     SettingsHazeScaffold(
         title = tr("外观"),
@@ -355,6 +364,71 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     .padding(horizontal = 16.dp, vertical = SettingsCardInset),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
+                val glassArrow by animateFloatAsState(
+                    targetValue = if (glassExpanded) 180f else 0f,
+                    animationSpec = irioSpring(),
+                    label = "glass expansion arrow",
+                )
+                val glassInteraction = remember { MutableInteractionSource() }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = glassInteraction,
+                            indication = null,
+                            onClick = { glassExpanded = !glassExpanded },
+                        )
+                        .padding(top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("毛玻璃"),
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][onPanelColor],
+                    )
+                    IconButton(
+                        onClick = { glassExpanded = !glassExpanded },
+                        style = ButtonStyle.Ghost,
+                        buttonSize = ButtonSize.Small,
+                        shape = ContinuousCapsule,
+                        modifier = Modifier.size(32.dp),
+                        interactionSource = glassInteraction,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = if (glassExpanded) tr("收起") else tr("展开"),
+                            tint = Theme[colors][onPanelColor],
+                            modifier = Modifier.size(20.dp).rotate(glassArrow),
+                        )
+                    }
+                }
+                AnimatedVisibility(
+                    visible = glassExpanded,
+                    enter = expandVertically(animationSpec = irioSpring(), expandFrom = Alignment.Top) + fadeIn(animationSpec = irioSpring()),
+                    exit = shrinkVertically(animationSpec = irioSpring(), shrinkTowards = Alignment.Top) + fadeOut(animationSpec = irioSpring()),
+                ) {
+                    Column {
+                    GlassSurface.entries.forEach { surface ->
+                        val label = when (surface) {
+                            GlassSurface.USER_BUBBLE -> tr("用户气泡")
+                            GlassSurface.SIDEBAR_BUTTON -> tr("侧边栏按钮")
+                            GlassSurface.CONTEXT_RING -> tr("上下文圆环")
+                            GlassSurface.MODEL_SWITCHER -> tr("模型切换器")
+                            GlassSurface.COMPOSER -> tr("消息框、语音框")
+                        }
+                        Checkbox(
+                            checked = surface in ThemeStore.glassSurfaces,
+                            onCheckedChange = { enabled ->
+                                ThemeStore.saveGlassSurface(context, surface, enabled)
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            accessibilityLabel = label,
+                        ) {
+                            Text(label, color = Theme[colors][onPanelColor])
+                        }
+                    }
+                    }
+                }
                 Row(
                     modifier = Modifier.settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
