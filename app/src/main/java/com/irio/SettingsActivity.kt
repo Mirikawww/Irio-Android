@@ -110,15 +110,11 @@ internal fun SettingsScreen(onBack: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = bottomInset),
+                .padding(bottom = bottomInset)
+                .verticalScroll(rememberScrollState())
+                .padding(top = topInset)
+                .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(top = topInset)
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-            ) {
                 SettingsProfileHeader(
                     onPickAvatar = {
                         pickAvatar.launch(
@@ -215,17 +211,15 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                         context.startActivity(Intent(context, OtherSettingsActivity::class.java))
                     },
                 )
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    softwareInfo,
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Theme[colors][mutedColor],
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                )
             }
-            Text(
-                softwareInfo,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                color = Theme[colors][mutedColor],
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center,
-            )
-        }
     }
     }
     SettingsSearchOverlay(
