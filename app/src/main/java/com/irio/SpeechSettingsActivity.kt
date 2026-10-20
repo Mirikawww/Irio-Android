@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,6 +57,8 @@ import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
+import java.util.Locale
+import kotlin.math.roundToInt
 
 class SpeechSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,6 +73,7 @@ class SpeechSettingsActivity : ComponentActivity() {
 internal fun SpeechSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var voiceId by remember { mutableStateOf(SpeechStore.loadVoiceId(context)) }
+    var speechRate by remember { mutableFloatStateOf(SpeechStore.loadSpeechRate(context)) }
     var voices by remember { mutableStateOf<List<SpeechVoice>?>(null) }
     var missing by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -164,6 +168,19 @@ internal fun SpeechSettingsScreen(onBack: () -> Unit) {
                     menuOpen = false
                 },
             )
+            Spacer(Modifier.height(12.dp))
+            SttSettingsSectionCard {
+                SettingsSlider(
+                    label = tr("朗读速度"),
+                    value = (speechRate * 10).roundToInt(),
+                    valueRange = (SpeechStore.MIN_SPEECH_RATE * 10).toInt()..(SpeechStore.MAX_SPEECH_RATE * 10).toInt(),
+                    onValueChange = {
+                        speechRate = it / 10f
+                        SpeechStore.saveSpeechRate(context, speechRate)
+                    },
+                    valueLabel = { String.format(Locale.getDefault(), "%.1f×", it / 10f) },
+                )
+            }
             Spacer(Modifier.height(16.dp))
             SttSettingsSectionCard {
                 SttProviderMenu(

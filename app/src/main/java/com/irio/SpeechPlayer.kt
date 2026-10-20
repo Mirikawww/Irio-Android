@@ -66,6 +66,9 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
 
+internal fun speechCacheKey(messageId: Long, voiceId: String, speechRate: Float, text: String): String =
+    "$messageId\u0000$voiceId\u0000$speechRate\u0000$text"
+
 /**
  * 系统默认 TTS 先把正文合成成音频，再用 [MediaPlayer] 播放。
  * 引擎本身不能按秒跳转，播放器可以，所以快退 / 快进五秒是真实的时间位置。
@@ -107,7 +110,9 @@ internal object SpeechPlayer {
             stopOnThread()
             val app = context.applicationContext
             appContext = app
-            val key = "$messageId\u0000${SpeechStore.loadVoiceId(app)}\u0000$text"
+            val voiceId = SpeechStore.loadVoiceId(app)
+            val speechRate = SpeechStore.loadSpeechRate(app)
+            val key = speechCacheKey(messageId, voiceId, speechRate, text)
             val hit = retained?.takeIf { cached ->
                 cached.key == key && cached.files.all { it.isFile && it.length() > 0L }
             }
@@ -127,7 +132,7 @@ internal object SpeechPlayer {
                     stopOnThread()
                     return@ensureEngine
                 }
-                applyVoice()
+                applyVoice(voiceId, speechRate)
                 pump(created)
             }
         }
@@ -269,14 +274,14 @@ internal object SpeechPlayer {
         handler?.post { callback(ok) }
     }
 
-    private fun applyVoice() {
+    private fun applyVoice(voiceId: String, speechRate: Float) {
         val engine = tts ?: return
-        val context = appContext ?: return
-        val id = SpeechStore.loadVoiceId(context)
-        val match = id.takeIf { it.isNotBlank() }?.let { saved ->
+        val match = voiceId.takeIf { it.isNotBlank() }?.let { saved ->
             engine.voices?.firstOrNull { it.name == saved }
         }
         engine.voice = match ?: engine.defaultVoice
+        // Bake speed into synthesized audio so seeking, duration and progress stay accurate.
+        engine.setSpeechRate(speechRate)
     }
 
     private fun pump(target: Session) {

@@ -662,6 +662,7 @@ private val English = mapOf(
     "自动朗读" to "Auto-read",
     "朗读" to "Read aloud",
     "朗读音色" to "Reading voice",
+    "朗读速度" to "Reading speed",
     "快退五秒" to "Rewind 5 seconds",
     "快进五秒" to "Forward 5 seconds",
     "暂停" to "Pause",
