@@ -122,7 +122,7 @@ internal object SpeechPlayer {
             }
             val chunks = speechChunks(text)
             if (chunks.isEmpty()) return@post
-            val created = Session(messageId, chunks)
+            val created = Session(messageId, chunks, speechRate)
             created.retainKey = key
             session = created
             publishSession(created)
@@ -304,9 +304,12 @@ internal object SpeechPlayer {
                 return@finish
             }
             target.files[index] = file
+            val measured = wavDurationMs(file)
+            if (measured > 0) target.durations[index] = measured
             maybeRetain(target)
             maybeStart(target)
             applyPendingSeek(target)
+            publishSession(target)
             pump(target)
         }
         val queued = tts?.synthesizeToFile(target.chunks[index], null, file, utterance)
@@ -338,7 +341,8 @@ internal object SpeechPlayer {
         player.setOnPreparedListener {
             handler?.post {
                 if (session !== target || target.player !== player) return@post
-                target.durations[index] = player.duration.coerceAtLeast(0)
+                val reported = player.duration
+                if (reported > 0) target.durations[index] = reported
                 target.ready = true
                 maybeRetain(target)
                 val pending = target.pendingSeekMs
@@ -515,8 +519,6 @@ internal object SpeechPlayer {
     }
 
     private fun publishSession(target: Session) {
-        var duration = 0
-        for (value in target.durations) if (value > 0) duration += value
         publish(
             SpeechPlayback(
                 messageId = target.id,
@@ -524,7 +526,7 @@ internal object SpeechPlayer {
                 playing = target.ready && !target.paused,
                 preparing = !target.ready,
                 positionMs = positionMs(target),
-                durationMs = duration,
+                durationMs = speechTimelineMs(target.chunks, target.durations, target.speechRate),
             ),
         )
     }
@@ -570,6 +572,7 @@ internal object SpeechPlayer {
     private class Session(
         val id: Long,
         val chunks: List<String>,
+        val speechRate: Float = 1f,
     ) {
         val generation = System.nanoTime()
         val files = arrayOfNulls<File>(chunks.size)
