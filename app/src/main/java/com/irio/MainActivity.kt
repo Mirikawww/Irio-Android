@@ -2619,8 +2619,9 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     pendingAttachments.forEach { attachment ->
-                        PendingAttachmentChip(
+                        AttachmentCard(
                             attachment = attachment,
+                            loading = attachment.filePath in writingPastedText,
                             onRemove = {
                                 pendingAttachments = pendingAttachments.filterNot { it == attachment }
                             },
@@ -3497,7 +3498,6 @@ internal fun MessageRow(
                     ) {
                         SentAttachmentRow(
                             attachments = chatMessage.attachments,
-                            boxed = true,
                             alignEnd = true,
                             scrollKey = chatMessage.id,
                             onOpen = onOpenAttachment,
@@ -3556,7 +3556,6 @@ internal fun MessageRow(
                 if (chatMessage.attachments.isNotEmpty()) {
                     SentAttachmentRow(
                         attachments = chatMessage.attachments,
-                        boxed = false,
                         alignEnd = false,
                         scrollKey = chatMessage.id,
                         onOpen = onOpenAttachment,
@@ -4011,7 +4010,6 @@ private fun TerminalCommandSheet(
 @Composable
 private fun SentAttachmentRow(
     attachments: List<ChatAttachment>,
-    boxed: Boolean,
     alignEnd: Boolean,
     scrollKey: Any,
     onOpen: (ChatAttachment) -> Unit,
@@ -4028,136 +4026,12 @@ private fun SentAttachmentRow(
             verticalAlignment = Alignment.Bottom,
         ) {
             attachments.forEach { attachment ->
-                AttachmentPreview(
+                AttachmentCard(
                     attachment,
-                    boxed = boxed,
                     onOpen = { onOpen(attachment) },
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun PendingAttachmentChip(
-    attachment: ChatAttachment,
-    onRemove: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedRectangle(12.dp))
-            .background(Theme[colors][panelColor])
-            .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        AttachmentPreview(attachment, boxed = false, compact = true, onOpen = null)
-        IconButton(
-            onClick = onRemove,
-            style = ButtonStyle.Ghost,
-            buttonSize = ButtonSize.Small,
-            modifier = Modifier
-                .size(28.dp)
-                .semantics { contentDescription = tr("移除附件") },
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Close,
-                contentDescription = tr("移除附件"),
-                modifier = Modifier.size(16.dp),
-                tint = Theme[colors][mutedColor],
-            )
-        }
-    }
-}
-
-internal object AttachmentPreviewCache {
-    private const val MAX_ENTRIES = 24
-    private val map = LinkedHashMap<String, ImageBitmap>(MAX_ENTRIES, 0.75f, true)
-
-    fun get(path: String): ImageBitmap? = synchronized(map) { map[path] }
-
-    fun getOrDecode(path: String, decode: () -> ImageBitmap?): ImageBitmap? {
-        synchronized(map) { map[path]?.let { return it } }
-        val bitmap = decode() ?: return null
-        synchronized(map) {
-            map[path] = bitmap
-            while (map.size > MAX_ENTRIES) {
-                val eldest = map.entries.iterator()
-                if (eldest.hasNext()) {
-                    eldest.next()
-                    eldest.remove()
-                }
-            }
-        }
-        return bitmap
-    }
-}
-
-@Composable
-private fun AttachmentPreview(
-    attachment: ChatAttachment,
-    boxed: Boolean,
-    compact: Boolean = false,
-    onOpen: (() -> Unit)? = null,
-) {
-    // Decode off the main thread: scrolled-off items are disposed, and a
-    // synchronous `remember { decodePreview() }` re-decoded on every scroll-back.
-    // Decode enough physical pixels for the thumbnail, without changing the original file.
-    val previewMaxPx = with(LocalDensity.current) {
-        (if (compact) 64.dp else 160.dp).roundToPx()
-    }
-    val cacheKey = "${attachment.filePath}#$previewMaxPx"
-    var preview by remember(cacheKey) {
-        mutableStateOf(
-            if (attachment.isImage) AttachmentPreviewCache.get(cacheKey) else null,
-        )
-    }
-    if (attachment.isImage && preview == null) {
-        LaunchedEffect(cacheKey) {
-            preview = withContext(Dispatchers.IO) {
-                AttachmentPreviewCache.getOrDecode(cacheKey) {
-                    decodePreview(attachment.filePath, maxPx = previewMaxPx)
-                }
-            }
-        }
-    }
-    val clickable = if (onOpen != null && !compact) Modifier.clickable(onClick = onOpen) else Modifier
-    val rendered = preview
-    if (rendered != null) {
-        val previewSize = attachmentPreviewSize(
-            rendered.width, rendered.height, LocalDensity.current.density, compact,
-        )
-        Image(
-            bitmap = rendered,
-            contentDescription = attachment.name,
-            modifier = Modifier
-                .size(previewSize.width, previewSize.height)
-                .clip(RoundedRectangle(12.dp))
-                .then(clickable),
-            contentScale = ContentScale.Fit,
-        )
-    } else {
-        Text(
-            attachment.name,
-            fontSize = 12.sp,
-            maxLines = if (compact) 1 else 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .widthIn(max = 160.dp)
-                .then(
-                    if (boxed || compact) {
-                        Modifier
-                            .background(
-                                color = Theme[colors][panelColor],
-                                shape = RoundedRectangle(12.dp),
-                            )
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    } else {
-                        Modifier
-                    },
-                )
-                .then(clickable),
-        )
     }
 }
 
@@ -4199,26 +4073,6 @@ private fun mimeFromName(name: String?): String {
         "json" -> "application/json"
         else -> "application/octet-stream"
     }
-}
-
-private fun decodePreview(path: String, maxPx: Int = 720): androidx.compose.ui.graphics.ImageBitmap? {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeFile(path, bounds)
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-    var sample = 1
-    // 停在仍能盖住目标的那一档。再缩一档就会小于槽位，显示时被放大。
-    while (
-        bounds.outWidth / (sample * 2) >= maxPx ||
-        bounds.outHeight / (sample * 2) >= maxPx
-    ) {
-        sample *= 2
-    }
-    val options = BitmapFactory.Options().apply {
-        inSampleSize = sample
-        inScaled = false
-        inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
-    }
-    return BitmapFactory.decodeFile(path, options)?.asImageBitmap()
 }
 
 private fun mergeProcess(current: List<ProcessEvent>, snapshot: List<ProcessEvent>): List<ProcessEvent> {
