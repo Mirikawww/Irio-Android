@@ -34,7 +34,7 @@ class ReactionToolTest {
     }
 
     @Test
-    fun validReactionAndRemovalOnlyInvokeMetadataCallbackWithNoLifecycleEvents() = runBlocking {
+    fun validReactionAndRemovalEmitOnlyNotificationsWithoutLifecycleEvents() = runBlocking {
         val updates = mutableListOf<ChatStreamUpdate>()
         val reactions = mutableListOf<Pair<Long, String>>()
         val context = ToolExecutionContext(
@@ -46,7 +46,8 @@ class ReactionToolTest {
         tool.execute(call(emoji = "❤"), context)
         tool.execute(call(emoji = ""), context)
         assertEquals(listOf(123L to "👍", 123L to "❤️", 123L to ""), reactions)
-        assertTrue(updates.isEmpty())
+        // Each successful change notifies the background UI, without any chat lifecycle payload.
+        assertEquals(List(3) { ChatStreamUpdate(notifyTool = ReactionTool.NAME) }, updates)
     }
 
     @Test
@@ -123,6 +124,10 @@ class ReactionToolTest {
                 assertEquals("回答", result.content)
                 assertEquals(listOf(123L to "❤️"), reactions)
                 assertTrue(updates.none { it.toolActive != null || it.searching != null })
+                assertEquals(
+                    listOf(ChatStreamUpdate(notifyTool = ReactionTool.NAME)),
+                    updates.filter { it.notifyTool.isNotEmpty() },
+                )
                 val first = JSONObject(server.takeRequest().body.readUtf8())
                 assertTrue(first.getJSONArray("messages").getJSONObject(0).getString("content")
                     .endsWith("[Irio message_id: 123]"))
