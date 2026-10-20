@@ -237,6 +237,7 @@ private val settingsSearchEntries = listOf(
     item("appearance.glass.ring", "上下文圆环", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.glass.switcher", "模型切换器", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.glass.composer", "消息框、语音框", "外观与偏好", AppearanceSettingsActivity::class.java),
+    item("appearance.userAvatar", "显示用户头像", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.paste", "粘贴长文本为文件", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.paste.threshold", "字符阈值", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.glyph", "文本淡入", "外观与偏好", AppearanceSettingsActivity::class.java),

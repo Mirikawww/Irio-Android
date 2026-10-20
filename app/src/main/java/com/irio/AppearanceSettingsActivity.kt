@@ -500,6 +500,22 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     }
                     }
                 }
+                Row(
+                    modifier = Modifier.settingsSearchAnchor("appearance.userAvatar").settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("显示用户头像"),
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][onPanelColor],
+                    )
+                    Switch(
+                        checked = ThemeStore.showUserAvatar,
+                        onCheckedChange = { enabled ->
+                            ThemeStore.saveShowUserAvatar(context, enabled)
+                        },
+                    )
+                }
                 val pasteArrow by animateFloatAsState(
                     targetValue = if (longTextPasteExpanded) 180f else 0f,
                     animationSpec = irioSpring(),

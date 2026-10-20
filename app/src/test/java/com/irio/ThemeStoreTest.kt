@@ -76,6 +76,7 @@ class ThemeStoreTest {
         assertEquals("外观与偏好", translate(AppLanguage.ZH_CN, "外观与偏好"))
         assertEquals("Appearance and preferences", translate(AppLanguage.EN, "外观与偏好"))
         assertEquals("Chat background", translate(AppLanguage.EN, "聊天背景"))
+        assertEquals("Show user avatar", translate(AppLanguage.EN, "显示用户头像"))
         assertEquals("New chat", translate(AppLanguage.EN, "新对话"))
     }
 

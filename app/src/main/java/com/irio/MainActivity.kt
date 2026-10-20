@@ -3419,6 +3419,86 @@ private fun ModelPicker(
     }
 }
 
+private val UserMessageAvatarSize = 28.dp
+private val UserMessageAvatarGap = 8.dp
+private val UserBubblePaddingVertical = 10.dp
+private val UserBubbleLineHeight = 22.sp
+
+/** 头像中心对齐气泡第一行。不看气泡总高度，所以多行时不会落到最后一行旁边。 */
+internal fun userMessageAvatarTopOffsetPx(
+    bubblePaddingTopPx: Float,
+    firstLineHeightPx: Float,
+    avatarSizePx: Float,
+): Float {
+    if (firstLineHeightPx <= 0f || avatarSizePx <= 0f) return 0f
+    val firstLineCenter = bubblePaddingTopPx.coerceAtLeast(0f) + firstLineHeightPx / 2f
+    return (firstLineCenter - avatarSizePx / 2f).coerceAtLeast(0f)
+}
+
+@Composable
+private fun userMessageAvatarTopOffset(): Dp {
+    val density = LocalDensity.current
+    return with(density) {
+        userMessageAvatarTopOffsetPx(
+            UserBubblePaddingVertical.toPx(),
+            UserBubbleLineHeight.toPx(),
+            UserMessageAvatarSize.toPx(),
+        ).toDp()
+    }
+}
+
+/**
+ * 用户消息内容贴右。打开头像时，头像占右侧一列，气泡变窄，避免顶出屏幕。
+ * [besideFirstLine] 为真时头像对准第一行，而不是整块内容的底边。
+ */
+@Composable
+private fun UserMessageSlot(
+    showAvatar: Boolean,
+    besideFirstLine: Boolean,
+    maxFraction: Float = 0.85f,
+    content: @Composable () -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val slot = if (showAvatar) UserMessageAvatarSize + UserMessageAvatarGap else 0.dp
+        val maxContent = (maxWidth * maxFraction - slot).coerceAtLeast(0.dp)
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = slot)
+                .widthIn(max = maxContent),
+        ) {
+            content()
+        }
+        if (showAvatar) {
+            UserMessageAvatar(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = if (besideFirstLine) userMessageAvatarTopOffset() else 0.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun UserMessageAvatar(modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .size(UserMessageAvatarSize)
+            .clip(CircleShape)
+            .background(Theme[colors][primaryColor])
+            .semantics { contentDescription = tr("头像") },
+    ) {
+        ProfileStore.avatar?.let { avatar ->
+            Image(
+                bitmap = avatar,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
+    }
+}
+
 @Composable
 internal fun MessageRow(
     chatMessage: ChatMessage,
@@ -3484,32 +3564,47 @@ internal fun MessageRow(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (chatMessage.fromUser) {
+                val showAvatar = ThemeStore.showUserAvatar
+                val hasText = chatMessage.text.isNotBlank()
+                val hasAttachments = chatMessage.attachments.isNotEmpty()
                 if (chatMessage.quote.isNotBlank()) {
-                    MessageQuotePreview(
-                        quote = chatMessage.quote,
-                        modifier = Modifier.fillMaxWidth(0.85f),
-                    )
-                }
-                if (chatMessage.attachments.isNotEmpty()) {
-                    UserBubbleReaction(
-                        emoji = if (chatMessage.text.isBlank()) chatMessage.modelReaction else "",
-                        bubbleColor = currentUserBubbleColors(isEditing).background,
-                        bounce = reactionBounce,
-                    ) {
-                        SentAttachmentRow(
-                            attachments = chatMessage.attachments,
-                            alignEnd = true,
-                            scrollKey = chatMessage.id,
-                            onOpen = onOpenAttachment,
+                    if (showAvatar && !hasText && !hasAttachments) {
+                        UserMessageSlot(showAvatar = true, besideFirstLine = false) {
+                            MessageQuotePreview(quote = chatMessage.quote)
+                        }
+                    } else {
+                        MessageQuotePreview(
+                            quote = chatMessage.quote,
+                            modifier = Modifier.fillMaxWidth(0.85f),
                         )
                     }
                 }
-                if (chatMessage.text.isNotBlank()) {
+                if (hasAttachments) {
+                    val attachmentRow = @Composable {
+                        UserBubbleReaction(
+                            emoji = if (!hasText) chatMessage.modelReaction else "",
+                            bubbleColor = currentUserBubbleColors(isEditing).background,
+                            bounce = reactionBounce,
+                        ) {
+                            SentAttachmentRow(
+                                attachments = chatMessage.attachments,
+                                alignEnd = true,
+                                scrollKey = chatMessage.id,
+                                onOpen = onOpenAttachment,
+                            )
+                        }
+                    }
+                    if (showAvatar && !hasText) {
+                        UserMessageSlot(showAvatar = true, besideFirstLine = false, maxFraction = 1f) {
+                            attachmentRow()
+                        }
+                    } else {
+                        attachmentRow()
+                    }
+                }
+                if (hasText) {
                     val bubble = currentUserBubbleColors(isEditing)
-                    BoxWithConstraints(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.CenterEnd,
-                    ) {
+                    UserMessageSlot(showAvatar = showAvatar, besideFirstLine = true) {
                         CompositionLocalProvider(
                             LocalTextSelectionColors provides Theme[textSelectionColors][defaultTextSelectionColors],
                         ) {
@@ -3518,7 +3613,6 @@ internal fun MessageRow(
                                     Text(
                                         chatMessage.text,
                                         modifier = Modifier
-                                            .widthIn(max = maxWidth * 0.85f)
                                             .irioSolidOrGlass(
                                                 GlassSurface.USER_BUBBLE in ThemeStore.glassSurfaces,
                                                 bubble.background,
@@ -3533,9 +3627,9 @@ internal fun MessageRow(
                                                     Modifier
                                                 }
                                             )
-                                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                                            .padding(horizontal = 14.dp, vertical = UserBubblePaddingVertical),
                                         fontSize = 16.sp,
-                                        lineHeight = 22.sp,
+                                        lineHeight = UserBubbleLineHeight,
                                         color = bubble.content,
                                     )
                                 }
@@ -3543,14 +3637,20 @@ internal fun MessageRow(
                         }
                     }
                 }
-                // 编辑版本切换器：与模型回复的版本切换同款
+                // 编辑版本切换器：与模型回复的版本切换同款，仍贴着气泡而不是头像。
                 if (editVersionCount > 1) {
-                    UserEditVersionSwitcher(
-                        versionIndex = editVersionIndex,
-                        versionCount = editVersionCount,
-                        onPrev = onPrevEditVersion,
-                        onNext = onNextEditVersion,
-                    )
+                    Box(
+                        Modifier.padding(
+                            end = if (showAvatar) UserMessageAvatarSize + UserMessageAvatarGap else 0.dp,
+                        ),
+                    ) {
+                        UserEditVersionSwitcher(
+                            versionIndex = editVersionIndex,
+                            versionCount = editVersionCount,
+                            onPrev = onPrevEditVersion,
+                            onNext = onNextEditVersion,
+                        )
+                    }
                 }
             } else {
                 if (chatMessage.attachments.isNotEmpty()) {

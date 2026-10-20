@@ -155,6 +155,7 @@ object ThemeStore {
     private const val CODE_BLOCK_WRAP_KEY = "code_block_wrap"
     private const val THINKING_BLOCK_KEY = "thinking_block"
     private const val MERGE_TOOL_CALLS_KEY = "merge_tool_calls"
+    private const val SHOW_USER_AVATAR_KEY = "show_user_avatar"
     private const val LEGACY_PREFS = "provider_settings"
     private const val LEGACY_KEY = "theme_preference"
 
@@ -220,6 +221,10 @@ object ThemeStore {
     var mergeToolCalls by mutableStateOf(false)
         private set
 
+    /** 用户消息右侧显示头像，对齐气泡第一行。默认关。 */
+    var showUserAvatar by mutableStateOf(false)
+        private set
+
     @Volatile
     private var loaded = false
 
@@ -252,6 +257,7 @@ object ThemeStore {
             codeBlockWrap = appearance.getBoolean(CODE_BLOCK_WRAP_KEY, false)
             thinkingBlock = appearance.getBoolean(THINKING_BLOCK_KEY, true)
             mergeToolCalls = appearance.getBoolean(MERGE_TOOL_CALLS_KEY, false)
+            showUserAvatar = appearance.getBoolean(SHOW_USER_AVATAR_KEY, false)
             if (appearance.getString(KEY, null) == null && stored != null) {
                 appearance.edit().putString(KEY, stored).apply()
             }
@@ -421,6 +427,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(CONTEXT_RING_KEY, enabled)
+            .apply()
+    }
+
+    fun saveShowUserAvatar(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (showUserAvatar == enabled) return
+        showUserAvatar = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(SHOW_USER_AVATAR_KEY, enabled)
             .apply()
     }
 }
