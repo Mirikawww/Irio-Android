@@ -48,7 +48,25 @@ class CodeBlockWrapTest {
     }
 
     @Test
+    fun codeBlockLineNumbersPersistAndCanStayOff() {
+        val context = RuntimeEnvironment.getApplication()
+        val previous = ThemeStore.codeBlockLineNumbers
+        val prefs = context.getSharedPreferences("appearance_settings", Context.MODE_PRIVATE)
+        try {
+            ThemeStore.saveCodeBlockLineNumbers(context, true)
+            assertTrue(ThemeStore.codeBlockLineNumbers)
+            assertTrue(prefs.getBoolean("code_block_line_numbers", false))
+            ThemeStore.saveCodeBlockLineNumbers(context, false)
+            assertFalse(ThemeStore.codeBlockLineNumbers)
+            assertFalse(prefs.getBoolean("code_block_line_numbers", true))
+        } finally {
+            ThemeStore.saveCodeBlockLineNumbers(context, previous)
+        }
+    }
+
+    @Test
     fun englishLabel() {
         assertEquals("Wrap code blocks", translate(AppLanguage.EN, "代码块自动换行"))
+        assertEquals("Code block line numbers", translate(AppLanguage.EN, "代码块行号"))
     }
 }

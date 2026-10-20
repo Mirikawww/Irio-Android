@@ -149,6 +149,7 @@ internal fun IrioMarkdown(
                 highlightsBuilder = highlightsBuilder,
                 showHeader = true,
                 softWrap = ThemeStore.codeBlockWrap,
+                lineNumbers = ThemeStore.codeBlockLineNumbers,
             )
         },
         codeBlock = {
@@ -159,6 +160,7 @@ internal fun IrioMarkdown(
                 highlightsBuilder = highlightsBuilder,
                 showHeader = true,
                 softWrap = ThemeStore.codeBlockWrap,
+                lineNumbers = ThemeStore.codeBlockLineNumbers,
             )
         },
         // Always this path, not only while streaming. Swapping back to MarkdownParagraph

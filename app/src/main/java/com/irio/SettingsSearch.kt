@@ -247,6 +247,7 @@ private val settingsSearchEntries = listOf(
     item("appearance.composerAnim", "消息框延展动画", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.enter", "按 Enter 发送", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.wrap", "代码块自动换行", "外观与偏好", AppearanceSettingsActivity::class.java),
+    item("appearance.lineNumbers", "代码块行号", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.ring", "上下文圆环", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.thinking", "思考块", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.mergeTools", "合并工具调用显示", "外观与偏好", AppearanceSettingsActivity::class.java),

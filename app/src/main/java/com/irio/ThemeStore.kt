@@ -153,6 +153,7 @@ object ThemeStore {
     private const val LONG_TEXT_PASTE_THRESHOLD_KEY = "long_text_paste_threshold"
     private const val GLASS_SURFACES_KEY = "glass_surfaces"
     private const val CODE_BLOCK_WRAP_KEY = "code_block_wrap"
+    private const val CODE_BLOCK_LINE_NUMBERS_KEY = "code_block_line_numbers"
     private const val THINKING_BLOCK_KEY = "thinking_block"
     private const val MERGE_TOOL_CALLS_KEY = "merge_tool_calls"
     private const val SHOW_USER_AVATAR_KEY = "show_user_avatar"
@@ -213,6 +214,10 @@ object ThemeStore {
     var codeBlockWrap by mutableStateOf(false)
         private set
 
+    /** 代码块左侧显示行号。折行仍算同一行。默认关。 */
+    var codeBlockLineNumbers by mutableStateOf(false)
+        private set
+
     /** 显示思考块（进行中的思考内容和「已思考 x 秒」）。关闭后只剩「思考中」。默认开。 */
     var thinkingBlock by mutableStateOf(true)
         private set
@@ -255,6 +260,7 @@ object ThemeStore {
                 .mapNotNull(GlassSurface::fromStored)
                 .toSet()
             codeBlockWrap = appearance.getBoolean(CODE_BLOCK_WRAP_KEY, false)
+            codeBlockLineNumbers = appearance.getBoolean(CODE_BLOCK_LINE_NUMBERS_KEY, false)
             thinkingBlock = appearance.getBoolean(THINKING_BLOCK_KEY, true)
             mergeToolCalls = appearance.getBoolean(MERGE_TOOL_CALLS_KEY, false)
             showUserAvatar = appearance.getBoolean(SHOW_USER_AVATAR_KEY, false)
@@ -387,6 +393,16 @@ object ThemeStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(CODE_BLOCK_WRAP_KEY, enabled)
+            .apply()
+    }
+
+    fun saveCodeBlockLineNumbers(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (codeBlockLineNumbers == enabled) return
+        codeBlockLineNumbers = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(CODE_BLOCK_LINE_NUMBERS_KEY, enabled)
             .apply()
     }
 

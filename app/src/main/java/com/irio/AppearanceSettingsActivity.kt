@@ -691,6 +691,22 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
+                    modifier = Modifier.settingsSearchAnchor("appearance.lineNumbers").settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("代码块行号"),
+                        color = Theme[colors][onPanelColor],
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(
+                        checked = ThemeStore.codeBlockLineNumbers,
+                        onCheckedChange = { enabled ->
+                            ThemeStore.saveCodeBlockLineNumbers(context, enabled)
+                        },
+                    )
+                }
+                Row(
                     modifier = Modifier.settingsSearchAnchor("appearance.ring").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

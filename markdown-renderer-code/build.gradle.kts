@@ -33,4 +33,5 @@ dependencies {
     implementation("androidx.compose.runtime:runtime")
     api("com.mikepenz:multiplatform-markdown-renderer:0.46.0")
     api("dev.snipme:highlights:1.1.0")
+    testImplementation("junit:junit:4.13.2")
 }
