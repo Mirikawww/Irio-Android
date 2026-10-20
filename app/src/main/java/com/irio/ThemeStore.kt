@@ -218,7 +218,10 @@ object ThemeStore {
     var codeBlockLineNumbers by mutableStateOf(false)
         private set
 
-    /** 显示思考块（进行中的思考内容和「已思考 x 秒」）。关闭后只剩「思考中」。默认开。 */
+    /**
+     * 为 true 时展开思考内容。设置项「默认折叠思考块」是它的反面，所以开关默认关。
+     * 打开开关后进行中只显示「思考中」，结束后整行收起；内容仍保存。
+     */
     var thinkingBlock by mutableStateOf(true)
         private set
 

@@ -728,14 +728,14 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        tr("思考块"),
+                        tr("默认折叠思考块"),
                         modifier = Modifier.weight(1f),
                         color = Theme[colors][onPanelColor],
                     )
                     Switch(
-                        checked = ThemeStore.thinkingBlock,
+                        checked = !ThemeStore.thinkingBlock,
                         onCheckedChange = { enabled ->
-                            ThemeStore.saveThinkingBlock(context, enabled)
+                            ThemeStore.saveThinkingBlock(context, !enabled)
                         },
                     )
                 }

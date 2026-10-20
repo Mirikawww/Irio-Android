@@ -515,7 +515,7 @@ private val English = mapOf(
     "按 Enter 发送" to "Send with Enter",
     "代码块自动换行" to "Wrap code blocks",
     "代码块行号" to "Code block line numbers",
-    "思考块" to "Thinking block",
+    "默认折叠思考块" to "Collapse thinking blocks by default",
     "合并工具调用显示" to "Merge tool calls",
     "主模型" to "Main model",
     "配置 GitHub MCP 后可用" to "Available after GitHub MCP is configured",

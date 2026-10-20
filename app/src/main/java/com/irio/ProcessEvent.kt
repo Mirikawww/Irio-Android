@@ -171,7 +171,7 @@ internal fun appendAssistantRoundBreak(text: String): String {
 internal fun settledAssistantText(streamed: String, lastRound: String): String =
     streamed.ifBlank { lastRound }
 
-/** 思考行的显示方式。关掉「思考块」后，进行中只剩「思考中」，结束后整行不显示（内容仍保存，重新打开开关即可看到）。 */
+/** 思考行的显示方式。打开「默认折叠思考块」后，进行中只剩「思考中」，结束后整行收起（内容仍保存，关掉开关即可看到）。 */
 internal enum class ThinkingRowMode { Full, StatusOnly, Hidden }
 
 internal fun thinkingRowMode(kind: ProcessEventKind, live: Boolean, blockEnabled: Boolean): ThinkingRowMode = when {
