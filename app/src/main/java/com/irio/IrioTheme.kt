@@ -82,6 +82,7 @@ import com.composeunstyled.theme.buildTheme
 
 fun ComponentActivity.setIrioContent(content: @Composable () -> Unit) {
     ThemeStore.ensureLoaded(this)
+    ChatBackgroundStore.ensureLoaded(this)
     enableEdgeToEdge(
         statusBarStyle = SystemBarStyle.auto(
             android.graphics.Color.TRANSPARENT,

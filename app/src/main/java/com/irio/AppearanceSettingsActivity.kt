@@ -2,6 +2,9 @@ package com.irio
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -33,9 +36,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -53,8 +58,10 @@ import com.composables.ui.components.Icon
 import com.composables.ui.components.IconButton
 import com.composables.ui.components.Text
 import com.composables.ui.components.Switch
+import com.composables.ui.theme.alphas
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
+import com.composables.ui.theme.disabledAlpha
 import com.composables.ui.theme.fieldShape
 import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.mutedColor
@@ -63,6 +70,7 @@ import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
+import kotlinx.coroutines.launch
 
 @Composable
 private fun AccentSwatch(color: Color) {
@@ -93,6 +101,15 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val chatBackgroundName = ChatBackgroundStore.fileName
+    val chatBackgroundInteraction = remember { MutableInteractionSource() }
+    val pickChatBackground = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (!ChatBackgroundEnabled || uri == null) return@rememberLauncherForActivityResult
+        scope.launch { ChatBackgroundStore.save(context, uri) }
+    }
     var texScalePercent by remember { mutableIntStateOf((ProviderStore.loadTexScale(context) * 100).toInt()) }
     var mergeModels by remember { mutableStateOf(ProviderStore.loadMergeModels(context)) }
     var mergeToolCalls by remember { mutableStateOf(ThemeStore.mergeToolCalls) }
@@ -355,6 +372,43 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                             ThemeStore.saveAutoAmoled(context, enabled)
                         },
                     )
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .alpha(if (ChatBackgroundEnabled) 1f else Theme[alphas][disabledAlpha]),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("聊天背景"),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(
+                                interactionSource = chatBackgroundInteraction,
+                                indication = null,
+                                enabled = ChatBackgroundEnabled,
+                                onClick = {
+                                    pickChatBackground.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                    )
+                                },
+                            )
+                            .padding(vertical = 7.dp),
+                        color = Theme[colors][onPanelColor],
+                    )
+                    if (ChatBackgroundEnabled && chatBackgroundName != null) {
+                        Text(
+                            tr("删除"),
+                            modifier = Modifier
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = { ChatBackgroundStore.clear(context) },
+                                )
+                                .padding(start = 12.dp, top = 7.dp, bottom = 7.dp),
+                            color = Theme[colors][onPanelColor],
+                        )
+                    }
                 }
             }
             Column(

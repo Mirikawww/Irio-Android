@@ -3039,10 +3039,22 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             containerColor = background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
         ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+            ) {
+                // 背景图固定铺满聊天页，不跟键盘一起重新缩放，避免出现黑边。
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(background),
+                ) {
+                    ChatBackgroundImage()
+                }
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
                     .imePadding()
             ) {
                 AndroidMessageList(
@@ -3051,7 +3063,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     modifier = Modifier
                         .fillMaxSize()
                         .hazeSource(chatHazeState)
-                        .background(background)
+                        .then(if (ChatBackgroundEnabled) Modifier else Modifier.background(background))
                         .padding(horizontal = 16.dp),
                     contentPaddingTop = toolbarContentPaddingPx,
                     contentPaddingBottom = composerContentPaddingPx,
@@ -3108,6 +3120,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     onDismiss = { sttProviderSnackbarVisible = false },
                     restartKey = sttProviderSnackbarRestartKey,
                 )
+            }
             }
 
         }

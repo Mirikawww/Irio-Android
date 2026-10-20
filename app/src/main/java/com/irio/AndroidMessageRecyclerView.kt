@@ -677,6 +677,8 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
         // Tapbacks may draw above an item without contributing to its measured height.
         clipChildren = false
         overScrollMode = View.OVER_SCROLL_NEVER
+        // 列表本身不铺底色，聊天背景图才能从气泡之间透出来。
+        setBackgroundColor(android.graphics.Color.TRANSPARENT)
         addItemDecoration(VerticalMessageSpacing(context, 12))
         addOnScrollListener(object : OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {

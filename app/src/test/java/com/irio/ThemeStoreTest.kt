@@ -74,6 +74,7 @@ class ThemeStoreTest {
         assertEquals("Visualize context", translate(AppLanguage.EN, "可视化上下文"))
         assertEquals("%d messages", translate(AppLanguage.EN, "%d 条"))
         assertEquals("外观", translate(AppLanguage.ZH_CN, "外观"))
+        assertEquals("Chat background", translate(AppLanguage.EN, "聊天背景"))
         assertEquals("New chat", translate(AppLanguage.EN, "新对话"))
     }
 
