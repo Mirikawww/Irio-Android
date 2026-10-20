@@ -288,6 +288,7 @@ private fun SttProviderMenu(
                     Icons.Rounded.KeyboardArrowDown,
                     contentDescription = tr("选择提供商"),
                     modifier = Modifier.size(20.dp),
+                    tint = Theme[colors][onPanelColor],
                 )
             }
         }
@@ -348,7 +349,12 @@ private fun SttModelMenu(
                 modifier = Modifier.size(32.dp),
                 interactionSource = interactionSource,
             ) {
-                Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = tr("选择模型"), modifier = Modifier.size(20.dp))
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = tr("选择模型"),
+                    modifier = Modifier.size(20.dp),
+                    tint = Theme[colors][onPanelColor],
+                )
             }
         }
     }
@@ -413,7 +419,12 @@ private fun SttLanguageMenu(
                 modifier = Modifier.size(32.dp),
                 interactionSource = interactionSource,
             ) {
-                Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = tr("选择语言"), modifier = Modifier.size(20.dp))
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = tr("选择语言"),
+                    modifier = Modifier.size(20.dp),
+                    tint = Theme[colors][onPanelColor],
+                )
             }
         }
     }
