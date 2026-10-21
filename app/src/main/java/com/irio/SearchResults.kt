@@ -18,7 +18,7 @@ internal data class SearchResultsContent(
     val fallback: String = "",
 )
 
-/** Both providers' original metadata is kept for display, independently of the model's text. */
+/** Providers' original metadata is kept for display, independently of the model's text. */
 internal fun searchResultsContent(body: String): SearchResultsContent {
     val trimmed = body.trim()
     if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
@@ -37,7 +37,7 @@ internal fun searchResultsContent(body: String): SearchResultsContent {
                 },
                 siteName = item.searchString("site_name", "siteName"),
                 favicon = item.searchString("favicon", "favicon_url"),
-                publishedAt = item.searchString("publishedDate", "published_date", "published_at"),
+                publishedAt = item.searchString("publishedDate", "published_date", "published_at", "date"),
             )
         }
         if (root != null || results != null) return SearchResultsContent(

@@ -10,6 +10,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.TimeUnit
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -24,7 +29,8 @@ enum class SearchProvider(
     val maxResultsDefault: Int,
 ) {
     TAVILY("tavily", "Tavily", 1, 20, 5),
-    EXA("exa", "Exa", 1, 100, 5);
+    EXA("exa", "Exa", 1, 100, 5),
+    TINYFISH("tinyfish", "TinyFish", 1, 100, 5);
 
     fun clampMaxResults(value: Int): Int = value.coerceIn(maxResultsMin, maxResultsMax)
 
@@ -40,8 +46,10 @@ object SearchStore {
     private const val PROVIDER = "search_provider"
     private const val TAVILY_ENCRYPTED_KEY = "tavily_encrypted_key"
     private const val EXA_ENCRYPTED_KEY = "exa_encrypted_key"
+    private const val TINYFISH_ENCRYPTED_KEY = "tinyfish_encrypted_key"
     private const val TAVILY_MAX_RESULTS = "max_results"
     private const val EXA_MAX_RESULTS = "exa_max_results"
+    private const val TINYFISH_MAX_RESULTS = "tinyfish_max_results"
     private const val SERPAPI_ENCRYPTED_KEY = "serpapi_encrypted_key"
     private const val IMAGE_MAX_RESULTS = "image_max_results"
     private const val KEY_ALIAS = "irio_tavily_key"
@@ -204,11 +212,13 @@ object SearchStore {
     private fun encryptedKeyName(provider: SearchProvider): String = when (provider) {
         SearchProvider.TAVILY -> TAVILY_ENCRYPTED_KEY
         SearchProvider.EXA -> EXA_ENCRYPTED_KEY
+        SearchProvider.TINYFISH -> TINYFISH_ENCRYPTED_KEY
     }
 
     private fun maxResultsName(provider: SearchProvider): String = when (provider) {
         SearchProvider.TAVILY -> TAVILY_MAX_RESULTS
         SearchProvider.EXA -> EXA_MAX_RESULTS
+        SearchProvider.TINYFISH -> TINYFISH_MAX_RESULTS
     }
 
     private fun preferences(context: Context) =
@@ -266,6 +276,7 @@ object WebSearch {
     ): WebSearchResult = when (provider) {
         SearchProvider.TAVILY -> TavilySearch.search(apiKey, query, cancellation, maxResults)
         SearchProvider.EXA -> ExaSearch.search(apiKey, query, cancellation, maxResults)
+        SearchProvider.TINYFISH -> TinyFishSearch.search(apiKey, query, cancellation, maxResults)
     }
 }
 
@@ -276,6 +287,7 @@ object WebFetch {
         val endpoint = when (provider) {
             SearchProvider.TAVILY -> "https://api.tavily.com/extract"
             SearchProvider.EXA -> "https://api.exa.ai/contents"
+            SearchProvider.TINYFISH -> return TinyFishFetch.fetch(apiKey, target, cancellation)
         }
         val connection = URL(endpoint).openConnection() as HttpURLConnection
         cancellation?.attach(connection)
@@ -465,3 +477,143 @@ object ExaSearch {
             ?: response.optString("error").ifBlank { response.optString("message") }
     }.getOrDefault("")
 }
+
+internal object TinyFishSearch {
+    const val ENDPOINT = "https://api.search.tinyfish.ai"
+
+    fun search(
+        apiKey: String,
+        query: String,
+        cancellation: ChatRequestCancellation? = null,
+        maxResults: Int = SearchProvider.TINYFISH.maxResultsDefault,
+        endpoint: String = ENDPOINT,
+    ): WebSearchResult {
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) return WebSearchResult(tr("缺少 query"))
+        if (apiKey.isBlank()) return WebSearchResult(tr("未配置 TinyFish 密钥"))
+        val call = runCatching {
+            val url = requireNotNull(endpoint.toHttpUrlOrNull()).newBuilder()
+                .addQueryParameter("query", trimmed).build()
+            tinyFishClient(30).newCall(Request.Builder().url(url)
+                .header("X-API-Key", apiKey.trim()).header("Accept", "application/json").build())
+        }.getOrElse { return WebSearchResult(tinyFishConnectionError(it, apiKey)) }
+        cancellation?.attach(call)
+        return try {
+            if (cancellation?.isCancelled() == true) return WebSearchResult(tr("搜索已停止"))
+            call.execute().use { response ->
+                val body = response.body.string()
+                if (cancellation?.isCancelled() == true) return WebSearchResult(tr("搜索已停止"))
+                if (!response.isSuccessful) {
+                    WebSearchResult(tinyFishError(body).ifBlank { tr("搜索失败（HTTP %s）").format(response.code) })
+                } else {
+                    formatResults(body, SearchProvider.TINYFISH.clampMaxResults(maxResults))
+                }
+            }
+        } catch (error: Exception) {
+            if (cancellation?.isCancelled() == true) WebSearchResult(tr("搜索已停止"))
+            else WebSearchResult(tinyFishConnectionError(error, apiKey))
+        } finally {
+            cancellation?.detach(call)
+        }
+    }
+
+    private fun formatResults(body: String, maxResults: Int): WebSearchResult {
+        val root = runCatching { JSONObject(body) }.getOrNull()
+            ?: return WebSearchResult(body.ifBlank { tr("没有搜索结果") })
+        val returned = root.optJSONArray("results") ?: JSONArray()
+        // TinyFish has pagination, not a count parameter. This is the app's local cap.
+        val results = JSONArray().apply {
+            repeat(minOf(returned.length(), maxResults)) { index ->
+                returned.optJSONObject(index)?.let(::put)
+            }
+        }
+        val text = buildString {
+            repeat(results.length()) { index ->
+                val item = results.optJSONObject(index) ?: return@repeat
+                item.optString("title").takeIf { it.isNotBlank() && it != "null" }?.let { append(it).append('\n') }
+                item.optString("url").takeIf { it.isNotBlank() && it != "null" }?.let { append(it).append('\n') }
+                item.optString("snippet").takeIf { it.isNotBlank() && it != "null" }?.let { append(it).append("\n\n") }
+            }
+        }.trim()
+        val displayContent = JSONObject(root.toString()).put("results", results).toString()
+        return WebSearchResult(
+            text = text.ifBlank { tr("没有搜索结果") },
+            pageCount = results.length(),
+            displayContent = displayContent,
+        )
+    }
+}
+
+internal object TinyFishFetch {
+    const val ENDPOINT = "https://api.fetch.tinyfish.ai"
+
+    fun fetch(
+        apiKey: String,
+        url: String,
+        cancellation: ChatRequestCancellation? = null,
+        endpoint: String = ENDPOINT,
+    ): WebSearchResult {
+        val target = url.trim()
+        val parsed = target.toHttpUrlOrNull()
+        if (parsed == null || parsed.username.isNotEmpty() || parsed.password.isNotEmpty()) {
+            return WebSearchResult(tr("网页地址必须以 http:// 或 https:// 开头"))
+        }
+        if (apiKey.isBlank()) return WebSearchResult(tr("未配置 TinyFish 密钥"))
+        val call = runCatching {
+            val payload = JSONObject().put("urls", JSONArray().put(target)).put("format", "markdown")
+            // TinyFish allows 110s per URL and recommends >=150s at the client.
+            tinyFishClient(150).newCall(Request.Builder().url(endpoint)
+                .header("X-API-Key", apiKey.trim()).header("Accept", "application/json")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build())
+        }
+            .getOrElse { return WebSearchResult(tinyFishConnectionError(it, apiKey)) }
+        cancellation?.attach(call)
+        return try {
+            if (cancellation?.isCancelled() == true) return WebSearchResult(tr("网页读取已停止"))
+            call.execute().use { response ->
+                val body = response.body.string()
+                if (cancellation?.isCancelled() == true) return WebSearchResult(tr("网页读取已停止"))
+                if (!response.isSuccessful) {
+                    return WebSearchResult(tinyFishError(body).ifBlank { tr("网页读取失败（HTTP %s）").format(response.code) })
+                }
+                val root = JSONObject(body)
+                val errors = root.optJSONArray("errors")
+                val error = (0 until (errors?.length() ?: 0))
+                    .asSequence()
+                    .mapNotNull { errors?.optJSONObject(it) }
+                    .firstOrNull { it.optString("url") == target }
+                    ?: errors?.optJSONObject(0)
+                if (error != null) {
+                    WebSearchResult(tr("网页读取失败（%s）").format(error.optString("error").ifBlank { tr("未知错误") }))
+                } else {
+                    val text = (root.optJSONArray("results")?.optJSONObject(0)?.opt("text") as? String).orEmpty()
+                    WebSearchResult(text.ifBlank { tr("网页没有可读取的正文") })
+                }
+            }
+        } catch (error: Exception) {
+            if (cancellation?.isCancelled() == true) WebSearchResult(tr("网页读取已停止"))
+            else WebSearchResult(tinyFishConnectionError(error, apiKey))
+        } finally {
+            cancellation?.detach(call)
+        }
+    }
+}
+
+private fun tinyFishError(body: String): String = runCatching {
+    val error = JSONObject(body).opt("error")
+    if (error is JSONObject) (error.opt("message") as? String).orEmpty()
+        .ifBlank { (error.opt("code") as? String).orEmpty() }
+    else (error as? String).orEmpty()
+}.getOrDefault("")
+
+private fun tinyFishConnectionError(error: Throwable, apiKey: String): String =
+    error.message?.replace(apiKey, "[redacted]")?.replace(apiKey.trim(), "[redacted]")
+        ?.takeIf { it.isNotBlank() } ?: tr("无法连接到 TinyFish")
+
+private fun tinyFishClient(readTimeoutSeconds: Long) = IrioHttp.client.newBuilder()
+    .connectTimeout(20, TimeUnit.SECONDS)
+    .readTimeout(readTimeoutSeconds, TimeUnit.SECONDS)
+    // Never forward a provider credential to a redirect target.
+    .followRedirects(false)
+    .followSslRedirects(false)
+    .build()
