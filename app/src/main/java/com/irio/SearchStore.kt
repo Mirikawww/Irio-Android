@@ -253,6 +253,7 @@ object SearchStore {
 data class WebSearchResult(
     val text: String,
     val pageCount: Int = 0,
+    val displayContent: String = text,
 )
 
 object WebSearch {
@@ -376,6 +377,7 @@ object TavilySearch {
         return WebSearchResult(
             text = text.toString().trim().ifBlank { tr("没有搜索结果") },
             pageCount = results.length(),
+            displayContent = body,
         )
     }
 
@@ -452,6 +454,7 @@ object ExaSearch {
         return WebSearchResult(
             text = text.toString().trim().ifBlank { tr("没有搜索结果") },
             pageCount = results.length(),
+            displayContent = body,
         )
     }
 

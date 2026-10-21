@@ -226,7 +226,7 @@ internal class WebSearchToolProvider : ToolProvider {
             ChatStreamUpdate(
                 searching = false,
                 searchPagesDelta = result.pageCount,
-                searchContent = result.text,
+                searchContent = result.displayContent,
             )
         )
         ToolExecutionResult(text = result.text, searchPages = result.pageCount)

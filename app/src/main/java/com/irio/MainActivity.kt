@@ -4036,6 +4036,13 @@ internal fun ProcessEventSheet(
             (LocalWindowInfo.current.containerSize.height * 0.85f).toDp()
         }
         val body = event?.content.orEmpty()
+        if (event?.kind == ProcessEventKind.SEARCH || event?.toolName == WebSearchTool.NAME) {
+            SearchResultsSheetContent(
+                body,
+                modifier = Modifier.fillMaxWidth().heightIn(min = minSheetHeight, max = maxSheetHeight),
+            )
+            return@BottomSheet
+        }
         val chunks = remember(body) { splitSheetChunks(body) }
         val longContent = body.length > 800 || chunks.size > 1
         if (longContent) {
