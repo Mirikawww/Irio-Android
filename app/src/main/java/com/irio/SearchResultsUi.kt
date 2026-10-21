@@ -51,6 +51,7 @@ internal fun SearchResultsSheetContent(body: String, modifier: Modifier = Modifi
         modifier = modifier,
         contentPadding = PaddingValues(bottom = 16.dp),
         itemSpacing = 24.dp,
+        prioritizeScrollGestures = true,
     ) { SearchResultRow(it.value) }
 }
 

@@ -45,6 +45,7 @@ internal fun <T : Any> AndroidComposeRecyclerList(
     cornerRadius: Dp = 0.dp,
     opacity: State<Float>? = null,
     interactionEnabled: Boolean = true,
+    prioritizeScrollGestures: Boolean = false,
     content: @Composable (T) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -64,6 +65,7 @@ internal fun <T : Any> AndroidComposeRecyclerList(
         modifier = modifier,
         factory = { context ->
             ComposeRecyclerView(context, key, content).also { view ->
+                view.prioritizeScrollGestures = prioritizeScrollGestures
                 view.updateVisibility(opacity?.value ?: 1f, interactionEnabled)
                 view.updateCornerRadius(cornerRadiusPx)
                 view.updatePadding(padding)
@@ -72,6 +74,7 @@ internal fun <T : Any> AndroidComposeRecyclerList(
             }
         },
         update = { view ->
+            view.prioritizeScrollGestures = prioritizeScrollGestures
             view.updateVisibility(opacity?.value ?: 1f, interactionEnabled)
             view.updateCornerRadius(cornerRadiusPx)
             view.updatePadding(padding)
@@ -98,6 +101,8 @@ private class ComposeRecyclerView<T : Any>(
     private var spacingDecoration: RecyclerSpacingDecoration? = null
     private var cornerRadiusPx = 0f
     private var acceptsTouch = true
+    var prioritizeScrollGestures = false
+    private var lastTouchY = 0f
 
     init {
         layoutManager = LinearLayoutManager(context)
@@ -145,8 +150,31 @@ private class ComposeRecyclerView<T : Any>(
             else View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
     }
 
-    override fun dispatchTouchEvent(event: MotionEvent): Boolean =
-        acceptsTouch && super.dispatchTouchEvent(event)
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (!acceptsTouch) return false
+        // AndroidView must claim DOWN before a Compose sheet's drag detector reaches
+        // touch slop and cancels the list. Nested scrolling still hands off at edges.
+        if (prioritizeScrollGestures && event.actionMasked == MotionEvent.ACTION_DOWN) {
+            lastTouchY = event.y
+            parent?.requestDisallowInterceptTouchEvent(true)
+        } else if (prioritizeScrollGestures && event.actionMasked == MotionEvent.ACTION_MOVE) {
+            val deltaY = event.y - lastTouchY
+            if (deltaY != 0f) {
+                val direction = if (deltaY > 0f) -1 else 1
+                parent?.requestDisallowInterceptTouchEvent(canScrollVertically(direction))
+                lastTouchY = event.y
+            }
+        }
+        return try {
+            super.dispatchTouchEvent(event)
+        } finally {
+            if (prioritizeScrollGestures &&
+                (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL)
+            ) {
+                parent?.requestDisallowInterceptTouchEvent(false)
+            }
+        }
+    }
 
     fun updateCornerRadius(next: Float) {
         if (cornerRadiusPx != next) {
