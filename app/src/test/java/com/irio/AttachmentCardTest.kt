@@ -109,6 +109,43 @@ class AttachmentCardTest {
         }
     }
 
+    @Test fun sentFileShowsOnlyACircularProgressInsideTheDimmedSuffixTile() {
+        val progress = mutableStateOf<AttachmentUploadProgress?>(AttachmentUploadProgress(1L, 50L, 100L))
+        withCard(
+            "notes.txt", "text/plain", onOpen = {}, uploadProgress = progress,
+            afterFirstLayout = { nodes, _ ->
+                val card = nodes.single { it.config.contains(SemanticsActions.OnClick) }
+                val ring = nodes.single { it.config.contains(SemanticsProperties.ProgressBarRangeInfo) }
+                assertEquals(24f, ring.boundsInRoot.width, 0.01f)
+                assertEquals(24f, ring.boundsInRoot.height, 0.01f)
+                assertTrue(ring.boundsInRoot.left >= card.boundsInRoot.left + 8f)
+                assertTrue(ring.boundsInRoot.right <= card.boundsInRoot.left + 48f)
+                assertTrue(texts(nodes).contains("txt"))
+                assertFalse(texts(nodes).any { it.contains("发送中") })
+                assertEquals(0.5f, ring.config[SemanticsProperties.ProgressBarRangeInfo].current, 0.01f)
+                progress.value = null
+            },
+        ) { nodes, _, _ ->
+            assertTrue(texts(nodes).contains("txt"))
+            assertFalse(nodes.any { it.config.contains(SemanticsProperties.ProgressBarRangeInfo) })
+        }
+    }
+
+    @Test fun sendingImageUsesTheSameRingOverItsDimmedThumbnail() = withCard(
+        "photo.jpg", "image/jpeg", onOpen = {},
+        uploadProgress = mutableStateOf(AttachmentUploadProgress(1L)),
+    ) { nodes, _, _ ->
+        val thumbnail = nodes.single { it.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() } == listOf("photo.jpg") }
+        val ring = nodes.single { it.config.contains(SemanticsProperties.ProgressBarRangeInfo) }
+        assertEquals(thumbnail.boundsInRoot.center.x, ring.boundsInRoot.center.x, 0.01f)
+        assertEquals(thumbnail.boundsInRoot.center.y, ring.boundsInRoot.center.y, 0.01f)
+        assertTrue(texts(nodes).isEmpty())
+        assertEquals(
+            androidx.compose.ui.semantics.ProgressBarRangeInfo.Indeterminate,
+            ring.config[SemanticsProperties.ProgressBarRangeInfo],
+        )
+    }
+
     @Test fun longNamesAndLargeTextKeepTheSizeBelowTheTitleInDarkMode() = withCard(
         "a-very-long-document-name-that-must-not-overlap-its-file-size.pdf", "application/pdf",
         fontScale = 1.5f, theme = ThemePreference.DARK,
@@ -154,6 +191,7 @@ class AttachmentCardTest {
         onOpen: (() -> Unit)? = null,
         onRemove: (() -> Unit)? = null,
         loading: State<Boolean>? = null,
+        uploadProgress: State<AttachmentUploadProgress?>? = null,
         afterFirstLayout: ((List<SemanticsNode>, ChatAttachment) -> Unit)? = null,
         check: (List<SemanticsNode>, ChatAttachment, Context) -> Unit,
     ) = runTest {
@@ -176,7 +214,7 @@ class AttachmentCardTest {
             view.setContent {
                 CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
                     AppTheme {
-                        AttachmentCard(attachment, loading = loading?.value ?: false, onOpen = onOpen, onRemove = onRemove)
+                        AttachmentCard(attachment, loading = loading?.value ?: false, uploadProgress = uploadProgress?.value, onOpen = onOpen, onRemove = onRemove)
                     }
                 }
             }

@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -65,6 +66,7 @@ internal fun AttachmentCard(
     attachment: ChatAttachment,
     modifier: Modifier = Modifier,
     loading: Boolean = false,
+    uploadProgress: AttachmentUploadProgress? = null,
     onOpen: (() -> Unit)? = null,
     onRemove: (() -> Unit)? = null,
 ) {
@@ -101,12 +103,20 @@ internal fun AttachmentCard(
                 .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
             if (attachment.isImage) {
                 // Coil bounds decoding, applies image orientation and caches off the UI thread.
-                AsyncImage(
-                    model = File(attachment.filePath),
-                    contentDescription = attachment.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = surface.size(cardHeight),
-                )
+                Box {
+                    AsyncImage(
+                        model = File(attachment.filePath),
+                        contentDescription = attachment.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = surface.size(cardHeight),
+                    )
+                    if (uploadProgress != null) {
+                        Box(
+                            Modifier.size(cardHeight).clip(shape).background(Color.Black.copy(alpha = 0.48f)),
+                            contentAlignment = Alignment.Center,
+                        ) { CircularAttachmentUploadIndicator(uploadProgress) }
+                    }
+                }
             } else {
                 Row(
                     modifier = surface.width(192.dp).height(cardHeight).padding(8.dp),
@@ -119,10 +129,14 @@ internal fun AttachmentCard(
                     ) {
                         Text(
                             extensionLabel,
-                            color = content,
+                            color = if (uploadProgress == null) content else content.copy(alpha = 0.28f),
                             style = badgeStyle,
                             maxLines = 1,
                         )
+                        if (uploadProgress != null) {
+                            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.48f), tileShape))
+                            CircularAttachmentUploadIndicator(uploadProgress)
+                        }
                     }
                     Column(
                         modifier = Modifier.weight(1f),

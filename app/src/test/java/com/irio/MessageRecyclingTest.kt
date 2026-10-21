@@ -33,6 +33,7 @@ class MessageRecyclingTest {
         val list = MessageRecyclerView(controller.get())
         list.updateCallbacks(AndroidMessageCallbacks(
             markdownScope = this,
+            uploadTracker = AttachmentUploadTracker(), uploadConversationId = "test",
             onOpenProcess = { _, _ -> }, onOpenAttachment = {}, onCopy = {}, onQuote = {},
             onAddReaction = {}, onRemoveReaction = {}, reactionAnimations = ReactionBounceTracker(),
             onRetry = {}, canRetry = { false }, onPrevVersion = { null }, onNextVersion = { null },

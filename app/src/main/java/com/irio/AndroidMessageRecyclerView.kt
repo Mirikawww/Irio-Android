@@ -32,6 +32,8 @@ import kotlinx.coroutines.CoroutineScope
  */
 internal data class AndroidMessageCallbacks(
     val markdownScope: CoroutineScope,
+    val uploadTracker: AttachmentUploadTracker,
+    val uploadConversationId: String,
     val onOpenProcess: (Long, ProcessEvent) -> Unit,
     val onOpenAttachment: (ChatAttachment) -> Unit,
     val onCopy: (ChatMessage) -> Unit,
@@ -975,6 +977,7 @@ private fun AndroidMessageRow(
             chatMessage = message,
             reactionAnimations = callbacks.reactionAnimations,
             newUserMessageId = callbacks.newUserMessageId,
+            uploadProgress = callbacks.uploadTracker.progress(callbacks.uploadConversationId, message.id),
 
 
             markdownScope = callbacks.markdownScope,

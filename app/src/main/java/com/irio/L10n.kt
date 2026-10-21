@@ -784,6 +784,8 @@ private val English = mapOf(
     "配对码无效或已刷新" to "The code is invalid or was refreshed",
     "重试" to "Retry",
     "附件总大小超过 5GB" to "Attachments exceed 5 GB",
+    "正在准备附件" to "Preparing attachments",
+    "附件请求发送中 %d%%" to "Sending request with attachments %d%%",
     "附件数量超过 15 个槽位（照片和视频各算半个）" to "More than 15 attachment slots (each photo or video counts as half)",
     "高" to "High",
     "不支持思考" to "Thinking isn't supported",

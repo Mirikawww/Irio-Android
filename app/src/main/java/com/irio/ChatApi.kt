@@ -202,6 +202,7 @@ object ChatApi {
         onUpdate: suspend (ChatStreamUpdate) -> Unit,
         appContext: android.content.Context? = null,
         onReaction: suspend (Long, String) -> Boolean = { _, _ -> false },
+        onUploadProgress: ((sent: Long, total: Long) -> Unit)? = null,
     ): ChatCompletionResult {
         val history = (if (toolRegistry.handles(ReactionTool.NAME)) reactionRequestMessages(messages) else messages).toMutableList()
         var searchPages = 0
@@ -250,6 +251,7 @@ object ChatApi {
                 connectionScope = connectionScope,
                 cancellation = cancellation,
                 onUpdate = onUpdate,
+                onUploadProgress = if (roundIndex == 0) onUploadProgress else null,
                 allowEmptyCompletion = displayedBubbles,
             )
             if (turn.usage != null) lastUsage = turn.usage
@@ -523,6 +525,7 @@ object ChatApi {
         connectionScope: String,
         cancellation: ChatRequestCancellation,
         onUpdate: suspend (ChatStreamUpdate) -> Unit,
+        onUploadProgress: ((sent: Long, total: Long) -> Unit)? = null,
         http1Retried: Boolean = false,
         allowEmptyCompletion: Boolean = false,
     ): ChatCompletionResult {
@@ -547,7 +550,7 @@ object ChatApi {
         val request = try {
             val builder = Request.Builder()
                 .url(ProviderEndpoints.chatUrl(provider, model))
-                .post(bodyBytes.toRequestBody(null))
+                .post(onUploadProgress?.let { UploadProgressRequestBody(bodyBytes, it) } ?: bodyBytes.toRequestBody(null))
                 .header("Content-Type", "application/json; charset=utf-8")
                 .header("Accept", "text/event-stream")
                 .header("Cache-Control", "no-cache, no-store")
@@ -732,6 +735,7 @@ object ChatApi {
                     connectionScope = connectionScope,
                     cancellation = cancellation,
                     onUpdate = onUpdate,
+                    onUploadProgress = onUploadProgress,
                     http1Retried = true,
                     allowEmptyCompletion = allowEmptyCompletion,
                 )

@@ -333,6 +333,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var messages by remember { mutableStateOf(currentConversation.messages) }
     var newUserMessageId by remember { mutableStateOf<Long?>(null) }
     var pendingAttachments by remember { mutableStateOf(emptyList<ChatAttachment>()) }
+    val attachmentUploads = remember { AttachmentUploadTracker() }
     var writingPastedText by remember { mutableStateOf(emptySet<String>()) }
     var clearingHistory by remember { mutableStateOf(false) }
     var composerStatus by remember { mutableStateOf<String?>(null) }
@@ -1439,6 +1440,12 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         val requestProvider = providers.firstOrNull { it.id == activeProviderId && it.models.isNotEmpty() }
             ?: providers.firstOrNull { it.models.isNotEmpty() }
             ?: ProviderStore.loadProvider(context)
+        val uploadMessageId = requestSource.lastOrNull()?.takeIf { user ->
+            user.fromUser && !user.hidden && user.id == reply.responseToUserId &&
+                user.attachments.isNotEmpty() && requestProvider != null && requestModel.isNotBlank() &&
+                !ModelCatalog.isImageModel(context, requestModel)
+        }?.id
+        if (uploadMessageId != null) attachmentUploads.prepare(requestConversationId, uploadMessageId, reply.id)
         val job = scope.launch {
             var appliedFinal = false
             try {
@@ -1538,6 +1545,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 }
                 val liveTokenEstimator = LiveReplyTokenEstimator()
                 val streamedToolCalls = StringBuilder()
+                var lastUploadPercent = -1
                 withContext(Dispatchers.IO) {
                     ChatApi.streamChat(
                         provider = provider,
@@ -1559,6 +1567,23 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         conversationId = requestConversationId,
                         cancellation = requestCancellation,
                         appContext = context,
+                        onUploadProgress = uploadMessageId?.let { userMessageId ->
+                            { sent: Long, total: Long ->
+                                val percent = if (total > 0L) (sent * 100L / total).toInt() else 0
+                                if (percent != lastUploadPercent) {
+                                    lastUploadPercent = percent
+                                    scope.launch(Dispatchers.Main.immediate) {
+                                        if (!requestCancellation.isCancelled()) {
+                                            attachmentUploads.advance(requestConversationId, userMessageId, reply.id, sent, total)
+                                            if (sent == total) {
+                                                delay(350)
+                                                attachmentUploads.hideCompleted(requestConversationId, userMessageId, reply.id)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
                         onReaction = { messageId, emoji ->
                             withContext(Dispatchers.Main.immediate) {
                                 !requestCancellation.isCancelled() &&
@@ -1798,6 +1823,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 flushBackgroundNotices(requestConversationId)
             }
             } finally {
+                if (uploadMessageId != null) attachmentUploads.finish(requestConversationId, uploadMessageId, reply.id)
                 if (!appliedFinal) {
                     generations = generations - reply.id
                     flushBackgroundNotices(requestConversationId)
@@ -2284,6 +2310,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     val editAnchorId = visibleTranscript.lastOrNull { it.fromUser && it.summaryState == SummaryState.NONE }?.id
     val contextBoundaryId = visibleTranscript.lastOrNull { it.summaryState == SummaryState.SUCCESS }?.id
     val messageCallbacks = remember(
+        currentConversation.id,
         newUserMessageId,
         editingMessageId,
         editAnchorId,
@@ -2294,6 +2321,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     ) {
         AndroidMessageCallbacks(
         markdownScope = scope,
+        uploadTracker = attachmentUploads,
+        uploadConversationId = currentConversation.id,
         onOpenProcess = { messageId, event ->
             processSheetMessageId = messageId
             processSheetEventId = event.id
@@ -3497,6 +3526,7 @@ internal fun MessageRow(
     chatMessage: ChatMessage,
     reactionAnimations: ReactionBounceTracker,
     newUserMessageId: Long? = null,
+    uploadProgress: AttachmentUploadProgress? = null,
 
 
     markdownScope: CoroutineScope,
@@ -3583,6 +3613,7 @@ internal fun MessageRow(
                                 attachments = chatMessage.attachments,
                                 alignEnd = true,
                                 scrollKey = chatMessage.id,
+                                uploadProgress = uploadProgress,
                                 onOpen = onOpenAttachment,
                             )
                         }
@@ -4112,6 +4143,7 @@ private fun SentAttachmentRow(
     attachments: List<ChatAttachment>,
     alignEnd: Boolean,
     scrollKey: Any,
+    uploadProgress: AttachmentUploadProgress? = null,
     onOpen: (ChatAttachment) -> Unit,
 ) {
     // 行宽随内容，短于视口时仍由消息列贴右或贴左。超出后才横向滚动。
@@ -4125,9 +4157,10 @@ private fun SentAttachmentRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
-            attachments.forEach { attachment ->
+            attachments.forEachIndexed { index, attachment ->
                 AttachmentCard(
                     attachment,
+                    uploadProgress = if (alignEnd && index == attachments.lastIndex) uploadProgress else null,
                     onOpen = { onOpen(attachment) },
                 )
             }
