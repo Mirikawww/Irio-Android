@@ -33,6 +33,13 @@ internal object GeminiProtocol {
                         parts.put(JSONObject().put("inlineData", JSONObject().put("mimeType", attachment.mimeType)
                             .put("data", java.util.Base64.getEncoder().encodeToString(attachment.bytes()))))
                     }
+                    message.toolCalls.forEach { call ->
+                        parts.put(JSONObject().put("functionCall", JSONObject().apply {
+                            put("name", call.name)
+                            call.geminiFunctionId?.let { put("id", it) }
+                            put("args", JSONObject(call.arguments))
+                        }))
+                    }
                     if (parts.length() == 0) parts.put(JSONObject().put("text", ""))
                 }
             }

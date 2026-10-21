@@ -18,7 +18,7 @@ class ToolContextTest {
                 ProcessEvent(1L, ProcessEventKind.TOOL, content = completed, toolName = LinuxShellTool.NAME),
                 ProcessEvent(2L, ProcessEventKind.TOOL, content = partial, toolName = LinuxShellTool.NAME),
             ))
-        val text = modelRequestMessages(listOf(reply)).single().text
+        val text = modelRequestMessages(listOf(reply)).joinToString("\n") { it.text }
         assertTrue(text.contains(partial))
         assertEquals(1, Regex(Regex.escape(completed)).findAll(text).count())
     }
@@ -52,12 +52,16 @@ class ToolContextTest {
         val linked = LinkConversationJson.decode(JSONObject(LinkConversationJson.encode(local).toString()))
         assertEquals(records, local.messages[1].toolRecords)
         assertEquals(records, linked.messages[1].toolRecords)
-        val text = modelRequestMessages(linked.messages)[1].text
+        val request = modelRequestMessages(linked.messages)
+        val text = request.joinToString("\n") { it.text + it.toolCalls.joinToString { call -> call.name + call.arguments } }
         assertTrue(text.contains("get_memory"))
         assertTrue(text.contains("actual-query"))
         assertEquals(1, Regex("search-output").findAll(text).count())
         assertTrue(text.indexOf("actual-query") < text.indexOf("second-query"))
-        assertEquals(text, summaryTurns(planCompression(linked.messages)!!)[1].text)
+        val summary = summaryTurns(planCompression(linked.messages)!!)[1].text
+        records.forEach { record -> assertTrue(summary.contains(record.call.arguments)); assertTrue(summary.contains(record.result)) }
+        assertEquals(records.map { it.result }, request.filter { it.role == "tool" }.map { it.text })
+        assertEquals("完成", request.single { it.role == "assistant" }.text)
     }
 
     @Test
@@ -89,13 +93,16 @@ class ToolContextTest {
         val reopened = LinkConversationJson.decode(JSONObject(LinkConversationJson.encode(local).toString()))
         val history = contextMessages(reopened.messages) + ChatMessage(3L, "刚才运行了什么？", true)
         val request = modelRequestMessages(history)
-        val toolText = request[1].text
+        val toolText = request.drop(1).joinToString("\n") { it.text }
         assertTrue(toolText.contains(LinuxShellTool.NAME))
         assertTrue(toolText.contains(transcript))
         assertTrue(toolText.contains(reply.text))
         assertEquals(reply.text, reopened.messages[1].text)
-        assertEquals(toolText, summaryTurns(planCompression(reopened.messages)!!)[1].text)
-        assertTrue(estimateRequestTokens(request) > estimateRequestTokens(request.map { it.copy(text = if (it.role == "assistant") reply.text else it.text) }))
+        val summary = summaryTurns(planCompression(reopened.messages)!!)[1].text
+        assertTrue(summary.contains(transcript))
+        assertTrue(summary.contains(reply.text))
+        assertEquals(reply.text, request.single { it.role == "assistant" }.text)
+        assertTrue(estimateRequestTokens(request) > estimateRequestTokens(request.filterNot { it.text.contains(transcript) }))
     }
 
     @Test
@@ -110,7 +117,7 @@ class ToolContextTest {
                 ProcessEvent(5L, ProcessEventKind.TOOL, content = "not-finished", live = true, toolName = LinuxShellTool.NAME),
             ),
         )
-        val text = modelRequestMessages(listOf(reply)).single().text
+        val text = modelRequestMessages(listOf(reply)).joinToString("\n") { it.text }
         assertTrue(text.contains(LinuxShellTool.NAME))
         assertTrue(text.contains(LinuxBackgroundTool.NAME))
         assertTrue(text.indexOf("first") < text.indexOf("background-status"))

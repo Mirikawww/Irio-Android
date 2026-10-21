@@ -68,9 +68,12 @@ class ToolContextApiTest {
                 val reopened = LinkConversationJson.decode(JSONObject(LinkConversationJson.encode(local).toString()))
                 assertEquals(records, reopened.messages[1].toolRecords)
                 val messages = modelRequestMessages(contextMessages(reopened.messages) + ChatMessage(3L, "what happened?", true))
-                val historyText = messages[1].text
-                records.forEach { assertTrue(historyText.contains(it.call.arguments)); assertTrue(historyText.contains(it.result)) }
-                assertEquals(historyText, summaryTurns(planCompression(reopened.messages)!!)[1].text)
+                assertEquals("done", messages[1].text)
+                assertFalse(messages[1].text.contains("[Tool execution record:"))
+                assertEquals(records.map { it.call.arguments }, messages[1].toolCalls.map { it.arguments })
+                assertEquals(records.map { it.result }, messages.filter { it.role == "tool" }.map { it.text })
+                val summary = summaryTurns(planCompression(reopened.messages)!!)[1].text
+                records.forEach { assertTrue(summary.contains(it.call.arguments)); assertTrue(summary.contains(it.result)) }
                 ProviderProtocol.entries.forEach { protocol ->
                     server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(""))
                     ChatApi.streamChat(

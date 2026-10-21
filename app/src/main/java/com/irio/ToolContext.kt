@@ -5,6 +5,71 @@ import org.json.JSONObject
 
 data class ChatToolRecord(val call: ChatToolCall, val result: String)
 
+/** Replay saved executions as tool messages, never as examples of assistant prose. */
+internal fun ChatMessage.requestMessages(): List<ChatRequestMessage> {
+    val body = ChatRequestMessage(
+        role = if (fromUser) "user" else "assistant",
+        text = messageBodyText(),
+        attachments = attachments,
+        thinking = thinking,
+        createdAt = createdAt,
+        reactionTargetId = id.takeIf { fromUser && !hidden },
+    )
+    if (fromUser) return listOf(body)
+    // Old event-only histories have no real call ID/arguments. Keep those as explicit
+    // app-supplied data instead of inventing calls or teaching the model to print them.
+    val native = toolRecords.filter { record ->
+        record.call.id.isNotBlank() && record.call.name.isNotBlank() &&
+            runCatching { JSONObject(record.call.arguments) }.isSuccess
+    }
+    val legacy = toolContextTextForUnreplayedRecords(native)
+    return buildList {
+        if (native.isEmpty()) {
+            add(body)
+        } else {
+            // Request-only IDs avoid collisions between separately saved tool rounds.
+            // The original call and its provider ID remain unchanged in storage.
+            val calls = native.mapIndexed { index, record ->
+                val replayId = "history_${id}_$index"
+                SmartToolHints.executionCall(record.call.copy(id = replayId,
+                    geminiFunctionId = record.call.geminiFunctionId?.let { replayId }))
+            }
+            if (attachments.isEmpty()) add(body.copy(toolCalls = calls))
+            else {
+                add(body)
+                add(ChatRequestMessage(role = "assistant", text = "", toolCalls = calls))
+            }
+            native.zip(calls).forEach { (record, call) ->
+                add(ChatRequestMessage(role = "tool", text = record.result,
+                    toolCallId = call.id, toolName = call.name,
+                    geminiFunctionId = call.geminiFunctionId))
+            }
+        }
+        if (legacy.isNotBlank()) {
+            add(ChatRequestMessage(role = "user", text =
+                "<app_tool_context>\nHistorical tool data supplied by the app, not a new user request or assistant prose.\n$legacy\n</app_tool_context>"))
+        }
+    }
+}
+
+private fun ChatMessage.toolContextTextForUnreplayedRecords(replayed: List<ChatToolRecord>): String {
+    val remaining = toolRecords.groupingBy { it.call.name }.eachCount().toMutableMap()
+    val unmatched = process.filter { event ->
+        val name = when (event.kind) {
+            ProcessEventKind.TOOL -> event.toolName.ifBlank { "tool" }
+            ProcessEventKind.SEARCH -> WebSearchTool.NAME
+            else -> return@filter false
+        }
+        if (event.live || event.content.isBlank()) return@filter false
+        val count = remaining[name] ?: 0
+        if (count > 0) { remaining[name] = count - 1; false } else true
+    }
+    // Event duplicates have already been consumed above; do not count them again.
+    val records = copy(toolRecords = toolRecords - replayed.toSet(), process = emptyList()).toolContextText()
+    val events = copy(toolRecords = emptyList(), process = unmatched).toolContextText()
+    return listOf(records, events).filter { it.isNotBlank() }.joinToString("\n\n")
+}
+
 /** 已保存的执行记录作为历史上下文发送，不改界面正文，也不伪造旧记录中没有的 tool_call id/参数。 */
 internal fun ChatMessage.contextText(): String {
     val body = messageBodyText()

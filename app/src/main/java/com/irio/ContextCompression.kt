@@ -198,18 +198,11 @@ internal fun summaryTurns(plan: CompressionPlan): List<ChatRequestMessage> {
 internal fun modelRequestMessages(messages: List<ChatMessage>): List<ChatRequestMessage> {
     val boundary = messages.indexOfLast { it.summaryState == SummaryState.SUCCESS }
     val slice = if (boundary < 0) messages else messages.drop(boundary + 1)
-    val later = slice.mapNotNull { message ->
+    val later = slice.flatMap { message ->
         if (message.summaryState != SummaryState.NONE || message.isError || message.isPending) {
-            null
+            emptyList()
         } else {
-            ChatRequestMessage(
-                role = if (message.fromUser) "user" else "assistant",
-                text = message.contextText(),
-                attachments = message.attachments,
-                thinking = message.thinking,
-                createdAt = message.createdAt,
-                reactionTargetId = message.id.takeIf { message.fromUser && !message.hidden },
-            )
+            message.requestMessages()
         }
     }
     if (boundary < 0) return later

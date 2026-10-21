@@ -300,10 +300,10 @@ class CommonsImageToolTest {
         val image = """{"images":[{"id":"commons:11","file_path":"/private/attachments/commons-local.png","source_url":"https://commons.wikimedia.org/w/index.php?curid=11"}]}"""
         val message = ChatMessage(1, "A panda", false, process = listOf(
             ProcessEvent(1, ProcessEventKind.TOOL, toolName = "show_images", content = image)))
-        val request = modelRequestMessages(listOf(message)).single()
-        assertTrue(request.attachments.isEmpty())
-        assertFalse("Local display paths are not model context", request.text.contains("/private/"))
-        assertTrue(request.text.contains("commons:11"))
+        val request = modelRequestMessages(listOf(message))
+        assertTrue(request.all { it.attachments.isEmpty() })
+        assertFalse("Local display paths are not model context", request.any { it.text.contains("/private/") })
+        assertTrue(request.any { it.text.contains("commons:11") })
     }
 
     private val response = """{
