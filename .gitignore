@@ -16,6 +16,8 @@ desktop/build/
 # Local configuration
 local.properties
 keystore.properties
+.env
+.env.*
 
 # Signing keys
 keystore/
