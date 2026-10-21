@@ -84,6 +84,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
     var deviceCode by remember { mutableStateOf<GitHubDeviceCode?>(null) }
     val error = sheets.loginError
     val detailsError = sheets.detailsError
+    var detailsErrorNonce by remember { mutableIntStateOf(0) }
     var busy by remember { mutableStateOf(false) }
     var accountLoading by remember { mutableStateOf(false) }
     var todoistAccountLoading by remember { mutableStateOf(false) }
@@ -92,6 +93,10 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
     var dismissJob by remember { mutableStateOf<Job?>(null) }
     val content = Theme[colors][onPanelColor]
     val muted = Theme[colors][mutedColor]
+    fun showDetailsError(message: String) {
+        sheets.detailsError = message
+        detailsErrorNonce++
+    }
 
     LaunchedEffect(store) {
         installation = withContext(Dispatchers.IO) { store.load() }
@@ -116,7 +121,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            if (!accountCancellation.isCancelled()) sheets.detailsError = tr("无法读取 GitHub 登录账号")
+            if (!accountCancellation.isCancelled()) showDetailsError(tr("无法读取 GitHub 登录账号"))
         } finally {
             accountCancellation.cancel()
             accountLoading = false
@@ -142,7 +147,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            if (!todoistAccountCancellation.isCancelled()) sheets.detailsError = tr("无法读取 Todoist 登录账号")
+            if (!todoistAccountCancellation.isCancelled()) showDetailsError(tr("无法读取 Todoist 登录账号"))
         } finally {
             todoistAccountCancellation.cancel()
             todoistAccountLoading = false
@@ -294,6 +299,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
     }
     BottomSheet(state = details, onDismissRequest = { details.targetDetent = BottomSheetDetent.Hidden },
         contentPadding = PaddingValues(top = 32.dp, bottom = 16.dp)) {
+        Box(Modifier.fillMaxWidth()) {
         SheetBody {
             if (selectedIntegration == McpIntegration.GITHUB) GitHubLogo(80.dp, Modifier.align(Alignment.CenterHorizontally))
              else TodoistLogo(80.dp, Modifier.align(Alignment.CenterHorizontally))
@@ -309,7 +315,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                     GitHubInfoRow(tr("开发者"), "Doist Inc.")
                     GitHubInfoDivider()
                     GitHubInfoRow(tr("官网"), "todoist.com", onClick = {
-                        if (!openGitHubPage(context, "https://todoist.com")) sheets.detailsError = tr("未找到可打开网页的浏览器")
+                        if (!openGitHubPage(context, "https://todoist.com")) showDetailsError(tr("未找到可打开网页的浏览器"))
                     })
                     todoistInstallation?.let { current ->
                         GitHubInfoDivider()
@@ -331,7 +337,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                                 try {
                                     withContext(Dispatchers.IO) { todoistStore.setEnabled(enabled) }
                                     todoistInstallation = withContext(Dispatchers.IO) { todoistStore.load() }
-                                } catch (_: Exception) { sheets.detailsError = tr("Todoist 集成设置保存失败，请重试") }
+                                } catch (_: Exception) { showDetailsError(tr("Todoist 集成设置保存失败，请重试")) }
                             }
                         })
                     }
@@ -339,7 +345,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                         try {
                             withContext(Dispatchers.IO) { todoistStore.remove() }
                             todoistInstallation = null
-                        } catch (_: Exception) { sheets.detailsError = tr("无法移除 Todoist 集成，请重试") }
+                        } catch (_: Exception) { showDetailsError(tr("无法移除 Todoist 集成，请重试")) }
                     } }, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
                         modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(tr("移除集成"))
@@ -347,7 +353,6 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                  } ?: TodoistButton(tr("安装"), method = "OAuth",
                      modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth(),
                      onClick = { openLogin(GitHubLogin.TODOIST) })
-                if (sheets.detailsError != null) Text(sheets.detailsError!!, Modifier.padding(horizontal = 24.dp), color = content)
             } else {
             Text("GitHub", Modifier.fillMaxWidth(), color = content, fontSize = 24.sp,
                 fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
@@ -359,7 +364,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                 GitHubInfoRow(tr("开发者"), "GitHub, Inc.")
                 GitHubInfoDivider()
                 GitHubInfoRow(tr("官网"), "github.com", onClick = {
-                    if (!openGitHubPage(context, "https://github.com")) sheets.detailsError = tr("未找到可打开网页的浏览器")
+                    if (!openGitHubPage(context, "https://github.com")) showDetailsError(tr("未找到可打开网页的浏览器"))
                 })
                 installation?.let { current ->
                     GitHubInfoDivider()
@@ -379,7 +384,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                         scope.launch {
                             try {
                                 installation = withContext(Dispatchers.IO) { store.setEnabled(enabled); store.load() }
-                            } catch (_: Exception) { sheets.detailsError = tr("GitHub 安装保存失败，请重试") }
+                            } catch (_: Exception) { showDetailsError(tr("GitHub 安装保存失败，请重试")) }
                         }
                     })
                 }
@@ -396,16 +401,21 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                         withContext(Dispatchers.IO) { store.remove(); check(store.load() == null) }
                         details.hide()
                         installation = null
-                    } catch (_: Exception) { sheets.detailsError = tr("无法移除 GitHub 集成，请重试") }
+                    } catch (_: Exception) { showDetailsError(tr("无法移除 GitHub 集成，请重试")) }
                 } }, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
                     modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(tr("移除集成"))
                 }
             }
-            if (detailsError != null) {
-                Text(detailsError, Modifier.padding(horizontal = 24.dp), color = content)
             }
-            }
+        }
+        IrioSnackbar(
+            visible = detailsError != null,
+            message = detailsError.orEmpty(),
+            bottomInset = with(LocalDensity.current) { WindowInsets.navigationBars.getBottom(this).toDp() },
+            onDismiss = { sheets.detailsError = null },
+            restartKey = detailsErrorNonce,
+        )
         }
     }
     if (login != null) BottomSheet(state = loginSheet, onDismissRequest = { clearLogin() },

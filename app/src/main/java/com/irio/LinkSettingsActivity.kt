@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -103,6 +104,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     val shake = remember { Animatable(0f) }
     var pairInvalid by remember { mutableStateOf(false) }
+    var pairSnackbarVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         LinkRuntime.ensure(context)
@@ -115,6 +117,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
             return@LaunchedEffect
         }
         pairInvalid = true
+        pairSnackbarVisible = true
         shake.snapTo(0f)
         listOf(-10f, 10f, -8f, 8f, -4f, 4f, 0f).forEach { target ->
             shake.animateTo(target, irioSpring<Float>(stiffness = 2600f, dampingRatio = 0.78f))
@@ -125,6 +128,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
         if (state.pairSuccessNonce == 0) return@LaunchedEffect
         codeState.clearText()
         pairInvalid = false
+        pairSnackbarVisible = false
     }
 
     DismissComposerFocusWhenImeHides()
@@ -132,6 +136,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
         title = tr("互连"),
         onBack = onBack,
     ) { topInset, bottomInset ->
+        Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -324,6 +329,14 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
             state.status?.let { message ->
                 Text(message, color = irioErrorTextColor(), fontSize = 13.sp)
             }
+        }
+        IrioSnackbar(
+            visible = pairSnackbarVisible,
+            message = tr("配对失败"),
+            bottomInset = bottomInset,
+            onDismiss = { pairSnackbarVisible = false },
+            restartKey = state.pairErrorNonce,
+        )
         }
     }
 }

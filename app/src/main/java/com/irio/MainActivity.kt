@@ -336,8 +336,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var writingPastedText by remember { mutableStateOf(emptySet<String>()) }
     var clearingHistory by remember { mutableStateOf(false) }
     var composerStatus by remember { mutableStateOf<String?>(null) }
-    var sttProviderSnackbarVisible by remember { mutableStateOf(false) }
-    var sttProviderSnackbarRestartKey by remember { mutableIntStateOf(0) }
+    var composerStatusNonce by remember { mutableIntStateOf(0) }
     /** 正在编辑的用户消息 id；null = 普通发送模式。 */
     var editingMessageId by remember { mutableStateOf<Long?>(null) }
     var pendingQuote by remember { mutableStateOf("") }
@@ -368,10 +367,12 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         composerFullscreen = false
     }
     val composerFocusRequester = remember { FocusRequester() }
+    fun showComposerError(error: String) {
+        composerStatus = error
+        composerStatusNonce++
+    }
     fun showSttProviderSnackbar() {
-        composerStatus = null
-        sttProviderSnackbarVisible = true
-        sttProviderSnackbarRestartKey++
+        showComposerError(tr("请先在「TTS/STT」中配置 STT 提供商"))
     }
     fun startSttRecording() {
         if (sttTranscribing || sttRecording) return
@@ -386,7 +387,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             sttWaveformLevels = emptyList()
             composerStatus = null
         } else {
-            composerStatus = tr("无法开始录音")
+            showComposerError(tr("无法开始录音"))
         }
     }
     fun finishSttRecording() {
@@ -394,7 +395,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         sttRecording = false
         val file = sttRecorder.stop()
         if (file == null) {
-            composerStatus = tr("录音为空")
+            showComposerError(tr("录音为空"))
             return
         }
         val provider = SttStore.loadActiveProvider(context)
@@ -410,7 +411,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             file.delete()
             sttTranscribing = false
             if (result.error != null) {
-                composerStatus = result.error
+                showComposerError(result.error)
             } else if (result.text.isNotBlank()) {
                 val needsSpace = message.text.isNotEmpty() && !message.text.last().isWhitespace()
                 message.edit {
@@ -424,7 +425,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     val requestRecordAudio = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (granted) startSttRecording() else composerStatus = tr("需要麦克风权限才能使用 STT")
+        if (granted) startSttRecording() else showComposerError(tr("需要麦克风权限才能使用 STT"))
     }
     fun toggleSttRecording() {
         when {
@@ -835,19 +836,20 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 bytes > ChatApi.MAX_ATTACHMENT_BYTES_TOTAL -> pendingAttachments
                 else -> merged
             }
-            composerStatus = when {
+            val error = when {
                 loaded.size < uris.size -> tr("有附件无法读取")
                 slots > ChatApi.MAX_ATTACHMENT_SLOTS -> tr("附件数量超过 15 个槽位（照片和视频各算半个）")
                 bytes > ChatApi.MAX_ATTACHMENT_BYTES_TOTAL -> tr("附件总大小超过 5GB")
                 else -> null
             }
+            if (error != null) showComposerError(error) else composerStatus = null
         }
     }
 
     fun pasteTextAsAttachment(text: String): Boolean {
         if (clearingHistory) return false
         if (attachmentSlots(pendingAttachments) + 1f > ChatApi.MAX_ATTACHMENT_SLOTS) {
-            composerStatus = tr("附件数量超过 15 个槽位（照片和视频各算半个）")
+            showComposerError(tr("附件数量超过 15 个槽位（照片和视频各算半个）"))
             return false // Leave the clipboard text to the editor's normal paste path.
         }
         val attachment = LongTextPaste.attachment(File(context.filesDir, "attachments"))
@@ -872,8 +874,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     if (active) {
                         pendingAttachments = restored.attachments
                         message.edit { append(text) }
-                        composerStatus = if (overLimit) tr("附件总大小超过 5GB")
-                            else tr("文本文件创建失败，已保留原文")
+                        showComposerError(if (overLimit) tr("附件总大小超过 5GB")
+                            else tr("文本文件创建失败，已保留原文"))
                     } else {
                         composerDrafts[conversationId] = restored
                     }
@@ -2727,15 +2729,6 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     .onSizeChanged { if (!expandedLayout) composerBarHeightPx = it.height },
             ) {
                 if (!expandedLayout) AttachmentChips()
-                if (composerStatus != null) {
-                    Text(
-                        composerStatus!!,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        color = irioErrorTextColor(),
-                        fontSize = 12.sp,
-                    )
-                }
-
                 // 编辑模式提示条：正在编辑某条用户消息
                 if (editingMessageId != null) {
                     val editFill = Theme[colors][primaryColor]
@@ -3175,11 +3168,11 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
                 ChatToolbar()
                 IrioSnackbar(
-                    visible = sttProviderSnackbarVisible,
-                    message = tr("请先在「TTS/STT」中配置 STT 提供商"),
+                    visible = composerStatus != null,
+                    message = composerStatus.orEmpty(),
                     bottomInset = composerBarHeight + 16.dp,
-                    onDismiss = { sttProviderSnackbarVisible = false },
-                    restartKey = sttProviderSnackbarRestartKey,
+                    onDismiss = { composerStatus = null },
+                    restartKey = composerStatusNonce,
                 )
             }
             }

@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -73,21 +74,29 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
     var importOverwrite by remember { mutableStateOf(true) }
     var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var importing by remember { mutableStateOf(false) }
-    var importResult by remember { mutableStateOf<BackupImportResult?>(null) }
+    var operationError by remember { mutableStateOf<String?>(null) }
+    var operationErrorNonce by remember { mutableStateOf(0) }
     var importModeMenuOpen by remember { mutableStateOf(false) }
     var importCompleted by remember { mutableStateOf(false) }
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        context.contentResolver.openOutputStream(uri)?.use { BackupStore.export(context, it) }
+        runCatching {
+            val output = context.contentResolver.openOutputStream(uri) ?: error("Output stream unavailable")
+            output.use { BackupStore.export(context, it) }
+        }.onFailure {
+            operationError = tr("导出失败")
+            operationErrorNonce++
+        }
     }
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         if (!BackupFileValidation.isIrioFile(uri.lastPathSegment.orEmpty())) {
-            importResult = BackupImportResult(false, tr("只能导入 .irio 格式的备份文件"))
+            operationError = tr("只能导入 .irio 格式的备份文件")
+            operationErrorNonce++
         } else {
             pendingImportUri = uri
             importDialogOpen = true
@@ -97,6 +106,7 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
         val uri = pendingImportUri ?: return
         importDialogOpen = false
         importing = true
+        operationError = null
         val overwrite = importOverwrite
         scope.launch(Dispatchers.IO) {
             val result = runCatching {
@@ -106,10 +116,11 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
             (context as? OtherSettingsActivity)?.runOnUiThread {
                 importing = false
                 if (result.success) {
-                    importResult = null
+                    operationError = null
                     pendingImportUri = null
                 } else {
-                    importResult = result
+                    operationError = result.message.ifBlank { tr("恢复失败") }
+                    operationErrorNonce++
                 }
             }
         }
@@ -118,35 +129,47 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
         title = tr("其他"),
         onBack = onBack,
     ) { topInset, bottomInset ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = bottomInset)
-                .verticalScroll(rememberScrollState())
-                .padding(top = topInset)
-                .padding(16.dp),
-        ) {
-            ListRowButton(
-                searchId = "other.history",
-                label = tr("删除所有历史"),
-                icon = Icons.Rounded.DeleteSweep,
-                onClick = { showClearHistoryDialog = true },
-            )
-            Spacer(Modifier.height(12.dp))
-            ListRowButton(
-                searchId = "other.export",
-                label = tr("导出数据"),
-                icon = Icons.Rounded.Upload,
-                experimental = true,
-                onClick = { exportLauncher.launch("irio-${System.currentTimeMillis()}.irio") },
-            )
-            Spacer(Modifier.height(12.dp))
-            ListRowButton(
-                searchId = "other.import",
-                label = tr("导入数据"),
-                icon = Icons.Rounded.Download,
-                experimental = true,
-                onClick = { importLauncher.launch(arrayOf("application/octet-stream", "application/zip", "*/*")) },
+        Box(Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = bottomInset)
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = topInset)
+                    .padding(16.dp),
+            ) {
+                ListRowButton(
+                    searchId = "other.history",
+                    label = tr("删除所有历史"),
+                    icon = Icons.Rounded.DeleteSweep,
+                    onClick = { showClearHistoryDialog = true },
+                )
+                Spacer(Modifier.height(12.dp))
+                ListRowButton(
+                    searchId = "other.export",
+                    label = tr("导出数据"),
+                    icon = Icons.Rounded.Upload,
+                    experimental = true,
+                    onClick = { exportLauncher.launch("irio-${System.currentTimeMillis()}.irio") },
+                )
+                Spacer(Modifier.height(12.dp))
+                ListRowButton(
+                    searchId = "other.import",
+                    label = tr("导入数据"),
+                    icon = Icons.Rounded.Download,
+                    experimental = true,
+                    onClick = {
+                        operationError = null
+                        importLauncher.launch(arrayOf("application/octet-stream", "application/zip", "*/*"))
+                    },
+                )
+            }
+            IrioSnackbar(
+                visible = operationError != null,
+                message = operationError.orEmpty(),
+                bottomInset = bottomInset,
+                onDismiss = { operationError = null },
+                restartKey = operationErrorNonce,
             )
         }
     }
@@ -243,27 +266,6 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                 DialogTitle(tr("正在恢复数据"))
                 Spacer(Modifier.height(16.dp))
                 ProgressIndicator(progress = 0.5f, modifier = Modifier.fillMaxWidth())
-            }
-        }
-    }
-
-    importResult?.let { result ->
-        if (result.success) {
-            importResult = null
-        } else {
-            IrioAlertDialog(
-                visible = true,
-                onDismissRequest = { importResult = null },
-                backgroundColor = Theme[colors][com.composables.ui.theme.panelColor],
-                contentColor = Theme[colors][com.composables.ui.theme.onPanelColor],
-            ) {
-                Column {
-                    DialogTitle(tr("恢复失败"))
-                    Spacer(Modifier.height(12.dp))
-                    Text(result.message)
-                    Spacer(Modifier.height(16.dp))
-                    DialogButtonRow(confirmLabel = tr("关闭"), onConfirm = { importResult = null }, onCancel = { importResult = null })
-                }
             }
         }
     }

@@ -126,6 +126,8 @@ private fun ProviderDetailScreen(
     var refreshing by remember { mutableStateOf(false) }
     var refreshDiff by remember { mutableStateOf(ModelRefreshDiff()) }
     var formError by rememberSaveable { mutableStateOf<String?>(null) }
+    var refreshError by remember { mutableStateOf<String?>(null) }
+    var refreshErrorNonce by remember { mutableIntStateOf(0) }
     val name = rememberTextFieldState(provider?.name.orEmpty())
     val endpoint = rememberTextFieldState(provider?.endpointUrl.orEmpty())
     val apiKey = rememberTextFieldState(provider?.apiKey.orEmpty())
@@ -220,13 +222,12 @@ private fun ProviderDetailScreen(
                             ProviderDetailPage.Models -> ProviderModelsPage(
                                 provider = provider!!,
                                 refreshing = refreshing || saving,
-                                formError = formError,
                                 refreshDiff = refreshDiff,
                                 onRefresh = refresh@{
                                     val currentProvider = provider ?: return@refresh
                                     if (refreshing || saving) return@refresh
                                     refreshing = true
-                                    formError = null
+                                    refreshError = null
                                     scope.launch {
                                         val result = withContext(Dispatchers.IO) {
                                             ProviderApi.fetchModels(currentProvider)
@@ -237,7 +238,8 @@ private fun ProviderDetailScreen(
                                             ProviderStore.saveProvider(context, currentProvider.copy(models = result.models))
                                             provider = ProviderStore.loadProvider(context, currentProvider.id)
                                         } else {
-                                            formError = result.error
+                                            refreshError = result.error
+                                            refreshErrorNonce++
                                         }
                                     }
                                 },
@@ -288,6 +290,7 @@ private fun ProviderDetailScreen(
                             selected = page,
                             onSelect = { next ->
                                 if (next != ProviderDetailPage.Config) protocolMenuOpen = false
+                                if (next != ProviderDetailPage.Models) refreshError = null
                                 page = next
                             },
                         )
@@ -302,6 +305,13 @@ private fun ProviderDetailScreen(
                 .align(Alignment.TopCenter)
                 .zIndex(2f),
             onHeightChanged = { capsulePx.intValue = it },
+        )
+        IrioSnackbar(
+            visible = refreshError != null,
+            message = refreshError.orEmpty(),
+            bottomInset = tabContentPadding,
+            onDismiss = { refreshError = null },
+            restartKey = refreshErrorNonce,
         )
     }
 
@@ -409,7 +419,6 @@ private fun ProviderConfigPage(
 private fun ProviderModelsPage(
     provider: ProviderConfig,
     refreshing: Boolean,
-    formError: String?,
     refreshDiff: ModelRefreshDiff,
     onRefresh: () -> Unit,
     onModelCheckedChange: (String, Boolean) -> Unit,
@@ -432,9 +441,6 @@ private fun ProviderModelsPage(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (formError != null) {
-                Text(formError)
-            }
             if (provider.models.isEmpty() && (!showRemoved || refreshDiff.removed.isEmpty())) {
                 Text(tr("还没有模型"))
             } else {

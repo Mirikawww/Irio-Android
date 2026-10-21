@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -74,9 +75,9 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
     var confirmRebuild by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
-    var deleteError by remember { mutableStateOf<String?>(null) }
+    var operationError by remember { mutableStateOf<String?>(null) }
+    var errorNonce by remember { mutableIntStateOf(0) }
     var showPrepare by remember { mutableStateOf(false) }
-    var prepareError by remember { mutableStateOf<String?>(null) }
     var revision by remember { mutableIntStateOf(0) }
     var offerRebuild by remember { mutableStateOf(false) }
     var commandsPerCall by remember {
@@ -103,7 +104,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
             refresh()
             return
         }
-        prepareError = null
+        operationError = null
         showPrepare = true
         LinuxSandboxSession.kick(context, rebuild)
         revision++
@@ -156,10 +157,11 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
         refresh()
         val error = LinuxSandboxSession.lastError
         if (error.isNullOrBlank()) {
-            prepareError = null
             showPrepare = false
         } else {
-            prepareError = error
+            showPrepare = false
+            operationError = error
+            errorNonce++
         }
     }
 
@@ -171,7 +173,8 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
             LinuxSandboxSession.delete(context)
         } catch (error: Exception) {
             if (error is kotlinx.coroutines.CancellationException) throw error
-            deleteError = error.message?.takeIf { it.isNotBlank() } ?: tr("删除失败")
+            operationError = error.message?.takeIf { it.isNotBlank() } ?: tr("删除失败")
+            errorNonce++
         } finally {
             enabled = LinuxSandboxStore.loadEnabled(layout.stateFile)
             deleting = false
@@ -183,6 +186,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
         title = tr("Linux 沙盒"),
         onBack = onBack,
     ) { topInset, bottomInset ->
+        Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -280,6 +284,14 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                 style = ButtonStyle.Destructive,
             ) { Text(tr("删除 Linux 沙盒")) }
         }
+        IrioSnackbar(
+            visible = operationError != null,
+            message = operationError.orEmpty(),
+            bottomInset = bottomInset,
+            onDismiss = { operationError = null },
+            restartKey = errorNonce,
+        )
+        }
     }
 
     IrioAlertDialog(
@@ -296,7 +308,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                 confirmEnabled = LinuxSandboxPolicy.canDelete(installed, preparing = showPrepare, deleting = deleting),
                 onConfirm = {
                     confirmDelete = false
-                    deleteError = null
+                    operationError = null
                     deleting = true
                 },
                 onCancel = { confirmDelete = false },
@@ -306,22 +318,13 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
     }
 
     IrioAlertDialog(
-        visible = deleting || deleteError != null,
-        onDismissRequest = { if (!deleting) deleteError = null },
+        visible = deleting,
+        onDismissRequest = {},
     ) {
         Column {
-            DialogTitle(if (deleting) tr("正在删除 Linux 沙盒") else tr("删除失败"))
+            DialogTitle(tr("正在删除 Linux 沙盒"))
             Spacer(Modifier.height(16.dp))
-            if (deleting) {
-                ProgressIndicator(progress = 0.5f, modifier = Modifier.fillMaxWidth())
-            } else {
-                Text(deleteError.orEmpty())
-                Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = { deleteError = null },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(tr("知道了")) }
-            }
+            ProgressIndicator(progress = 0.5f, modifier = Modifier.fillMaxWidth())
         }
     }
 
@@ -350,33 +353,14 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
 
     IrioAlertDialog(
         visible = showPrepare,
-        onDismissRequest = {
-            if (prepareError != null) {
-                prepareError = null
-                showPrepare = false
-            }
-        },
+        onDismissRequest = {},
         backgroundColor = Theme[colors][panelColor],
         contentColor = Theme[colors][onPanelColor],
     ) {
         Column {
-            if (prepareError == null) {
-                DialogTitle(tr("正在准备环境"))
-                Spacer(Modifier.height(16.dp))
-                ProgressIndicator(progress = 0.5f, modifier = Modifier.fillMaxWidth())
-            } else {
-                DialogTitle(tr("准备失败"))
-                Spacer(Modifier.height(12.dp))
-                Text(prepareError.orEmpty())
-                Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = {
-                        prepareError = null
-                        showPrepare = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(tr("知道了")) }
-            }
+            DialogTitle(tr("正在准备环境"))
+            Spacer(Modifier.height(16.dp))
+            ProgressIndicator(progress = 0.5f, modifier = Modifier.fillMaxWidth())
         }
     }
 }

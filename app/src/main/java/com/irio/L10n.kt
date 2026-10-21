@@ -794,6 +794,7 @@ private val English = mapOf(
     "增量恢复" to "Merge",
     "导入 Irio 数据" to "Import Irio data",
     "导出 Irio 数据" to "Export Irio data",
+    "导出失败" to "Export failed",
     "恢复失败" to "Restore failed",
     "恢复数据" to "Restore",
     "恢复方式" to "Restore mode",
