@@ -48,7 +48,7 @@ internal class ColoredBubbleToolProvider : ToolProvider {
             "show a normal tool status message."
     override fun handles(name: String) = name == ColoredBubbleTool.NAME
     override suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {
-        if (context.cancellation.isCancelled()) return ToolExecutionResult("Colored bubbles cancelled")
+        if (context.cancellation.isCancelled()) return ToolExecutionResult("Colored bubbles cancelled", outcome = ToolOutcome.STOPPED)
         val bubbles = runCatching {
             val array = JSONObject(call.arguments).getJSONArray("bubbles")
             require(array.length() in 1..12)
@@ -60,8 +60,8 @@ internal class ColoredBubbleToolProvider : ToolProvider {
                 require(text.isNotBlank() && text.length <= 1000)
                 ColoredBubble(text, color)
             }
-        }.getOrNull() ?: return ToolExecutionResult("Invalid bubbles: provide 1 to 12 bubbles, each with nonblank text (up to 1000 characters) and an RGB color in #RRGGBB or #RGB format")
-        if (context.cancellation.isCancelled()) return ToolExecutionResult("Colored bubbles cancelled")
+        }.getOrNull() ?: return ToolExecutionResult("Invalid bubbles: provide 1 to 12 bubbles, each with nonblank text (up to 1000 characters) and an RGB color in #RRGGBB or #RGB format", outcome = ToolOutcome.FAILED)
+        if (context.cancellation.isCancelled()) return ToolExecutionResult("Colored bubbles cancelled", outcome = ToolOutcome.STOPPED)
         context.onUpdate(ChatStreamUpdate(coloredBubbles = bubbles))
         return ToolExecutionResult("Colored bubbles displayed. Do not repeat their text or narrate tool use.")
     }

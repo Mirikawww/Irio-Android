@@ -31,6 +31,7 @@ data class ProcessEvent(
     val webDomain: String = "",
     val displayText: String = "",
     val bubbleColor: String = "",
+    val toolOutcome: ToolOutcome? = null,
 )
 
 internal const val MERGED_TOOL_CALLS_NAME = "__merged_tool_calls__"
@@ -44,10 +45,12 @@ internal fun searchStatusLabel(query: String, language: AppLanguage = ThemeStore
 internal fun renderedProcessEvents(events: List<ProcessEvent>, mergeToolCalls: Boolean): List<ProcessEvent> {
     if (!mergeToolCalls) return events
     val mergeableEvents = events.filter {
-        it.kind == ProcessEventKind.SEARCH ||
-            (it.kind == ProcessEventKind.TOOL && it.toolName !in setOf(ImageGenTool.NAME, CommonsImageTools.SHOW))
+        it.toolOutcome != ToolOutcome.FAILED && it.toolOutcome != ToolOutcome.STOPPED &&
+            (it.kind == ProcessEventKind.SEARCH ||
+                (it.kind == ProcessEventKind.TOOL && it.toolName !in setOf(ImageGenTool.NAME, CommonsImageTools.SHOW)))
     }
     if (mergeableEvents.isEmpty()) return events
+    val mergeableIds = mergeableEvents.mapTo(hashSetOf()) { it.id }
     val first = mergeableEvents.first()
     val summary = mergedToolSummary(mergeableEvents)
     val firstIndex = events.indexOfFirst { it.id == first.id }
@@ -62,7 +65,7 @@ internal fun renderedProcessEvents(events: List<ProcessEvent>, mergeToolCalls: B
                     live = mergeableEvents.any { it.live },
                 ),
             )
-            if ((event.kind != ProcessEventKind.SEARCH && event.kind != ProcessEventKind.TOOL) || event.toolName == CommonsImageTools.SHOW) {
+            if (event.id !in mergeableIds) {
                 add(event)
             }
         }

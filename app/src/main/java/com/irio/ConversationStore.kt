@@ -296,6 +296,7 @@ object ConversationStore {
                                                 if (event.searchQuery.isNotBlank()) put("searchQuery", event.searchQuery)
                                                 if (event.webDomain.isNotBlank()) put("webDomain", event.webDomain)
                                                 if (event.displayText.isNotEmpty()) put("displayText", event.displayText)
+                                                event.toolOutcome?.let { put("toolOutcome", it.name) }
                                                 if (event.bubbleColor.isNotEmpty()) put("bubbleColor", event.bubbleColor)
                                             }
                                         )
@@ -422,6 +423,7 @@ internal fun processEventsFrom(item: JSONObject): List<ProcessEvent> {
                         webDomain = event.optString("webDomain"),
                         displayText = event.optString("displayText"),
                         bubbleColor = event.optString("bubbleColor"),
+                        toolOutcome = runCatching { event.optString("toolOutcome").takeIf { it.isNotBlank() }?.let(ToolOutcome::valueOf) }.getOrNull(),
                     )
                 )
             }

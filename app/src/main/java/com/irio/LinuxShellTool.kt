@@ -124,6 +124,7 @@ internal class LinuxShellToolProvider(
         val selection = linuxSandboxSelectCommands(call.arguments, limit, backgroundOn)
         val finished = mutableListOf<String>()
         var transcript = ""
+        var outcome = ToolOutcome.FAILED
         suspend fun publish(current: String? = null) {
             transcript = linuxSandboxJoinSections(finished + listOfNotNull(current))
             context.onUpdate(
@@ -146,7 +147,7 @@ internal class LinuxShellToolProvider(
                         shown.map { linuxSandboxTerminalTranscript(it, message) },
                     )
                 }
-                return ToolExecutionResult(transcript)
+                return ToolExecutionResult(transcript, outcome = ToolOutcome.FAILED)
             }
             val app = context.appContext ?: return refuse(tr("Linux 沙盒当前不可用。"))
             if (!LinuxSandboxPolicy.exposed(
@@ -163,12 +164,14 @@ internal class LinuxShellToolProvider(
                     tr("命令为空")
                 }
                 transcript = message
-                return ToolExecutionResult(message)
+                return ToolExecutionResult(message, outcome = ToolOutcome.FAILED)
             }
+            outcome = ToolOutcome.SUCCESS
             for (command in selection.commands) {
                 if (context.cancellation.isCancelled()) throw CancellationException()
                 val normalized = linuxSandboxNormalizeCommand(command)
                 if (normalized == null) {
+                    outcome = ToolOutcome.FAILED
                     val message = if (command.trim().isEmpty()) tr("命令为空") else tr("命令太长")
                     finished += linuxSandboxTerminalTranscript(command, message)
                     publish()
@@ -176,12 +179,14 @@ internal class LinuxShellToolProvider(
                 }
                 var block = linuxSandboxTerminalTranscript(command, "")
                 var sawProgress = false
+                var finalProgress: LinuxSandboxCommandProgress? = null
                 val result = LinuxSandboxSession.runCommand(
                     app,
                     command,
                     context.cancellation,
                 ) { progress ->
                     sawProgress = true
+                    if (progress.exitCode != null || progress.timedOut) finalProgress = progress
                     block = linuxSandboxTerminalTranscript(
                         command,
                         progress.output,
@@ -191,6 +196,7 @@ internal class LinuxShellToolProvider(
                     )
                     publish(block)
                 }
+                if (finalProgress?.let { it.exitCode == 0 && !it.timedOut } != true) outcome = ToolOutcome.FAILED
                 if (!sawProgress) block = linuxSandboxTerminalTranscript(command, result)
                 finished += block
                 publish()
@@ -199,6 +205,7 @@ internal class LinuxShellToolProvider(
                 if (context.cancellation.isCancelled()) throw CancellationException()
                 val normalized = linuxSandboxNormalizeCommand(command)
                 if (normalized == null) {
+                    outcome = ToolOutcome.FAILED
                     val message = if (command.trim().isEmpty()) tr("命令为空") else tr("命令太长")
                     finished += linuxSandboxTerminalTranscript(command, message)
                     publish()
@@ -206,6 +213,7 @@ internal class LinuxShellToolProvider(
                 }
                 publish(linuxSandboxTerminalTranscript(command, ""))
                 val started = LinuxSandboxSession.startBackground(app, command, context.conversationId)
+                if (started.id == null) outcome = ToolOutcome.FAILED
                 val message = if (started.id != null) {
                     tr("已在后台运行，编号 %s").format(started.id)
                 } else {
@@ -215,6 +223,7 @@ internal class LinuxShellToolProvider(
                 publish()
             }
             if (selection.backgroundIgnored > 0) {
+                outcome = ToolOutcome.FAILED
                 val note = tr("后台命令已关闭，未启动 %s 条。").format(selection.backgroundIgnored)
                 finished += note
                 publish()
@@ -224,7 +233,7 @@ internal class LinuxShellToolProvider(
                 finished += note
                 publish()
             }
-            ToolExecutionResult(transcript)
+            ToolExecutionResult(transcript, outcome = outcome)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } finally {
@@ -233,6 +242,7 @@ internal class LinuxShellToolProvider(
                     toolActive = false,
                     toolName = LinuxShellTool.NAME,
                     toolContent = transcript,
+                    toolOutcome = if (context.cancellation.isCancelled()) ToolOutcome.STOPPED else outcome,
                 ),
             )
         }
@@ -243,14 +253,16 @@ internal class LinuxShellToolProvider(
         context: ToolExecutionContext,
     ): ToolExecutionResult {
         context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = LinuxBackgroundTool.NAME))
+        var result: ToolExecutionResult? = null
         return try {
             val enabled = context.appContext?.let {
                 LinuxSandboxStore.loadBackgroundEnabled(LinuxSandboxLayout.of(it.filesDir).stateFile)
             } ?: backgroundEnabled
-            val message = if (!enabled) tr("后台命令已关闭。") else LinuxBackgroundJobs.handle(call.arguments)
-            ToolExecutionResult(message)
+            (if (!enabled) ToolExecutionResult(tr("后台命令已关闭。"), outcome = ToolOutcome.FAILED)
+                else LinuxBackgroundJobs.result(call.arguments)).also { result = it }
         } finally {
-            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = LinuxBackgroundTool.NAME))
+            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = LinuxBackgroundTool.NAME,
+                toolContent = result?.text.orEmpty(), toolOutcome = result?.outcome ?: ToolOutcome.FAILED))
         }
     }
 }

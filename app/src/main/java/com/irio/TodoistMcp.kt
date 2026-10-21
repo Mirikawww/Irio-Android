@@ -390,7 +390,7 @@ internal class TodoistMcpClient(
     fun callTool(name: String, arguments: JSONObject): String {
         initialize()
         val result = request("tools/call", JSONObject().put("name", name).put("arguments", arguments))
-        return buildString {
+        val text = buildString {
             if (result.optBoolean("isError")) append("Todoist MCP tool error:\n")
             val content = result.optJSONArray("content") ?: JSONArray()
             for (i in 0 until content.length()) {
@@ -404,6 +404,8 @@ internal class TodoistMcpClient(
             }
             result.optJSONObject("structuredContent")?.let { append(it.toString()) }
         }.replace(token, "[redacted]").let { if (it.length > MAX_RESULT_CHARS) it.take(MAX_RESULT_CHARS) + "\n[Todoist MCP result truncated]" else it }
+        if (mcpToolFailed(result)) throw McpToolFailure(text)
+        return text
     }
 
     private fun initialize() {
@@ -509,22 +511,38 @@ internal class TodoistMcpToolProvider(
     override fun handles(name: String): Boolean = tools.any { PREFIX + it.name == name }
 
     override suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {
-        if (context.cancellation.isCancelled()) return ToolExecutionResult(tr("Todoist 工具已停止"))
+        context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = call.name))
+        if (context.cancellation.isCancelled()) {
+            val result = ToolExecutionResult(tr("Todoist 工具已停止"), outcome = ToolOutcome.STOPPED)
+            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name, toolContent = result.text, toolOutcome = result.outcome))
+            return result
+        }
         require(handles(call.name)) { "Unknown Todoist MCP tool" }
         val args = runCatching { JSONObject(call.arguments) }.getOrNull()
-            ?: return ToolExecutionResult(tr("Todoist 工具参数无效"))
-        context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = call.name))
+            ?: return ToolExecutionResult(tr("Todoist 工具参数无效"), outcome = ToolOutcome.FAILED).also {
+                context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name, toolContent = it.text, toolOutcome = it.outcome))
+            }
         var result = ""
+        var outcome = ToolOutcome.FAILED
         try {
             result = invoke(call.name.removePrefix(PREFIX), args)
+            outcome = ToolOutcome.SUCCESS
             return ToolExecutionResult(result)
+        } catch (failed: McpToolFailure) {
+            result = failed.content
+            return ToolExecutionResult(result, outcome = ToolOutcome.FAILED)
         } catch (cancelled: CancellationException) {
-            throw cancelled
+            outcome = ToolOutcome.STOPPED
+            if (!context.cancellation.isCancelled()) throw cancelled
+            result = tr("Todoist 工具已停止")
+            return ToolExecutionResult(result, outcome = ToolOutcome.STOPPED)
         } catch (_: Exception) {
             result = if (context.cancellation.isCancelled()) tr("Todoist 工具已停止") else tr("Todoist 工具执行失败，请检查登录和权限")
-            return ToolExecutionResult(result)
+            outcome = if (context.cancellation.isCancelled()) ToolOutcome.STOPPED else ToolOutcome.FAILED
+            return ToolExecutionResult(result, outcome = outcome)
         } finally {
-            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name, toolContent = result))
+            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name, toolContent = result,
+                toolOutcome = outcome))
         }
     }
 

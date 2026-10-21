@@ -26,7 +26,7 @@ class ToolPreferencesRegistryTest {
         assertTrue(parent.handles(SubagentTools.CREATE))
     }
 
-    @Test fun disabledCallsAreRejectedBeforeProviderOrProgressSideEffects() = kotlinx.coroutines.runBlocking {
+    @Test fun disabledCallsNeverInvokeProvidersButLeaveOneFailedStatus() = kotlinx.coroutines.runBlocking {
         var executions = 0
         val updates = mutableListOf<ChatStreamUpdate>()
         val remote = GitHubMcpToolProvider(listOf(
@@ -37,16 +37,20 @@ class ToolPreferencesRegistryTest {
             .register(remote)
         val context = ToolExecutionContext(ProviderConfig("test", "Test", "https://example.test", ""), "test", onUpdate = { updates += it })
         for (name in listOf("github_mcp_disabled", "unregistered_disabled")) {
+            updates.clear()
             val result = registry.execute(ChatToolCall("stale", name, "{}"), context)
             assertTrue(result.text, result.text.contains("disabled", ignoreCase = true) || result.text.contains("禁用"))
             assertTrue(result.text.contains(name))
             assertEquals(0, executions)
-            assertTrue(updates.isEmpty())
+            assertEquals(listOf(true, false), updates.mapNotNull { it.toolActive })
+            assertEquals(ToolOutcome.FAILED, updates.last().toolOutcome)
+            assertEquals(result.text, updates.last().toolContent)
             assertFalse(registry.handles(name))
             assertNull(registry.providerFor(name))
         }
         assertSame(remote, registry.providerFor("github_mcp_enabled"))
         assertTrue(registry.handles("github_mcp_enabled"))
+        updates.clear()
         assertEquals("enabled", registry.execute(ChatToolCall("fresh", "github_mcp_enabled", "{}"), context).text)
         assertEquals(1, executions)
         assertEquals(listOf(true, false), updates.map { it.toolActive })

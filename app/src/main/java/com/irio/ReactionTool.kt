@@ -44,22 +44,22 @@ internal class ReactionToolProvider : ToolProvider {
     override fun handles(name: String): Boolean = name == ReactionTool.NAME
 
     override suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {
-        if (context.cancellation.isCancelled()) return ToolExecutionResult("Reaction cancelled")
+        if (context.cancellation.isCancelled()) return ToolExecutionResult("Reaction cancelled", outcome = ToolOutcome.STOPPED)
         val args = runCatching { JSONObject(call.arguments) }.getOrNull()
-            ?: return ToolExecutionResult("Invalid reaction arguments")
+            ?: return ToolExecutionResult("Invalid reaction arguments", outcome = ToolOutcome.FAILED)
         val rawId = args.opt("message_id") as? String
-            ?: return ToolExecutionResult("message_id must be the exact user message id string")
+            ?: return ToolExecutionResult("message_id must be the exact user message id string", outcome = ToolOutcome.FAILED)
         val messageId = rawId.takeIf { it.matches(Regex("[1-9][0-9]*")) }?.toLongOrNull()
-            ?: return ToolExecutionResult("Invalid message_id")
+            ?: return ToolExecutionResult("Invalid message_id", outcome = ToolOutcome.FAILED)
         if (context.history.none { it.role == "user" && it.reactionTargetId == messageId }) {
-            return ToolExecutionResult("Reaction target is not a user message in this conversation")
+            return ToolExecutionResult("Reaction target is not a user message in this conversation", outcome = ToolOutcome.FAILED)
         }
         val rawEmoji = args.opt("emoji") as? String
-            ?: return ToolExecutionResult("emoji must be one emoji string, or empty to remove")
+            ?: return ToolExecutionResult("emoji must be one emoji string, or empty to remove", outcome = ToolOutcome.FAILED)
         val emoji = if (rawEmoji.isEmpty()) "" else ReactionEmojiCatalog.normalize(rawEmoji)
-            ?: return ToolExecutionResult("Only one standard emoji is allowed")
+            ?: return ToolExecutionResult("Only one standard emoji is allowed", outcome = ToolOutcome.FAILED)
         if (context.cancellation.isCancelled() || !context.onReaction(messageId, emoji)) {
-            return ToolExecutionResult("Reaction target is no longer available")
+            return ToolExecutionResult("Reaction target is no longer available", outcome = ToolOutcome.FAILED)
         }
         // 对话里不出现过程行。后台通知仍要显示这一步。
         context.onUpdate(ChatStreamUpdate(notifyTool = ReactionTool.NAME))

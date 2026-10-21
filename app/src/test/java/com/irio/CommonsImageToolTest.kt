@@ -216,7 +216,8 @@ class CommonsImageToolTest {
                 val stopped = tools.execute(ChatToolCall("stop", "show_images", """{"image_ids":["commons:11"]}"""),
                     context.copy(cancellation = cancellation, onUpdate = { updates += it }))
                 assertEquals("cancelled", JSONObject(stopped.text).getJSONObject("error").getString("code"))
-                assertTrue(updates.isEmpty())
+                assertEquals(listOf(true, false), updates.mapNotNull { it.toolActive })
+                assertEquals(ToolOutcome.STOPPED, updates.last().toolOutcome)
                 val registry = ToolRegistry(listOf(tools), preferences = ToolPreferences(setOf("show_images", "view_images", "image_search")))
                 for (name in listOf("image_search", "show_images", "view_images")) {
                     assertTrue(registry.execute(ChatToolCall("off", name, "{}"), context).text.contains("disabled"))

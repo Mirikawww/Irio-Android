@@ -273,6 +273,7 @@ object LinkConversationJson {
                                                     if (event.searchQuery.isNotBlank()) put("searchQuery", event.searchQuery)
                                                     if (event.webDomain.isNotBlank()) put("webDomain", event.webDomain)
                                                     if (event.displayText.isNotEmpty()) put("displayText", event.displayText)
+                                                    event.toolOutcome?.let { put("toolOutcome", it.name) }
                                                 }
                                             )
                                         }

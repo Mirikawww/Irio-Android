@@ -40,24 +40,40 @@ internal class GitHubMcpToolProvider(
     override fun handles(name: String): Boolean = tools.any { PREFIX + it.name == name }
 
     override suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {
-        if (context.cancellation.isCancelled()) return ToolExecutionResult(tr("GitHub 工具已停止"))
+        context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = call.name))
+        if (context.cancellation.isCancelled()) {
+            val result = ToolExecutionResult(tr("GitHub 工具已停止"), outcome = ToolOutcome.STOPPED)
+            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name, toolContent = result.text, toolOutcome = result.outcome))
+            return result
+        }
         require(handles(call.name)) { "Unknown GitHub MCP tool" }
         val arguments = runCatching { JSONObject(call.arguments) }.getOrNull()
-            ?: return ToolExecutionResult(tr("GitHub 工具参数无效"))
-        context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = call.name))
+            ?: return ToolExecutionResult(tr("GitHub 工具参数无效"), outcome = ToolOutcome.FAILED).also {
+                context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name, toolContent = it.text, toolOutcome = it.outcome))
+            }
         var result = ""
+        var outcome = ToolOutcome.FAILED
         try {
             result = invoke(call.name.removePrefix(PREFIX), arguments)
+            outcome = ToolOutcome.SUCCESS
             return ToolExecutionResult(result)
+        } catch (failed: McpToolFailure) {
+            result = failed.content
+            return ToolExecutionResult(result, outcome = ToolOutcome.FAILED)
         } catch (cancelled: CancellationException) {
-            throw cancelled
+            outcome = ToolOutcome.STOPPED
+            if (!context.cancellation.isCancelled()) throw cancelled
+            result = tr("GitHub 工具已停止")
+            return ToolExecutionResult(result, outcome = ToolOutcome.STOPPED)
         } catch (_: Exception) {
             // Do not relay arbitrary transport/parser errors which might contain credentials.
             result = if (context.cancellation.isCancelled()) tr("GitHub 工具已停止")
                 else tr("GitHub 工具执行失败，请检查登录和仓库权限")
-            return ToolExecutionResult(result)
+            outcome = if (context.cancellation.isCancelled()) ToolOutcome.STOPPED else ToolOutcome.FAILED
+            return ToolExecutionResult(result, outcome = outcome)
         } finally {
-            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name, toolContent = result))
+            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name, toolContent = result,
+                toolOutcome = outcome))
         }
     }
 

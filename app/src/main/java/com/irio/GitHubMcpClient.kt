@@ -13,6 +13,22 @@ import java.util.concurrent.TimeUnit
 
 internal data class McpTool(val name: String, val description: String, val inputSchema: JSONObject)
 
+/** A remote tools/call failure, with already-redacted model-visible details. */
+internal class McpToolFailure(val content: String) : Exception()
+
+internal fun mcpToolFailed(result: JSONObject): Boolean {
+    fun failedBatch(json: JSONObject): Boolean = json.optInt("failureCount") > 0 ||
+        (json.optJSONArray("failures")?.length() ?: 0) > 0
+    if (result.optBoolean("isError")) return true
+    if (result.optJSONObject("structuredContent")?.let(::failedBatch) == true) return true
+    val content = result.optJSONArray("content") ?: return false
+    return (0 until content.length()).any { index ->
+        val item = content.optJSONObject(index)
+        item?.optString("type") == "text" &&
+            runCatching { failedBatch(JSONObject(item.optString("text"))) }.getOrDefault(false)
+    }
+}
+
 internal class GitHubMcpClient(
     private val token: String,
     private val endpoint: HttpUrl = "https://api.githubcopilot.com/mcp/".toHttpUrl(),
@@ -68,9 +84,11 @@ internal class GitHubMcpClient(
             result.optJSONObject("structuredContent")?.let { append(it.toString()) }
         }
         // Never echo a credential even if a remote error or result happens to contain it.
-        return text.replace(token, "[redacted]").let {
+        val safeText = text.replace(token, "[redacted]").let {
             if (it.length > 32_000) it.take(32_000) + "\n[GitHub MCP result truncated]" else it
         }
+        if (mcpToolFailed(result)) throw McpToolFailure(safeText)
+        return safeText
     }
 
     private fun initialize() {

@@ -1606,14 +1606,14 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 }
                                 if (update.usage != null) streamedUsage = update.usage
                                 if (update.searching == true && !cancelled) process.onSearchStarted(update.searchQuery, update.displayText)
-                                if (update.searching == false) process.onSearchFinished(update.searchPagesDelta, update.searchContent)
+                                if (update.searching == false) process.onSearchFinished(update.searchPagesDelta, update.searchContent, update.toolOutcome)
                                 if (update.toolActive == true && !cancelled) process.onToolStarted(update.toolName, update.webDomain, update.displayText)
                                 if (update.toolOutput != null) process.onToolOutput(update.toolOutput)
                                 if (update.toolActive == false) {
                                     if (update.toolName == ImageGenTool.NAME && update.toolContent == ImageGenTool.STATUS_OK) {
                                         process.dropLiveTool()
                                     } else {
-                                        process.onToolFinished(update.toolContent)
+                                        process.onToolFinished(update.toolContent, update.toolOutcome)
                                     }
                                 }
                                 if (update.done) process.finishAll()
@@ -3846,7 +3846,7 @@ internal fun ProcessEventRow(
     onOpen: (ProcessEvent) -> Unit,
     onQuote: (String) -> Unit = {},
 ) {
-    if (event.toolName == CommonsImageTools.SHOW) {
+    if (event.toolName == CommonsImageTools.SHOW && event.toolOutcome != ToolOutcome.FAILED && event.toolOutcome != ToolOutcome.STOPPED) {
         CommonsImageBlock(event.content)
         return
     }
@@ -3882,14 +3882,13 @@ internal fun ProcessEventRow(
         return
     }
     val terminal = event.kind == ProcessEventKind.TOOL && event.toolName == LinuxShellTool.NAME
-    val openable = event.toolName != ImageGenTool.NAME &&
+    val openable = (event.toolName != ImageGenTool.NAME || event.toolOutcome == ToolOutcome.FAILED) &&
         (terminal || (!event.live && event.content.isNotBlank()))
     val label = when (event.kind) {
         ProcessEventKind.THINKING -> if (event.live) null else tr("已思考 %s").format(formatThinkingDuration(event.millis))
-        ProcessEventKind.SEARCH -> if (event.live) null else searchCompletedLabel(event.pages, event.searchQuery)
-        ProcessEventKind.TOOL -> if (event.live) null else MemoryTool.doneLabel(event.toolName, event.content, event.webDomain)
+        ProcessEventKind.SEARCH, ProcessEventKind.TOOL -> if (event.live) null else event.completedLabel()
         ProcessEventKind.BUBBLE, ProcessEventKind.SUBAGENT -> null
-    }?.let { event.displayText.ifEmpty { it } }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (event.live) {
             if (terminal) {
@@ -3996,7 +3995,7 @@ internal fun ProcessEventRow(
             ) {
                 Text(
                     label,
-                    color = muted,
+                    color = toolStatusTextColor(event.toolOutcome, LocalResolvedTheme.current.isDark, muted, irioErrorTextColor()),
                     fontSize = 13.sp,
                 )
                 if (openable) {

@@ -60,10 +60,10 @@ internal class ProcessTracker {
         )
     }
 
-    fun onSearchFinished(pages: Int, content: String = "") {
+    fun onSearchFinished(pages: Int, content: String = "", outcome: ToolOutcome? = null) {
         val id = liveSearchId ?: return
         events.replaceAll { event ->
-            if (event.id == id) event.copy(pages = event.pages + pages, content = content.ifBlank { event.content }, live = false) else event
+            if (event.id == id) event.copy(pages = event.pages + pages, content = content.ifBlank { event.content }, live = false, toolOutcome = outcome) else event
         }
         liveSearchId = null
     }
@@ -140,8 +140,8 @@ internal class ProcessTracker {
             toolName = CommonsImageTools.SHOW, content = content, belowText = outputStarted, textOffset = eventAnchor())
     }
 
-    fun onToolFinished(content: String = "") {
-        finishLiveTool(content)
+    fun onToolFinished(content: String = "", outcome: ToolOutcome? = null) {
+        finishLiveTool(content, outcome)
     }
 
     /** 成功出图不留过程行，图片本身就是结果。 */
@@ -181,17 +181,18 @@ internal class ProcessTracker {
 
     private fun finishSearch(id: Long) {
         events.replaceAll { event ->
-            if (event.id == id) event.copy(live = false) else event
+            if (event.id == id) event.copy(live = false, toolOutcome = ToolOutcome.STOPPED) else event
         }
         liveSearchId = null
     }
 
-    private fun finishLiveTool(content: String = "") {
+    private fun finishLiveTool(content: String = "", outcome: ToolOutcome? = ToolOutcome.STOPPED) {
         val id = liveToolId ?: return
         events.replaceAll { event ->
             if (event.id == id) event.copy(
                 content = content.ifBlank { event.content },
                 live = false,
+                toolOutcome = outcome,
             ) else event
         }
         liveToolId = null

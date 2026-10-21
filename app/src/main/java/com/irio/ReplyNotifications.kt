@@ -67,7 +67,9 @@ internal fun advanceReplyNotice(current: String, update: ChatStreamUpdate, finis
     if (update.searching == true) {
         step = update.displayText.ifEmpty { searchStatusLabel(update.searchQuery) }
     }
-    if (update.searching == false) step = searchCompletedLabel(update.searchPagesDelta, update.searchQuery)
+    if (update.searching == false) step = ProcessEvent(0, ProcessEventKind.SEARCH,
+        pages = update.searchPagesDelta, searchQuery = update.searchQuery,
+        displayText = update.displayText, toolOutcome = update.toolOutcome).completedLabel()
     if (update.toolActive == true) {
         step = update.displayText.ifEmpty { MemoryTool.liveLabel(update.toolName, update.webDomain) }
     }
@@ -75,7 +77,8 @@ internal fun advanceReplyNotice(current: String, update: ChatStreamUpdate, finis
         step = if (update.toolName == ImageGenTool.NAME && update.toolContent == ImageGenTool.STATUS_OK) {
             tr("已生成图片")
         } else {
-            update.displayText.ifEmpty { MemoryTool.doneLabel(update.toolName, update.toolContent, update.webDomain) }
+            ProcessEvent(0, ProcessEventKind.TOOL, update.toolContent, toolName = update.toolName,
+                webDomain = update.webDomain, displayText = update.displayText, toolOutcome = update.toolOutcome).completedLabel()
         }
     }
     if (update.subagentJson.isNotEmpty()) step = tr("创建子智能体")

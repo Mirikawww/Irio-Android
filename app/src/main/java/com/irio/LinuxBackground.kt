@@ -189,6 +189,8 @@ internal object LinuxBackgroundJobs {
 
     fun handle(arguments: String): String = linuxBackgroundHandle(arguments, board)
 
+    fun result(arguments: String): ToolExecutionResult = linuxBackgroundResult(arguments, board)
+
     fun subscribe(listener: () -> Unit): () -> Unit = board.subscribe(listener)
 
     fun onFinished(listener: (LinuxBackgroundCommand) -> Unit): () -> Unit = board.onFinished(listener)
@@ -204,21 +206,28 @@ internal fun linuxBackgroundParseRequest(arguments: String): LinuxBackgroundRequ
     )
 }
 
-internal fun linuxBackgroundHandle(arguments: String, board: LinuxBackgroundBoard): String {
+internal fun linuxBackgroundHandle(arguments: String, board: LinuxBackgroundBoard): String =
+    linuxBackgroundResult(arguments, board).text
+
+internal fun linuxBackgroundResult(arguments: String, board: LinuxBackgroundBoard): ToolExecutionResult {
     val request = linuxBackgroundParseRequest(arguments)
     return when (request.action) {
-        "list" -> linuxBackgroundFormatList(board.tracked())
-        "status" -> linuxBackgroundFormatStatus(board.find(request.id))
+        "list" -> ToolExecutionResult(linuxBackgroundFormatList(board.tracked()))
+        "status" -> {
+            val command = board.find(request.id)
+            ToolExecutionResult(linuxBackgroundFormatStatus(command),
+                outcome = if (command == null) ToolOutcome.FAILED else ToolOutcome.SUCCESS)
+        }
         "stop" -> {
             val found = board.find(request.id)
             when {
-                found == null -> tr("没有这条后台命令。")
-                !found.running -> tr("后台命令 %s 已经结束。").format(found.id)
-                board.stop(found.id, notify = false) -> tr("已停止后台命令 %s。").format(found.id)
-                else -> tr("没有这条后台命令。")
+                found == null -> ToolExecutionResult(tr("没有这条后台命令。"), outcome = ToolOutcome.FAILED)
+                !found.running -> ToolExecutionResult(tr("后台命令 %s 已经结束。").format(found.id))
+                board.stop(found.id, notify = false) -> ToolExecutionResult(tr("已停止后台命令 %s。").format(found.id))
+                else -> ToolExecutionResult(tr("没有这条后台命令。"), outcome = ToolOutcome.FAILED)
             }
         }
-        else -> tr("未知操作")
+        else -> ToolExecutionResult(tr("未知操作"), outcome = ToolOutcome.FAILED)
     }
 }
 

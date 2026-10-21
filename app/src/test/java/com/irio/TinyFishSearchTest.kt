@@ -28,6 +28,7 @@ class TinyFishSearchTest {
             assertNull(request.getHeader("Authorization"))
             assertTrue("TinyFish must reuse the app's shared HTTP transport", request.getHeader("User-Agent")!!.startsWith("okhttp/"))
             assertEquals(2, result.pageCount)
+            assertTrue(result.succeeded)
             assertTrue(result.text.contains("First result"))
             assertTrue(result.text.contains("Second result"))
             assertFalse(result.text.contains("Third result"))
@@ -42,10 +43,12 @@ class TinyFishSearchTest {
             server.start()
             val failed = TinyFishSearch.search("key", "query", endpoint = server.url("/").toString().removeSuffix("/"))
             assertEquals("Invalid API key", failed.text)
+            assertFalse(failed.succeeded)
             assertEquals(1, server.requestCount)
             val missing = TinyFishSearch.search("key", "  ", endpoint = server.url("/").toString().removeSuffix("/"))
             assertEquals(1, server.requestCount)
             assertFalse(missing.text.isBlank())
+            assertFalse(missing.succeeded)
         }
     }
 
@@ -66,6 +69,7 @@ class TinyFishSearchTest {
             assertEquals("https://example.com/a", payload.getJSONArray("urls").getString(0))
             assertEquals("markdown", payload.getString("format"))
             assertEquals("# Example\n\nFetched page content.", result.text)
+            assertTrue(result.succeeded)
         }
     }
 
@@ -75,6 +79,7 @@ class TinyFishSearchTest {
             server.start()
             val result = TinyFishFetch.fetch("key", "https://example.com", endpoint = server.url("/").toString().removeSuffix("/"))
             assertTrue(result.text.contains("bot_blocked"))
+            assertFalse(result.succeeded)
         }
     }
 

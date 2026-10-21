@@ -108,6 +108,7 @@ internal fun subagentProcessJson(events: List<ProcessEvent>): JSONArray = JSONAr
                 if (event.searchQuery.isNotBlank()) put("searchQuery", event.searchQuery)
                 if (event.webDomain.isNotBlank()) put("webDomain", event.webDomain)
                 if (event.displayText.isNotEmpty()) put("displayText", event.displayText)
+                event.toolOutcome?.let { put("toolOutcome", it.name) }
                 if (event.bubbleColor.isNotEmpty()) put("bubbleColor", event.bubbleColor)
             },
         )
@@ -151,7 +152,7 @@ internal class SubagentTurn {
             changed = true
         }
         if (update.searching == false) {
-            tracker.onSearchFinished(update.searchPagesDelta, update.searchContent)
+            tracker.onSearchFinished(update.searchPagesDelta, update.searchContent, update.toolOutcome)
             changed = true
         }
         if (update.toolActive == true) {
@@ -166,7 +167,7 @@ internal class SubagentTurn {
             if (update.toolName == ImageGenTool.NAME && update.toolContent == ImageGenTool.STATUS_OK) {
                 tracker.dropLiveTool()
             } else {
-                tracker.onToolFinished(update.toolContent)
+                tracker.onToolFinished(update.toolContent, update.toolOutcome)
             }
             changed = true
         }
@@ -301,34 +302,39 @@ internal class SubagentToolProvider : ToolProvider {
             "Its final output is sent back to you once when it finishes."
 
     override suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {
-        val name = ToolArguments.value(call.arguments, "name").trim()
-        if (name.isEmpty()) return ToolExecutionResult(tr("子智能体需要一个名称。"))
+        val args = runCatching { JSONObject(call.arguments) }.getOrNull()
+        val name = args?.optString("name").orEmpty().trim()
+        if (name.isEmpty()) return ToolExecutionResult(tr("子智能体需要一个名称。"), outcome = ToolOutcome.FAILED)
         return when (call.name) {
             SubagentTools.CREATE -> {
                 context.onUpdate(ChatStreamUpdate(notifyTool = SubagentTools.CREATE))
-                SubagentHub.create(name, ToolArguments.value(call.arguments, "task").trim(), context)
+                SubagentHub.create(name, args?.optString("task").orEmpty().trim(), context)
             }
             SubagentTools.MESSAGE -> {
                 context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = call.name))
+                var result: ToolExecutionResult? = null
                 try {
-                    SubagentHub.message(context.conversationId, name, ToolArguments.value(call.arguments, "message").trim())
+                    SubagentHub.message(context.conversationId, name, args?.optString("message").orEmpty().trim()).also { result = it }
                 } finally {
-                    context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name))
+                    context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name,
+                        toolContent = result?.text.orEmpty(), toolOutcome = result?.outcome ?: ToolOutcome.FAILED))
                 }
             }
             SubagentTools.STOP -> {
                 context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = call.name))
+                var result: ToolExecutionResult? = null
                 try {
-                    SubagentHub.stop(context.conversationId, name)
+                    SubagentHub.stop(context.conversationId, name).also { result = it }
                 } finally {
-                    context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name))
+                    context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name,
+                        toolContent = result?.text.orEmpty(), toolOutcome = result?.outcome ?: ToolOutcome.FAILED))
                 }
             }
             SubagentTools.INSPECT -> {
                 context.onUpdate(ChatStreamUpdate(notifyTool = SubagentTools.INSPECT))
                 SubagentHub.inspect(context.conversationId, name)
             }
-            else -> ToolExecutionResult(tr("未知工具 %s").format(call.name))
+            else -> ToolExecutionResult(tr("未知工具 %s").format(call.name), outcome = ToolOutcome.FAILED)
         }
     }
 
@@ -363,15 +369,15 @@ internal object SubagentHub {
     }
 
     suspend fun create(name: String, task: String, context: ToolExecutionContext): ToolExecutionResult {
-        if (task.isEmpty()) return ToolExecutionResult(tr("子智能体需要一项任务。"))
-        if (context.provider.id.isBlank()) return ToolExecutionResult(tr("请先在设置中添加提供商"))
+        if (task.isEmpty()) return ToolExecutionResult(tr("子智能体需要一项任务。"), outcome = ToolOutcome.FAILED)
+        if (context.provider.id.isBlank()) return ToolExecutionResult(tr("请先在设置中添加提供商"), outcome = ToolOutcome.FAILED)
         val conversationId = context.conversationId
         if (sessions.values.any { it.conversationId == conversationId && it.name == name }) {
-            return ToolExecutionResult(tr("已经有名为「%s」的子智能体，请换一个名字。").format(name))
+            return ToolExecutionResult(tr("已经有名为「%s」的子智能体，请换一个名字。").format(name), outcome = ToolOutcome.FAILED)
         }
         val appContext = context.appContext
         val model = appContext?.let { ToolStore.loadSubagentModel(it) }.orEmpty().ifBlank { context.model }
-        if (model.isBlank()) return ToolExecutionResult(tr("没有可用的子智能体模型。"))
+        if (model.isBlank()) return ToolExecutionResult(tr("没有可用的子智能体模型。"), outcome = ToolOutcome.FAILED)
         val snapshot = SubagentSnapshot(
             id = UUID.randomUUID().toString(),
             conversationId = conversationId,
@@ -397,10 +403,10 @@ internal object SubagentHub {
     }
 
     suspend fun message(conversationId: String, name: String, text: String): ToolExecutionResult {
-        if (text.isEmpty()) return ToolExecutionResult(tr("发给子智能体的内容不能为空。"))
+        if (text.isEmpty()) return ToolExecutionResult(tr("发给子智能体的内容不能为空。"), outcome = ToolOutcome.FAILED)
         val session = sessions.values.firstOrNull { it.conversationId == conversationId && it.name == name }
-            ?: return ToolExecutionResult(tr("找不到名为「%s」的子智能体。").format(name))
-        if (session.state != SubagentState.RUNNING) return ToolExecutionResult(tr("子智能体「%s」已经不在运行。").format(name))
+            ?: return ToolExecutionResult(tr("找不到名为「%s」的子智能体。").format(name), outcome = ToolOutcome.FAILED)
+        if (session.state != SubagentState.RUNNING) return ToolExecutionResult(tr("子智能体「%s」已经不在运行。").format(name), outcome = ToolOutcome.FAILED)
         locks[session.id]?.withLock {
             inbox.getOrPut(session.id) { mutableListOf() }.add(text)
         }
@@ -409,12 +415,12 @@ internal object SubagentHub {
 
     fun stop(conversationId: String, name: String): ToolExecutionResult {
         val session = sessions.values.firstOrNull { it.conversationId == conversationId && it.name == name }
-            ?: return ToolExecutionResult(tr("找不到名为「%s」的子智能体。").format(name))
+            ?: return ToolExecutionResult(tr("找不到名为「%s」的子智能体。").format(name), outcome = ToolOutcome.FAILED)
         return stopById(session.id, name)
     }
 
     fun stopById(id: String): ToolExecutionResult {
-        val session = sessions[id] ?: return ToolExecutionResult(tr("找不到这个子智能体。"))
+        val session = sessions[id] ?: return ToolExecutionResult(tr("找不到这个子智能体。"), outcome = ToolOutcome.FAILED)
         return stopById(id, session.name)
     }
 
@@ -429,7 +435,7 @@ internal object SubagentHub {
 
     fun inspect(conversationId: String, name: String): ToolExecutionResult {
         val session = sessions.values.firstOrNull { it.conversationId == conversationId && it.name == name }
-            ?: return ToolExecutionResult(tr("找不到名为「%s」的子智能体。").format(name))
+            ?: return ToolExecutionResult(tr("找不到名为「%s」的子智能体。").format(name), outcome = ToolOutcome.FAILED)
         val finished = session.lines.filterNot { it.fromUser }.joinToString("\n\n") { it.visibleText() }
         val live = visibleTranscriptText(session.liveText, session.liveProcess)
         return ToolExecutionResult(

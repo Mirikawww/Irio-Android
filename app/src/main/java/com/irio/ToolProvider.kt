@@ -2,6 +2,7 @@ package com.irio
 
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONObject
@@ -43,6 +44,7 @@ data class ToolExecutionResult(
     val endTurn: Boolean = false,
     /** Explicit visual inspection only; display-only images must never populate this. */
     val modelAttachments: List<ChatAttachment> = emptyList(),
+    val outcome: ToolOutcome = ToolOutcome.SUCCESS,
 )
 
 /**
@@ -151,25 +153,71 @@ class ToolRegistry(
     fun handles(name: String): Boolean = providerFor(name) != null
 
     suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {
-        // Reject stale or hallucinated calls before dispatch, callbacks, or any provider side effects.
-        if (!preferences.isEnabled(call.name)) {
-            return ToolExecutionResult("Tool ${call.name} is disabled by user preferences.")
-        }
-        val provider = providerFor(call.name)
-            ?: return ToolExecutionResult(tr("未知工具 %s").format(call.name))
         val displayText = if (smartToolHints) SmartToolHints.displayText(call.arguments) else ""
-        val executionContext = context.copy(onUpdate = { update ->
+        val search = call.name == WebSearchTool.NAME
+        val query = if (search) runCatching { JSONObject(call.arguments).opt("query") as? String }.getOrNull().orEmpty() else ""
+        var started = false
+        var terminal: ChatStreamUpdate? = null
+        var latestOutput = ""
+        suspend fun publish(update: ChatStreamUpdate) {
             context.onUpdate(update.copy(displayText = displayText))
+        }
+        suspend fun start() {
+            if (started) return
+            started = true
+            publish(if (search) ChatStreamUpdate(searching = true, searchQuery = query)
+            else ChatStreamUpdate(toolActive = true, toolName = call.name,
+                webDomain = if (call.name == WebFetchTool.NAME) webPageDomain(ToolArguments.value(call.arguments, "url")) else ""))
+        }
+        suspend fun finish(result: ToolExecutionResult) {
+            // Successful visual/metadata tools stay silent. Their failures are never silent.
+            if (!started && result.outcome == ToolOutcome.SUCCESS && terminal == null) return
+            start()
+            val update = terminal ?: if (search) ChatStreamUpdate(searching = false) else
+                ChatStreamUpdate(toolActive = false, toolName = call.name)
+            val providerContent = if (search) update.searchContent else update.toolContent.ifBlank { latestOutput }
+            val content = if (result.outcome == ToolOutcome.SUCCESS) {
+                providerContent.ifBlank { result.text }
+            } else if (call.name == LinuxShellTool.NAME && providerContent.isNotBlank() && providerContent != result.text) {
+                "$providerContent\n\n${result.text}"
+            } else result.text
+            publish(if (search) update.copy(searching = false, searchContent = content,
+                searchQuery = query, toolOutcome = result.outcome)
+            else update.copy(toolActive = false, toolName = call.name, toolContent = content, toolOutcome = result.outcome))
+        }
+        val executionContext = context.copy(onUpdate = { update ->
+            update.toolOutput?.let { latestOutput = it }
+            when {
+                update.searching == false || update.toolActive == false -> terminal = update
+                update.searching == true || update.toolActive == true -> {
+                    // Repeated shell output snapshots update one event; ordinary starts occur once.
+                    if (!started || update.toolOutput != null) publish(update)
+                    started = true
+                }
+                else -> publish(update)
+            }
         })
-        return try {
-            provider.execute(SmartToolHints.executionCall(call), executionContext)
+        val result = try {
+            // Reject stale calls before invoking any provider or its side effects.
+            when {
+                !preferences.isEnabled(call.name) -> ToolExecutionResult(
+                    "Tool ${call.name} is disabled by user preferences.", outcome = ToolOutcome.FAILED)
+                context.cancellation.isCancelled() -> ToolExecutionResult(tr("工具已停止"), outcome = ToolOutcome.STOPPED)
+                else -> providerFor(call.name)?.execute(SmartToolHints.executionCall(call), executionContext)
+                    ?: ToolExecutionResult(tr("未知工具 %s").format(call.name), outcome = ToolOutcome.FAILED)
+            }
         } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) { finish(ToolExecutionResult(tr("工具已停止"), outcome = ToolOutcome.STOPPED)) }
             throw cancelled
         } catch (error: Exception) {
             ToolExecutionResult(
                 text = tr("工具 %s 执行失败：%s").format(call.name, error.message ?: tr("未知错误")),
+                outcome = ToolOutcome.FAILED,
             )
         }
+        val settled = if (context.cancellation.isCancelled()) result.copy(outcome = ToolOutcome.STOPPED) else result
+        finish(settled)
+        return settled
     }
 
     companion object {
@@ -206,11 +254,13 @@ internal class WebSearchToolProvider : ToolProvider {
         call: ChatToolCall,
         context: ToolExecutionContext,
     ): ToolExecutionResult = withContext(Dispatchers.IO) {
-        if (!context.webSearch || context.searchApiKey.isBlank()) {
-            return@withContext ToolExecutionResult(tr("搜索工具当前不可用：请先启用网页搜索并配置密钥"))
-        }
-        val query = ToolArguments.value(call.arguments, "query")
+        val query = runCatching { JSONObject(call.arguments).opt("query") as? String }.getOrNull().orEmpty()
         context.onUpdate(ChatStreamUpdate(searching = true, searchQuery = query))
+        if (!context.webSearch || context.searchApiKey.isBlank()) {
+            val text = tr("搜索工具当前不可用：请先启用网页搜索并配置密钥")
+            context.onUpdate(ChatStreamUpdate(searching = false, searchQuery = query, searchContent = text, toolOutcome = ToolOutcome.FAILED))
+            return@withContext ToolExecutionResult(text, outcome = ToolOutcome.FAILED)
+        }
         val result = WebSearch.search(
             provider = context.searchProvider,
             apiKey = context.searchApiKey,
@@ -219,17 +269,20 @@ internal class WebSearchToolProvider : ToolProvider {
             maxResults = context.searchMaxResults,
         )
         if (context.cancellation.isCancelled()) {
-            context.onUpdate(ChatStreamUpdate(searching = false))
-            return@withContext ToolExecutionResult(tr("搜索已停止"))
+            val text = tr("搜索已停止")
+            context.onUpdate(ChatStreamUpdate(searching = false, searchQuery = query, searchContent = text, toolOutcome = ToolOutcome.STOPPED))
+            return@withContext ToolExecutionResult(text, outcome = ToolOutcome.STOPPED)
         }
         context.onUpdate(
             ChatStreamUpdate(
                 searching = false,
                 searchPagesDelta = result.pageCount,
                 searchContent = result.displayContent,
+                toolOutcome = if (result.succeeded) ToolOutcome.SUCCESS else ToolOutcome.FAILED,
             )
         )
-        ToolExecutionResult(text = result.text, searchPages = result.pageCount)
+        ToolExecutionResult(text = result.text, searchPages = result.pageCount,
+            outcome = if (result.succeeded) ToolOutcome.SUCCESS else ToolOutcome.FAILED)
     }
 }
 
@@ -245,14 +298,15 @@ internal class WebFetchToolProvider : ToolProvider {
         call: ChatToolCall,
         context: ToolExecutionContext,
     ): ToolExecutionResult = withContext(Dispatchers.IO) {
+        val url = runCatching { JSONObject(call.arguments).opt("url") as? String }.getOrNull().orEmpty()
+        context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = WebFetchTool.NAME, webDomain = webPageDomain(url)))
         if (!context.webSearch || context.searchApiKey.isBlank()) {
-            return@withContext ToolExecutionResult(tr("网页读取工具当前不可用：请先启用网页搜索并配置密钥"))
+            val text = tr("网页读取工具当前不可用：请先启用网页搜索并配置密钥")
+            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = WebFetchTool.NAME, webDomain = webPageDomain(url), toolContent = text, toolOutcome = ToolOutcome.FAILED))
+            return@withContext ToolExecutionResult(text, outcome = ToolOutcome.FAILED)
         }
-        val url = ToolArguments.value(call.arguments, "url")
-        context.onUpdate(
-            ChatStreamUpdate(toolActive = true, toolName = WebFetchTool.NAME, webDomain = webPageDomain(url)),
-        )
         var resultText = ""
+        var outcome = ToolOutcome.FAILED
         return@withContext try {
             val result = WebFetch.fetch(
                 provider = context.searchProvider,
@@ -261,13 +315,16 @@ internal class WebFetchToolProvider : ToolProvider {
                 cancellation = context.cancellation,
             )
             resultText = result.text
-            ToolExecutionResult(result.text)
+            outcome = if (context.cancellation.isCancelled()) ToolOutcome.STOPPED
+                else if (result.succeeded) ToolOutcome.SUCCESS else ToolOutcome.FAILED
+            ToolExecutionResult(result.text, outcome = outcome)
         } finally {
             context.onUpdate(
                 ChatStreamUpdate(
                     toolActive = false,
                     toolName = WebFetchTool.NAME,
                     toolContent = resultText,
+                    toolOutcome = if (context.cancellation.isCancelled()) ToolOutcome.STOPPED else outcome,
                 )
             )
         }
@@ -293,13 +350,14 @@ internal class ImageGenToolProvider : ToolProvider {
                     toolActive = false,
                     toolName = ImageGenTool.NAME,
                     toolContent = ImageGenTool.STATUS_FAILED,
+                    toolOutcome = ToolOutcome.FAILED,
                 ),
             )
-            return@withContext ToolExecutionResult(tr("图片生成工具当前不可用：请先配置图片生成模型"))
+            return@withContext ToolExecutionResult(tr("图片生成工具当前不可用：请先配置图片生成模型"), outcome = ToolOutcome.FAILED)
         }
-        if (context.cancellation.isCancelled()) return@withContext ToolExecutionResult(tr("图片生成已停止"))
+        if (context.cancellation.isCancelled()) return@withContext ToolExecutionResult(tr("图片生成已停止"), outcome = ToolOutcome.STOPPED)
         context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = ImageGenTool.NAME))
-        var status = ""
+        var status = ImageGenTool.STATUS_FAILED
         return@withContext try {
             val prompt = ToolArguments.value(call.arguments, "prompt")
             // Images API 无状态：把最近一轮生成图和 prompt 作为编辑参考传回端点。
@@ -322,10 +380,11 @@ internal class ImageGenToolProvider : ToolProvider {
                 }
                 ToolExecutionResult(message)
             } else if (stopped) {
-                ToolExecutionResult(tr("图片生成已停止"))
+                status = ""
+                ToolExecutionResult(tr("图片生成已停止"), outcome = ToolOutcome.STOPPED)
             } else {
                 status = ImageGenTool.STATUS_FAILED
-                ToolExecutionResult(tr("图片生成失败：%s").format(result.error ?: tr("未知错误")))
+                ToolExecutionResult(tr("图片生成失败：%s").format(result.error ?: tr("未知错误")), outcome = ToolOutcome.FAILED)
             }
         } finally {
             context.onUpdate(
@@ -333,6 +392,11 @@ internal class ImageGenToolProvider : ToolProvider {
                     toolActive = false,
                     toolName = ImageGenTool.NAME,
                     toolContent = status,
+                    toolOutcome = when (status) {
+                        ImageGenTool.STATUS_OK -> ToolOutcome.SUCCESS
+                        ImageGenTool.STATUS_FAILED -> ToolOutcome.FAILED
+                        else -> ToolOutcome.STOPPED
+                    },
                 ),
             )
         }
@@ -366,10 +430,15 @@ internal class TimeToolProvider : ToolProvider {
         context: ToolExecutionContext,
     ): ToolExecutionResult {
         context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = TimeTool.NAME))
+        var outcome = ToolOutcome.FAILED
+        var content = ""
         return try {
-            ToolExecutionResult(TimeTool.now())
+            content = TimeTool.now()
+            outcome = ToolOutcome.SUCCESS
+            ToolExecutionResult(content)
         } finally {
-            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = TimeTool.NAME))
+            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = TimeTool.NAME,
+                toolContent = content, toolOutcome = outcome))
         }
     }
 }
@@ -388,16 +457,22 @@ internal class MemoryToolProvider : ToolProvider {
         context: ToolExecutionContext,
     ): ToolExecutionResult {
         context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = call.name))
+        var outcome = ToolOutcome.FAILED
+        var content = ""
         return try {
-            when (call.name) {
-                MemoryTool.GET -> ToolExecutionResult(MemoryTool.read(context.appContext))
-                MemoryTool.UPDATE -> ToolExecutionResult(
-                    MemoryTool.write(context.appContext, ToolArguments.value(call.arguments, "content")),
-                )
-                else -> ToolExecutionResult(tr("未知工具 %s").format(call.name))
+            val app = context.appContext
+            val addition = runCatching { JSONObject(call.arguments).opt("content") as? String }.getOrNull().orEmpty()
+            val available = app != null && MemoryStore.loadEnabled(app)
+            content = when (call.name) {
+                MemoryTool.GET -> MemoryTool.read(app)
+                MemoryTool.UPDATE -> MemoryTool.write(app, addition)
+                else -> tr("未知工具 %s").format(call.name)
             }
+            outcome = if (available && (call.name == MemoryTool.GET ||
+                    call.name == MemoryTool.UPDATE && addition.isNotBlank())) ToolOutcome.SUCCESS else ToolOutcome.FAILED
+            ToolExecutionResult(content, outcome = outcome)
         } finally {
-            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name))
+            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name, toolContent = content, toolOutcome = outcome))
         }
     }
 }

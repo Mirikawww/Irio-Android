@@ -113,16 +113,24 @@ internal class CommonsImageToolProvider : ToolProvider {
     }
     override fun handles(name: String) = name in setOf(CommonsImageTools.SEARCH, CommonsImageTools.SHOW, CommonsImageTools.VIEW)
     override suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {
+        val query = ToolArguments.value(call.arguments, "query")
+        if (call.name != CommonsImageTools.SHOW) context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = call.name,
+            searchQuery = query.takeIf { call.name == CommonsImageTools.SEARCH }.orEmpty()))
         if (!context.webSearch) {
-            return ToolExecutionResult(tr("图片工具当前不可用：请先启用网页搜索并配置密钥"))
+            val result = ToolExecutionResult(tr("图片工具当前不可用：请先启用网页搜索并配置密钥"), outcome = ToolOutcome.FAILED)
+            if (call.name == CommonsImageTools.SHOW) context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = call.name))
+            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name, toolContent = result.text, toolOutcome = result.outcome))
+            return result
         }
         if (call.name == CommonsImageTools.SEARCH && context.imageSearchApiKey.isBlank()) {
-            return ToolExecutionResult(tr("图片搜索当前不可用：请先在「搜索」中配置 SerpAPI 密钥"))
+            val result = ToolExecutionResult(tr("图片搜索当前不可用：请先在「搜索」中配置 SerpAPI 密钥"), outcome = ToolOutcome.FAILED)
+            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = call.name, toolContent = result.text, toolOutcome = result.outcome))
+            return result
         }
         if (call.name != CommonsImageTools.SEARCH) return selected(call, context)
         var output = ""
+        var outcome = ToolOutcome.FAILED
         try {
-            context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = CommonsImageTools.SEARCH))
             output = withContext(Dispatchers.IO) {
                 checkCancellation(context)
                 val args = runCatching { JSONObject(call.arguments) }.getOrElse {
@@ -157,7 +165,9 @@ internal class CommonsImageToolProvider : ToolProvider {
                         if (root.optJSONObject("serpapi_pagination")?.optString("next").orEmpty().isNotBlank()) put("next_offset", offset + 1)
                     }.toString()
             }
+            outcome = ToolOutcome.SUCCESS
         } catch (e: CancellationException) {
+            outcome = ToolOutcome.STOPPED
             output = CommonsImageTools.error("cancelled", "Image search stopped.")
             currentCoroutineContext().ensureActive()
             if (!context.cancellation.isCancelled()) throw e
@@ -169,16 +179,16 @@ internal class CommonsImageToolProvider : ToolProvider {
             output = CommonsImageTools.error(if (context.cancellation.isCancelled()) "cancelled" else "search_failed",
                 "Could not retrieve Google Images. Check your connection and retry.")
         } finally {
-            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = CommonsImageTools.SEARCH, toolContent = output))
+            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = CommonsImageTools.SEARCH, toolContent = output, toolOutcome = outcome))
         }
-        return ToolExecutionResult(output)
+        return ToolExecutionResult(output, outcome = outcome)
     }
 
     private suspend fun selected(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult = withContext(Dispatchers.IO) {
         var output = ""
         val viewing = call.name == CommonsImageTools.VIEW
+        var outcome = ToolOutcome.FAILED
         try {
-            if (viewing) context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = CommonsImageTools.VIEW))
             checkCancellation(context)
             val args = JSONObject(call.arguments)
             val ids = args.getJSONArray("image_ids")
@@ -207,22 +217,28 @@ internal class CommonsImageToolProvider : ToolProvider {
             // Local file paths are UI/storage data, never part of model-visible tool output.
             output = CommonsImageTools.publicResult(result.toString())
             if (!viewing) context.onUpdate(ChatStreamUpdate(displayedImages = result.toString()))
+            outcome = ToolOutcome.SUCCESS
             ToolExecutionResult(output, modelAttachments = if (viewing) attachments else emptyList())
         } catch (e: CancellationException) {
+            outcome = ToolOutcome.STOPPED
             output = CommonsImageTools.error("cancelled", "Image operation stopped.")
             currentCoroutineContext().ensureActive()
             if (!context.cancellation.isCancelled()) throw e
-            ToolExecutionResult(output)
+            ToolExecutionResult(output, outcome = ToolOutcome.STOPPED)
         } catch (e: CommonsImageException) {
             output = CommonsImageTools.error(e.code, e.message.orEmpty())
-            ToolExecutionResult(output)
+            ToolExecutionResult(output, outcome = ToolOutcome.FAILED)
         } catch (e: Exception) {
             output = CommonsImageTools.error(if (context.cancellation.isCancelled()) "cancelled" else "image_failed",
                 if (e is IllegalArgumentException || e is org.json.JSONException) "Supply 1 to 5 valid image IDs returned by image_search."
                 else "Could not load the selected images. Check your connection and retry.")
-            ToolExecutionResult(output)
+            ToolExecutionResult(output, outcome = ToolOutcome.FAILED)
         } finally {
-            if (viewing) context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = CommonsImageTools.VIEW, toolContent = output))
+            if (!viewing && outcome != ToolOutcome.SUCCESS) context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = call.name))
+            if (viewing || outcome != ToolOutcome.SUCCESS) context.onUpdate(ChatStreamUpdate(
+                toolActive = false, toolName = call.name, toolContent = output,
+                toolOutcome = outcome,
+            ))
         }
     }
 

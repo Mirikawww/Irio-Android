@@ -86,6 +86,7 @@ internal class HistoryToolProvider : ToolProvider {
 
     override suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {
         var output = ""
+        var outcome = ToolOutcome.FAILED
         try {
             context.onUpdate(ChatStreamUpdate(toolActive = true, toolName = HistoryTool.NAME))
             output = withContext(Dispatchers.IO) {
@@ -102,7 +103,9 @@ internal class HistoryToolProvider : ToolProvider {
                     HistoryQuery(app, context.conversationId, checkCancellation).execute(JSONObject(call.arguments))
                 }
             }
+            outcome = if (JSONObject(output).has("error")) ToolOutcome.FAILED else ToolOutcome.SUCCESS
         } catch (e: CancellationException) {
+            outcome = ToolOutcome.STOPPED
             output = HistoryTool.error("cancelled", "History query stopped.")
             currentCoroutineContext().ensureActive()
             if (!context.cancellation.isCancelled()) throw e
@@ -114,9 +117,9 @@ internal class HistoryToolProvider : ToolProvider {
             // Do not expose private filesystem paths or arbitrary parser/transport exception text.
             output = HistoryTool.error("read_failed", "Could not read local history. Retry after the conversation has finished saving.")
         } finally {
-            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = HistoryTool.NAME, toolContent = output))
+            context.onUpdate(ChatStreamUpdate(toolActive = false, toolName = HistoryTool.NAME, toolContent = output, toolOutcome = outcome))
         }
-        return ToolExecutionResult(output)
+        return ToolExecutionResult(output, outcome = outcome)
     }
 }
 

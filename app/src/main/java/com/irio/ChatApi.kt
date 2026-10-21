@@ -60,6 +60,12 @@ data class TokenUsage(
         get() = totalTokens ?: listOfNotNull(promptTokens, completionTokens).sum()
 }
 
+enum class ToolOutcome {
+    SUCCESS,
+    FAILED,
+    STOPPED,
+}
+
 data class ChatCompletionResult(
     val content: String = "",
     val thinking: String = "",
@@ -91,6 +97,8 @@ data class ChatStreamUpdate(
     val toolName: String = "",
     /** 工具完成后展示在可展开详情中的结果内容。 */
     val toolContent: String = "",
+    /** Explicit lifecycle result; null means this update does not close a tool. */
+    val toolOutcome: ToolOutcome? = null,
     /** 工具调用之后的新一轮。UI 保留已输出正文，下一轮正文接在后面，不要清掉上一轮。 */
     val newRound: Boolean = false,
     val usage: TokenUsage? = null,
@@ -268,7 +276,10 @@ object ChatApi {
                     if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
                     throw cancelled
                 }
-                onUpdate(ChatStreamUpdate(toolRecord = ChatToolRecord(call, result.text), toolContent = result.text))
+                onUpdate(ChatStreamUpdate(
+                    toolRecord = ChatToolRecord(call, result.text),
+                    toolContent = result.text,
+                ))
                 if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
                 searchPages += result.searchPages
                 endTurn = endTurn || result.endTurn
@@ -1527,28 +1538,32 @@ internal object MemoryTool {
         }
     }
 
-    fun doneLabel(name: String, content: String = "", webDomain: String = ""): String = when (name) {
-        ImageGenTool.NAME -> when (content) {
-            ImageGenTool.STATUS_FAILED -> tr("生成图片失败")
-            else -> tr("图片生成已停止")
-        }
-        TimeTool.NAME -> tr("已获取时间")
-        CommonsImageTools.SEARCH -> CommonsImageTools.doneLabel(content)
-        CommonsImageTools.VIEW -> CommonsImageTools.viewDoneLabel(content)
-        HistoryTool.NAME -> HistoryTool.doneLabel(content)
-        LinuxShellTool.NAME -> tr("已运行命令")
-        LinuxBackgroundTool.NAME -> tr("已处理后台命令")
-        WebFetchTool.NAME -> tr("已浏览网页").let { status ->
-            if (webDomain.isBlank()) status else "$status - $webDomain"
-        }
-        GET -> tr("已读取记忆")
-        UPDATE -> tr("已写入记忆")
-        SubagentTools.MESSAGE -> tr("已联系子智能体")
-        SubagentTools.STOP -> tr("已停止子智能体")
-        else -> when {
-            name.startsWith(GitHubMcpToolProvider.PREFIX) -> GitHubMcpToolProvider.progressLabel(name, completed = true)
-            name.startsWith(TodoistMcpToolProvider.PREFIX) -> TodoistMcpToolProvider.progressLabel(name, completed = true)
-            else -> tr("已调用工具")
+    fun doneLabel(name: String, content: String = "", webDomain: String = "", outcome: ToolOutcome? = null): String {
+        if (outcome == ToolOutcome.FAILED) return toolFailureLabel(name)
+        if (outcome == ToolOutcome.STOPPED) return toolStoppedLabel(name, webDomain)
+        return when (name) {
+            ImageGenTool.NAME -> when (content) {
+                ImageGenTool.STATUS_FAILED -> tr("生成图片失败")
+                else -> tr("图片生成已停止")
+            }
+            TimeTool.NAME -> tr("已获取时间")
+            CommonsImageTools.SEARCH -> CommonsImageTools.doneLabel(content)
+            CommonsImageTools.VIEW -> CommonsImageTools.viewDoneLabel(content)
+            HistoryTool.NAME -> HistoryTool.doneLabel(content)
+            LinuxShellTool.NAME -> tr("已运行命令")
+            LinuxBackgroundTool.NAME -> tr("已处理后台命令")
+            WebFetchTool.NAME -> tr("已浏览网页").let { status ->
+                if (webDomain.isBlank()) status else "$status - $webDomain"
+            }
+            GET -> tr("已读取记忆")
+            UPDATE -> tr("已写入记忆")
+            SubagentTools.MESSAGE -> tr("已联系子智能体")
+            SubagentTools.STOP -> tr("已停止子智能体")
+            else -> when {
+                name.startsWith(GitHubMcpToolProvider.PREFIX) -> GitHubMcpToolProvider.progressLabel(name, completed = true)
+                name.startsWith(TodoistMcpToolProvider.PREFIX) -> TodoistMcpToolProvider.progressLabel(name, completed = true)
+                else -> tr("已调用工具")
+            }
         }
     }
 
