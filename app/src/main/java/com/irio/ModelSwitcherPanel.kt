@@ -150,6 +150,10 @@ private val UltraThinkingPurple = Color(0xFF9254E8)
 internal fun modelSwitcherListHeight(naturalHeight: Dp, screenHeightDp: Int): Dp =
     naturalHeight.coerceAtMost((screenHeightDp * 0.55f).dp.coerceIn(264.dp, 420.dp))
 
+/** Fading a panel out does not remove it from hit testing. Keep it inert until fully restored. */
+internal fun modelSwitcherCompactInteractive(modelsExpanded: Boolean, phase: Float): Boolean =
+    !modelsExpanded && phase <= 0.001f
+
 /** The entire surface changes to the list during the initial fast extension. */
 @Composable
 internal fun DropdownMenuScope.ModelSwitcherPanel(
@@ -177,6 +181,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
     val accent = Theme[colors][primaryColor]
     var modelsExpanded by remember { mutableStateOf(false) }
     val phase = remember { androidx.compose.animation.core.Animatable(0f) }
+    val compactInteractive by remember { derivedStateOf { modelSwitcherCompactInteractive(modelsExpanded, phase.value) } }
     LaunchedEffect(modelsExpanded) {
         phase.animateTo(if (modelsExpanded) 1f else 0f, irioSpring<Float>(stiffness = if (modelsExpanded) 900f else 1150f))
     }
@@ -209,7 +214,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
             Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(
                     Modifier.weight(1f).height(44.dp).clip(RoundedRectangle(12.dp))
-                        .modelSwitcherClickable { modelsExpanded = !modelsExpanded }
+                        .modelSwitcherClickable { if (compactInteractive) modelsExpanded = true }
                         .semantics {
                             contentDescription = tr("选择模型")
                             stateDescription = tr(if (modelsExpanded) "收起模型" else "展开模型")
@@ -223,7 +228,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                 }
                 Spacer(Modifier.width(6.dp))
                 IconButton(
-                    onClick = { onFastModeChange(!fastMode) }, style = ButtonStyle.Ghost,
+                    onClick = { if (compactInteractive) onFastModeChange(!fastMode) }, style = ButtonStyle.Ghost,
                     buttonSize = ButtonSize.Small, shape = ContinuousCapsule,
                     modifier = Modifier.size(36.dp).background(fastBackground, ContinuousCapsule)
                         .semantics { selected = fastMode; stateDescription = tr(if (fastMode) "开启" else "关闭") },
@@ -232,10 +237,12 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                 }
             }
                 Spacer(Modifier.height(3.dp))
-                ThinkingDepthSlider(reasoningEffort, supportsThinking, reasoningLevels, onReasoningChange, active = !modelsExpanded)
+                ThinkingDepthSlider(reasoningEffort, supportsThinking, reasoningLevels, onReasoningChange, active = compactInteractive)
                 Spacer(Modifier.height(2.dp))
-                ModelSwitcherToggle(tr("网络搜索"), webSearchAvailable && webSearchEnabled, webSearchAvailable, onWebSearchChange)
-                ModelSwitcherToggle(tr("自动朗读"), autoRead, onCheckedChange = onAutoReadChange)
+                ModelSwitcherToggle(tr("网络搜索"), webSearchAvailable && webSearchEnabled, webSearchAvailable) {
+                    if (compactInteractive) onWebSearchChange(it)
+                }
+                ModelSwitcherToggle(tr("自动朗读"), autoRead) { if (compactInteractive) onAutoReadChange(it) }
             }
                 AndroidComposeRecyclerList(
                     items = rows, key = { it.key },
@@ -426,7 +433,7 @@ internal fun RollingGlyphLabel(
 private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, supportedLevels: List<ReasoningEffort>, onEffortChange: (ReasoningEffort) -> Unit, active: Boolean = true) {
     val darkTheme = LocalResolvedTheme.current.isDark
     val levels = supportedLevels.ifEmpty { listOf(ReasoningEffort.OFF) }
-    val adjustable = enabled && levels.size > 1
+    val adjustable = active && enabled && levels.size > 1
     val selectedIndex = levels.indexOf(effort).coerceAtLeast(0)
     val muted = Theme[colors][mutedColor]
     val accent = Theme[colors][primaryColor]
@@ -485,7 +492,7 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
         }
     }
     val commitSelection by rememberUpdatedState<() -> Unit> {
-        if (levels[preview.index] != effort) onEffortChange(levels[preview.index])
+        if (active && levels[preview.index] != effort) onEffortChange(levels[preview.index])
     }
     val fraction = { if (levels.size == 1) 0.5f else (position / levels.lastIndex).coerceIn(0f, 1f) }
     val geometry = { thinkingSliderGeometry(sliderWidth.toFloat(), radius, fraction(), rtl) }

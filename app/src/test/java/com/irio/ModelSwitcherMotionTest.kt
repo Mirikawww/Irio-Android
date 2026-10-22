@@ -2,10 +2,22 @@ package com.irio
 
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ModelSwitcherMotionTest {
+    @Test
+    fun compactControlsRemainInertWhileModelListIsOpenOrClosing() {
+        assertTrue(modelSwitcherCompactInteractive(modelsExpanded = false, phase = 0f))
+        // The list becomes interactive before its fade-in completes.
+        assertFalse(modelSwitcherCompactInteractive(modelsExpanded = true, phase = 0f))
+        assertFalse(modelSwitcherCompactInteractive(modelsExpanded = true, phase = 1f))
+        // Closing the list must not activate the slider while the surfaces overlap.
+        assertFalse(modelSwitcherCompactInteractive(modelsExpanded = false, phase = 0.5f))
+        assertTrue(modelSwitcherCompactInteractive(modelsExpanded = false, phase = 0f))
+    }
+
     @Test
     fun entirePanelExchangesDuringFastEntryAndFinishesWithSlowExit() {
         assertEquals(0f, modelSwitcherListOpacity(0.04f), 0.001f)
