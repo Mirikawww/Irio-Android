@@ -13,9 +13,12 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,6 +50,9 @@ import com.composables.ui.components.Text
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
+import com.composables.ui.theme.secondaryColor
+import com.composables.ui.theme.largeShape
+import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 
 class SettingsActivity : ComponentActivity() {
@@ -123,83 +129,44 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                     },
                 )
                 Spacer(Modifier.height(20.dp))
-                ListRowButton(
-                    label = tr("提供商"),
-                    icon = IrioIcons.Braces,
-                    onClick = {
+                SettingsHomeGroup {
+                    SettingsHomeRow(tr("提供商"), IrioIcons.Braces) {
                         context.startActivity(Intent(context, ProviderSettingsActivity::class.java))
-                    },
-                )
-                Spacer(Modifier.height(12.dp))
-                ListRowButton(
-                    label = tr("模型"),
-                    icon = IrioIcons.Bot,
-                    onClick = {
+                    }
+                    SettingsHomeRow(tr("模型"), IrioIcons.Bot) {
                         context.startActivity(Intent(context, ModelSettingsActivity::class.java))
-                    },
-                )
-                Spacer(Modifier.height(12.dp))
-                ListRowButton(
-                    label = tr("搜索"),
-                    icon = IrioIcons.Search,
-                    onClick = {
-                        context.startActivity(Intent(context, SearchSettingsActivity::class.java))
-                    },
-                )
-                Spacer(Modifier.height(12.dp))
-                ListRowButton(
-                    label = "TTS/STT",
-                    icon = IrioIcons.Speech,
-                    onClick = {
+                    }
+                    SettingsHomeRow("TTS/STT", IrioIcons.Speech) {
                         context.startActivity(Intent(context, SpeechSettingsActivity::class.java))
-                    },
-                )
-                Spacer(Modifier.height(12.dp))
-                ListRowButton(
-                    label = tr("记忆"),
-                    icon = IrioIcons.Cpu,
-                    onClick = {
+                    }
+                }
+                Spacer(Modifier.height(20.dp))
+                SettingsHomeGroup {
+                    SettingsHomeRow(tr("搜索"), IrioIcons.Search) {
+                        context.startActivity(Intent(context, SearchSettingsActivity::class.java))
+                    }
+                    SettingsHomeRow(tr("记忆"), IrioIcons.Cpu) {
                         context.startActivity(Intent(context, MemorySettingsActivity::class.java))
-                    },
-                )
-                Spacer(Modifier.height(12.dp))
-                ListRowButton(
-                    label = "MCP",
-                    iconPainter = painterResource(R.drawable.ic_mcp),
-                    onClick = { context.startActivity(Intent(context, McpSettingsActivity::class.java)) },
-                )
-                Spacer(Modifier.height(12.dp))
-                ListRowButton(
-                    label = tr("外观与偏好"),
-                    icon = IrioIcons.Palette,
-                    onClick = {
-                        context.startActivity(Intent(context, AppearanceSettingsActivity::class.java))
-                    },
-                )
-                Spacer(Modifier.height(12.dp))
-                ListRowButton(
-                    label = tr("互连"),
-                    icon = IrioIcons.MonitorSmartphone,
-                    onClick = {
-                        context.startActivity(Intent(context, LinkSettingsActivity::class.java))
-                    },
-                )
-                Spacer(Modifier.height(12.dp))
-                ListRowButton(
-                    label = tr("Linux 沙盒"),
-                    icon = IrioIcons.Terminal,
-                    onClick = {
+                    }
+                    SettingsHomeRow("MCP", iconPainter = painterResource(R.drawable.ic_mcp)) {
+                        context.startActivity(Intent(context, McpSettingsActivity::class.java))
+                    }
+                    SettingsHomeRow(tr("Linux 沙盒"), IrioIcons.Terminal) {
                         context.startActivity(Intent(context, LinuxSandboxSettingsActivity::class.java))
-                    },
-                )
-                Spacer(Modifier.height(12.dp))
-                ListRowButton(
-                    label = tr("其他"),
-                    icon = IrioIcons.Ellipsis,
-                    onClick = {
+                    }
+                }
+                Spacer(Modifier.height(20.dp))
+                SettingsHomeGroup {
+                    SettingsHomeRow(tr("外观与偏好"), IrioIcons.Palette) {
+                        context.startActivity(Intent(context, AppearanceSettingsActivity::class.java))
+                    }
+                    SettingsHomeRow(tr("互连"), IrioIcons.MonitorSmartphone) {
+                        context.startActivity(Intent(context, LinkSettingsActivity::class.java))
+                    }
+                    SettingsHomeRow(tr("其他"), IrioIcons.Ellipsis) {
                         context.startActivity(Intent(context, OtherSettingsActivity::class.java))
-                    },
-                )
+                    }
+                }
                 Spacer(Modifier.height(20.dp))
                 Text(
                     softwareInfo,
@@ -233,4 +200,30 @@ internal fun SettingsScreen(onBack: () -> Unit) {
         AvatarCropScreen(source = source, onDismiss = { cropSource = null })
     }
     }
+}
+
+@Composable
+private fun SettingsHomeGroup(content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Theme[colors][secondaryColor], Theme[shapes][largeShape]),
+    ) { content() }
+}
+
+@Composable
+private fun SettingsHomeRow(
+    label: String,
+    icon: ImageVector? = null,
+    iconPainter: Painter? = null,
+    onClick: () -> Unit,
+) {
+    ListRowButton(
+        label = label,
+        icon = icon,
+        iconPainter = iconPainter,
+        style = ButtonStyle.Ghost,
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        onClick = onClick,
+    )
 }
