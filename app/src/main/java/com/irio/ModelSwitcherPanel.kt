@@ -233,7 +233,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                     modifier = Modifier.size(36.dp).background(fastBackground, ContinuousCapsule)
                         .semantics { selected = fastMode; stateDescription = tr(if (fastMode) "开启" else "关闭") },
                 ) {
-                    Icon(IrioIcons.Zap, contentDescription = tr("快速"), tint = if (fastMode) accent else content, modifier = Modifier.size(21.dp))
+                    Icon(if (fastMode) IrioIcons.Zap else IrioIcons.ZapOff, contentDescription = tr("快速"), tint = if (fastMode) accent else content, modifier = Modifier.size(21.dp))
                 }
             }
                 Spacer(Modifier.height(3.dp))

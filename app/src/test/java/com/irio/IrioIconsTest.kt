@@ -12,7 +12,7 @@ class IrioIconsTest {
             IrioIcons.ArrowLeft, IrioIcons.ChevronLeft, IrioIcons.ChevronRight,
             IrioIcons.ChevronDown, IrioIcons.Volume2, IrioIcons.Plus,
             IrioIcons.FaceSlightlySmilingPlus, IrioIcons.ArrowUp, IrioIcons.Paperclip,
-            IrioIcons.Sparkles, IrioIcons.Zap, IrioIcons.Check, IrioIcons.X,
+            IrioIcons.Sparkles, IrioIcons.Zap, IrioIcons.ZapOff, IrioIcons.Check, IrioIcons.X,
             IrioIcons.Minimize2, IrioIcons.Monitor, IrioIcons.Copy, IrioIcons.Braces,
             IrioIcons.Trash, IrioIcons.MonitorSmartphone, IrioIcons.Download,
             IrioIcons.Pencil, IrioIcons.Quote, IrioIcons.FastForward, IrioIcons.Cpu,
@@ -22,7 +22,7 @@ class IrioIconsTest {
             IrioIcons.Rewind, IrioIcons.Search, IrioIcons.Settings, IrioIcons.Bot,
             IrioIcons.Square, IrioIcons.SquareCheck, IrioIcons.Terminal, IrioIcons.Upload,
         )
-        assertEquals(44, icons.size)
+        assertEquals(45, icons.size)
         assertEquals(icons.size, icons.map { it.name }.toSet().size)
         assertTrue(icons.all { it.name.startsWith("lucide:") })
         assertTrue(IrioIcons.ArrowLeft.autoMirror)
