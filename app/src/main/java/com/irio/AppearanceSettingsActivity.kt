@@ -67,15 +67,12 @@ import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.disabledAlpha
 import com.composables.ui.theme.fieldShape
-import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.onPrimaryColor
 import com.composables.ui.theme.primaryColor
-import com.composables.ui.theme.secondaryColor
-import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 import kotlinx.coroutines.launch
 
@@ -224,13 +221,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-                    .padding(horizontal = 16.dp, vertical = SettingsCardInset),
-                verticalArrangement = Arrangement.spacedBy(0.dp),
-            ) {
+            SettingsSectionCard {
                 Row(
                     modifier = Modifier
                         .settingsSearchAnchor("appearance.font", edge = SettingsSearchEdge.Top)
@@ -247,7 +238,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 DropdownMenu(
                     expanded = languageMenuOpen,
                     onExpandedChange = { languageMenuOpen = it },
-                    modifier = Modifier.fillMaxWidth().settingsSearchAnchor("appearance.language"),
+                    modifier = Modifier.fillMaxWidth().settingsSearchAnchor("appearance.language", edge = SettingsSearchEdge.Bottom),
                     alignment = DropdownMenuAlignment.End,
                     panel = {
                         DropdownMenuPanel {
@@ -310,10 +301,12 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         }
                     }
                 }
+            }
+            SettingsSectionCard {
                 DropdownMenu(
                     expanded = themeMenuOpen,
                     onExpandedChange = { themeMenuOpen = it },
-                    modifier = Modifier.fillMaxWidth().settingsSearchAnchor("appearance.theme"),
+                    modifier = Modifier.fillMaxWidth().settingsSearchAnchor("appearance.theme", edge = SettingsSearchEdge.Top),
                     alignment = DropdownMenuAlignment.End,
                     panel = {
                         DropdownMenuPanel {
@@ -473,7 +466,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 }
                 Row(
                     modifier = Modifier
-                        .settingsSearchAnchor("appearance.background", edge = SettingsSearchEdge.Bottom)
+                        .settingsSearchAnchor("appearance.background")
                         .fillMaxWidth()
                         .alpha(if (ChatBackgroundEnabled) 1f else Theme[alphas][disabledAlpha]),
                     verticalAlignment = Alignment.CenterVertically,
@@ -509,14 +502,6 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         )
                     }
                 }
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-                    .padding(horizontal = 16.dp, vertical = SettingsCardInset),
-                verticalArrangement = Arrangement.spacedBy(0.dp),
-            ) {
                 val glassArrow by animateFloatAsState(
                     targetValue = if (glassExpanded) 180f else 0f,
                     animationSpec = irioSpring(),
@@ -525,7 +510,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 val glassInteraction = remember { MutableInteractionSource() }
                 Row(
                     modifier = Modifier
-                        .settingsSearchAnchor("appearance.glass", edge = SettingsSearchEdge.Top)
+                        .settingsSearchAnchor("appearance.glass")
                         .fillMaxWidth()
                         .clickable(
                             interactionSource = glassInteraction,
@@ -595,7 +580,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     }
                 }
                 Row(
-                    modifier = Modifier.settingsSearchAnchor("appearance.userAvatar").settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.userAvatar", edge = SettingsSearchEdge.Bottom).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -610,6 +595,8 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         },
                     )
                 }
+            }
+            SettingsSectionCard {
                 val pasteArrow by animateFloatAsState(
                     targetValue = if (longTextPasteExpanded) 180f else 0f,
                     animationSpec = irioSpring(),
@@ -618,7 +605,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 val pasteInteraction = remember { MutableInteractionSource() }
                 Row(
                     modifier = Modifier
-                        .settingsSearchAnchor("appearance.paste")
+                        .settingsSearchAnchor("appearance.paste", edge = SettingsSearchEdge.Top)
                         .fillMaxWidth()
                         .clickable(
                             interactionSource = pasteInteraction,
@@ -672,7 +659,25 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.settingsSearchAnchor("appearance.glyph").settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.enter", edge = SettingsSearchEdge.Bottom).settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("按 Enter 发送"),
+                        color = Theme[colors][onPanelColor],
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(
+                        checked = ThemeStore.enterToSend,
+                        onCheckedChange = { enabled ->
+                            ThemeStore.saveEnterToSend(context, enabled)
+                        },
+                    )
+                }
+            }
+            SettingsSectionCard {
+                Row(
+                    modifier = Modifier.settingsSearchAnchor("appearance.glyph", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ExperimentalLabel(
@@ -753,23 +758,26 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.settingsSearchAnchor("appearance.enter").settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.ring", edge = SettingsSearchEdge.Bottom).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        tr("按 Enter 发送"),
-                        color = Theme[colors][onPanelColor],
+                    Row(
                         modifier = Modifier.weight(1f),
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(tr("上下文圆环"), color = Theme[colors][onPanelColor])
+                    }
                     Switch(
-                        checked = ThemeStore.enterToSend,
+                        checked = ThemeStore.contextRing,
                         onCheckedChange = { enabled ->
-                            ThemeStore.saveEnterToSend(context, enabled)
+                            ThemeStore.saveContextRing(context, enabled)
                         },
                     )
                 }
+            }
+            SettingsSectionCard {
                 Row(
-                    modifier = Modifier.settingsSearchAnchor("appearance.wrap").settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.wrap", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -797,23 +805,6 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         checked = ThemeStore.codeBlockLineNumbers,
                         onCheckedChange = { enabled ->
                             ThemeStore.saveCodeBlockLineNumbers(context, enabled)
-                        },
-                    )
-                }
-                Row(
-                    modifier = Modifier.settingsSearchAnchor("appearance.ring").settingsSwitchRow(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(tr("上下文圆环"), color = Theme[colors][onPanelColor])
-                    }
-                    Switch(
-                        checked = ThemeStore.contextRing,
-                        onCheckedChange = { enabled ->
-                            ThemeStore.saveContextRing(context, enabled)
                         },
                     )
                 }
@@ -868,8 +859,10 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     },
                     valueLabel = { "$it%" },
                 )
+            }
+            SettingsSectionCard {
                 Row(
-                    modifier = Modifier.settingsSearchAnchor("appearance.mergeModels").settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.mergeModels", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
