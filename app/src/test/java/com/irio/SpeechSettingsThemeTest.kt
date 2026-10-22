@@ -91,7 +91,13 @@ class SpeechSettingsThemeTest {
                     var foregroundPixels = 0
                     for (y in bounds.top.toInt().coerceAtLeast(0) until bounds.bottom.toInt().coerceAtMost(bitmap.height)) {
                         for (x in bounds.left.toInt().coerceAtLeast(0) until bounds.right.toInt().coerceAtMost(bitmap.width)) {
-                            if (bitmap.getPixel(x, y) == expectedColor) foregroundPixels++
+                            val actual = bitmap.getPixel(x, y)
+                            // Lucide draws a 2-unit anti-aliased stroke: unlike the old filled
+                            // Material chevron, an on-color pixel need not match exactly.
+                            val closeToForeground = listOf(16, 8, 0).all { shift ->
+                                kotlin.math.abs((actual ushr shift and 0xff) - (expectedColor ushr shift and 0xff)) <= 64
+                            }
+                            if (closeToForeground) foregroundPixels++
                         }
                     }
                     assertTrue("$label must render using onPanelColor in $theme (matching pixels=$foregroundPixels)", foregroundPixels > 0)

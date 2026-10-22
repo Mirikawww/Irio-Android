@@ -34,11 +34,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import com.kyant.shapes.RoundedRectangle
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Bolt
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -223,7 +218,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                 ) {
                     Text(selectedDisplay.ifBlank { tr("选择模型") }, modifier = Modifier.weight(1f, fill = false),
                         color = content, fontSize = 17.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = muted,
+                    Icon(IrioIcons.ChevronDown, contentDescription = null, tint = muted,
                         modifier = Modifier.padding(start = 4.dp).size(18.dp).graphicsLayer { rotationZ = phase.value * 180f })
                 }
                 Spacer(Modifier.width(6.dp))
@@ -233,7 +228,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                     modifier = Modifier.size(36.dp).background(fastBackground, ContinuousCapsule)
                         .semantics { selected = fastMode; stateDescription = tr(if (fastMode) "开启" else "关闭") },
                 ) {
-                    Icon(Icons.Rounded.Bolt, contentDescription = tr("快速"), tint = if (fastMode) accent else content, modifier = Modifier.size(21.dp))
+                    Icon(IrioIcons.Zap, contentDescription = tr("快速"), tint = if (fastMode) accent else content, modifier = Modifier.size(21.dp))
                 }
             }
                 Spacer(Modifier.height(3.dp))
@@ -271,7 +266,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(row.display, modifier = Modifier.weight(1f), color = content, fontSize = 16.sp, singleLine = false)
-                                if (selected) Icon(Icons.Rounded.Check, contentDescription = null, tint = accent, modifier = Modifier.padding(start = 8.dp).size(18.dp))
+                                if (selected) Icon(IrioIcons.Check, contentDescription = null, tint = accent, modifier = Modifier.padding(start = 8.dp).size(18.dp))
                             }
                         }
                     }
@@ -616,7 +611,7 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
             Row(Modifier.fillMaxWidth().padding(top = 5.dp).padding(horizontal = 8.dp, vertical = 3.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) {
                 Box(Modifier.width(19.dp * iconReveal).height(15.dp).clipToBounds()) {
-                    Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = indicatorInk,
+                    Icon(IrioIcons.Sparkles, contentDescription = null, tint = indicatorInk,
                         modifier = Modifier.size(15.dp).graphicsLayer { alpha = iconReveal })
                 }
                 Box(Modifier.width(labelWidth), contentAlignment = Alignment.CenterStart) {

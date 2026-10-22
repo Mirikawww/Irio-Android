@@ -26,12 +26,6 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Computer
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -280,7 +274,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                             interactionSource = interactionSource,
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                imageVector = IrioIcons.ChevronDown,
                                 contentDescription = tr("选择同步方式"),
                                 tint = Theme[colors][onPanelColor],
                                 modifier = Modifier.size(20.dp),
@@ -367,9 +361,9 @@ private fun PeerRow(
     val content = Theme[colors][onBackgroundColor]
     val muted = Theme[colors][mutedColor]
     val icon: ImageVector = if (peer.platform == LinkPlatform.PHONE) {
-        Icons.Rounded.PhoneAndroid
+        IrioIcons.Smartphone
     } else {
-        Icons.Rounded.Computer
+        IrioIcons.Monitor
     }
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -391,7 +385,7 @@ private fun PeerRow(
             style = ButtonStyle.Ghost,
         ) {
             Icon(
-                imageVector = Icons.Rounded.Close,
+                imageVector = IrioIcons.X,
                 contentDescription = tr("删除设备"),
                 tint = muted,
             )

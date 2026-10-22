@@ -22,6 +22,7 @@ package com.mikepenz.markdown.compose.elements
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -159,29 +160,38 @@ fun MarkdownHighlightedCode(
         color = backgroundCodeColor,
         shape = RoundedCornerShape(codeBackgroundCornerSize),
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        showHeader = showHeader,
+        showHeader = false,
         language = language,
         code = code
     ) {
-        if (lineNumbers) {
-            NumberedCodeText(
-                code = code,
-                text = codeHighlights,
-                style = resolvedStyle,
-                softWrap = softWrap,
-                padding = codeBlockPadding,
-            )
-        } else {
-            MarkdownBasicText(
-                text = codeHighlights,
-                style = resolvedStyle,
-                modifier = Modifier
-                    .then(
-                        if (softWrap) Modifier.fillMaxWidth()
-                        else Modifier.horizontalScroll(scroll)
-                    )
-                    .padding(codeBlockPadding),
-            )
+        Column {
+            if (showHeader) {
+                IrioMarkdownCodeTopBar(language, code)
+                MarkdownDivider(
+                    color = LocalMarkdownColors.current.dividerColor.copy(alpha = 0.3f),
+                    thickness = 0.5.dp,
+                )
+            }
+            if (lineNumbers) {
+                NumberedCodeText(
+                    code = code,
+                    text = codeHighlights,
+                    style = resolvedStyle,
+                    softWrap = softWrap,
+                    padding = codeBlockPadding,
+                )
+            } else {
+                MarkdownBasicText(
+                    text = codeHighlights,
+                    style = resolvedStyle,
+                    modifier = Modifier
+                        .then(
+                            if (softWrap) Modifier.fillMaxWidth()
+                            else Modifier.horizontalScroll(scroll)
+                        )
+                        .padding(codeBlockPadding),
+                )
+            }
         }
     }
 }

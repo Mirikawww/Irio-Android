@@ -24,17 +24,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.DataObject
-import androidx.compose.material.icons.rounded.Devices
-import androidx.compose.material.icons.rounded.Memory
-import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.SmartToy
-import androidx.compose.material.icons.rounded.RecordVoiceOver
-import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -136,7 +125,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(20.dp))
                 ListRowButton(
                     label = tr("提供商"),
-                    icon = Icons.Rounded.DataObject,
+                    icon = IrioIcons.Braces,
                     onClick = {
                         context.startActivity(Intent(context, ProviderSettingsActivity::class.java))
                     },
@@ -144,7 +133,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 ListRowButton(
                     label = tr("模型"),
-                    icon = Icons.Rounded.SmartToy,
+                    icon = IrioIcons.Bot,
                     onClick = {
                         context.startActivity(Intent(context, ModelSettingsActivity::class.java))
                     },
@@ -152,7 +141,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 ListRowButton(
                     label = tr("搜索"),
-                    icon = Icons.Rounded.Search,
+                    icon = IrioIcons.Search,
                     onClick = {
                         context.startActivity(Intent(context, SearchSettingsActivity::class.java))
                     },
@@ -160,7 +149,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 ListRowButton(
                     label = "TTS/STT",
-                    icon = Icons.Rounded.RecordVoiceOver,
+                    icon = IrioIcons.Speech,
                     onClick = {
                         context.startActivity(Intent(context, SpeechSettingsActivity::class.java))
                     },
@@ -168,7 +157,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 ListRowButton(
                     label = tr("记忆"),
-                    icon = Icons.Rounded.Memory,
+                    icon = IrioIcons.Cpu,
                     onClick = {
                         context.startActivity(Intent(context, MemorySettingsActivity::class.java))
                     },
@@ -182,7 +171,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 ListRowButton(
                     label = tr("外观与偏好"),
-                    icon = Icons.Rounded.Palette,
+                    icon = IrioIcons.Palette,
                     onClick = {
                         context.startActivity(Intent(context, AppearanceSettingsActivity::class.java))
                     },
@@ -190,7 +179,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 ListRowButton(
                     label = tr("互连"),
-                    icon = Icons.Rounded.Devices,
+                    icon = IrioIcons.MonitorSmartphone,
                     onClick = {
                         context.startActivity(Intent(context, LinkSettingsActivity::class.java))
                     },
@@ -198,7 +187,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 ListRowButton(
                     label = tr("Linux 沙盒"),
-                    icon = Icons.Rounded.Terminal,
+                    icon = IrioIcons.Terminal,
                     onClick = {
                         context.startActivity(Intent(context, LinuxSandboxSettingsActivity::class.java))
                     },
@@ -206,7 +195,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 ListRowButton(
                     label = tr("其他"),
-                    icon = Icons.Rounded.MoreHoriz,
+                    icon = IrioIcons.Ellipsis,
                     onClick = {
                         context.startActivity(Intent(context, OtherSettingsActivity::class.java))
                     },

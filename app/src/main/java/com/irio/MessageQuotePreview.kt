@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import com.kyant.shapes.RoundedRectangle
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.FormatQuote
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,7 +40,7 @@ internal fun MessageQuotePreview(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(
-            imageVector = Icons.Rounded.FormatQuote,
+            imageVector = IrioIcons.Quote,
             contentDescription = null,
             modifier = Modifier.size(18.dp),
             tint = Theme[colors][mutedColor],
@@ -67,7 +64,7 @@ internal fun MessageQuotePreview(
                 modifier = Modifier.size(32.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Close,
+                    imageVector = IrioIcons.X,
                     contentDescription = tr("取消引用"),
                     modifier = Modifier.size(16.dp),
                     tint = Theme[colors][mutedColor],

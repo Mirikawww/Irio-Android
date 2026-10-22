@@ -27,8 +27,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -157,7 +155,7 @@ internal fun ToolSettingsRow(
                 }
             }
             Icon(
-                imageVector = Icons.Rounded.KeyboardArrowDown,
+                imageVector = IrioIcons.ChevronDown,
                 contentDescription = if (expanded && available) tr("收起") else tr("展开"),
                 modifier = Modifier.padding(start = 8.dp).size(20.dp).rotate(arrow),
                 tint = content,

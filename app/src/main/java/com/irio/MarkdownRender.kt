@@ -1,6 +1,5 @@
 package com.irio
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -10,8 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -20,11 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.isUnspecified
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.semantics.Role
@@ -46,11 +39,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kyant.shapes.RoundedRectangle
 import com.kyant.shapes.UnevenRoundedRectangle
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
-import com.composables.ui.theme.backgroundColor
+import com.composables.ui.components.Icon
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.onBackgroundColor
 import com.composeunstyled.theme.Theme
@@ -115,7 +107,7 @@ internal fun IrioMarkdown(
         darkTheme = dark,
     )
     val inlineSize = typography.inlineCode.fontSize
-    val pronunciationSpeaker = rememberVectorPainter(Icons.AutoMirrored.Rounded.VolumeUp)
+    val pronunciationSpeaker = rememberVectorPainter(IrioIcons.Volume2)
     val extendedSpans = markdownExtendedSpans {
         remember(inlineSize, pronunciationSpeaker, onBg) {
             ExtendedSpans(IrioInlineCodeSpanPainter(fontSize = inlineSize), PronunciationSpanPainter(pronunciationSpeaker, onBg))
@@ -268,8 +260,7 @@ internal class IrioImageTransformer(
 @Composable
 private fun IrioMarkdownCheckBox(content: String, node: ASTNode) {
     val checked = node.getTextInNode(content).contains("[x]", ignoreCase = true)
-    val stroke = Theme[colors][onBackgroundColor]
-    val fill = Theme[colors][backgroundColor]
+    val ink = Theme[colors][onBackgroundColor]
     Box(
         modifier = Modifier
             .padding(end = 8.dp)
@@ -285,25 +276,12 @@ private fun IrioMarkdownCheckBox(content: String, node: ASTNode) {
             lineHeight = 17.sp,
             color = Color.Transparent,
         )
-        Canvas(Modifier.size(18.dp)) {
-            val box = RoundedRectangle(2.dp)
-            val strokeWidth = 1.5.dp.toPx()
-            if (checked) {
-                drawContinuous(stroke, box, style = Fill)
-                val check = Path().apply {
-                    moveTo(size.width * 0.22f, size.height * 0.52f)
-                    lineTo(size.width * 0.42f, size.height * 0.72f)
-                    lineTo(size.width * 0.78f, size.height * 0.28f)
-                }
-                drawPath(
-                    path = check,
-                    color = fill,
-                    style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
-                )
-            } else {
-                drawContinuous(stroke, box, style = Stroke(width = strokeWidth))
-            }
-        }
+        Icon(
+            imageVector = if (checked) IrioIcons.SquareCheck else IrioIcons.Square,
+            contentDescription = null,
+            tint = ink,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 

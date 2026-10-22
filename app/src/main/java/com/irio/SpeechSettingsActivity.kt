@@ -20,9 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -302,7 +299,7 @@ private fun SttProviderMenu(
                 interactionSource = interactionSource,
             ) {
                 Icon(
-                    Icons.Rounded.KeyboardArrowDown,
+                    IrioIcons.ChevronDown,
                     contentDescription = tr("选择提供商"),
                     modifier = Modifier.size(20.dp),
                     tint = Theme[colors][onPanelColor],
@@ -333,7 +330,7 @@ private fun SttModelMenu(
                             onClick = { onSelect(option); onExpandedChange(false) },
                             modifier = Modifier.fillMaxWidth(),
                             leading = {
-                                if (option == model) Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                if (option == model) Icon(IrioIcons.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                                 else Spacer(Modifier.size(16.dp))
                             },
                         ) { Text(option) }
@@ -367,7 +364,7 @@ private fun SttModelMenu(
                 interactionSource = interactionSource,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    imageVector = IrioIcons.ChevronDown,
                     contentDescription = tr("选择模型"),
                     modifier = Modifier.size(20.dp),
                     tint = Theme[colors][onPanelColor],
@@ -404,7 +401,7 @@ private fun SttLanguageMenu(
                         onClick = { onSelect(code); onExpandedChange(false) },
                         modifier = Modifier.fillMaxWidth(),
                         leading = {
-                            if (code == language) Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                            if (code == language) Icon(IrioIcons.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                             else Spacer(Modifier.size(16.dp))
                         },
                     ) { Text(label) }
@@ -437,7 +434,7 @@ private fun SttLanguageMenu(
                 interactionSource = interactionSource,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    imageVector = IrioIcons.ChevronDown,
                     contentDescription = tr("选择语言"),
                     modifier = Modifier.size(20.dp),
                     tint = Theme[colors][onPanelColor],
@@ -520,7 +517,7 @@ private fun VoiceMenu(
                 interactionSource = interactionSource,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    imageVector = IrioIcons.ChevronDown,
                     contentDescription = tr("选择音色"),
                     tint = Theme[colors][onPanelColor],
                     modifier = Modifier.size(20.dp),
@@ -542,7 +539,7 @@ private fun DropdownMenuPanelContentScope.VoiceItem(
         leading = {
             if (selected) {
                 Icon(
-                    imageVector = Icons.Rounded.Check,
+                    imageVector = IrioIcons.Check,
                     contentDescription = null,
                     tint = Theme[colors][onPanelColor],
                     modifier = Modifier.size(16.dp),

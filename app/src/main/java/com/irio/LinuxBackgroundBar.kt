@@ -11,10 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import com.kyant.shapes.RoundedRectangle
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -72,7 +68,7 @@ internal fun LinuxBackgroundBar(onOpen: (Long) -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = if (expanded) Icons.Rounded.KeyboardArrowDown else Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                imageVector = if (expanded) IrioIcons.ChevronDown else IrioIcons.ChevronRight,
                 contentDescription = if (expanded) tr("收起") else tr("展开"),
                 modifier = Modifier.size(18.dp),
                 tint = Theme[colors][onPanelColor],
@@ -114,7 +110,7 @@ internal fun LinuxBackgroundBar(onOpen: (Long) -> Unit) {
                             overflow = TextOverflow.Ellipsis,
                         )
                         Icon(
-                            imageVector = Icons.Rounded.Stop,
+                            imageVector = IrioIcons.Square,
                             contentDescription = tr("停止"),
                             modifier = Modifier
                                 .clickable { LinuxBackgroundJobs.stop(job.id) }

@@ -26,11 +26,6 @@ import androidx.compose.foundation.text.input.maxLength
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -154,7 +149,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 trailing = {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        imageVector = IrioIcons.ChevronRight,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
                         tint = Theme[colors][onPanelColor],
@@ -371,7 +366,7 @@ private fun SystemPromptRow(onClick: () -> Unit) {
             interactionSource = interactionSource,
         ) {
             Icon(
-                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                imageVector = IrioIcons.ChevronRight,
                 contentDescription = tr("编辑系统提示词"),
                 tint = Theme[colors][onPanelColor],
                 modifier = Modifier.size(20.dp),
@@ -449,7 +444,7 @@ private fun ImageGenModelPicker(
                                 leading = {
                                     if (model == selected) {
                                         Icon(
-                                            imageVector = Icons.Rounded.Check,
+                                            imageVector = IrioIcons.Check,
                                             contentDescription = null,
                                             tint = Theme[colors][onPanelColor],
                                             modifier = Modifier.size(16.dp),
@@ -503,7 +498,7 @@ private fun ImageGenModelPicker(
                 interactionSource = interactionSource,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    imageVector = IrioIcons.ChevronDown,
                     contentDescription = tr("选择图片生成模型"),
                     tint = Theme[colors][onPanelColor],
                     modifier = Modifier.size(20.dp),
@@ -569,7 +564,7 @@ private fun TitleModelPicker(
                         leading = {
                             if (selected.isBlank()) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Check,
+                                    imageVector = IrioIcons.Check,
                                     contentDescription = null,
                                     tint = Theme[colors][onPanelColor],
                                     modifier = Modifier.size(16.dp),
@@ -602,7 +597,7 @@ private fun TitleModelPicker(
                                 leading = {
                                     if (model == selected) {
                                         Icon(
-                                            imageVector = Icons.Rounded.Check,
+                                            imageVector = IrioIcons.Check,
                                             contentDescription = null,
                                             tint = Theme[colors][onPanelColor],
                                             modifier = Modifier.size(16.dp),
@@ -655,7 +650,7 @@ private fun TitleModelPicker(
                 interactionSource = interactionSource,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    imageVector = IrioIcons.ChevronDown,
                     contentDescription = contentDescription,
                     tint = Theme[colors][onPanelColor],
                     modifier = Modifier.size(20.dp),

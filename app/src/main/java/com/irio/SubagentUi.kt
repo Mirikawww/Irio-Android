@@ -73,9 +73,6 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Pause
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
@@ -338,7 +335,7 @@ private fun SubagentScreen(id: String, onBack: () -> Unit) {
                 .background(fabFill, ContinuousCapsule),
         ) {
             Icon(
-                Icons.Rounded.Pause,
+                IrioIcons.Pause,
                 contentDescription = tr("暂停"),
                 tint = fabInk,
                 modifier = Modifier.size(24.dp),

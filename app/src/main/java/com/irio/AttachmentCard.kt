@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -174,7 +172,7 @@ internal fun AttachmentCard(
                     .semantics { contentDescription = tr("移除附件") },
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Close,
+                    imageVector = IrioIcons.X,
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
                     tint = content,

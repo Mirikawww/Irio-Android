@@ -9,7 +9,6 @@ import me.saket.telephoto.zoomable.ZoomableState
 import me.saket.telephoto.zoomable.rememberZoomableState
 import me.saket.telephoto.zoomable.zoomable
 import okio.Path.Companion.toPath
-import androidx.compose.material.icons.rounded.Download
 import android.content.Context
 import android.content.Intent
 import android.Manifest
@@ -91,27 +90,6 @@ import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ArrowUpward
-import androidx.compose.material.icons.rounded.AttachFile
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.OpenInFull
-import androidx.compose.material.icons.rounded.CloseFullscreen
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.Photo
-import androidx.compose.material.icons.rounded.PushPin
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Composable
@@ -2434,7 +2412,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             ) {
                 ListRowButton(
                     label = tr("新对话"),
-                    icon = Icons.Rounded.Add,
+                    icon = IrioIcons.Plus,
                     style = ButtonStyle.Ghost,
                     contentPadding = DrawerRowPadding,
                     onClick = { newConversation() },
@@ -2501,7 +2479,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                     contentPadding = if (generating) {
                                         PaddingValues(start = 16.dp, end = 56.dp)
                                     } else DrawerRowPadding,
-                                    icon = if (conversation.pinned) Icons.Rounded.PushPin else null,
+                                    icon = if (conversation.pinned) IrioIcons.Pin else null,
                                     active = conversation.id == currentConversation.id,
                                     modifier = Modifier.generatingRipple(generating),
                                     onClick = { openConversation(conversation) },
@@ -2521,7 +2499,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 ) {
                     ListRowButton(
                         label = tr("设置"),
-                        icon = Icons.Rounded.Settings,
+                        icon = IrioIcons.Settings,
                         style = ButtonStyle.Ghost,
                         contentPadding = DrawerRowPadding,
                         onClick = {
@@ -2564,7 +2542,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             },
                             leading = {
                                 Icon(
-                                    imageVector = Icons.Rounded.Photo,
+                                    imageVector = IrioIcons.Image,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
                                 )
@@ -2577,7 +2555,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             },
                             leading = {
                                 Icon(
-                                    imageVector = Icons.Rounded.AttachFile,
+                                    imageVector = IrioIcons.Paperclip,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
                                 )
@@ -2595,7 +2573,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         .semantics { contentDescription = tr("添加附件") },
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Add,
+                        imageVector = IrioIcons.Plus,
                         contentDescription = tr("添加附件"),
                         modifier = Modifier.size(20.dp),
                         tint = content,
@@ -2608,7 +2586,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         fun SttButton() {
             AccentCircleIconButton(
                 onClick = ::toggleSttRecording,
-                imageVector = if (sttRecording) Icons.Rounded.Stop else Icons.Rounded.Mic,
+                imageVector = if (sttRecording) IrioIcons.Square else IrioIcons.Mic,
                 contentDescription = if (sttRecording) tr("停止录音") else tr("语音输入"),
                 enabled = !sttTranscribing,
                 active = !sttTranscribing,
@@ -2632,7 +2610,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         else -> submitMessage()
                     }
                 },
-                imageVector = if (generatingThisChat) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward,
+                imageVector = if (generatingThisChat) IrioIcons.Square else IrioIcons.ArrowUp,
                 contentDescription = if (generatingThisChat) tr("停止输出") else "Send message",
                 enabled = sendActive,
                 active = sendActive,
@@ -2776,7 +2754,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Edit,
+                            imageVector = IrioIcons.Pencil,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
                             tint = editContent,
@@ -2788,7 +2766,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             fontSize = 13.sp,
                         )
                         Icon(
-                            imageVector = Icons.Rounded.Close,
+                            imageVector = IrioIcons.X,
                             contentDescription = tr("取消编辑"),
                             modifier = Modifier
                                 .size(16.dp)
@@ -2885,7 +2863,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                         buttonSize = ButtonSize.Small,
                                         modifier = Modifier.size(32.dp),
                                     ) {
-                                        Icon(Icons.Rounded.OpenInFull, contentDescription = tr("全屏输入"), modifier = Modifier.size(18.dp), tint = content)
+                                        Icon(IrioIcons.Maximize2, contentDescription = tr("全屏输入"), modifier = Modifier.size(18.dp), tint = content)
                                     }
                                 }
                                 SendButton()
@@ -2907,7 +2885,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                             buttonSize = ButtonSize.Small,
                                             modifier = Modifier.size(32.dp),
                                         ) {
-                                            Icon(Icons.Rounded.CloseFullscreen, contentDescription = tr("收起全屏输入"), modifier = Modifier.size(20.dp), tint = content)
+                                            Icon(IrioIcons.Minimize2, contentDescription = tr("收起全屏输入"), modifier = Modifier.size(20.dp), tint = content)
                                         }
                                         SendButton()
                                     }
@@ -3007,7 +2985,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 }
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Menu,
+                                    imageVector = IrioIcons.Menu,
                                     contentDescription = if (drawerOpen) "Close sidebar" else "Open sidebar",
                                     tint = content
                                 )
@@ -3344,7 +3322,7 @@ private fun ModelPicker(
                 maxLines = 1,
             )
             Icon(
-                imageVector = Icons.Rounded.KeyboardArrowDown,
+                imageVector = IrioIcons.ChevronDown,
                 contentDescription = tr("选择模型"),
                 modifier = Modifier.size(18.dp),
                 tint = muted,
@@ -3433,7 +3411,7 @@ private fun ModelPicker(
                 overflow = TextOverflow.Ellipsis,
             )
             Icon(
-                imageVector = Icons.Rounded.KeyboardArrowDown,
+                imageVector = IrioIcons.ChevronDown,
                 contentDescription = tr("选择模型"),
                 modifier = Modifier.size(18.dp),
                 tint = content,
@@ -3928,7 +3906,7 @@ internal fun ProcessEventRow(
                 ) {
                     StatusSweepText(event.displayText.ifEmpty { MemoryTool.liveLabel(event.toolName) })
                     Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        imageVector = IrioIcons.ChevronRight,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
                         tint = muted,
@@ -4029,7 +4007,7 @@ internal fun ProcessEventRow(
                 )
                 if (openable) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        imageVector = IrioIcons.ChevronRight,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
                         tint = muted,
@@ -4863,7 +4841,7 @@ private fun UserEditVersionSwitcher(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Icon(
-            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+            imageVector = IrioIcons.ChevronLeft,
             contentDescription = tr("上一版本"),
             modifier = Modifier
                 .size(16.dp)
@@ -4876,7 +4854,7 @@ private fun UserEditVersionSwitcher(
             fontSize = 13.sp,
         )
         Icon(
-            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            imageVector = IrioIcons.ChevronRight,
             contentDescription = tr("下一版本"),
             modifier = Modifier
                 .size(16.dp)
@@ -4913,7 +4891,7 @@ private fun AssistantActions(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = if (copyConfirmation.confirmed) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
+            imageVector = if (copyConfirmation.confirmed) IrioIcons.Check else IrioIcons.Copy,
             contentDescription = tr(if (copyConfirmation.confirmed) "已复制" else "复制"),
             modifier = Modifier
                 .size(18.dp)
@@ -4922,7 +4900,7 @@ private fun AssistantActions(
         )
         if (canRetry) {
             Icon(
-                imageVector = Icons.Rounded.Refresh,
+                imageVector = IrioIcons.RefreshCw,
                 contentDescription = tr("重试"),
                 modifier = Modifier
                     .size(18.dp)
@@ -4932,7 +4910,7 @@ private fun AssistantActions(
         }
         if (onSpeak != null) {
             Icon(
-                imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
+                imageVector = IrioIcons.Volume2,
                 contentDescription = tr("朗读"),
                 modifier = Modifier
                     .size(18.dp)
@@ -4954,7 +4932,7 @@ private fun AssistantActions(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                    imageVector = IrioIcons.ChevronLeft,
                     contentDescription = tr("上一个回复"),
                     modifier = Modifier
                         .size(16.dp)
@@ -4967,7 +4945,7 @@ private fun AssistantActions(
                     fontSize = 13.sp,
                 )
                 Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    imageVector = IrioIcons.ChevronRight,
                     contentDescription = tr("下一个回复"),
                     modifier = Modifier
                         .size(16.dp)
@@ -5049,13 +5027,13 @@ internal fun PhotoViewer(
         ) {
             if (saved) {
                 Icon(
-                    imageVector = Icons.Rounded.Check,
+                    imageVector = IrioIcons.Check,
                     contentDescription = tr("已保存"),
                     tint = Color.White,
                 )
             } else {
                 Icon(
-                    imageVector = Icons.Rounded.Download,
+                    imageVector = IrioIcons.Download,
                     contentDescription = tr("下载图片"),
                     tint = Color.White,
                 )

@@ -29,10 +29,6 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -178,7 +174,7 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
             ListRowButton(
                 searchId = "provider.add",
                 label = tr("添加提供商"),
-                icon = Icons.Rounded.Add,
+                icon = IrioIcons.Plus,
                 onClick = {
                     resetAddForm()
                     dialogOpen = true
@@ -353,7 +349,7 @@ internal fun ProtocolPicker(
                 interactionSource = interactionSource,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    imageVector = IrioIcons.ChevronDown,
                     contentDescription = tr("选择协议"),
                     tint = Theme[colors][onPanelColor],
                     modifier = Modifier.size(20.dp),

@@ -75,7 +75,7 @@ internal object SpeechNotifications {
     }
 
     private fun build(context: Context, state: SpeechPlayback, media: MediaSession): Notification {
-        val toggleIcon = if (state.playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+        val toggleIcon = if (state.playing) R.drawable.ic_speech_pause else R.drawable.ic_speech_play
         val toggleLabel = tr(if (state.playing) "暂停" else "播放")
         return Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_speech)
@@ -85,10 +85,10 @@ internal object SpeechNotifications {
             .setOnlyAlertOnce(true)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setCategory(Notification.CATEGORY_TRANSPORT)
-            .addAction(action(context, android.R.drawable.ic_media_rew, tr("快退五秒"), ACTION_REWIND, 1))
+            .addAction(action(context, R.drawable.ic_speech_rewind, tr("快退五秒"), ACTION_REWIND, 1))
             .addAction(action(context, toggleIcon, toggleLabel, ACTION_TOGGLE, 2))
-            .addAction(action(context, android.R.drawable.ic_media_ff, tr("快进五秒"), ACTION_FORWARD, 3))
-            .addAction(action(context, android.R.drawable.ic_menu_close_clear_cancel, tr("停止朗读"), ACTION_STOP, 4))
+            .addAction(action(context, R.drawable.ic_speech_fast_forward, tr("快进五秒"), ACTION_FORWARD, 3))
+            .addAction(action(context, R.drawable.ic_speech_stop, tr("停止朗读"), ACTION_STOP, 4))
             .setStyle(
                 Notification.MediaStyle()
                     .setMediaSession(media.sessionToken)

@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -143,7 +141,7 @@ internal fun SearchSettingsScreen(onBack: () -> Unit) {
                             interactionSource = interactionSource,
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                imageVector = IrioIcons.ChevronDown,
                                 contentDescription = tr("选择搜索提供方"),
                                 tint = Theme[colors][onPanelColor],
                                 modifier = Modifier.size(20.dp),

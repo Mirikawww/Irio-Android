@@ -20,12 +20,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.sp
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.DeleteSweep
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.Upload
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Scaffold
 
 import androidx.compose.runtime.Composable
@@ -141,14 +135,14 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                 ListRowButton(
                     searchId = "other.history",
                     label = tr("删除所有历史"),
-                    icon = Icons.Rounded.DeleteSweep,
+                    icon = IrioIcons.Trash,
                     onClick = { showClearHistoryDialog = true },
                 )
                 Spacer(Modifier.height(12.dp))
                 ListRowButton(
                     searchId = "other.export",
                     label = tr("导出数据"),
-                    icon = Icons.Rounded.Upload,
+                    icon = IrioIcons.Upload,
                     experimental = true,
                     onClick = { exportLauncher.launch("irio-${System.currentTimeMillis()}.irio") },
                 )
@@ -156,7 +150,7 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                 ListRowButton(
                     searchId = "other.import",
                     label = tr("导入数据"),
-                    icon = Icons.Rounded.Download,
+                    icon = IrioIcons.Download,
                     experimental = true,
                     onClick = {
                         operationError = null
@@ -238,7 +232,7 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                         interactionSource = interactionSource,
                     ) {
                         Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Rounded.KeyboardArrowDown,
+                            imageVector = IrioIcons.ChevronDown,
                             contentDescription = tr("选择恢复方式"),
                             tint = Theme[colors][com.composables.ui.theme.onPanelColor],
                             modifier = Modifier.size(20.dp),

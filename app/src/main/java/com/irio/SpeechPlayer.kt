@@ -29,12 +29,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import com.kyant.shapes.RoundedRectangle
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Forward5
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Replay5
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -611,19 +605,19 @@ internal fun SpeechTransportBar() {
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SpeechTransportButton(Icons.Rounded.Replay5, tr("快退五秒"), tint) { SpeechPlayer.seekBy(-5_000) }
+        SpeechTransportButton(IrioIcons.Rewind, tr("快退五秒"), tint) { SpeechPlayer.seekBy(-5_000) }
         if (state.preparing) {
             Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
                 SpeechLoadingIndicator(tint)
             }
         } else {
             SpeechTransportButton(
-                if (state.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                if (state.playing) IrioIcons.Pause else IrioIcons.Play,
                 if (state.playing) tr("暂停") else tr("播放"),
                 tint,
             ) { SpeechPlayer.togglePause() }
         }
-        SpeechTransportButton(Icons.Rounded.Forward5, tr("快进五秒"), tint) { SpeechPlayer.seekBy(5_000) }
+        SpeechTransportButton(IrioIcons.FastForward, tr("快进五秒"), tint) { SpeechPlayer.seekBy(5_000) }
         Text(
             formatSpeechClock(position),
             modifier = Modifier.padding(start = 6.dp),
@@ -637,7 +631,7 @@ internal fun SpeechTransportBar() {
             color = muted,
             fontSize = 12.sp,
         )
-        SpeechTransportButton(Icons.Rounded.Close, tr("停止朗读"), tint) { SpeechPlayer.stop() }
+        SpeechTransportButton(IrioIcons.X, tr("停止朗读"), tint) { SpeechPlayer.stop() }
     }
 }
 

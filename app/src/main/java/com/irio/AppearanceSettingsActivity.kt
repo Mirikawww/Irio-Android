@@ -32,10 +32,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -265,7 +261,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                     leading = {
                                         if (language == option) {
                                             Icon(
-                                                imageVector = Icons.Rounded.Check,
+                                                imageVector = IrioIcons.Check,
                                                 contentDescription = null,
                                                 tint = Theme[colors][onPanelColor],
                                                 modifier = Modifier.size(16.dp),
@@ -306,7 +302,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                             interactionSource = interactionSource,
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                imageVector = IrioIcons.ChevronDown,
                                 contentDescription = tr("选择语言"),
                                 tint = Theme[colors][onPanelColor],
                                 modifier = Modifier.size(20.dp),
@@ -331,7 +327,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                     leading = {
                                         if (themePreference == option) {
                                             Icon(
-                                                imageVector = Icons.Rounded.Check,
+                                                imageVector = IrioIcons.Check,
                                                 contentDescription = null,
                                                 tint = Theme[colors][onPanelColor],
                                                 modifier = Modifier.size(16.dp),
@@ -370,7 +366,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                             interactionSource = interactionSource,
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                imageVector = IrioIcons.ChevronDown,
                                 contentDescription = tr("选择主题"),
                                 tint = Theme[colors][onPanelColor],
                                 modifier = Modifier.size(20.dp),
@@ -395,7 +391,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                                     leading = {
                                         if (accent == option) {
                                             Icon(
-                                                imageVector = Icons.Rounded.Check,
+                                                imageVector = IrioIcons.Check,
                                                 contentDescription = null,
                                                 tint = Theme[colors][onPanelColor],
                                                 modifier = Modifier.size(16.dp),
@@ -453,7 +449,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                             interactionSource = interactionSource,
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                imageVector = IrioIcons.ChevronDown,
                                 contentDescription = tr("选择强调色"),
                                 tint = Theme[colors][onPanelColor],
                                 modifier = Modifier.size(20.dp),
@@ -553,7 +549,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         interactionSource = glassInteraction,
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                            imageVector = IrioIcons.ChevronDown,
                             contentDescription = if (glassExpanded) tr("收起") else tr("展开"),
                             tint = Theme[colors][onPanelColor],
                             modifier = Modifier.size(20.dp).rotate(glassArrow),
@@ -653,7 +649,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         interactionSource = pasteInteraction,
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                            imageVector = IrioIcons.ChevronDown,
                             contentDescription = if (longTextPasteExpanded) tr("收起") else tr("展开"),
                             tint = Theme[colors][onPanelColor],
                             modifier = Modifier.size(20.dp).rotate(pasteArrow),

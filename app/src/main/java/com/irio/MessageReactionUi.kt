@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AddReaction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
@@ -111,7 +109,7 @@ internal fun AssistantReactionButton(
     ) {
         if (emoji.isEmpty()) {
             Icon(
-                imageVector = Icons.Rounded.AddReaction,
+                imageVector = IrioIcons.FaceSlightlySmilingPlus,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
                 tint = Theme[colors][mutedColor],

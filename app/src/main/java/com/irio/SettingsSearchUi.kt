@@ -26,8 +26,6 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -335,7 +333,7 @@ private fun SettingsSearchField(
         decorationBox = { inner ->
             Row(Modifier.height(40.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = Icons.Rounded.Search,
+                    imageVector = IrioIcons.Search,
                     contentDescription = null,
                     tint = muted,
                     modifier = Modifier.size(18.dp),
