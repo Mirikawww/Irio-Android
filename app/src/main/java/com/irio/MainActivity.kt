@@ -48,6 +48,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -2382,6 +2383,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 }
                 .zIndex(1f)
                 .background(background)
+                .absorbDrawerBackgroundTaps()
                 .statusBarsPadding()
                 .drawerSwipe(
                     drawerWidthPx = drawerWidthPx,
@@ -2495,6 +2497,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         .fillMaxWidth()
                         .zIndex(1f)
                         .background(background)
+                        .absorbDrawerBackgroundTaps()
                         .padding(bottom = 8.dp),
                 ) {
                     ListRowButton(
@@ -4816,6 +4819,11 @@ private fun Modifier.drawerSwipe(
             }
         }
     }
+}
+
+/** Painted whitespace must consume taps, while child buttons and drawer drags keep their gestures. */
+internal fun Modifier.absorbDrawerBackgroundTaps(): Modifier = pointerInput(Unit) {
+    detectTapGestures(onTap = {})
 }
 
 private val DrawerRowPadding = PaddingValues(start = 16.dp, end = 12.dp)
