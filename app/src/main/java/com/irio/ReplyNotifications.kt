@@ -63,6 +63,7 @@ internal fun appInForeground(): Boolean = ReplyLiveNotice.foreground()
  */
 internal fun advanceReplyNotice(current: String, update: ChatStreamUpdate, finished: Boolean = false, preview: String = ""): String {
     var step = current
+    val silentPronunciation = isSilentPronunciationLookup(update.toolName, update.toolOutcome)
     if (update.thinkingDelta.isNotEmpty()) step = tr("思考中")
     if (update.searching == true) {
         step = update.displayText.ifEmpty { searchStatusLabel(update.searchQuery) }
@@ -70,10 +71,10 @@ internal fun advanceReplyNotice(current: String, update: ChatStreamUpdate, finis
     if (update.searching == false) step = ProcessEvent(0, ProcessEventKind.SEARCH,
         pages = update.searchPagesDelta, searchQuery = update.searchQuery,
         displayText = update.displayText, toolOutcome = update.toolOutcome).completedLabel()
-    if (update.toolActive == true) {
+    if (update.toolActive == true && !silentPronunciation) {
         step = update.displayText.ifEmpty { MemoryTool.liveLabel(update.toolName, update.webDomain) }
     }
-    if (update.toolActive == false) {
+    if (update.toolActive == false && !silentPronunciation) {
         step = if (update.toolName == ImageGenTool.NAME && update.toolContent == ImageGenTool.STATUS_OK) {
             tr("已生成图片")
         } else {
@@ -84,7 +85,7 @@ internal fun advanceReplyNotice(current: String, update: ChatStreamUpdate, finis
     if (update.subagentJson.isNotEmpty()) step = tr("创建子智能体")
     if (update.coloredBubbles.isNotEmpty()) step = tr("发送彩色气泡")
     if (update.displayedImages.isNotEmpty()) step = tr("展示图片")
-    if (update.notifyTool.isNotEmpty()) step = MemoryTool.liveLabel(update.notifyTool)
+    if (update.notifyTool.isNotEmpty() && !isSilentPronunciationLookup(update.notifyTool, update.toolOutcome)) step = MemoryTool.liveLabel(update.notifyTool)
     if (update.delta.isNotEmpty()) step = tr("输出中")
     if (finished) step = preview.ifEmpty { tr("完成") }
     return step

@@ -111,6 +111,7 @@ internal object ToolCatalog {
         CommonsImageTools.VIEW -> "查看图片"
         ImageGenTool.NAME -> "生成图片"
         TimeTool.NAME -> "获取时间"
+        LinguaLibreTool.NAME -> "检索发音"
         HistoryTool.NAME -> "查询历史会话"
         ReactionTool.NAME -> "表情回应"
         ColoredBubbleTool.NAME -> "发送彩色气泡"

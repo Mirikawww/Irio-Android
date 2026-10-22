@@ -11,6 +11,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isUnspecified
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.LinkInteractionListener
@@ -301,8 +302,17 @@ internal fun FadingMarkdownAnnotated(
             pop()
         }
     }
+    val recordings = LocalPronunciationRecordings.current
+    val context = LocalContext.current
+    val suppliedPlayback = LocalPronunciationPlayback.current
+    val playback = remember(context, suppliedPlayback) {
+        suppliedPlayback ?: { recording: PronunciationRecording -> PronunciationPlayer.play(context, recording) }
+    }
+    val marked = remember(styled, recordings, style.color, playback) {
+        decoratePronunciationLinks(styled, recordings, style.color, playback)
+    }
     val rendered = rememberStreamingGlyphFade(
-        content = styled,
+        content = marked,
         color = style.color,
         source = content,
         nodeStart = child.startOffset,

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -24,6 +26,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.isUnspecified
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -37,7 +40,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -60,7 +62,6 @@ import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeBlock
 import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
 import com.mikepenz.markdown.compose.elements.MarkdownOrderedList
 import com.mikepenz.markdown.compose.elements.MarkdownTable
-import com.mikepenz.markdown.compose.elements.MarkdownTableBasicText
 import com.mikepenz.markdown.compose.elements.listDepth
 import com.mikepenz.markdown.compose.extendedspans.ExtendedSpanPainter
 import com.mikepenz.markdown.compose.extendedspans.ExtendedSpans
@@ -98,6 +99,7 @@ internal fun IrioMarkdown(
     // Null = parse inline, same as before.
     state: MarkdownState? = null,
     glyphFade: Boolean = false,
+    pronunciations: Map<String, PronunciationRecording> = emptyMap(),
 ) {
     val onBg = Theme[colors][onBackgroundColor]
     val dark = LocalResolvedTheme.current.isDark
@@ -113,9 +115,10 @@ internal fun IrioMarkdown(
         darkTheme = dark,
     )
     val inlineSize = typography.inlineCode.fontSize
+    val pronunciationSpeaker = rememberVectorPainter(Icons.AutoMirrored.Rounded.VolumeUp)
     val extendedSpans = markdownExtendedSpans {
-        remember(inlineSize) {
-            ExtendedSpans(IrioInlineCodeSpanPainter(fontSize = inlineSize))
+        remember(inlineSize, pronunciationSpeaker, onBg) {
+            ExtendedSpans(IrioInlineCodeSpanPainter(fontSize = inlineSize), PronunciationSpanPainter(pronunciationSpeaker, onBg))
         }
     }
     val components = markdownComponents(
@@ -194,7 +197,7 @@ internal fun IrioMarkdown(
     val glyphFadeTracker = remember { StreamingTailFadeTracker() }
     val trackedFade = remember(content) { glyphFadeTracker.update(content, streamingNowMs()) }
     val glyphFadeSample = if (glyphFade) trackedFade else null
-    CompositionLocalProvider(LocalStreamingGlyphFade provides glyphFadeSample) {
+    CompositionLocalProvider(LocalStreamingGlyphFade provides glyphFadeSample, LocalPronunciationRecordings provides pronunciations) {
         if (entryState != null) {
             Markdown(
                 markdownState = entryState,
@@ -369,12 +372,10 @@ private fun IrioTableRow(
                 modifier = Modifier.padding(tableCellPadding).weight(1f),
                 horizontalAlignment = horizontal,
             ) {
-                MarkdownTableBasicText(
+                FadingMarkdownAnnotated(
                     content = content,
-                    cell = cell,
+                    node = cell,
                     style = style.copy(textAlign = textAlign),
-                    maxLines = Int.MAX_VALUE,
-                    overflow = TextOverflow.Clip,
                 )
             }
         }

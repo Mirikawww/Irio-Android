@@ -37,6 +37,7 @@ internal fun chatToolRegistry(
         }
         if (imageGenModel.isNotBlank()) add(ImageGenToolProvider())
         add(TimeToolProvider())
+        add(LinguaLibreToolProvider())
         add(ReactionToolProvider())
         add(ColoredBubbleToolProvider())
         add(HistoryToolProvider())

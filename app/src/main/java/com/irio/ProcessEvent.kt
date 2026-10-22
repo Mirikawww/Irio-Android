@@ -36,6 +36,9 @@ data class ProcessEvent(
 
 internal const val MERGED_TOOL_CALLS_NAME = "__merged_tool_calls__"
 
+internal fun isSilentPronunciationLookup(toolName: String, outcome: ToolOutcome?): Boolean =
+    toolName == LinguaLibreTool.NAME && outcome != ToolOutcome.FAILED && outcome != ToolOutcome.STOPPED
+
 internal fun searchStatusLabel(query: String, language: AppLanguage = ThemeStore.language): String {
     val status = translate(language, "网络搜索中")
     return if (query.isBlank()) status else "$status - $query"
@@ -43,19 +46,21 @@ internal fun searchStatusLabel(query: String, language: AppLanguage = ThemeStore
 
 /** 和主对话同一套：合并开关打开时，搜索和工具收成第一条工具锚点上的一行摘要。 */
 internal fun renderedProcessEvents(events: List<ProcessEvent>, mergeToolCalls: Boolean): List<ProcessEvent> {
-    if (!mergeToolCalls) return events
-    val mergeableEvents = events.filter {
+    // Successful/in-flight lookups stay silent; failures and stops use ordinary tool feedback.
+    val visibleEvents = events.filterNot { isSilentPronunciationLookup(it.toolName, it.toolOutcome) }
+    if (!mergeToolCalls) return visibleEvents
+    val mergeableEvents = visibleEvents.filter {
         it.toolOutcome != ToolOutcome.FAILED && it.toolOutcome != ToolOutcome.STOPPED &&
             (it.kind == ProcessEventKind.SEARCH ||
                 (it.kind == ProcessEventKind.TOOL && it.toolName !in setOf(ImageGenTool.NAME, CommonsImageTools.SHOW)))
     }
-    if (mergeableEvents.isEmpty()) return events
+    if (mergeableEvents.isEmpty()) return visibleEvents
     val mergeableIds = mergeableEvents.mapTo(hashSetOf()) { it.id }
     val first = mergeableEvents.first()
     val summary = mergedToolSummary(mergeableEvents)
-    val firstIndex = events.indexOfFirst { it.id == first.id }
+    val firstIndex = visibleEvents.indexOfFirst { it.id == first.id }
     return buildList {
-        events.forEachIndexed { index, event ->
+        visibleEvents.forEachIndexed { index, event ->
             if (index == firstIndex) add(
                 first.copy(
                     kind = ProcessEventKind.TOOL,
@@ -82,7 +87,7 @@ internal fun mergedToolSummary(
         .sumOf { event -> event.content.lineSequence().count { it.startsWith("$ ") }.coerceAtLeast(1) }
     val times = events.count { it.kind == ProcessEventKind.TOOL && it.toolName == TimeTool.NAME }
     val pagesRead = events.count { it.kind == ProcessEventKind.TOOL && it.toolName == WebFetchTool.NAME }
-    val known = setOf(LinuxShellTool.NAME, TimeTool.NAME, WebFetchTool.NAME, ImageGenTool.NAME, CommonsImageTools.SHOW)
+    val known = setOf(LinuxShellTool.NAME, TimeTool.NAME, WebFetchTool.NAME, ImageGenTool.NAME, CommonsImageTools.SHOW, LinguaLibreTool.NAME)
     val otherTools = events.count { it.kind == ProcessEventKind.TOOL && it.toolName !in known }
     if (searchEvents.isNotEmpty()) add(translate(language, "搜索了 %d 个网页").format(pages))
     if (commands > 0) add(translate(language, "运行了 %d 个命令").format(commands))

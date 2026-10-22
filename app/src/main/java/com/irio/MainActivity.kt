@@ -372,6 +372,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         composerStatus = error
         composerStatusNonce++
     }
+    ObservePronunciationPlayback(onError = ::showComposerError)
     fun showSttProviderSnackbar() {
         showComposerError(tr("请先在「TTS/STT」中配置 STT 提供商"))
     }
@@ -3562,6 +3563,7 @@ internal fun MessageRow(
         if (granted) SpeechNotifications.sync(context, SpeechPlayer.playback)
     }
     val spoken = remember(chatMessage.id, chatMessage.text, chatMessage.process) { speechPlainText(chatMessage.visibleText()) }
+    val pronunciations = remember(chatMessage.toolRecords) { pronunciationRecordings(chatMessage.toolRecords) }
     val reactionBounce = rememberReactionBounce(
         chatMessage.id,
         if (chatMessage.fromUser) chatMessage.modelReaction else chatMessage.userReaction,
@@ -3736,6 +3738,7 @@ internal fun MessageRow(
                                                             text = shown,
                                                             streaming = streamingBody && row.index == lastTextIndex,
                                                             renderScope = markdownScope,
+                                                            pronunciations = pronunciations,
                                                         )
                                                     }
                                                 }
@@ -3748,7 +3751,8 @@ internal fun MessageRow(
                     }
                     if ((chatMessage.isPending || chatMessage.isStreaming) &&
                         chatMessage.text.isBlank() &&
-                        chatMessage.process.none { it.live || it.kind == ProcessEventKind.BUBBLE || it.toolName == CommonsImageTools.SHOW }
+                        chatMessage.process.none { !isSilentPronunciationLookup(it.toolName, it.toolOutcome) &&
+                            (it.live || it.kind == ProcessEventKind.BUBBLE || it.toolName == CommonsImageTools.SHOW) }
                     ) {
                         StatusSweepText(tr("请求中"))
                     }
@@ -3870,6 +3874,7 @@ internal fun ProcessEventRow(
     onOpen: (ProcessEvent) -> Unit,
     onQuote: (String) -> Unit = {},
 ) {
+    if (isSilentPronunciationLookup(event.toolName, event.toolOutcome)) return
     if (event.toolName == CommonsImageTools.SHOW && event.toolOutcome != ToolOutcome.FAILED && event.toolOutcome != ToolOutcome.STOPPED) {
         CommonsImageBlock(event.content)
         return
@@ -4527,6 +4532,7 @@ internal fun AssistantMarkdown(
     text: String,
     streaming: Boolean,
     renderScope: CoroutineScope,
+    pronunciations: Map<String, PronunciationRecording> = emptyMap(),
 ) {
     val segments = remember(text) { markdownSegments(text) }
     val markdownSlots = remember(text, segments, streaming) {
@@ -4594,6 +4600,7 @@ internal fun AssistantMarkdown(
                                 typography = typography,
                                 imageTransformer = imageTransformer,
                                 glyphFade = streaming && ThemeStore.glyphFade,
+                                pronunciations = pronunciations,
                             )
                         }
                     }

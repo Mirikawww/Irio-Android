@@ -183,8 +183,8 @@ class SmartToolHintsTest {
                     ?: definition.optJSONObject("parametersJsonSchema")
                     ?: definition.getJSONObject("parameters")
                 val hint = parameters.optJSONObject("properties")?.optJSONObject("_display_text")
-                if (definition.optString("name") == CommonsImageTools.SHOW) {
-                    assertNull("Silent image output must not advertise a tool status hint", hint)
+                if (definition.optString("name") in setOf(CommonsImageTools.SHOW, LinguaLibreTool.NAME)) {
+                    assertNull("Silent tools must not advertise a tool status hint", hint)
                     return@schemaLoop
                 }
                 assertNotNull("Missing UI hint for $protocol: $schema", hint)

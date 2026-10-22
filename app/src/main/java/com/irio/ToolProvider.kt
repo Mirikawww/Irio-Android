@@ -130,7 +130,7 @@ class ToolRegistry(
             preferences.descriptions[name]?.let { description ->
                 (copy.optJSONObject("function") ?: copy).put("description", description)
             }
-            if (smartToolHints && name !in SubagentTools.QUIET && name != CommonsImageTools.SHOW) SmartToolHints.decorate(copy) else copy
+            if (smartToolHints && name !in SubagentTools.QUIET && name !in setOf(CommonsImageTools.SHOW, LinguaLibreTool.NAME)) SmartToolHints.decorate(copy) else copy
         }
     }
 
@@ -229,6 +229,7 @@ class ToolRegistry(
                 CommonsImageToolProvider(),
                 ImageGenToolProvider(),
                 TimeToolProvider(),
+                LinguaLibreToolProvider(),
                 ReactionToolProvider(),
                 ColoredBubbleToolProvider(),
                 HistoryToolProvider(),

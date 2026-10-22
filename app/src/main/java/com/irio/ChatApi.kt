@@ -1525,6 +1525,7 @@ internal object MemoryTool {
         SubagentTools.CREATE -> tr("创建子智能体")
         SubagentTools.INSPECT -> tr("查看子智能体")
         TimeTool.NAME -> tr("获取时间")
+        LinguaLibreTool.NAME -> tr("检索发音中")
         HistoryTool.NAME -> tr("查询历史会话")
         LinuxShellTool.NAME -> tr("运行命令中")
         LinuxBackgroundTool.NAME -> tr("处理后台命令")
@@ -1551,6 +1552,8 @@ internal object MemoryTool {
                 else -> tr("图片生成已停止")
             }
             TimeTool.NAME -> tr("已获取时间")
+            LinguaLibreTool.NAME -> if (runCatching { org.json.JSONObject(content).optJSONArray("recordings")?.length() }.getOrNull() == 0)
+                tr("未找到发音") else tr("已检索发音")
             CommonsImageTools.SEARCH -> CommonsImageTools.doneLabel(content)
             CommonsImageTools.VIEW -> CommonsImageTools.viewDoneLabel(content)
             HistoryTool.NAME -> HistoryTool.doneLabel(content)

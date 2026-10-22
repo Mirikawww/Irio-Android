@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
@@ -253,6 +255,9 @@ private fun SubagentScreen(id: String, onBack: () -> Unit) {
     val topInset = with(androidx.compose.ui.platform.LocalDensity.current) { chromePx.intValue.toDp() }
     val processSheetState = rememberBottomSheetState()
     var openedProcess by remember { mutableStateOf<ProcessEvent?>(null) }
+    var pronunciationError by remember { mutableStateOf<String?>(null) }
+    var pronunciationErrorNonce by remember { mutableIntStateOf(0) }
+    ObservePronunciationPlayback { message -> pronunciationError = message; pronunciationErrorNonce++ }
     val sheetEvent = openedProcess?.let { selected ->
         if (!selected.live) selected
         else session?.liveProcess?.firstOrNull { it.id == selected.id && it.toolName == selected.toolName } ?: selected
@@ -344,6 +349,15 @@ private fun SubagentScreen(id: String, onBack: () -> Unit) {
             state = processSheetState,
             onDismiss = { processSheetState.targetDetent = BottomSheetDetent.Hidden },
         )
+        IrioSnackbar(
+            visible = pronunciationError != null,
+            message = pronunciationError.orEmpty(),
+            bottomInset = with(androidx.compose.ui.platform.LocalDensity.current) {
+                WindowInsets.systemBars.getBottom(this).toDp()
+            } + 72.dp,
+            onDismiss = { pronunciationError = null },
+            restartKey = pronunciationErrorNonce,
+        )
     }
 }
 
@@ -356,6 +370,10 @@ private fun SubagentTranscript(
     onOpen: (ProcessEvent) -> Unit,
 ) {
     val pieces = interleaveTranscript(text, renderedProcessEvents(process, ThemeStore.mergeToolCalls))
+    val pronunciations = remember(process) {
+        pronunciationRecordings(process.filter { it.toolName == LinguaLibreTool.NAME && it.toolOutcome != ToolOutcome.FAILED }
+            .map { ChatToolRecord(ChatToolCall("stored", LinguaLibreTool.NAME, "{}"), it.content) })
+    }
     val lastTextIndex = pieces.indexOfLast { it is TranscriptPiece.Text }
     var seenText = false
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -374,6 +392,7 @@ private fun SubagentTranscript(
                                     text = shown,
                                     streaming = streaming && index == lastTextIndex,
                                     renderScope = renderScope,
+                                    pronunciations = pronunciations,
                                 )
                             }
                         }
