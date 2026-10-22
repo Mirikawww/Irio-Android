@@ -114,6 +114,13 @@ internal object IrioIcons {
     val Bot by lazy { icon("bot", "M12 8V4H8", rect(4, 8, 16, 12, 2), "M2 14h2", "M20 14h2", "M15 13v2", "M9 13v2") }
     val Square by lazy { icon("square", rect(3, 3, 18, 18, 2)) }
     val SquareCheck by lazy { icon("square-check", rect(3, 3, 18, 18, 2), "m16 9-5.5 5.5L8 12") }
+    val SquarePen by lazy {
+        icon(
+            "square-pen",
+            "M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7",
+            "m18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.506l-2.873.84.84-2.872a2 2 0 0 1 .506-.854z",
+        )
+    }
     val Terminal by lazy { icon("terminal", "M12 19h8", "m4 17 6-6-6-6") }
     val Upload by lazy { icon("upload", "M12 3v12", "m17 8-5-5-5 5", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4") }
 }

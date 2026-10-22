@@ -20,9 +20,9 @@ class IrioIconsTest {
             IrioIcons.Palette, IrioIcons.Pause, IrioIcons.Smartphone, IrioIcons.Image,
             IrioIcons.Play, IrioIcons.Pin, IrioIcons.Speech, IrioIcons.RefreshCw,
             IrioIcons.Rewind, IrioIcons.Search, IrioIcons.Settings, IrioIcons.Bot,
-            IrioIcons.Square, IrioIcons.SquareCheck, IrioIcons.Terminal, IrioIcons.Upload,
+            IrioIcons.Square, IrioIcons.SquareCheck, IrioIcons.SquarePen, IrioIcons.Terminal, IrioIcons.Upload,
         )
-        assertEquals(45, icons.size)
+        assertEquals(46, icons.size)
         assertEquals(icons.size, icons.map { it.name }.toSet().size)
         assertTrue(icons.all { it.name.startsWith("lucide:") })
         assertTrue(IrioIcons.ArrowLeft.autoMirror)

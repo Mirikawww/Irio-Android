@@ -2404,23 +2404,6 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     end = 12.dp,
                 )
         ) {
-            // 列表在后绘制，且抽屉 graphicsLayer 不裁剪。顶栏必须自带不透明底并压在列表之上，
-            // 否则滚出视口的历史行会叠在「新对话」上，再滚一点就被回收、整行消失。
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .zIndex(1f)
-                    .background(background),
-            ) {
-                ListRowButton(
-                    label = tr("新对话"),
-                    icon = IrioIcons.Plus,
-                    style = ButtonStyle.Ghost,
-                    contentPadding = DrawerRowPadding,
-                    onClick = { newConversation() },
-                )
-                Spacer(Modifier.height(8.dp))
-            }
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -2432,7 +2415,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     modifier = Modifier
                         .fillMaxSize()
                         .clipToBounds(),
-                    contentPadding = PaddingValues(bottom = 72.dp),
+                    contentPadding = PaddingValues(bottom = 112.dp),
                     itemSpacing = 2.dp,
                 ) {
                     when (val row = it) {
@@ -2496,23 +2479,63 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .zIndex(1f)
-                        .background(background)
+                        .hazeBlur(
+                            input = HazeInput.Sources(chatHazeState),
+                            style = chatComposerHazeStyle(),
+                        )
                         .absorbDrawerBackgroundTaps()
-                        .padding(bottom = 8.dp),
+                        .padding(horizontal = 8.dp),
                 ) {
-                    ListRowButton(
-                        label = tr("设置"),
-                        icon = IrioIcons.Settings,
-                        style = ButtonStyle.Ghost,
-                        contentPadding = DrawerRowPadding,
-                        onClick = {
-                            context.startActivity(Intent(context, SettingsActivity::class.java))
-                        },
-                        // 空抽屉没有可删除的历史会话，不提供“删除全部历史”的长按入口。
-                        onLongClick = conversations
-                            .takeIf { it.isNotEmpty() }
-                            ?.let { { clearHistoryDialogOpen = true } },
-                    )
+                    Column(Modifier.fillMaxWidth()) {
+                        Spacer(Modifier.height(ChatComposerHazeBleed))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .windowInsetsPadding(
+                                    WindowInsets.navigationBars.only(WindowInsetsSides.Bottom).exclude(WindowInsets.ime),
+                                )
+                                .padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            ToolbarCapsule(
+                                modifier = Modifier.size(48.dp),
+                                glass = GlassSurface.SIDEBAR_BUTTON in ThemeStore.glassSurfaces,
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        context.startActivity(Intent(context, SettingsActivity::class.java))
+                                    },
+                                    style = ButtonStyle.Ghost,
+                                    buttonSize = ButtonSize.Large,
+                                    shape = ToolbarCapsuleShape,
+                                    modifier = Modifier.fillMaxSize(),
+                                ) {
+                                    Icon(
+                                        imageVector = IrioIcons.Settings,
+                                        contentDescription = tr("设置"),
+                                        tint = content,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Button(
+                                onClick = { newConversation() },
+                                style = ButtonStyle.Primary,
+                                buttonSize = ButtonSize.Large,
+                                shape = ToolbarCapsuleShape,
+                                contentColor = Theme[colors][onPrimaryColor],
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                            ) {
+                                Icon(
+                                    imageVector = IrioIcons.SquarePen,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Text(tr("新对话"))
+                            }
+                        }
+                    }
                 }
             }
         }
