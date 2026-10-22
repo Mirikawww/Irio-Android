@@ -128,6 +128,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.drawText
 import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 
@@ -153,6 +154,9 @@ internal fun modelSwitcherListHeight(naturalHeight: Dp, screenHeightDp: Int): Dp
 /** Fading a panel out does not remove it from hit testing. Keep it inert until fully restored. */
 internal fun modelSwitcherCompactInteractive(modelsExpanded: Boolean, phase: Float): Boolean =
     !modelsExpanded && phase <= 0.001f
+
+internal fun modelSwitcherListComposed(listPrepared: Boolean, modelsExpanded: Boolean): Boolean =
+    listPrepared || modelsExpanded
 
 /** The entire surface changes to the list during the initial fast extension. */
 @Composable
@@ -180,6 +184,12 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
     val muted = Theme[colors][mutedColor]
     val accent = Theme[colors][primaryColor]
     var modelsExpanded by remember { mutableStateOf(false) }
+    var listPrepared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        // The collapsed popup does not draw the list; build its RecyclerView after the native menu entrance.
+        delay(160)
+        listPrepared = true
+    }
     val phase = remember { androidx.compose.animation.core.Animatable(0f) }
     val compactInteractive by remember { derivedStateOf { modelSwitcherCompactInteractive(modelsExpanded, phase.value) } }
     LaunchedEffect(modelsExpanded) {
@@ -197,7 +207,6 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
     val listHeight = modelSwitcherListHeight(naturalHeight, configuration.screenHeightDp)
     val fastBackground by animateColorAsState(if (fastMode) accent.copy(alpha = 0.16f) else content.copy(alpha = 0.08f), irioSpring(), label = "fast background")
     val listOpacity = { modelSwitcherListOpacity(phase.value) }
-    // Prepared in the same composition before the user starts expanding the surface.
     val listOpacityState = remember { androidx.compose.runtime.derivedStateOf { modelSwitcherListOpacity(phase.value) } }
     DropdownMenuPanel(modifier = Modifier.width(width)) {
         Box(Modifier.width(width).padding(horizontal = 8.dp, vertical = 6.dp)
@@ -244,6 +253,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                 }
                 ModelSwitcherToggle(tr("自动朗读"), autoRead) { if (compactInteractive) onAutoReadChange(it) }
             }
+            if (modelSwitcherListComposed(listPrepared, modelsExpanded)) {
                 AndroidComposeRecyclerList(
                     items = rows, key = { it.key },
                     modifier = Modifier.fillMaxWidth().height(listHeight)
@@ -278,6 +288,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                         }
                     }
                 }
+            }
         }
     }
 }

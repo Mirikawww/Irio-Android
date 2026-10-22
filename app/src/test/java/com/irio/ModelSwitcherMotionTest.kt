@@ -8,6 +8,13 @@ import org.junit.Test
 
 class ModelSwitcherMotionTest {
     @Test
+    fun listIsDeferredDuringPopupEntranceButAvailableOnEarlyExpansion() {
+        assertFalse(modelSwitcherListComposed(listPrepared = false, modelsExpanded = false))
+        assertTrue(modelSwitcherListComposed(listPrepared = true, modelsExpanded = false))
+        assertTrue(modelSwitcherListComposed(listPrepared = false, modelsExpanded = true))
+    }
+
+    @Test
     fun compactControlsRemainInertWhileModelListIsOpenOrClosing() {
         assertTrue(modelSwitcherCompactInteractive(modelsExpanded = false, phase = 0f))
         // The list becomes interactive before its fade-in completes.
