@@ -121,6 +121,16 @@ object ConversationStore {
         if (wrote) notifyChanged()
     }
 
+    /** Patch the latest body under the store lock; never revive a deleted conversation. */
+    internal fun updateGeneratedTitle(context: Context, request: ConversationTitleRequest, title: String) {
+        if (title.isBlank()) return
+        ConversationSummaries.withLock {
+            val latest = load(context, request.original.id) ?: return@withLock
+            if (!request.accepts(latest.summary())) return@withLock
+            save(context, latest.copy(title = title, titlePending = false))
+        }
+    }
+
     fun replaceAll(context: Context, conversations: List<Conversation>, lastOpenedId: String?) {
         val dir = directory(context)
         ConversationSummaries.withLock {

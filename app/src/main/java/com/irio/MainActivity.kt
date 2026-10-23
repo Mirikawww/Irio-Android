@@ -458,6 +458,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     var autoRead by remember { mutableStateOf(SpeechStore.loadAutoRead(context)) }
     var clearHistoryDialogOpen by remember { mutableStateOf(false) }
     var conversationAction by remember { mutableStateOf<ConversationSummary?>(null) }
+    val titleGeneration = remember { ConversationTitleGenerationState() }
     var viewingPhoto by remember { mutableStateOf<ChatAttachment?>(null) }
     var generations by remember { mutableStateOf(emptyMap<Long, ActiveGeneration>()) }
     // 发送前预检（token 估算在后台线程）进行中的回复占位：堵住异步窗口期的重复提交。
@@ -1263,6 +1264,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
 
     fun clearAllHistory() {
         clearingHistory = true
+        titleGeneration.clear()
         generations.values.forEach { it.cancellation.cancel() }
         IrioHttp.evictAllScopes()
         ConversationStore.deleteAll(context)
@@ -1301,6 +1303,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     }
 
     fun deleteConversation(conversation: ConversationSummary) {
+        titleGeneration.cancel(conversation.id)
         if (conversation.id in generatingIds) stopGeneration(conversation.id)
         IrioHttp.evictConversation(conversation.id)
         conversations = conversations.filterNot { it.id == conversation.id }
@@ -1331,50 +1334,83 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     }
 
     /**
-     * AI 标题生成：只在会话标记了 titlePending（尚未生成过）时跑；手动改过标题的不带标记，不会被覆盖。
+     * 首轮自动生成只处理 titlePending；长按菜单可以显式重新生成已有标题。
      * 模型优先级：设置中的标题模型 → 当前对话模型（非图片）→ 上次对话模型。
      */
-    fun maybeGenerateTitle(conversationId: String, userText: String, assistantText: String) {
-        if (userText.isBlank() || assistantText.isBlank()) return
+    fun maybeGenerateTitle(conversationId: String, userText: String, assistantText: String, regenerate: Boolean = false) {
+        if (clearingHistory || userText.isBlank() || (!regenerate && assistantText.isBlank())) return
         val conversation = conversations.firstOrNull { it.id == conversationId } ?: return
-        if (!conversation.titlePending) return
+        if (!conversation.titlePending && !regenerate) return
         val configured = ToolStore.loadTitleModel(context)
         val titleModel = when {
             configured.isNotBlank() -> configured
             !ModelCatalog.isImageModel(context, selectedModel) -> selectedModel
             else -> ProviderStore.loadLastChatModel(context)
         }
-        if (titleModel.isBlank()) return
+        if (titleModel.isBlank()) {
+            if (regenerate) titleGeneration.showNotice(tr("请先选择标题生成模型或对话模型"))
+            return
+        }
+        val token = titleGeneration.begin(conversationId) ?: return
+        val request = ConversationTitleRequest(conversation)
         scope.launch {
-            // 标题模型可能与当前 provider 不同：优先找拥有该模型的 provider
-            val provider = ProviderStore.loadProviders(context)
-                .firstOrNull { titleModel in it.models }
-                ?: ProviderStore.loadProvider(context)
-                ?: return@launch
-            val title = ChatApi.generateTitle(
-                provider,
-                titleModel,
-                userText,
-                assistantText,
-                connectionScope = "$conversationId#title",
-            )
-            if (title.isNullOrBlank()) return@launch
-            // 仍要确认标题没被别的路径改掉（并发防抢占）
-            val current = conversations.firstOrNull { it.id == conversationId } ?: return@launch
-            if (!current.titlePending) return@launch
-            withContext(Dispatchers.Main) {
+            try {
+                // 标题模型可能与当前 provider 不同：优先找拥有该模型的 provider
+                val provider = ProviderStore.loadProviders(context)
+                    .firstOrNull { titleModel in it.models }
+                    ?: ProviderStore.loadProvider(context)
+                if (provider == null) {
+                    if (regenerate) titleGeneration.showNotice(tr("请先选择标题生成模型或对话模型"))
+                    return@launch
+                }
+                val title = ChatApi.generateTitle(
+                    provider,
+                    titleModel,
+                    userText,
+                    assistantText,
+                    connectionScope = "$conversationId#title",
+                )
+                if (!titleGeneration.isCurrent(conversationId, token) || clearingHistory) return@launch
+                if (title.isNullOrBlank()) {
+                    if (regenerate) titleGeneration.showNotice(tr("标题生成失败，已保留原标题"))
+                    return@launch
+                }
+                // 仍要确认标题没被别的路径改掉（并发防抢占）
+                val current = conversations.firstOrNull { it.id == conversationId } ?: return@launch
+                if (!request.accepts(current)) return@launch
                 conversations = conversations.map { if (it.id == conversationId) it.copy(title = title, titlePending = false) else it }
                 if (currentConversation.id == conversationId) {
                     currentConversation = currentConversation.copy(title = title, titlePending = false)
+                    cacheConversationContent(currentConversation.copy(messages = messages))
+                } else {
+                    synchronized(conversationCache) {
+                        conversationCache[conversationId]?.let {
+                            conversationCache[conversationId] = it.copy(title = title, titlePending = false)
+                        }
+                    }
                 }
-            }
-            withContext(Dispatchers.IO) {
-                conversationContent(conversationId)?.let { full ->
-                    val updated = full.copy(title = title, titlePending = false)
-                    cacheConversationContent(updated)
-                    ConversationStore.save(context, updated)
+                val saved = withContext(Dispatchers.IO) {
+                    runCatching { ConversationStore.updateGeneratedTitle(context, request, title) }.isSuccess
                 }
+                if (!saved && regenerate) titleGeneration.showNotice(tr("标题保存失败"))
+            } finally {
+                titleGeneration.finish(conversationId, token)
             }
+        }
+    }
+
+    fun regenerateConversationTitle(conversationId: String) {
+        if (clearingHistory || titleGeneration.isRunning(conversationId)) return
+        scope.launch {
+            val full = if (currentConversation.id == conversationId) {
+                currentConversation.copy(messages = messages)
+            } else withContext(Dispatchers.IO) { conversationContent(conversationId) }
+            val input = full?.let { withContext(Dispatchers.Default) { conversationTitleInput(it.messages) } }
+            if (input == null) {
+                titleGeneration.showNotice(tr("没有可用于生成标题的消息"))
+                return@launch
+            }
+            maybeGenerateTitle(conversationId, input.user, input.assistant, regenerate = true)
         }
     }
 
@@ -2494,6 +2530,17 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                         }
                                         DropdownMenuItem(
                                             onClick = {
+                                                regenerateConversationTitle(conversation.id)
+                                                conversationAction = null
+                                            },
+                                        ) {
+                                            Text(
+                                                tr(if (titleGeneration.isRunning(conversation.id)) "正在生成标题" else "重新生成标题"),
+                                                color = if (titleGeneration.isRunning(conversation.id)) muted else content,
+                                            )
+                                        }
+                                        DropdownMenuItem(
+                                            onClick = {
                                                 deleteConversation(conversation)
                                                 conversationAction = null
                                             },
@@ -3276,6 +3323,15 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         ),
                 )
             }
+        }
+        Box(Modifier.fillMaxSize().zIndex(2f)) {
+            IrioSnackbar(
+                visible = titleGeneration.notice != null,
+                message = titleGeneration.notice.orEmpty(),
+                bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+                onDismiss = { titleGeneration.notice = null },
+                restartKey = titleGeneration.noticeNonce,
+            )
         }
         ClearHistoryDialog(
             visible = clearHistoryDialogOpen,
