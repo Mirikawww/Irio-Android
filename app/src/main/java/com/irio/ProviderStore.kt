@@ -674,11 +674,12 @@ object ProviderApi {
         prompt: String,
         context: ImageGenContext? = null,
         cancellation: ChatRequestCancellation? = null,
+        options: ImageGenerationOptions? = null,
     ): ImageGenResult {
         if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
-        if (config.protocol.isGoogleGemini) return generateImagePlain(config, model, prompt, cancellation, context)
+        if (config.protocol.isGoogleGemini) return generateImagePlain(config, model, prompt, cancellation, context, options)
         if (context != null && context.previousImages.isNotEmpty()) {
-            val edited = runCatching { generateImageWithEdits(config, model, prompt, context, cancellation) }.getOrNull()
+            val edited = runCatching { generateImageWithEdits(config, model, prompt, context, cancellation, options) }.getOrNull()
             if (edited != null) return edited
             // edits 不可用（端点 404/405/415 或网络层拒绝）→ 回落 generations，把上轮 prompt 织进文本
             val combined = buildString {
@@ -687,9 +688,42 @@ object ProviderApi {
                 append(tr("。参考图即上一轮的生成结果。本次要求："))
                 append(prompt.trim())
             }
-            return generateImagePlain(config, model, combined, cancellation)
+            return generateImagePlain(config, model, combined, cancellation, options = options)
         }
-        return generateImagePlain(config, model, prompt, cancellation)
+        return generateImagePlain(config, model, prompt, cancellation, options = options)
+    }
+
+    internal fun imageRequestBody(
+        config: ProviderConfig,
+        model: String,
+        prompt: String,
+        context: ImageGenContext? = null,
+        options: ImageGenerationOptions? = null,
+    ): JSONObject {
+        val messages = buildList {
+            if (context != null && context.previousImages.isNotEmpty()) {
+                add(ChatRequestMessage("user", context.previousPrompt))
+                add(ChatRequestMessage("assistant", attachments = context.previousImages))
+            }
+            add(ChatRequestMessage("user", prompt))
+        }
+        return when (config.protocol) {
+            ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.requestBody(model, messages, null).apply {
+                if (options == null) put("response_modalities", JSONArray().put("IMAGE"))
+                else put("response_format", JSONObject().put("type", "image").put("image_size", options.resolution.label).apply {
+                    options.aspectRatio?.let { put("aspect_ratio", it.label) }
+                })
+            }
+            ProviderProtocol.GEMINI -> GeminiProtocol.requestBody(messages, null).put("generationConfig", JSONObject()
+                .put("responseModalities", JSONArray().put("TEXT").put("IMAGE")).apply {
+                    if (options != null) put("imageConfig", JSONObject().put("imageSize", options.resolution.label).apply {
+                        options.aspectRatio?.let { put("aspectRatio", it.label) }
+                    })
+                })
+            else -> JSONObject().put("model", model).put("prompt", prompt).put("n", 1).apply {
+                (options?.openAiFields() ?: mapOf("size" to "1024x1024")).forEach { (name, value) -> put(name, value) }
+            }
+        }
     }
 
     private fun generateImagePlain(
@@ -698,6 +732,7 @@ object ProviderApi {
         prompt: String,
         cancellation: ChatRequestCancellation?,
         context: ImageGenContext? = null,
+        options: ImageGenerationOptions? = null,
     ): ImageGenResult {
         val connection = runCatching {
             val url = if (config.protocol.isGoogleGemini) ProviderEndpoints.chatUrl(config, model, streaming = false)
@@ -715,20 +750,7 @@ object ProviderApi {
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             connection.setRequestProperty("Accept", "application/json")
             applyAuth(connection, config)
-            val messages = buildList {
-                if (context != null && context.previousImages.isNotEmpty()) {
-                    add(ChatRequestMessage("user", context.previousPrompt))
-                    add(ChatRequestMessage("assistant", attachments = context.previousImages))
-                }
-                add(ChatRequestMessage("user", prompt))
-            }
-            val requestBody = if (config.protocol == ProviderProtocol.GEMINI_INTERACTIONS) {
-                GeminiInteractionsProtocol.requestBody(model, messages, null)
-                    .put("response_modalities", JSONArray().put("IMAGE"))
-            } else if (config.protocol == ProviderProtocol.GEMINI) {
-                GeminiProtocol.requestBody(messages, null).put("generationConfig", JSONObject()
-                    .put("responseModalities", JSONArray().put("TEXT").put("IMAGE")))
-            } else JSONObject().put("model", model).put("prompt", prompt).put("n", 1).put("size", "1024x1024")
+            val requestBody = imageRequestBody(config, model, prompt, context, options)
             connection.outputStream.use { output ->
                 if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
                 output.write(
@@ -771,6 +793,7 @@ object ProviderApi {
         prompt: String,
         context: ImageGenContext,
         cancellation: ChatRequestCancellation?,
+        options: ImageGenerationOptions?,
     ): ImageGenResult? {
         val connection = runCatching {
             URL(imagesEditsUrl(config.endpointUrl)).openConnection() as HttpURLConnection
@@ -796,7 +819,7 @@ object ProviderApi {
                 field("model", model)
                 field("prompt", prompt)
                 field("n", "1")
-                field("size", "1024x1024")
+                (options?.openAiFields() ?: mapOf("size" to "1024x1024")).forEach { (name, value) -> field(name, value) }
                 context.previousImages.forEach { image ->
                     val file = File(image.filePath)
                     if (!file.exists()) return@forEach

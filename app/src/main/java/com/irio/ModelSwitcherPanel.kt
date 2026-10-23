@@ -158,6 +158,8 @@ internal fun modelSwitcherCompactInteractive(modelsExpanded: Boolean, phase: Flo
 internal fun modelSwitcherListComposed(listPrepared: Boolean, modelsExpanded: Boolean): Boolean =
     listPrepared || modelsExpanded
 
+internal fun modelSwitcherCompactHeight(imageModel: Boolean): Dp = if (imageModel) 396.dp else 220.dp
+
 /** The entire surface changes to the list during the initial fast extension. */
 @Composable
 internal fun DropdownMenuScope.ModelSwitcherPanel(
@@ -172,6 +174,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
     webSearchAvailable: Boolean,
     webSearchEnabled: Boolean,
     autoRead: Boolean,
+    providerProtocol: ProviderProtocol = ProviderProtocol.CHAT_COMPLETIONS,
     onSelectedModelChange: (String, String) -> Unit,
     onReasoningChange: (ReasoningEffort) -> Unit,
     onFastModeChange: (Boolean) -> Unit,
@@ -183,6 +186,16 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
     val content = Theme[colors][onBackgroundColor]
     val muted = Theme[colors][mutedColor]
     val accent = Theme[colors][primaryColor]
+    val context = LocalContext.current
+    val imageModel = remember(selectedModel) { ModelCatalog.isImageModel(context, selectedModel) }
+    var imageOptions by remember(activeProviderId, selectedModel) {
+        mutableStateOf(ImageGenerationStore.load(context, activeProviderId, selectedModel))
+    }
+    fun saveImageOptions(options: ImageGenerationOptions) {
+        imageOptions = options
+        ImageGenerationStore.save(context, activeProviderId, selectedModel, options)
+    }
+    var aspectRatioPage by remember { mutableStateOf(false) }
     var modelsExpanded by remember { mutableStateOf(false) }
     var listPrepared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -197,8 +210,8 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
         motion.animateTo(modelsExpanded)
     }
     androidx.activity.compose.BackHandler(enabled = modelsExpanded) { modelsExpanded = false }
-    val compactHeight = 220.dp
-    val naturalHeight = rows.sumOf {
+    val compactHeight = modelSwitcherCompactHeight(imageModel)
+    val naturalHeight = if (aspectRatioPage && imageModel) ((imageAspectRatioPresets.size + 1) * 36 + 152).dp else rows.sumOf {
         when (it) {
             is ModelPickerRow.Model -> 36
             is ModelPickerRow.GroupLabel -> 26
@@ -224,7 +237,12 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
             Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(
                     Modifier.weight(1f).height(44.dp).clip(RoundedRectangle(12.dp))
-                        .modelSwitcherClickable { if (compactInteractive) modelsExpanded = true }
+                        .modelSwitcherClickable {
+                            if (compactInteractive) {
+                                aspectRatioPage = false
+                                modelsExpanded = true
+                            }
+                        }
                         .semantics {
                             contentDescription = tr("选择模型")
                             stateDescription = tr(if (modelsExpanded) "收起模型" else "展开模型")
@@ -247,14 +265,44 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                 }
             }
                 Spacer(Modifier.height(3.dp))
-                ThinkingDepthSlider(reasoningEffort, supportsThinking, reasoningLevels, onReasoningChange, active = compactInteractive)
-                Spacer(Modifier.height(2.dp))
-                ModelSwitcherToggle(tr("网络搜索"), webSearchAvailable && webSearchEnabled, webSearchAvailable) {
-                    if (compactInteractive) onWebSearchChange(it)
-                }
-                ModelSwitcherToggle(tr("自动朗读"), autoRead) { if (compactInteractive) onAutoReadChange(it) }
+                ModelSwitcherParameterControls(
+                    imageModel = imageModel,
+                    imageOptions = imageOptions,
+                    compactInteractive = compactInteractive,
+                    supportsOpenAiOptions = !providerProtocol.isGoogleGemini,
+                    reasoningEffort = reasoningEffort,
+                    supportsThinking = supportsThinking,
+                    reasoningLevels = reasoningLevels,
+                    webSearchAvailable = webSearchAvailable,
+                    webSearchEnabled = webSearchEnabled,
+                    autoRead = autoRead,
+                    onReasoningChange = onReasoningChange,
+                    onWebSearchChange = onWebSearchChange,
+                    onAutoReadChange = onAutoReadChange,
+                    onImageOptionsChange = ::saveImageOptions,
+                    onAspectRatio = {
+                        aspectRatioPage = true
+                        modelsExpanded = true
+                    },
+                )
             }
             if (modelSwitcherListComposed(listPrepared, modelsExpanded)) {
+                if (aspectRatioPage && imageModel) {
+                    ImageAspectRatioList(
+                        options = imageOptions,
+                        modifier = Modifier.fillMaxWidth().height(listHeight)
+                            .semantics { if (listOpacity() < 0.5f) invisibleToUser() },
+                        opacity = listOpacityState,
+                        active = modelsExpanded,
+                        onSelect = {
+                            saveImageOptions(imageOptions.copy(aspectRatio = it, useCustomAspectRatio = false))
+                            modelsExpanded = false
+                        },
+                        onCustomChange = {
+                            saveImageOptions(imageOptions.copy(aspectRatio = it, useCustomAspectRatio = true, customRatio = it))
+                        },
+                    )
+                } else {
                 AndroidComposeRecyclerList(
                     items = rows, key = { it.key },
                     modifier = Modifier.fillMaxWidth().height(listHeight)
@@ -289,9 +337,39 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                         }
                     }
                 }
+                }
             }
         }
     }
+}
+
+@Composable
+internal fun ModelSwitcherParameterControls(
+    imageModel: Boolean,
+    imageOptions: ImageGenerationOptions,
+    compactInteractive: Boolean,
+    supportsOpenAiOptions: Boolean,
+    reasoningEffort: ReasoningEffort,
+    supportsThinking: Boolean,
+    reasoningLevels: List<ReasoningEffort>,
+    webSearchAvailable: Boolean,
+    webSearchEnabled: Boolean,
+    autoRead: Boolean,
+    onReasoningChange: (ReasoningEffort) -> Unit,
+    onWebSearchChange: (Boolean) -> Unit,
+    onAutoReadChange: (Boolean) -> Unit,
+    onImageOptionsChange: (ImageGenerationOptions) -> Unit,
+    onAspectRatio: () -> Unit,
+) {
+    ThinkingDepthSlider(reasoningEffort, supportsThinking, reasoningLevels, onReasoningChange, active = compactInteractive)
+    Spacer(Modifier.height(2.dp))
+    if (imageModel) {
+        ImageGenerationControls(imageOptions, compactInteractive, supportsOpenAiOptions, onImageOptionsChange, onAspectRatio)
+    }
+    ModelSwitcherToggle(tr("网络搜索"), webSearchAvailable && webSearchEnabled, webSearchAvailable) {
+        if (compactInteractive) onWebSearchChange(it)
+    }
+    ModelSwitcherToggle(tr("自动朗读"), autoRead) { if (compactInteractive) onAutoReadChange(it) }
 }
 
 @Composable

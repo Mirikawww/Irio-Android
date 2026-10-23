@@ -1391,6 +1391,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         }
         SpeechPlayer.stop()
         val requestModel = selectedModel
+        val requestImageOptions = ImageGenerationStore.load(context, activeProviderId, requestModel)
         val effectiveReasoningInfo = if (ProviderStore.loadModelsDevReasoning(context)) {
             ModelCatalog.reasoningInfo(context, requestModel, useCatalog = true)
         } else null
@@ -1511,7 +1512,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     withContext(Dispatchers.IO) {
                         imageRetries.runRound {
                             val generated = ProviderApi.generateImage(provider, requestModel, prompt, imageContext,
-                                cancellation = requestCancellation)
+                                cancellation = requestCancellation, options = requestImageOptions)
                             val stopped = requestCancellation.isCancelled() || generated.error == tr("图片生成已停止")
                             if (!stopped) {
                                 if (generated.attachment != null) process.dropLiveTool()
@@ -3456,6 +3457,8 @@ private fun ModelPicker(
                 webSearchAvailable = webSearchAvailable,
                 webSearchEnabled = webSearchEnabled,
                 autoRead = autoRead,
+                providerProtocol = providersWithModels.firstOrNull { it.id == activeProviderId }?.protocol
+                    ?: ProviderProtocol.CHAT_COMPLETIONS,
                 onSelectedModelChange = onSelectedModelChange,
                 onReasoningChange = onReasoningChange,
                 onFastModeChange = onFastModeChange,

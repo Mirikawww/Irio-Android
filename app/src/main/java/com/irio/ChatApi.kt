@@ -1405,21 +1405,26 @@ internal object ImageGenTool {
     const val STATUS_FAILED = "failed"
     const val DESCRIPTION =
         "Generate an image from a text prompt and deliver it to the user. " +
-            "Call with {\"prompt\":\"detailed image description in English\"}. " +
+            "Choose prompt, resolution, aspect_ratio, background and quality yourself from the user's request. " +
+            "Use resolution 1K, aspect_ratio auto, background auto and quality medium when unspecified. " +
             "Do NOT use this tool if you can already output images yourself."
 
     private fun parameters(): JSONObject = JSONObject()
         .put("type", "object")
         .put(
             "properties",
-            JSONObject().put(
-                "prompt",
-                JSONObject()
-                    .put("type", "string")
-                    .put("description", "Detailed image description, in English"),
-            ),
+            JSONObject()
+                .put("prompt", JSONObject().put("type", "string").put("description", "Detailed image description, in English"))
+                .put("resolution", JSONObject().put("type", "string").put("enum", JSONArray(listOf("1K", "2K", "4K")))
+                    .put("description", "Requested output resolution. Use 1K unless a higher resolution is needed. OpenAI chooses size automatically when aspect_ratio is auto."))
+                .put("aspect_ratio", JSONObject().put("type", "string")
+                    .put("description", "auto to let the image model choose framing, or a positive integer width:height ratio between 1:3 and 3:1 inclusive. Examples: 1:1, 4:3, 3:2, 16:9, 9:16, 7:5. Use auto when unspecified."))
+                .put("background", JSONObject().put("type", "string").put("enum", JSONArray(listOf("auto", "opaque", "transparent")))
+                    .put("description", "Output background. Use auto unless the user requests an opaque or transparent image. Applies to Images API providers."))
+                .put("quality", JSONObject().put("type", "string").put("enum", JSONArray(listOf("low", "medium", "high")))
+                    .put("description", "Rendering quality. Use medium by default, low for drafts, high for final detail. Applies to Images API providers.")),
         )
-        .put("required", JSONArray().put("prompt"))
+        .put("required", JSONArray(listOf("prompt", "resolution", "aspect_ratio", "background", "quality")))
         .put("additionalProperties", false)
 
     fun schemaFor(protocol: ProviderProtocol): JSONObject = when (protocol) {

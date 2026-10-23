@@ -361,6 +361,8 @@ internal class ImageGenToolProvider : ToolProvider {
         var status = ImageGenTool.STATUS_FAILED
         return@withContext try {
             val prompt = ToolArguments.value(call.arguments, "prompt")
+            require(prompt.isNotBlank()) { "prompt must not be empty" }
+            val options = ImageGenerationOptions.fromToolArguments(call.arguments)
             // Images API 无状态：把最近一轮生成图和 prompt 作为编辑参考传回端点。
             val imageContext = imageContext(context.history)
             val result = ProviderApi.generateImage(
@@ -369,6 +371,7 @@ internal class ImageGenToolProvider : ToolProvider {
                 prompt = prompt,
                 context = imageContext,
                 cancellation = context.cancellation,
+                options = options,
             )
             val stopped = context.cancellation.isCancelled() || result.error == tr("图片生成已停止")
             if (result.attachment != null) {
