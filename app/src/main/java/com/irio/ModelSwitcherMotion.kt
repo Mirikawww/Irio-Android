@@ -1,5 +1,8 @@
 package com.irio
 
+import androidx.compose.animation.core.Animatable
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.math.min
@@ -91,6 +94,29 @@ internal class ThinkingParticleField(seed: Int, val count: Int) {
 /** Immediate fast arrival with a soft, decelerating finish. */
 internal fun modelSwitcherExtension(phase: Float): Float {
     return IrioEaseOut.transform(phase.coerceIn(0f, 1f))
+}
+
+internal class ModelSwitcherTransition {
+    val phase = Animatable(0f)
+    private val openingReveal = Animatable(0f)
+
+    val listOpacity: Float get() = minOf(modelSwitcherListOpacity(phase.value), openingReveal.value.coerceIn(0f, 1f))
+
+    suspend fun animateTo(modelsExpanded: Boolean) {
+        coroutineScope {
+            launch {
+                phase.animateTo(if (modelsExpanded) 1f else 0f,
+                    irioSpring<Float>(stiffness = if (modelsExpanded) 900f else 1150f))
+                // Reset only once fully hidden; reversing mid-transition keeps the visible alpha.
+                if (!modelsExpanded) openingReveal.snapTo(0f)
+            }
+            if (modelsExpanded) launch {
+                // Opening needs a readable fade independent of the much faster size spring.
+                // The phase gate still keeps it invisible until the configuration has faded out.
+                openingReveal.animateTo(1f, irioSpring())
+            }
+        }
+    }
 }
 
 /** The non-overlapping ranges fade through invisibility in either direction, including reversals. */

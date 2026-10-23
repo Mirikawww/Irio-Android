@@ -1,12 +1,86 @@
 package com.irio
 
+import androidx.compose.runtime.BroadcastFrameClock
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ModelSwitcherMotionTest {
+    @Test
+    fun openingTheModelListKeepsAVisibleFadeAfterTheFastResize() = runTest {
+        val motion = ModelSwitcherTransition()
+        val clock = BroadcastFrameClock()
+        val opening = launch(clock) { motion.animateTo(true) }
+        runCurrent()
+        var visibleFadeFrames = 0
+        repeat(60) { frame ->
+            clock.sendFrame((frame + 1) * 16_000_000L)
+            runCurrent()
+            if (modelSwitcherListOpacity(motion.phase.value) == 1f && motion.listOpacity in 0.01f..0.99f) {
+                visibleFadeFrames++
+            }
+            assertTrue(motion.listOpacity == 0f || modelSwitcherCompactOpacity(motion.phase.value) == 0f)
+        }
+        opening.join()
+        assertTrue("Configuration to model list must fade visibly, not appear during the fast resize; frames=$visibleFadeFrames",
+            visibleFadeFrames >= 5)
+        assertEquals(1f, motion.listOpacity, 0.001f)
+    }
+
+    @Test
+    fun closingKeepsItsExistingTimingAndRapidReversalsKeepTheVisibleAlpha() = runTest {
+        val motion = ModelSwitcherTransition()
+        val clock = BroadcastFrameClock()
+        var frameTime = 0L
+        fun frame() {
+            frameTime += 16_000_000L
+            clock.sendFrame(frameTime)
+            runCurrent()
+            assertTrue(motion.listOpacity == 0f || modelSwitcherCompactOpacity(motion.phase.value) == 0f)
+        }
+        var animation = launch(clock) { motion.animateTo(true) }
+        runCurrent()
+        repeat(60) { frame() }
+        animation.join()
+        animation = launch(clock) { motion.animateTo(false) }
+        runCurrent()
+        repeat(60) {
+            frame()
+            assertEquals("Returning from the model list must keep its existing fade",
+                modelSwitcherListOpacity(motion.phase.value), motion.listOpacity, 0.001f)
+        }
+        animation.join()
+        assertEquals(0f, motion.listOpacity, 0.001f)
+
+        animation = launch(clock) { motion.animateTo(true) }
+        runCurrent()
+        repeat(8) { frame() }
+        val partiallyRevealed = motion.listOpacity
+        assertTrue(partiallyRevealed in 0.01f..0.99f)
+        animation.cancel()
+        animation.join()
+        animation = launch(clock) { motion.animateTo(false) }
+        runCurrent()
+        assertEquals(partiallyRevealed, motion.listOpacity, 0.001f)
+        repeat(4) { frame() }
+        val partiallyClosed = motion.listOpacity
+        animation.cancel()
+        animation.join()
+        animation = launch(clock) { motion.animateTo(true) }
+        runCurrent()
+        assertEquals(partiallyClosed, motion.listOpacity, 0.001f)
+        repeat(60) { frame() }
+        animation.join()
+        assertEquals(1f, motion.listOpacity, 0.001f)
+    }
+
     @Test
     fun listIsDeferredDuringPopupEntranceButAvailableOnEarlyExpansion() {
         assertFalse(modelSwitcherListComposed(listPrepared = false, modelsExpanded = false))

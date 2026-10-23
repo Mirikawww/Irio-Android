@@ -190,10 +190,11 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
         delay(160)
         listPrepared = true
     }
-    val phase = remember { androidx.compose.animation.core.Animatable(0f) }
+    val motion = remember { ModelSwitcherTransition() }
+    val phase = motion.phase
     val compactInteractive by remember { derivedStateOf { modelSwitcherCompactInteractive(modelsExpanded, phase.value) } }
     LaunchedEffect(modelsExpanded) {
-        phase.animateTo(if (modelsExpanded) 1f else 0f, irioSpring<Float>(stiffness = if (modelsExpanded) 900f else 1150f))
+        motion.animateTo(modelsExpanded)
     }
     androidx.activity.compose.BackHandler(enabled = modelsExpanded) { modelsExpanded = false }
     val compactHeight = 220.dp
@@ -206,8 +207,8 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
     }.dp + 8.dp
     val listHeight = modelSwitcherListHeight(naturalHeight, configuration.screenHeightDp)
     val fastBackground by animateColorAsState(if (fastMode) accent.copy(alpha = 0.16f) else content.copy(alpha = 0.08f), irioSpring(), label = "fast background")
-    val listOpacity = { modelSwitcherListOpacity(phase.value) }
-    val listOpacityState = remember { androidx.compose.runtime.derivedStateOf { modelSwitcherListOpacity(phase.value) } }
+    val listOpacity = { motion.listOpacity }
+    val listOpacityState = remember { androidx.compose.runtime.derivedStateOf { motion.listOpacity } }
     DropdownMenuPanel(modifier = Modifier.width(width)) {
         Box(Modifier.width(width).padding(horizontal = 8.dp, vertical = 6.dp)
             .layout { measurable, constraints ->
