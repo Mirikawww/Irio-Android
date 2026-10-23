@@ -20,10 +20,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
 import coil3.request.ImageRequest
@@ -50,8 +53,19 @@ internal fun CommonsImageBlock(content: String) {
         imageStripFrames(images.map { it.optInt("width") to it.optInt("height") })
     }
     var opened by remember(content) { mutableStateOf<ChatAttachment?>(null) }
+    val horizontalOutset = LocalChatImageStripOutset.current
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 6.dp).horizontalScroll(rememberScrollState()),
+        Modifier.fillMaxWidth()
+            .layout { measurable, constraints ->
+                val outset = horizontalOutset.roundToPx()
+                val strip = measurable.measure(constraints.offset(horizontal = outset * 2))
+                layout(constraints.constrainWidth(strip.width - outset * 2), strip.height) {
+                    strip.placeRelative(-outset, 0)
+                }
+            }
+            .padding(vertical = 6.dp)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = horizontalOutset),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

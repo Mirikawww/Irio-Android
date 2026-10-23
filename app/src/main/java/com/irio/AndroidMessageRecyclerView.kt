@@ -973,33 +973,33 @@ private fun AndroidMessageRow(
     val version = callbacks.versionInfo(message)
     val editVersion = callbacks.editVersionInfo(message)
     key(message.id) {
-        MessageRow(
-            chatMessage = message,
-            reactionAnimations = callbacks.reactionAnimations,
-            newUserMessageId = callbacks.newUserMessageId,
-            uploadProgress = callbacks.uploadTracker.progress(callbacks.uploadConversationId, message.id),
-
-
-            markdownScope = callbacks.markdownScope,
-            onOpenProcess = { event -> callbacks.onOpenProcess(message.id, event) },
-            onOpenAttachment = callbacks.onOpenAttachment,
-            onCopy = { callbacks.onCopy(message) },
-            onQuote = callbacks.onQuote,
-            onAddReaction = { callbacks.onAddReaction(message) },
-            onRemoveReaction = { callbacks.onRemoveReaction(message) },
-            onRetry = { callbacks.onRetry(message) },
-            canRetry = callbacks.canRetry(message),
-            versionIndex = version.index,
-            versionCount = version.count,
-            onPrevVersion = callbacks.onPrevVersion(message),
-            onNextVersion = callbacks.onNextVersion(message),
-            isEditing = callbacks.isEditing(message),
-            onEdit = callbacks.onEdit(message),
-            editVersionIndex = editVersion.index,
-            editVersionCount = editVersion.count,
-            onPrevEditVersion = callbacks.onPrevEditVersion(message),
-            onNextEditVersion = callbacks.onNextEditVersion(message),
-            outsideContext = callbacks.outsideContext(message),
-        )
+        ChatTranscriptRow {
+            MessageRow(
+                chatMessage = message,
+                reactionAnimations = callbacks.reactionAnimations,
+                newUserMessageId = callbacks.newUserMessageId,
+                uploadProgress = callbacks.uploadTracker.progress(callbacks.uploadConversationId, message.id),
+                markdownScope = callbacks.markdownScope,
+                onOpenProcess = { event -> callbacks.onOpenProcess(message.id, event) },
+                onOpenAttachment = callbacks.onOpenAttachment,
+                onCopy = { callbacks.onCopy(message) },
+                onQuote = callbacks.onQuote,
+                onAddReaction = { callbacks.onAddReaction(message) },
+                onRemoveReaction = { callbacks.onRemoveReaction(message) },
+                onRetry = { callbacks.onRetry(message) },
+                canRetry = callbacks.canRetry(message),
+                versionIndex = version.index,
+                versionCount = version.count,
+                onPrevVersion = callbacks.onPrevVersion(message),
+                onNextVersion = callbacks.onNextVersion(message),
+                isEditing = callbacks.isEditing(message),
+                onEdit = callbacks.onEdit(message),
+                editVersionIndex = editVersion.index,
+                editVersionCount = editVersion.count,
+                onPrevEditVersion = callbacks.onPrevEditVersion(message),
+                onNextEditVersion = callbacks.onNextEditVersion(message),
+                outsideContext = callbacks.outsideContext(message),
+            )
+        }
     }
 }

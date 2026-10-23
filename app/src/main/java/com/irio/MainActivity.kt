@@ -3195,8 +3195,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     modifier = Modifier
                         .fillMaxSize()
                         .hazeSource(chatHazeState)
-                        .then(if (ChatBackgroundEnabled) Modifier else Modifier.background(background))
-                        .padding(horizontal = 16.dp),
+                        .then(if (ChatBackgroundEnabled) Modifier else Modifier.background(background)),
                     contentPaddingTop = toolbarContentPaddingPx,
                     contentPaddingBottom = composerContentPaddingPx,
                     callbacks = messageCallbacks,
