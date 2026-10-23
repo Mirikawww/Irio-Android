@@ -1398,6 +1398,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             reasoningEffort, ModelCatalog.reasoningLevels(effectiveReasoningInfo),
         )
         val requestFast = fastMode
+        val requestRetryOptions = ThemeStore.retryOptions()
         val requestWebSearch = SearchStore.isWebSearchActive(context)
         val requestSearchProvider = SearchStore.loadProvider(context)
         val requestSearchKey = SearchStore.loadApiKey(context, requestSearchProvider)
@@ -1456,6 +1457,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 var publishedBodyLength = 0
                 var publishedThinking = false
                 var streamedUsage: TokenUsage? = null
+                var retryStatus: ChatRetryStatus? = null
+                var attemptText = ""
+                var attemptAttachments = emptyList<ChatAttachment>()
+                var attemptProcess = process.checkpoint()
+                var attemptUsage: TokenUsage? = null
+                var attemptRoundBreak = false
+                var attemptToolTextLength = 0
                 // 对话模型本身是生图模型：聊天请求整条改走 /images/generations
                 // （gpt-image 等纯生图模型在 chat/completions 上游必拒），
                 // 最后一条用户消息当 prompt，结果图片作为回复附件回流。非流式，过程行只报生成状态。
@@ -1487,28 +1495,36 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             isStreaming = true,
                         ),
                     )
-                    val imageProvider = provider
-                    val genResult = withContext(Dispatchers.IO) {
-                        ProviderApi.generateImage(
-                            imageProvider,
-                            requestModel,
-                            prompt,
-                            imageContext,
-                            cancellation = requestCancellation,
-                        )
-                    }
-                    val stopped = requestCancellation.isCancelled() || genResult.error == tr("图片生成已停止")
-                    if (!stopped) {
-                        if (genResult.attachment != null) process.dropLiveTool()
-                        else process.onToolFinished(ImageGenTool.STATUS_FAILED)
-                    }
-                    when {
-                        stopped -> ChatCompletionResult(stopped = true)
-                        genResult.attachment != null -> ChatCompletionResult(
-                            attachments = listOf(genResult.attachment),
-                            model = requestModel,
-                        )
-                        else -> ChatCompletionResult(error = genResult.error ?: tr("图片生成失败"))
+                    val imageProcess = process.checkpoint()
+                    val imageRetries = ChatRetryController(requestRetryOptions, requestCancellation,
+                        onUpdate = { update ->
+                            if (update.resetAttempt) process.restore(imageProcess)
+                            if (update.retry != null) retryStatus = update.retry
+                            if (update.retryCleared) retryStatus = null
+                            withContext(Dispatchers.Main.immediate) {
+                                if (!requestCancellation.isCancelled()) replaceInConversation(
+                                    requestConversationId, reply.id, reply.copy(process = process.snapshot(),
+                                        retryStatus = retryStatus, isPending = false, isStreaming = true),
+                                )
+                            }
+                        }, downgradeToHttp1 = { false }, isEnabled = { ThemeStore.autoRetry })
+                    withContext(Dispatchers.IO) {
+                        imageRetries.runRound {
+                            val generated = ProviderApi.generateImage(provider, requestModel, prompt, imageContext,
+                                cancellation = requestCancellation)
+                            val stopped = requestCancellation.isCancelled() || generated.error == tr("图片生成已停止")
+                            if (!stopped) {
+                                if (generated.attachment != null) process.dropLiveTool()
+                                else process.onToolFinished(ImageGenTool.STATUS_FAILED)
+                            }
+                            when {
+                                stopped -> ChatCompletionResult(stopped = true)
+                                generated.attachment != null -> ChatCompletionResult(
+                                    attachments = listOf(generated.attachment), model = requestModel)
+                                else -> ChatCompletionResult(error = generated.error ?: tr("图片生成失败"),
+                                    retryable = generated.retryable)
+                            }
+                        }
                     }
                 } else if (requestModel.isBlank()) {
                     ChatCompletionResult(error = tr("请先选择一个可用模型"))
@@ -1547,6 +1563,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                         conversationId = requestConversationId,
                         cancellation = requestCancellation,
                         appContext = context,
+                        retryOptions = requestRetryOptions,
                         onUploadProgress = uploadMessageId?.let { userMessageId ->
                             { sent: Long, total: Long ->
                                 val percent = if (total > 0L) (sent * 100L / total).toInt() else 0
@@ -1571,8 +1588,28 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             }
                         },
                         onUpdate = update@{ update ->
+                            if (update.attemptStarted) {
+                                attemptText = streamedText
+                                attemptAttachments = streamedAttachments
+                                attemptProcess = process.checkpoint()
+                                attemptUsage = streamedUsage
+                                attemptRoundBreak = roundBreakPending
+                                attemptToolTextLength = streamedToolCalls.length
+                                return@update
+                            }
+                            if (update.resetAttempt) {
+                                streamedText = attemptText
+                                streamedAttachments = attemptAttachments
+                                process.restore(attemptProcess)
+                                streamedUsage = attemptUsage
+                                roundBreakPending = attemptRoundBreak
+                                streamedToolCalls.setLength(attemptToolTextLength)
+                                lastUploadPercent = -1
+                            }
+                            if (update.retry != null) retryStatus = update.retry
+                            if (update.retryCleared) retryStatus = null
                             update.toolRecord?.let { toolRecords = toolRecords + it }
-                            val advanced = advanceReplyNotice(notice, update)
+                            val advanced = update.retry?.let { chatRetryLine(it) } ?: advanceReplyNotice(notice, update)
                             if (advanced != notice) {
                                 notice = advanced
                                 val step = advanced
@@ -1628,7 +1665,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             // 停止后不再把普通增量绘制到 UI；上面的终止事件仍用于闭合过程状态。
                             if (cancelled) return@update
                             val now = System.currentTimeMillis()
-                            val publish = shouldPublishStreamUpdate(
+                            val publish = update.retry != null || update.retryCleared || update.resetAttempt || shouldPublishStreamUpdate(
                                 nowMs = now,
                                 lastPublishAt = lastPublishAt,
                                 deltaLength = update.delta.length,
@@ -1671,12 +1708,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                         attachments = attachments,
                                         usage = usage,
                                         toolRecords = toolRecords,
+                                        retryStatus = retryStatus,
                                         finishedAt = if (update.done && snapshot.none { it.live }) {
                                             System.currentTimeMillis()
                                         } else {
                                             0L
                                         },
-                                        isPending = toolRecords.isEmpty() && !hasReplyContent(text, attachments, snapshot),
+                                        isPending = retryStatus == null && toolRecords.isEmpty() && !hasReplyContent(text, attachments, snapshot),
                                         isStreaming = (!update.done && !requestCancellation.isCancelled()) ||
                                             snapshot.any { it.live },
                                     )
@@ -1712,7 +1750,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 result.stopped -> {
                     val finalText = streamedText.ifBlank { current?.text.orEmpty() }
                     val finalAttachments = streamedAttachments.ifEmpty { current?.attachments.orEmpty() }
-                    if (toolRecords.isEmpty() && !hasReplyContent(finalText, finalAttachments, finalProcess)) {
+                    if (retryStatus == null && toolRecords.isEmpty() && !hasReplyContent(finalText, finalAttachments, finalProcess)) {
                         null
                     } else {
                         reply.copy(
@@ -1721,6 +1759,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             attachments = finalAttachments,
                             usage = finalUsage,
                             toolRecords = toolRecords,
+                            retryStatus = retryStatus?.copy(running = false, remainingSeconds = null, stopped = true, downgradedToHttp1 = false),
+                            isError = retryStatus != null,
                             finishedAt = finishedAt,
                             isPending = false,
                             isStreaming = false,
@@ -1728,9 +1768,11 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     }
                 }
                 result.error != null -> reply.copy(
-                    text = result.error,
+                    text = streamedText,
                     process = finalProcess.map { it.copy(live = false) },
                     toolRecords = toolRecords,
+                    attachments = streamedAttachments,
+                    retryStatus = retryStatus ?: ChatRetryStatus(result.error, stopped = true),
                     usage = finalUsage,
                     finishedAt = finishedAt,
                     isError = true,
@@ -1770,11 +1812,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 currentConversation = currentConversation.copy(tokenUsage = finalMessage.usage)
                             }
                             // 首轮成功回复后生成 AI 标题（异步，不阻塞 UI）
-                            maybeGenerateTitle(
-                                conversationId = requestConversationId,
-                                userText = requestSource.lastOrNull { it.fromUser && !it.hidden }?.text.orEmpty(),
-                                assistantText = finalMessage.text,
-                            )
+                            if (result.error == null && !result.stopped) {
+                                maybeGenerateTitle(
+                                    conversationId = requestConversationId,
+                                    userText = requestSource.lastOrNull { it.fromUser && !it.hidden }?.text.orEmpty(),
+                                    assistantText = finalMessage.text,
+                                )
+                            }
                             val completed = result.error == null && !result.stopped
                             if (completed) {
                                 val preview = replyNotificationPreview(finalMessage.text).ifEmpty {
@@ -2143,7 +2187,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
             responseToUserId = userMessage.id,
         )
         val history = contextMessages(messages).filterNot { it.isError || it.isPending }
-        messages = messages + userMessage + reply
+        messages = dismissReplyErrors(messages) + userMessage + reply
         persistCurrent(messages)
         pendingAttachments = emptyList()
         composerStatus = null
@@ -3692,7 +3736,7 @@ internal fun MessageRow(
                         onOpen = onOpenAttachment,
                     )
                 }
-                if (chatMessage.isError && chatMessage.text.isNotBlank()) {
+                if (chatMessage.isError && chatMessage.retryStatus == null && chatMessage.text.isNotBlank()) {
                     chatMessage.process.filterNot { it.belowText }.let { events ->
                         ProcessRun(events, onOpen = onOpenProcess, onQuote = onQuote)
                     }
@@ -3701,12 +3745,7 @@ internal fun MessageRow(
                             LocalTextSelectionColors provides Theme[textSelectionColors][defaultTextSelectionColors],
                         ) {
                             QuoteSelectionContainer(onQuote = onQuote) {
-                                Text(
-                                    chatMessage.text,
-                                    color = irioErrorTextColor(),
-                                    fontSize = 17.sp,
-                                    lineHeight = 26.sp,
-                                )
+                                ReplyErrorRow(ChatRetryStatus(chatMessage.text, stopped = true))
                             }
                         }
                     }
@@ -3753,7 +3792,8 @@ internal fun MessageRow(
                             }
                         }
                     }
-                    if ((chatMessage.isPending || chatMessage.isStreaming) &&
+                    chatMessage.retryStatus?.let { ReplyErrorRow(it) }
+                    if (chatMessage.retryStatus == null && (chatMessage.isPending || chatMessage.isStreaming) &&
                         chatMessage.text.isBlank() &&
                         chatMessage.process.none { !isSilentPronunciationLookup(it.toolName, it.toolOutcome) &&
                             (it.live || it.kind == ProcessEventKind.BUBBLE || it.toolName == CommonsImageTools.SHOW) }

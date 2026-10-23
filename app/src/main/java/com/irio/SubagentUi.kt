@@ -303,6 +303,7 @@ private fun SubagentScreen(id: String, onBack: () -> Unit) {
             if (live.isNotBlank() || liveProcess.isNotEmpty()) {
                 SubagentTranscript(live, liveProcess, streaming = true, renderScope = renderScope, onOpen = onOpenProcess)
             }
+            session?.retryStatus?.let { ReplyErrorRow(it) }
         }
         Column(
             Modifier

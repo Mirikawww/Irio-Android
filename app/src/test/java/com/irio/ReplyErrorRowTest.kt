@@ -1,0 +1,130 @@
+package com.irio
+
+import android.view.View
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.BroadcastFrameClock
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Recomposer
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.ViewRootForTest
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsProperties.ContentDescription
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
+import com.composables.ui.components.Text
+import com.composables.ui.theme.colors
+import com.composables.ui.theme.mutedColor
+import com.composables.ui.theme.onBackgroundColor
+import com.composeunstyled.theme.Theme
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.*
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.Robolectric
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@OptIn(ExperimentalCoroutinesApi::class, ExperimentalComposeUiApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33], manifest = Config.NONE)
+class ReplyErrorRowTest {
+    @Test fun onlyExclamationIsRedAndRetryMatchesVersionTextBelowReason() = runTest {
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        val clock = BroadcastFrameClock()
+        val recomposer = Recomposer(coroutineContext + clock)
+        val runner = launch(clock) { recomposer.runRecomposeAndApplyChanges() }
+        val view = ComposeView(controller.get())
+        var normal = Color.Unspecified
+        var red = Color.Unspecified
+        val retry = ChatRetryStatus("fixture error", 2, remainingSeconds = 8)
+        try {
+            view.setParentCompositionContext(recomposer)
+            controller.get().setContentView(view)
+            view.setContent {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    AppTheme {
+                        normal = Theme[colors][onBackgroundColor]
+                        red = irioErrorTextColor()
+                        Column {
+                            ReplyErrorRow(retry)
+                            Text("version reference", color = Theme[colors][mutedColor])
+                        }
+                    }
+                }
+            }
+            repeat(8) { index ->
+                Snapshot.sendApplyNotifications()
+                runCurrent()
+                clock.sendFrame((index + 1) * 16_000_000L)
+                runCurrent()
+                view.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(300, View.MeasureSpec.EXACTLY))
+                view.layout(0, 0, 360, 300)
+            }
+            fun descend(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descend)
+            val nodes = descend((view.getChildAt(0) as ViewRootForTest).semanticsOwner.unmergedRootSemanticsNode)
+            fun text(value: String) = nodes.single {
+                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { entry -> entry.text == value }
+            }
+            fun color(node: SemanticsNode): Color {
+                val results = mutableListOf<TextLayoutResult>()
+                node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(results)
+                return results.single().layoutInput.style.color
+            }
+            val icon = nodes.single { it.config.getOrElse(ContentDescription) { emptyList() }.contains(tr("重试状态")) }
+            val reason = text("fixture error")
+            val retryNode = text(chatRetryLine(retry))
+            assertEquals(normal, color(reason))
+            assertNotEquals(red, color(reason))
+            assertEquals(color(text("version reference")), color(retryNode))
+            assertTrue(reason.boundsInRoot.left > icon.boundsInRoot.left)
+            assertEquals(reason.boundsInRoot.left, retryNode.boundsInRoot.left, 0.5f)
+            assertTrue(retryNode.boundsInRoot.top > reason.boundsInRoot.top)
+        } finally {
+            view.disposeComposition()
+            recomposer.close()
+            runner.cancel()
+            controller.pause().stop().destroy()
+        }
+    }
+
+    @Test fun retryStatesUseTheMatchingLucideIcons() {
+        assertEquals("lucide:cloud-alert", replyErrorIcon(ChatRetryStatus("e", remainingSeconds = 4)).name)
+        assertEquals("lucide:cloud-backup", replyErrorIcon(ChatRetryStatus("e", running = true)).name)
+        assertEquals("lucide:cloud-off", replyErrorIcon(ChatRetryStatus("e", stopped = true)).name)
+    }
+
+    @Test fun retryPreferencesPersistAndClampToTheirSupportedRanges() {
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        val context = controller.get()
+        ThemeStore.ensureLoaded(context)
+        val original = ThemeStore.retryOptions()
+        try {
+            ThemeStore.saveAutoRetry(context, false)
+            ThemeStore.saveRetryLimit(context, 100)
+            ThemeStore.saveRetryCooldown(context, -1)
+            assertEquals(ChatRetryOptions(false, 20, 0), ThemeStore.retryOptions())
+            val prefs = context.getSharedPreferences("appearance_settings", 0)
+            assertFalse(prefs.getBoolean("auto_retry", true))
+            assertEquals(20, prefs.getInt("retry_limit", 0))
+            assertEquals(0, prefs.getInt("retry_cooldown_seconds", -1))
+            ThemeStore.saveRetryLimit(context, 0)
+            ThemeStore.saveRetryCooldown(context, 999)
+            assertEquals(ChatRetryOptions(false, 1, 300), ThemeStore.retryOptions())
+        } finally {
+            ThemeStore.saveAutoRetry(context, original.enabled)
+            ThemeStore.saveRetryLimit(context, original.maxRetries)
+            ThemeStore.saveRetryCooldown(context, original.cooldownSeconds)
+            controller.pause().stop().destroy()
+        }
+    }
+}

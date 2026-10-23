@@ -6,6 +6,11 @@ import org.json.JSONObject
 internal object ChatProtocol {
     fun parseChatCompletions(data: String): ChatStreamUpdate? = runCatching {
         val response = JSONObject(data)
+        val error = response.opt("error")
+        if (error != null && error != JSONObject.NULL) {
+            return@runCatching ChatStreamUpdate(error = (error as? JSONObject)?.optString("message")
+                ?.takeIf { it.isNotBlank() } ?: error.toString())
+        }
         val choice = response.optJSONArray("choices")?.optJSONObject(0)
         val delta = choice?.optJSONObject("delta")
         val message = choice?.optJSONObject("message")

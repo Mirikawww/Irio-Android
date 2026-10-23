@@ -57,21 +57,23 @@ internal object IrioHttp {
     }
 
     /**
-     * 上游用 HTTP/2 RST_STREAM(PROTOCOL_ERROR) 掐掉还没吐出正文的流时，这条连接不能再复用。
+     * 上游用 HTTP/2 RST_STREAM(PROTOCOL_ERROR) 掐掉流时，这条连接不能再复用。
      * 下次 [clientFor] 只协商 HTTP/1.1。
      */
-    fun downgradeToHttp1(scope: String) {
+    @Synchronized
+    fun downgradeToHttp1(scope: String): Boolean {
         if (scope.isEmpty()) {
-            if (baseHttp1) return
+            if (baseHttp1) return false
             baseHttp1 = true
             val previous = baseClient
             baseClient = previous.newBuilder().protocols(listOf(Protocol.HTTP_1_1)).build()
             closeLater(listOf(previous))
-            return
+            return true
         }
-        if (!http1Scopes.add(scope)) return
+        if (!http1Scopes.add(scope)) return false
         val previous = scoped.remove(scope)
         if (previous != null) closeLater(listOf(previous))
+        return true
     }
 
     private fun newScopeClient(http1: Boolean): OkHttpClient {

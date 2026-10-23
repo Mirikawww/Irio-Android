@@ -40,6 +40,7 @@ data class ChatMessage(
     val userReaction: String = "",
     /** 完整工具记录，与界面过程行和正文分别保存。 */
     val toolRecords: List<ChatToolRecord> = emptyList(),
+    val retryStatus: ChatRetryStatus? = null,
 ) {
     val groupId: Long get() = retryGroup.takeIf { it != 0L } ?: id
     /** 用户版本组键：编辑过取 editGroup，否则取 id（单条即自己）。 */
@@ -263,6 +264,7 @@ object ConversationStore {
                                 if (message.summaryUntilId != 0L) put("summaryUntilId", message.summaryUntilId)
                             }
                             put("isError", message.isError)
+                            message.retryStatus?.let { put("retryStatus", chatRetryJson(it)) }
                             put("retryGroup", message.groupId)
                             put("selected", message.selected)
                             message.responseToUserId?.let { put("responseToUserId", it) }
@@ -359,7 +361,8 @@ object ConversationStore {
                         attachments = attachments,
                         process = processEventsFrom(item),
                         toolRecords = toolRecordsFrom(item),
-                        isError = item.optBoolean("isError"),
+                        isError = item.optBoolean("isError") || item.has("retryStatus"),
+                        retryStatus = chatRetryFromJson(item.optJSONObject("retryStatus")),
                         retryGroup = item.optLong("retryGroup").takeIf { it != 0L } ?: item.optLong("id"),
                         selected = if (item.has("selected")) item.optBoolean("selected") else true,
                         responseToUserId = item.optLong("responseToUserId").takeIf { it != 0L },

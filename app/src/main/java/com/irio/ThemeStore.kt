@@ -158,6 +158,9 @@ object ThemeStore {
     private const val MERGE_TOOL_CALLS_KEY = "merge_tool_calls"
     private const val SHOW_USER_AVATAR_KEY = "show_user_avatar"
     private const val APP_FONT_KEY = "app_font"
+    private const val AUTO_RETRY_KEY = "auto_retry"
+    private const val RETRY_LIMIT_KEY = "retry_limit"
+    private const val RETRY_COOLDOWN_KEY = "retry_cooldown_seconds"
     private const val LEGACY_PREFS = "provider_settings"
     private const val LEGACY_KEY = "theme_preference"
 
@@ -238,6 +241,15 @@ object ThemeStore {
     var appFont by mutableStateOf(AppFont.SANS)
         private set
 
+    var autoRetry by mutableStateOf(true)
+        private set
+    var retryLimit by mutableStateOf(5)
+        private set
+    var retryCooldownSeconds by mutableStateOf(10)
+        private set
+
+    fun retryOptions(): ChatRetryOptions = ChatRetryOptions(autoRetry, retryLimit, retryCooldownSeconds)
+
     @Volatile
     private var loaded = false
 
@@ -273,6 +285,9 @@ object ThemeStore {
             mergeToolCalls = appearance.getBoolean(MERGE_TOOL_CALLS_KEY, false)
             showUserAvatar = appearance.getBoolean(SHOW_USER_AVATAR_KEY, false)
             appFont = AppFont.fromStored(appearance.getString(APP_FONT_KEY, null))
+            autoRetry = appearance.getBoolean(AUTO_RETRY_KEY, true)
+            retryLimit = appearance.getInt(RETRY_LIMIT_KEY, 5).coerceIn(1, 20)
+            retryCooldownSeconds = appearance.getInt(RETRY_COOLDOWN_KEY, 10).coerceIn(0, 300)
             if (appearance.getString(KEY, null) == null && stored != null) {
                 appearance.edit().putString(KEY, stored).apply()
             }
@@ -473,5 +488,26 @@ object ThemeStore {
             .edit()
             .putString(APP_FONT_KEY, value.stored)
             .apply()
+    }
+
+    fun saveAutoRetry(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        autoRetry = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(AUTO_RETRY_KEY, enabled).apply()
+    }
+
+    fun saveRetryLimit(context: Context, value: Int) {
+        ensureLoaded(context)
+        retryLimit = value.coerceIn(1, 20)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt(RETRY_LIMIT_KEY, retryLimit).apply()
+    }
+
+    fun saveRetryCooldown(context: Context, value: Int) {
+        ensureLoaded(context)
+        retryCooldownSeconds = value.coerceIn(0, 300)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt(RETRY_COOLDOWN_KEY, retryCooldownSeconds).apply()
     }
 }

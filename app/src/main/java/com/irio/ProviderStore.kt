@@ -544,6 +544,7 @@ data class ImageGenResult(
     val attachment: ChatAttachment? = null,
     val revisedPrompt: String = "",
     val error: String? = null,
+    val retryable: Boolean = false,
 )
 
 object ProviderApi {
@@ -740,7 +741,8 @@ object ProviderApi {
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
             if (status !in 200..299) {
-                ImageGenResult(error = apiError(body).ifBlank { tr("图片生成失败（HTTP %s）").format(status) })
+                ImageGenResult(error = apiError(body).ifBlank { tr("图片生成失败（HTTP %s）").format(status) },
+                    retryable = retryableHttpStatus(status))
             } else {
                 if (config.protocol.isGoogleGemini) {
                     val parsed = if (config.protocol == ProviderProtocol.GEMINI_INTERACTIONS) {
@@ -755,7 +757,7 @@ object ProviderApi {
             }
         } catch (error: Exception) {
             if (cancellation?.isCancelled() == true) ImageGenResult(error = tr("图片生成已停止"))
-            else ImageGenResult(error = error.message ?: tr("无法连接到图片端点"))
+            else ImageGenResult(error = error.message ?: tr("无法连接到图片端点"), retryable = retryableConnectionFailure(error))
         } finally {
             cancellation?.detach(connection)
             connection.disconnect()
@@ -818,7 +820,8 @@ object ProviderApi {
                     ?: ImageGenResult(error = tr("图片端点没有返回图片"))
                 // 端点不支持 edits（路由不存在/方法不允许/类型不收）→ 让调用方回落 generations
                 status == 404 || status == 405 || status == 415 -> null
-                else -> ImageGenResult(error = apiError(body).ifBlank { tr("图片生成失败（HTTP %s）").format(status) })
+                else -> ImageGenResult(error = apiError(body).ifBlank { tr("图片生成失败（HTTP %s）").format(status) },
+                    retryable = retryableHttpStatus(status))
             }
         } catch (error: Exception) {
             if (cancellation?.isCancelled() == true) ImageGenResult(error = tr("图片生成已停止"))

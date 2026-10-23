@@ -163,7 +163,7 @@ class ChatApiOkHttpTest {
             apiKey = "k",
             protocol = ProviderProtocol.CHAT_COMPLETIONS,
         )
-        val result = chat(provider, "conv-reset", "hello")
+        val result = chat(provider, "conv-reset", "hello", ChatRetryOptions(cooldownSeconds = 0))
         assertEquals(null, result.error)
         assertEquals("hi", result.content)
         assertEquals(2, attempts)
@@ -353,7 +353,8 @@ class ChatApiOkHttpTest {
                 "data: [DONE]\n\n",
         )
 
-    private suspend fun chat(provider: ProviderConfig, scope: String, text: String) = ChatApi.streamChat(
+    private suspend fun chat(provider: ProviderConfig, scope: String, text: String,
+        retries: ChatRetryOptions = ChatRetryOptions(enabled = false)) = ChatApi.streamChat(
         provider = provider,
         model = "m",
         messages = listOf(ChatRequestMessage(role = "user", text = text)),
@@ -362,5 +363,6 @@ class ChatApiOkHttpTest {
         connectionScope = scope,
         cancellation = ChatRequestCancellation(),
         onUpdate = {},
+        retryOptions = retries,
     )
 }

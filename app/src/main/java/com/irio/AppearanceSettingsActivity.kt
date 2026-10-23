@@ -677,6 +677,30 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
             }
             SettingsSectionCard {
                 Row(
+                    modifier = Modifier.settingsSearchAnchor("appearance.retry", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(tr("自动重试"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
+                    Switch(checked = ThemeStore.autoRetry, onCheckedChange = { ThemeStore.saveAutoRetry(context, it) })
+                }
+                SettingsSlider(
+                    modifier = Modifier.settingsSearchAnchor("appearance.retry.limit"),
+                    label = tr("重试次数上限"),
+                    value = ThemeStore.retryLimit,
+                    valueRange = 1..20,
+                    onValueChange = { ThemeStore.saveRetryLimit(context, it) },
+                )
+                SettingsSlider(
+                    modifier = Modifier.settingsSearchAnchor("appearance.retry.cooldown", edge = SettingsSearchEdge.Bottom),
+                    label = tr("重试冷却时长"),
+                    value = ThemeStore.retryCooldownSeconds,
+                    valueRange = 0..300,
+                    valueLabel = { "${it}s" },
+                    onValueChange = { ThemeStore.saveRetryCooldown(context, it) },
+                )
+            }
+            SettingsSectionCard {
+                Row(
                     modifier = Modifier.settingsSearchAnchor("appearance.glyph", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

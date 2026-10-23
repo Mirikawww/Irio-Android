@@ -41,6 +41,7 @@ internal data class SubagentSnapshot(
     val lines: List<SubagentLine> = emptyList(),
     val liveText: String = "",
     val liveProcess: List<ProcessEvent> = emptyList(),
+    val retryStatus: ChatRetryStatus? = null,
 )
 
 internal fun SubagentSnapshot.toJson(): String = JSONObject()
@@ -51,6 +52,7 @@ internal fun SubagentSnapshot.toJson(): String = JSONObject()
     .put("state", state.name)
     .put("liveText", liveText)
     .put("liveProcess", subagentProcessJson(liveProcess))
+    .apply { retryStatus?.let { put("retryStatus", chatRetryJson(it)) } }
     .put("lines", JSONArray().apply {
         lines.forEach { line ->
             put(
@@ -90,6 +92,7 @@ internal fun subagentSnapshot(json: String): SubagentSnapshot? {
         lines = lines,
         liveText = parsed.optString("liveText"),
         liveProcess = subagentProcessFrom(parsed.optJSONArray("liveProcess")),
+        retryStatus = chatRetryFromJson(parsed.optJSONObject("retryStatus")),
     )
 }
 
@@ -130,9 +133,28 @@ internal class SubagentTurn {
     private val tracker = ProcessTracker()
     private var body = ""
     private var roundBreakPending = false
+    private var attemptBody = ""
+    private var attemptProcess = tracker.checkpoint()
+    private var attemptRoundBreak = false
+    var retryStatus: ChatRetryStatus? = null
+        private set
 
     fun apply(update: ChatStreamUpdate): Boolean {
-        var changed = false
+        if (update.retry != null) retryStatus = update.retry
+        if (update.retryCleared) retryStatus = null
+        if (update.attemptStarted) {
+            attemptBody = body
+            attemptProcess = tracker.checkpoint()
+            attemptRoundBreak = roundBreakPending
+            return false
+        }
+        if (update.resetAttempt) {
+            body = attemptBody
+            tracker.restore(attemptProcess)
+            roundBreakPending = attemptRoundBreak
+            return true
+        }
+        var changed = update.retry != null || update.retryCleared
         if (update.newRound && body.isNotEmpty()) roundBreakPending = true
         if (update.thinkingDelta.isNotEmpty()) {
             tracker.onThinkingDelta(update.thinkingDelta)
@@ -489,10 +511,11 @@ internal object SubagentHub {
                     conversationId = context.conversationId,
                     cancellation = cancellation,
                     appContext = context.appContext,
+                    retryOptions = ThemeStore.retryOptions(),
                     onUpdate = { update ->
                         if (turn.apply(update)) {
                             sessions[id]?.let {
-                                publish(it.copy(liveText = turn.text(), liveProcess = turn.process()), persist = false)
+                                publish(it.copy(liveText = turn.text(), liveProcess = turn.process(), retryStatus = turn.retryStatus), persist = false)
                             }
                         }
                     },
@@ -510,14 +533,16 @@ internal object SubagentHub {
                 if (reply == null) lines else lines + reply
             if (cancellation.isCancelled() || current.state == SubagentState.FAILED) {
                 publish(
-                    current.copy(state = SubagentState.FAILED, lines = withReply(current.lines), liveText = "", liveProcess = emptyList()),
+                    current.copy(state = SubagentState.FAILED, lines = withReply(current.lines), liveText = "", liveProcess = emptyList(),
+                        retryStatus = turn.retryStatus?.copy(running = false, remainingSeconds = null, stopped = true, downgradedToHttp1 = false)),
                     persist = true,
                 )
                 return
             }
             if (result.error != null) {
                 publish(
-                    current.copy(state = SubagentState.FAILED, lines = withReply(current.lines), liveText = "", liveProcess = emptyList()),
+                    current.copy(state = SubagentState.FAILED, lines = withReply(current.lines), liveText = "", liveProcess = emptyList(),
+                        retryStatus = turn.retryStatus ?: ChatRetryStatus(result.error, stopped = true)),
                     persist = true,
                 )
                 return
@@ -527,7 +552,7 @@ internal object SubagentHub {
             pending = drain(id)
             if (pending.isEmpty()) {
                 publish(
-                    current.copy(state = SubagentState.COMPLETED, lines = replied, liveText = "", liveProcess = emptyList()),
+                    current.copy(state = SubagentState.COMPLETED, lines = replied, liveText = "", liveProcess = emptyList(), retryStatus = null),
                     persist = true,
                 )
                 return
@@ -539,6 +564,7 @@ internal object SubagentHub {
                     lines = replied + pending.map { SubagentLine(true, it) },
                     liveText = "",
                     liveProcess = emptyList(),
+                    retryStatus = null,
                 ),
                 persist = true,
             )

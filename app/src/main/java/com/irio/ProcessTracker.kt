@@ -12,6 +12,27 @@ internal class ProcessTracker {
 
     fun snapshot(): List<ProcessEvent> = events.toList()
 
+    data class Checkpoint(
+        val events: List<ProcessEvent>, val nextId: Long,
+        val thinkingId: Long?, val searchId: Long?, val toolId: Long?,
+        val thinkingStartedAt: Long?, val outputStarted: Boolean, val outputLength: Int,
+    )
+
+    fun checkpoint() = Checkpoint(snapshot(), nextId, liveThinkingId, liveSearchId, liveToolId,
+        thinkingStartedAt, outputStarted, outputLength)
+
+    fun restore(checkpoint: Checkpoint) {
+        events.clear()
+        events.addAll(checkpoint.events)
+        nextId = checkpoint.nextId
+        liveThinkingId = checkpoint.thinkingId
+        liveSearchId = checkpoint.searchId
+        liveToolId = checkpoint.toolId
+        thinkingStartedAt = checkpoint.thinkingStartedAt
+        outputStarted = checkpoint.outputStarted
+        outputLength = checkpoint.outputLength
+    }
+
     fun onThinkingDelta(delta: String, now: Long = System.currentTimeMillis()) {
         if (delta.isEmpty()) return
         liveSearchId?.let { finishSearch(it) }

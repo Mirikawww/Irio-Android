@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import okhttp3.Call
@@ -77,6 +79,8 @@ data class ChatCompletionResult(
     val searchPages: Int = 0,
     val usage: TokenUsage? = null,
     val geminiParts: List<String> = emptyList(),
+    val retryable: Boolean = false,
+    val http1Fallback: Boolean = false,
 )
 
 data class ChatStreamUpdate(
@@ -124,6 +128,10 @@ data class ChatStreamUpdate(
      * 展示图片、创建/查看子智能体、表情回应这些调用在对话里没有状态提示。
      */
     val notifyTool: String = "",
+    val retry: ChatRetryStatus? = null,
+    val retryCleared: Boolean = false,
+    val attemptStarted: Boolean = false,
+    val resetAttempt: Boolean = false,
 )
 
 data class ToolCallDelta(
@@ -144,6 +152,7 @@ class MutableToolCall(
 )
 
 class ChatRequestCancellation {
+    private val cancelledSignal = CompletableDeferred<Unit>()
     private val connections = mutableSetOf<HttpURLConnection>()
     private val calls = mutableSetOf<Call>()
     private var cancelled = false
@@ -161,6 +170,7 @@ class ChatRequestCancellation {
     @Synchronized
     fun cancel() {
         cancelled = true
+        cancelledSignal.complete(Unit)
         connections.forEach { it.disconnect() }
         calls.forEach { it.cancel() }
         connections.clear()
@@ -168,6 +178,12 @@ class ChatRequestCancellation {
     }
 
     @Synchronized fun isCancelled(): Boolean = cancelled
+
+    suspend fun waitForRetry(millis: Long): Boolean {
+        if (isCancelled()) return false
+        withTimeoutOrNull(millis) { cancelledSignal.await() }
+        return !isCancelled()
+    }
 
     @Synchronized
     fun detach(connection: HttpURLConnection) { connections.remove(connection) }
@@ -203,6 +219,7 @@ object ChatApi {
         appContext: android.content.Context? = null,
         onReaction: suspend (Long, String) -> Boolean = { _, _ -> false },
         onUploadProgress: ((sent: Long, total: Long) -> Unit)? = null,
+        retryOptions: ChatRetryOptions = ChatRetryOptions(enabled = false),
     ): ChatCompletionResult {
         val history = (if (toolRegistry.handles(ReactionTool.NAME)) reactionRequestMessages(messages) else messages).toMutableList()
         var searchPages = 0
@@ -235,12 +252,17 @@ object ChatApi {
             fastMode = fastMode,
         )
         var roundIndex = 0
+        val retries = ChatRetryController(
+            retryOptions, cancellation, onUpdate,
+            downgradeToHttp1 = { IrioHttp.downgradeToHttp1(connectionScope) },
+            isEnabled = { retryOptions.enabled && (appContext == null || ThemeStore.autoRetry) },
+        )
         while (rounds == ToolStore.MAX_ROUNDS_MIN || roundIndex < rounds) {
             if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true, searchPages = searchPages)
             if (roundIndex > 0) {
                 onUpdate(ChatStreamUpdate(newRound = true))
             }
-            val turn = streamOnce(
+            val turn = retries.runRound { attemptUpdate -> streamOnce(
                 provider = provider,
                 model = model,
                 messages = if (includeTimestamps) history else history.map { it.copy(createdAt = 0L) },
@@ -250,10 +272,10 @@ object ChatApi {
                 toolRegistry = toolRegistry,
                 connectionScope = connectionScope,
                 cancellation = cancellation,
-                onUpdate = onUpdate,
+                onUpdate = attemptUpdate,
                 onUploadProgress = if (roundIndex == 0) onUploadProgress else null,
                 allowEmptyCompletion = displayedBubbles,
-            )
+            ) }
             if (turn.usage != null) lastUsage = turn.usage
             if (turn.error != null || turn.stopped || turn.toolCalls.isEmpty()) {
                 return turn.copy(searchPages = searchPages, usage = turn.usage ?: lastUsage)
@@ -526,19 +548,9 @@ object ChatApi {
         cancellation: ChatRequestCancellation,
         onUpdate: suspend (ChatStreamUpdate) -> Unit,
         onUploadProgress: ((sent: Long, total: Long) -> Unit)? = null,
-        http1Retried: Boolean = false,
         allowEmptyCompletion: Boolean = false,
     ): ChatCompletionResult {
-        var delivered = false
         val publish: suspend (ChatStreamUpdate) -> Unit = { update ->
-            if (
-                update.delta.isNotEmpty() ||
-                update.thinkingDelta.isNotEmpty() ||
-                update.toolCallDeltas.isNotEmpty() ||
-                update.attachments.isNotEmpty()
-            ) {
-                delivered = true
-            }
             onUpdate(update)
         }
         val bodyBytes = try {
@@ -562,7 +574,9 @@ object ChatApi {
         } catch (_: Exception) {
             return ChatCompletionResult(error = tr("端点 URL 无效"))
         }
-        val call = provider.requestClient(connectionScope).newCall(request)
+        // The application owns retry counting, cooldown and cancellation for chat POSTs.
+        val call = provider.requestClient(connectionScope).newBuilder()
+            .retryOnConnectionFailure(false).build().newCall(request)
         cancellation.attach(call)
         var response: okhttp3.Response? = null
 
@@ -573,7 +587,10 @@ object ChatApi {
             if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
             if (status !in 200..299) {
                 val err = response.body?.string().orEmpty()
-                ChatCompletionResult(error = apiError(err).ifBlank { tr("请求失败（HTTP %s）").format(status) })
+                ChatCompletionResult(
+                    error = apiError(err).ifBlank { tr("请求失败（HTTP %s）").format(status) },
+                    retryable = retryableHttpStatus(status),
+                )
             } else {
             var responseModel = model
             val streamedContent = StringBuilder()
@@ -609,7 +626,7 @@ object ChatApi {
                         anthropicToolIndex = { anthropicToolIndex },
                     )) ?: return false
                     if (update.error != null) {
-                        throw StreamFailedException(update.error)
+                        throw StreamFailedException(update.error, retryableProviderError(payload))
                     }
                     if (update.model.isNotBlank()) responseModel = update.model
                     if (update.delta.isNotEmpty()) streamedContent.append(update.delta)
@@ -703,7 +720,7 @@ object ChatApi {
                     completedTools.isEmpty() &&
                     !(allowEmptyCompletion && terminalUpdateSent &&
                         finishReason !in setOf("length", "max_tokens", "MAX_TOKENS", "tool_calls", "tool_use", "function_call")) ->
-                    ChatCompletionResult(error = tr("端点返回了空回复"))
+                    ChatCompletionResult(error = tr("端点返回了空回复"), retryable = true)
                 else -> ChatCompletionResult(
                     content = streamedContent.toString(),
                     thinking = streamedThinking.toString(),
@@ -716,31 +733,18 @@ object ChatApi {
             }
         } catch (failed: StreamFailedException) {
             if (cancellation.isCancelled()) ChatCompletionResult(stopped = true)
-            else ChatCompletionResult(error = failed.message)
+            else ChatCompletionResult(error = failed.message, retryable = failed.retryable)
         } catch (cancelled: CancellationException) {
             if (cancellation.isCancelled()) ChatCompletionResult(stopped = true) else throw cancelled
         } catch (error: Exception) {
             if (cancellation.isCancelled() || currentCoroutineContext()[Job]?.isCancelled == true) {
                 ChatCompletionResult(stopped = true)
-            } else if (!http1Retried && !delivered && isHttp2StreamReset(error)) {
-                IrioHttp.downgradeToHttp1(connectionScope)
-                streamOnce(
-                    provider = provider,
-                    model = model,
-                    messages = messages,
-                    reasoningEffort = reasoningEffort,
-                    fastMode = fastMode,
-                    systemPrompt = systemPrompt,
-                    toolRegistry = toolRegistry,
-                    connectionScope = connectionScope,
-                    cancellation = cancellation,
-                    onUpdate = onUpdate,
-                    onUploadProgress = onUploadProgress,
-                    http1Retried = true,
-                    allowEmptyCompletion = allowEmptyCompletion,
-                )
             } else {
-                ChatCompletionResult(error = error.message ?: tr("无法连接到端点"))
+                ChatCompletionResult(
+                    error = error.message ?: tr("无法连接到端点"),
+                    retryable = retryableConnectionFailure(error),
+                    http1Fallback = isHttp2StreamReset(error),
+                )
             }
         } finally {
             cancellation.detach(call)
@@ -1646,7 +1650,7 @@ internal object MemoryTool {
     }
 }
 
-private class StreamFailedException(message: String) : Exception(message)
+private class StreamFailedException(message: String, val retryable: Boolean) : Exception(message)
 
 internal val IMAGE_MIME_TYPES = setOf(
     "image/png",
