@@ -93,10 +93,17 @@ internal fun modelSwitcherExtension(phase: Float): Float {
     return IrioEaseOut.transform(phase.coerceIn(0f, 1f))
 }
 
-/** Finish the whole-panel exchange during the first, fastest portion of the extension. */
-internal fun modelSwitcherListOpacity(extension: Float): Float {
-    val p = ((extension - 0.04f) / 0.46f).coerceIn(0f, 1f)
-    return IrioEaseInOut.transform(p)
+/** The non-overlapping ranges fade through invisibility in either direction, including reversals. */
+internal fun modelSwitcherListOpacity(extension: Float): Float =
+    modelSwitcherFadeOpacity(extension, start = 0.27f, end = 0.5f)
+
+internal fun modelSwitcherCompactOpacity(extension: Float): Float =
+    1f - modelSwitcherFadeOpacity(extension, start = 0.04f, end = 0.23f)
+
+private fun modelSwitcherFadeOpacity(extension: Float, start: Float, end: Float): Float = when {
+    extension <= start -> 0f
+    extension >= end -> 1f
+    else -> IrioEaseInOut.transform((extension - start) / (end - start))
 }
 
 internal data class ThinkingGlyphFrame(val index: Int, val character: String, val x: Float, val y: Float = 0f, val alpha: Float = 1f)

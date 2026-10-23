@@ -26,9 +26,34 @@ class ModelSwitcherMotionTest {
     }
 
     @Test
+    fun modelNamesAndParameterControlsNeverFadeOverEachOther() {
+        assertEquals("Parameter controls must stay hidden while the model list is still visible",
+            0f, modelSwitcherCompactOpacity(0.27f), 0.001f)
+        // Both directions and a reversal share the same phase, including spring overshoot.
+        val phases = (-100..1100).map { it / 1000f }
+        (phases + phases.reversed() + listOf(0.4f, 0.2f, 0.35f, 0.1f, 0f)).forEach { phase ->
+            val list = modelSwitcherListOpacity(phase)
+            val compact = modelSwitcherCompactOpacity(phase)
+            assertTrue("Model list and parameter panel overlap at phase=$phase: list=$list, compact=$compact",
+                list == 0f || compact == 0f)
+            assertTrue(list in 0f..1f)
+            assertTrue(compact in 0f..1f)
+        }
+        assertEquals(1f, modelSwitcherCompactOpacity(0f), 0.001f)
+        assertEquals(0f, modelSwitcherListOpacity(0f), 0.001f)
+        assertEquals(0f, modelSwitcherCompactOpacity(1f), 0.001f)
+        assertEquals(1f, modelSwitcherListOpacity(1f), 0.001f)
+    }
+
+    @Test
     fun entirePanelExchangesDuringFastEntryAndFinishesWithSlowExit() {
-        assertEquals(0f, modelSwitcherListOpacity(0.04f), 0.001f)
-        assertEquals(0.5f, modelSwitcherListOpacity(0.27f), 0.001f)
+        assertEquals(1f, modelSwitcherCompactOpacity(0.04f), 0.001f)
+        assertEquals(0.5f, modelSwitcherCompactOpacity(0.135f), 0.001f)
+        assertEquals(0f, modelSwitcherCompactOpacity(0.23f), 0.001f)
+        assertEquals(0f, modelSwitcherCompactOpacity(0.25f), 0.001f)
+        assertEquals(0f, modelSwitcherListOpacity(0.25f), 0.001f)
+        assertEquals(0f, modelSwitcherListOpacity(0.27f), 0.001f)
+        assertEquals(0.5f, modelSwitcherListOpacity(0.385f), 0.001f)
         assertEquals(1f, modelSwitcherListOpacity(0.5f), 0.001f)
         assertEquals(0f, modelSwitcherExtension(0f), 0.001f)
         assertEquals(1f, modelSwitcherExtension(1f), 0.001f)

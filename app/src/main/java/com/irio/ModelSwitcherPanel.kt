@@ -218,8 +218,8 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                 layout(placeable.width, height) { placeable.placeRelative(0, 0) }
             }.clipToBounds()) {
             Column(Modifier.fillMaxWidth().height(compactHeight)
-                .graphicsLayer { alpha = 1f - listOpacity() }
-                .semantics { if (listOpacity() >= 0.5f) invisibleToUser() }) {
+                .graphicsLayer { alpha = modelSwitcherCompactOpacity(phase.value) }
+                .semantics { if (modelSwitcherCompactOpacity(phase.value) < 0.5f) invisibleToUser() }) {
             Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(
                     Modifier.weight(1f).height(44.dp).clip(RoundedRectangle(12.dp))
