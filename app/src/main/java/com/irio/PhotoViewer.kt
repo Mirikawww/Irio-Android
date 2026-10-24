@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,7 +24,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -47,6 +51,10 @@ import me.saket.telephoto.zoomable.rememberZoomableState
 import me.saket.telephoto.zoomable.zoomable
 import okio.Path.Companion.toPath
 
+private object PhotoZoomHapticsDisabled : HapticFeedback {
+    override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) = Unit
+}
+
 @Composable
 internal fun PhotoViewer(attachment: ChatAttachment, onDismiss: () -> Unit) {
     val context = LocalContext.current
@@ -68,27 +76,30 @@ internal fun PhotoViewer(attachment: ChatAttachment, onDismiss: () -> Unit) {
         modifier = Modifier.fillMaxSize().zIndex(4f).background(Color.Black.copy(alpha = 0.92f)),
         contentAlignment = Alignment.Center,
     ) {
-        if (!regionDecodeFailed) {
-            // 按当前缩放从原文件切块，而不是先压成屏幕大小的位图再放大。
-            val imageState =
-                rememberSubSamplingImageState(
-                    imageSource = SubSamplingImageSource.file(attachment.filePath.toPath()),
-                    zoomableState = zoomState,
-                    errorReporter = errorReporter,
+        // 只禁用图片缩放边界的震动，保留缩放回弹和其他控件的触觉反馈。
+        CompositionLocalProvider(LocalHapticFeedback provides PhotoZoomHapticsDisabled) {
+            if (!regionDecodeFailed) {
+                // 按当前缩放从原文件切块，而不是先压成屏幕大小的位图再放大。
+                val imageState =
+                    rememberSubSamplingImageState(
+                        imageSource = SubSamplingImageSource.file(attachment.filePath.toPath()),
+                        zoomableState = zoomState,
+                        errorReporter = errorReporter,
+                    )
+                SubSamplingImage(
+                    state = imageState,
+                    contentDescription = attachment.name,
+                    modifier =
+                        Modifier
+                            // 整个屏幕都是图片手势区：双击缩放、双指缩放/平移。
+                            // 不设 onClick：tap 判定要等 double-tap 超时窗口（~300ms），关闭有可感延迟；
+                            // 关闭走返回键（NavigationBackHandler）。
+                            .fillMaxSize()
+                            .zoomable(zoomState),
                 )
-            SubSamplingImage(
-                state = imageState,
-                contentDescription = attachment.name,
-                modifier =
-                    Modifier
-                        // 整个屏幕都是图片手势区：双击缩放、双指缩放/平移。
-                        // 不设 onClick：tap 判定要等 double-tap 超时窗口（~300ms），关闭有可感延迟；
-                        // 关闭走返回键（NavigationBackHandler）。
-                        .fillMaxSize()
-                        .zoomable(zoomState),
-            )
-        } else {
-            ZoomableDecodedImage(attachment, zoomState)
+            } else {
+                ZoomableDecodedImage(attachment, zoomState)
+            }
         }
         // 右下角下载按钮：保存到系统下载（相册可见）
         IconButton(
