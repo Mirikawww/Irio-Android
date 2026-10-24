@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -14,11 +15,11 @@ import com.composables.ui.components.Text
 import com.composables.ui.components.Icon
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
-import com.composables.ui.theme.onBackgroundColor
 import com.composeunstyled.theme.Theme
 
 @Composable
 internal fun ReplyErrorRow(status: ChatRetryStatus) {
+    val renderScope = rememberCoroutineScope()
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(
             imageVector = replyErrorIcon(status),
@@ -27,7 +28,7 @@ internal fun ReplyErrorRow(status: ChatRetryStatus) {
             tint = irioErrorTextColor(),
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(status.error, color = Theme[colors][onBackgroundColor], fontSize = 17.sp, lineHeight = 26.sp)
+            AssistantMarkdown(text = status.error, streaming = false, renderScope = renderScope)
             if (status.attempt > 0) {
                 Text(chatRetryLine(status), color = Theme[colors][mutedColor], fontSize = 13.sp, lineHeight = 18.sp)
             }

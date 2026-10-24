@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.BroadcastFrameClock
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Recomposer
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.Color
@@ -17,6 +18,8 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.SemanticsProperties.ContentDescription
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import com.composables.ui.components.Text
 import com.composables.ui.theme.colors
@@ -38,6 +41,68 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
 class ReplyErrorRowTest {
+    @Test fun errorReasonsRenderMarkdownWhileRetryStatusRemainsPlainText() = runTest {
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        val clock = BroadcastFrameClock()
+        val recomposer = Recomposer(coroutineContext + clock)
+        val runner = launch(clock) { recomposer.runRecomposeAndApplyChanges() }
+        val view = ComposeView(controller.get())
+        val error = "# Request failed\n\n**Access denied**\n\n- Check credentials\n- Try again\n\nError code: `HTTP_403`"
+        val status = mutableStateOf(ChatRetryStatus(error, 2, remainingSeconds = 8))
+        // Keep parsing deterministic in the headless composition.
+        FinishedMarkdownCache.prepare(error, this)
+        var frameTime = 0L
+        fun frames() {
+            repeat(12) {
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+                Snapshot.sendApplyNotifications()
+                runCurrent()
+                clock.sendFrame(frameTime.also { frameTime += 16_000_000L })
+                runCurrent()
+                view.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+                view.layout(0, 0, 360, 1000)
+            }
+        }
+        fun nodes(): List<SemanticsNode> {
+            fun descend(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descend)
+            return descend((view.getChildAt(0) as ViewRootForTest).semanticsOwner.unmergedRootSemanticsNode)
+        }
+        fun text(value: String) = nodes().single {
+            it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { entry -> entry.text == value }
+        }
+        try {
+            view.setParentCompositionContext(recomposer)
+            controller.get().setContentView(view)
+            view.setContent {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    AppTheme { ReplyErrorRow(status.value) }
+                }
+            }
+            frames()
+            assertTrue("Error Markdown syntax must not be displayed literally", nodes().none {
+                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { entry -> entry.text == error }
+            })
+            text("Request failed")
+            val bold = text("Access denied").config[SemanticsProperties.Text].single()
+            assertTrue("Strong emphasis must render as bold", bold.spanStyles.any { it.item.fontWeight == FontWeight.Bold })
+            text("Check credentials")
+            text("Try again")
+            val code = nodes().flatMap { it.config.getOrElse(SemanticsProperties.Text) { emptyList() } }
+                .single { it.text.contains("HTTP_403") }
+            assertFalse("Inline code delimiters must not be displayed", code.text.contains('`'))
+            assertTrue("Error codes must retain monospace formatting", code.spanStyles.any { it.item.fontFamily == FontFamily.Monospace })
+            text(chatRetryLine(status.value))
+            status.value = status.value.copy(error = "A plain network error", stopped = true, remainingSeconds = null)
+            frames()
+            text("A plain network error")
+            text(chatRetryLine(status.value))
+        } finally {
+            view.disposeComposition(); recomposer.close(); runner.cancel()
+            controller.pause().stop().destroy()
+        }
+    }
+
     @Test fun onlyExclamationIsRedAndRetryMatchesVersionTextBelowReason() = runTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val clock = BroadcastFrameClock()
