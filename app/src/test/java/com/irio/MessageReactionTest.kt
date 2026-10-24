@@ -67,7 +67,7 @@ class MessageReactionTest {
         assertNull(setUserReaction(assistant.copy(hidden = true), "❤️"))
         assertNull(setUserReaction(assistant.copy(isPending = true), "❤️"))
         assertNull(setUserReaction(assistant.copy(isStreaming = true), "❤️"))
-        listOf("普通文本", "❤️👍", "🫪").forEach {
+        listOf("普通文本", "❤️👍", "🫪🫪").forEach {
             assertNull(setModelReaction(user, it))
             assertNull(setUserReaction(assistant, it))
         }
@@ -75,8 +75,8 @@ class MessageReactionTest {
 
     @Test
     fun bothReactionsSurviveLocalAndLinkRoundTripsAndRemoval() {
-        val user = ChatMessage(1L, "用户", true, retryGroup = 1L, modelReaction = "🥰")
-        val assistant = ChatMessage(2L, "回答", false, retryGroup = 2L, userReaction = "❤️")
+        val user = ChatMessage(1L, "用户", true, retryGroup = 1L, modelReaction = "🫪")
+        val assistant = ChatMessage(2L, "回答", false, retryGroup = 2L, userReaction = "🧑‍🩰")
         val original = Conversation("reactions", "测试", 1L, listOf(user, assistant))
         val local = ConversationStore.parseConversation(JSONObject(ConversationStore.conversationJson(original).toString()))
         val linked = LinkConversationJson.decode(JSONObject(LinkConversationJson.encode(local).toString()))
@@ -84,8 +84,8 @@ class MessageReactionTest {
         assertEquals(original.id, linked.id)
         assertEquals(original.messages.map { it.id }, linked.messages.map { it.id })
         assertEquals(original.messages.map { it.text }, linked.messages.map { it.text })
-        assertEquals(listOf("🥰", ""), linked.messages.map { it.modelReaction })
-        assertEquals(listOf("", "❤️"), linked.messages.map { it.userReaction })
+        assertEquals(listOf("🫪", ""), linked.messages.map { it.modelReaction })
+        assertEquals(listOf("", "🧑‍🩰"), linked.messages.map { it.userReaction })
         val removed = linked.copy(messages = listOf(setModelReaction(user, "")!!, setUserReaction(assistant, "")!!))
         val encoded = ConversationStore.conversationJson(removed)
         assertFalse(encoded.getJSONArray("messages").getJSONObject(0).has("modelReaction"))
@@ -96,7 +96,7 @@ class MessageReactionTest {
     }
 
     @Test
-    fun legacyInvalidAndWrongRoleStoredReactionsAreDiscarded() {
+    fun invalidAndWrongRoleStoredReactionsAreDiscardedButUnicode17IsRetained() {
         val json = JSONObject("""{"id":"legacy","messages":[
             {"id":1,"text":"旧消息","fromUser":true},
             {"id":2,"text":"用户","fromUser":true,"modelReaction":"👍🏿","userReaction":"❤️"},
@@ -105,7 +105,7 @@ class MessageReactionTest {
             {"id":5,"text":"新版","fromUser":true,"modelReaction":"🫪"}
         ]}""")
         listOf(ConversationStore.parseConversation(json), LinkConversationJson.decode(json)).forEach { conversation ->
-            assertEquals(listOf("", "👍", "", "", ""), conversation.messages.map { it.modelReaction })
+            assertEquals(listOf("", "👍", "", "", "🫪"), conversation.messages.map { it.modelReaction })
             assertEquals(listOf("", "", "❤️", "", ""), conversation.messages.map { it.userReaction })
         }
     }

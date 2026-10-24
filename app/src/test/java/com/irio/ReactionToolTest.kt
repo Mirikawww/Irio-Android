@@ -27,7 +27,7 @@ class ReactionToolTest {
             val function = definition.optJSONObject("function") ?: definition
             assertEquals(ReactionTool.NAME, function.getString("name"))
             assertTrue(function.getString("description").contains("ONE"))
-            assertTrue(function.getString("description").contains("16.0"))
+            assertTrue(function.getString("description").contains("17.0"))
             assertTrue(function.getString("description").contains("empty string removes"))
             assertTrue(registry.handles(ReactionTool.NAME))
         }
@@ -51,6 +51,23 @@ class ReactionToolTest {
     }
 
     @Test
+    fun unicode17ReactionsReachTheCallbackWithDefaultYellowNormalization() = runBlocking {
+        val updates = mutableListOf<ChatStreamUpdate>()
+        val reactions = mutableListOf<Pair<Long, String>>()
+        val context = ToolExecutionContext(
+            provider, "model", history = listOf(ChatRequestMessage("user", "hi", reactionTargetId = 123L)),
+            onUpdate = { updates += it }, onReaction = { id, emoji -> reactions += id to emoji; true },
+        )
+        val cases = listOf("🫪" to "🫪", "🧑🏿‍🩰" to "🧑‍🩰", "👨🏻‍🫯‍👨🏿" to "🤼‍♂️")
+        for ((input, expected) in cases) {
+            val result = tool.execute(call(emoji = input), context)
+            assertEquals(expected, JSONObject(result.text).getString("emoji"))
+        }
+        assertEquals(cases.map { 123L to it.second }, reactions)
+        assertEquals(List(cases.size) { ChatStreamUpdate(notifyTool = ReactionTool.NAME) }, updates)
+    }
+
+    @Test
     fun malformedIdsForeignTargetsAndUnsupportedEmojiNeverReachTheCallback() = runBlocking {
         var called = false
         val context = ToolExecutionContext(
@@ -66,7 +83,7 @@ class ReactionToolTest {
                 val result = tool.execute(call(id = id), context)
                 assertFalse(result.text.startsWith("{"))
             }
-        listOf("🫪", "😀😀", "text", " ", 1, JSONObject.NULL).forEach { emoji ->
+        listOf("🫪🫪", "😀😀", "text", " ", 1, JSONObject.NULL).forEach { emoji ->
             assertFalse(tool.execute(call(emoji = emoji), context).text.startsWith("{"))
         }
         assertFalse(tool.execute(ChatToolCall("bad", ReactionTool.NAME, "not JSON"), context).text.startsWith("{"))

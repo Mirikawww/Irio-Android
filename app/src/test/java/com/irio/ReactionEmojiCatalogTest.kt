@@ -3,8 +3,8 @@ package com.irio
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReactionEmojiCatalogTest {
@@ -28,12 +28,19 @@ class ReactionEmojiCatalogTest {
         assertEquals("👭", ReactionEmojiCatalog.normalize("👩🏻‍🤝‍👩🏿"))
         assertEquals("💏", ReactionEmojiCatalog.normalize("🧑🏻‍❤️‍💋‍🧑🏿"))
         assertEquals("💑", ReactionEmojiCatalog.normalize("🧑🏻‍❤️‍🧑🏿"))
+        assertEquals("👯", ReactionEmojiCatalog.normalize("🧑🏻‍🐰‍🧑🏿"))
+        assertEquals("👯‍♂️", ReactionEmojiCatalog.normalize("👨🏻‍🐰‍👨🏿"))
+        assertEquals("👯‍♀️", ReactionEmojiCatalog.normalize("👩🏻‍🐰‍👩🏿"))
+        assertEquals("🤼", ReactionEmojiCatalog.normalize("🧑🏻‍🫯‍🧑🏿"))
+        assertEquals("🤼‍♂️", ReactionEmojiCatalog.normalize("👨🏻‍🫯‍👨🏿"))
+        assertEquals("🤼‍♀️", ReactionEmojiCatalog.normalize("👩🏻‍🫯‍👩🏿"))
+        assertEquals("🧑‍🩰", ReactionEmojiCatalog.normalize("🧑🏿‍🩰"))
     }
 
     @Test
     fun bundledCatalogLoadsWithoutAndroidContext() {
         assertEquals(9, ReactionEmojiCatalog.categories.size)
-        assertEquals(1906, ReactionEmojiCatalog.categories.sumOf { it.emojis.size })
+        assertEquals(1914, ReactionEmojiCatalog.categories.sumOf { it.emojis.size })
     }
 
     @Test
@@ -41,9 +48,9 @@ class ReactionEmojiCatalogTest {
         val json = ReactionEmojiCatalog::class.java.getResourceAsStream("/emoji-reactions.json")!!
             .bufferedReader(Charsets.UTF_8).use { it.readText() }
         val data = JSONObject(json)
-        assertEquals("16.0", data.getString("unicodeVersion"))
-        assertEquals("https://www.unicode.org/Public/emoji/16.0/emoji-test.txt", data.getString("source"))
-        assertEquals("24f0c534e86cf142e2496953e8f0e46a3e702392911eddcd29c6cced85139697", data.getString("sourceSha256"))
+        assertEquals("17.0", data.getString("unicodeVersion"))
+        assertEquals("https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt", data.getString("source"))
+        assertEquals("1d8a944f88d7952f7ef7c5167fef3c67995bcae24543949710231b03a201acda", data.getString("sourceSha256"))
         assertEquals("https://www.unicode.org/license.txt", data.getString("license"))
         assertEquals(ReactionEmojiCatalog.categories, ReactionEmojiCatalog.parse(json))
     }
@@ -54,7 +61,7 @@ class ReactionEmojiCatalogTest {
             listOf("Smileys & Emotion", "People & Body", "Animals & Nature", "Food & Drink", "Travel & Places", "Activities", "Objects", "Symbols", "Flags"),
             ReactionEmojiCatalog.categories.map { it.name }
         )
-        assertEquals(listOf(169, 386, 159, 131, 218, 85, 264, 224, 270), ReactionEmojiCatalog.categories.map { it.emojis.size })
+        assertEquals(listOf(171, 388, 160, 131, 219, 85, 266, 224, 270), ReactionEmojiCatalog.categories.map { it.emojis.size })
         val emojis = ReactionEmojiCatalog.categories.flatMap { it.emojis }
         assertEquals(emojis.size, emojis.toSet().size)
         emojis.forEach { emoji ->
@@ -82,7 +89,7 @@ class ReactionEmojiCatalogTest {
             .bufferedReader(Charsets.UTF_8).use { it.readText() }
         val aliases = JSONObject(json).getJSONObject("defaultYellowAliases")
         val keys = aliases.keys()
-        assertEquals(6, aliases.length())
+        assertEquals(12, aliases.length())
         while (keys.hasNext()) {
             val key = keys.next()
             val expected = aliases.getString(key)
@@ -104,12 +111,33 @@ class ReactionEmojiCatalogTest {
     }
 
     @Test
-    fun unicode17AdditionsAreUnavailableInPickerAndModelReactions() {
+    fun unicode17AdditionsAreAvailableAndNonRgiSequencesRemainUnavailable() {
         val catalog = ReactionEmojiCatalog.categories.flatMap { it.emojis }
-        listOf("🫪", "🫯", "🫈", "🧑‍🩰", "🫍", "🛘", "🪊", "🪎").forEach {
+        val unicode17 = listOf(
+            String(Character.toChars(0x1FAEA)), // distorted face
+            String(Character.toChars(0x1FAEF)), // fight cloud
+            String(Character.toChars(0x1FAC8)), // hairy creature
+            String(Character.toChars(0x1F9D1)) + "\u200D" + String(Character.toChars(0x1FA70)), // ballet dancer
+            String(Character.toChars(0x1FACD)), // orca
+            String(Character.toChars(0x1F6D8)), // landslide
+            String(Character.toChars(0x1FA8A)), // trombone
+            String(Character.toChars(0x1FA8E)), // treasure chest
+        )
+        unicode17.forEach {
+            assertTrue(it in catalog)
+            assertEquals(it, ReactionEmojiCatalog.normalize(it))
+        }
+        val retained = listOf(0x1FAE8, 0x1FA77, 0x1FA75, 0x1FAF7, 0x1FAF8, 0x1FADC)
+            .map { String(Character.toChars(it)) }
+        retained.forEach {
+            assertTrue(it in catalog)
+            assertEquals(it, ReactionEmojiCatalog.normalize(it))
+        }
+        val distortedFace = String(Character.toChars(0x1FAEA))
+        val nonRgi = listOf(distortedFace + distortedFace, distortedFace + "\u200D" + distortedFace)
+        nonRgi.forEach {
             assertFalse(it in catalog)
             assertNull(it, ReactionEmojiCatalog.normalize(it))
         }
-        assertNull(ReactionEmojiCatalog.normalize("👨🏻‍🫯‍👨🏿"))
     }
 }

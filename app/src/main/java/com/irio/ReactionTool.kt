@@ -10,7 +10,7 @@ internal object ReactionTool {
             "Use the exact numeric string from that user's [Irio message_id: ...] marker. " +
             "Each user message can have at most ONE assistant reaction. " +
             "Setting a different emoji replaces yours; an empty string removes yours. " +
-            "Use Unicode 16.0 or earlier emoji with default-yellow skin tone. " +
+            "Use Unicode 17.0 or earlier emoji with default-yellow skin tone. " +
             "Only react to user messages, not assistant replies. " +
             "Do not narrate the reaction or mention tool use; the emoji appearing on the message is the response."
 
