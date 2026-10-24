@@ -363,8 +363,8 @@ internal class ImageGenToolProvider : ToolProvider {
             val prompt = ToolArguments.value(call.arguments, "prompt")
             require(prompt.isNotBlank()) { "prompt must not be empty" }
             val options = ImageGenerationOptions.fromToolArguments(call.arguments)
-            // Images API 无状态：把最近一轮生成图和 prompt 作为编辑参考传回端点。
-            val imageContext = imageContext(context.history)
+            // 当前用户参考图和历史生成图都必须进入实际的生图请求。
+            val imageContext = imageGenerationContext(context.history)
             val result = ProviderApi.generateImage(
                 config = context.provider,
                 model = context.imageGenModel,
@@ -408,20 +408,6 @@ internal class ImageGenToolProvider : ToolProvider {
                     },
                 ),
             )
-        }
-    }
-
-    private fun imageContext(history: List<ChatRequestMessage>): ProviderApi.ImageGenContext? {
-        val lastUserIndex = history.indexOfLast { it.role == "user" }
-        if (lastUserIndex <= 0) return null
-        val previousUser = history.subList(0, lastUserIndex)
-            .lastOrNull { it.role == "user" }
-            ?: return null
-        val previousImages = history.subList(0, lastUserIndex)
-            .filter { it.role == "assistant" }
-            .flatMap { message -> message.attachments.filter(ChatAttachment::isImage) }
-        return previousImages.takeIf { it.isNotEmpty() }?.let {
-            ProviderApi.ImageGenContext(previousUser.text, it.takeLast(3))
         }
     }
 }

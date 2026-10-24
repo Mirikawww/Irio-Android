@@ -598,6 +598,8 @@ private val English = mapOf(
     "已缩放" to "Scaled",
     "图片已生成并发送给用户。不要重复描述图片内容，直接继续回答。" to "The image was generated and sent to the user. Do not describe the image again; continue the answer.",
     "图片生成失败" to "Image generation failed",
+    "无法读取参考图片：%s" to "Cannot read reference image: %s",
+    "当前图片端点不支持参考图生成" to "This image endpoint does not support reference images",
     "图片生成中" to "Generating an image",
     "生成图片失败" to "Couldn't generate an image",
     "图片生成工具当前不可用：请先配置图片生成模型" to "Image generation is unavailable. Choose an image model first",

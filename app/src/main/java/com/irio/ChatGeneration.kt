@@ -162,32 +162,7 @@ internal fun ChatScreenState.startGeneration(
                                 ?.requestText()
                                 .orEmpty()
                                 .ifBlank { tr("图片") }
-                        // Images API 无状态：多轮要回传上轮 prompt + 生成图。
-                        // 上轮 = 本条用户消息之前最近的一次生图往返（上轮用户 prompt + 其后模型产出的图）。
-                        val imageContext =
-                            if (lastUserIndex > 0) {
-                                val previousUserPrompt =
-                                    requestSource
-                                        .subList(0, lastUserIndex)
-                                        .lastOrNull { it.fromUser && !it.hidden }
-                                        ?.requestText()
-                                        .orEmpty()
-                                val previousImages =
-                                    requestSource
-                                        .subList(0, lastUserIndex)
-                                        .filter { !it.fromUser }
-                                        .flatMap {
-                                            it.attachments.filter { attachment ->
-                                                attachment.isImage
-                                            }
-                                        }
-                                if (previousImages.isNotEmpty()) {
-                                    ProviderApi.ImageGenContext(
-                                        previousUserPrompt,
-                                        previousImages.takeLast(3),
-                                    )
-                                } else null
-                            } else null
+                        val imageContext = chatImageGenerationContext(requestSource)
                         process.onToolStarted(ImageGenTool.NAME)
                         pushNotice(MemoryTool.liveLabel(ImageGenTool.NAME), finished = false)
                         replaceInConversation(

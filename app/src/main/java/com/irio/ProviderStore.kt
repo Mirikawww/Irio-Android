@@ -660,15 +660,19 @@ object ProviderApi {
         }
     }
 
-    /** 多轮生图上下文：上一轮的 prompt 与生成图（Images API 无状态，需回传参考）。 */
+    /** 历史生成图与当前用户上传的参考图分开保留，供不同协议正确传输。 */
     data class ImageGenContext(
         val previousPrompt: String,
         val previousImages: List<ChatAttachment>,
-    )
+        val referenceImages: List<ChatAttachment> = emptyList(),
+    ) {
+        val inputImages: List<ChatAttachment>
+            get() = (referenceImages + previousImages).distinctBy { it.filePath }
+    }
 
     /** OpenAI Images API 生成图片；成功返回落盘后的附件。
-     *  [context] 非空时优先走 /images/edits 把上轮图回传作参考；端点不支持时回落 generations 并把
-     *  上轮 prompt 拼进文本（模型至少能读到历史语义）。 */
+     *  有参考图时走 /images/edits；显式上传的参考图不可静默丢弃。
+     *  仅历史生成图保留兼容回退：端点不支持 edits 时带上旧 prompt 重试 generations。 */
     fun generateImage(
         config: ProviderConfig,
         model: String,
@@ -680,11 +684,15 @@ object ProviderApi {
         onProgress: (ImageGenerationProgress) -> Unit = {},
     ): ImageGenResult {
         if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
+        context?.referenceImages?.firstOrNull {
+            val file = File(it.filePath)
+            !file.isFile || !file.canRead() || file.length() == 0L
+        }?.let { return ImageGenResult(error = tr("无法读取参考图片：%s").format(it.name)) }
         val imageStream = ImageGenerationStream(onProgress, cancelled = { cancellation?.isCancelled() == true },
             download = { url, revised -> imageFromRemoteUrl(url, revised, config, cancellation) })
         imageStream.start()
         if (config.protocol.isGoogleGemini) return generateImagePlain(config, model, prompt, cancellation, context, options, imageStream, streaming)
-        if (context != null && context.previousImages.isNotEmpty()) {
+        if (context != null && context.inputImages.isNotEmpty()) {
             val edited = generateImageWithEdits(config, model, prompt, context, cancellation, options, imageStream, streaming)
             if (edited != null) return edited
             // edits 不可用（端点 404/405/415 或网络层拒绝）→ 回落 generations，把上轮 prompt 织进文本
@@ -712,7 +720,7 @@ object ProviderApi {
                 add(ChatRequestMessage("user", context.previousPrompt))
                 add(ChatRequestMessage("assistant", attachments = context.previousImages))
             }
-            add(ChatRequestMessage("user", prompt))
+            add(ChatRequestMessage("user", prompt, attachments = context?.referenceImages.orEmpty()))
         }
         return when (config.protocol) {
             ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.requestBody(model, messages, null).apply {
@@ -801,7 +809,7 @@ object ProviderApi {
         }
     }
 
-    /** /v1/images/edits multipart：上轮图作 image[] 输入，本轮 prompt 作指令。端点不支持时返回 null。 */
+    /** 上传当前参考图和历史生成图；只有无显式参考图的旧多轮请求允许回退纯文本。 */
     private fun generateImageWithEdits(
         config: ProviderConfig,
         model: String,
@@ -840,9 +848,14 @@ object ProviderApi {
                 if (streaming) field("partial_images", "3")
                 field("stream", streaming.toString())
                 (options?.openAiFields() ?: mapOf("size" to "1024x1024")).forEach { (name, value) -> field(name, value) }
-                context.previousImages.forEach { image ->
+                context.inputImages.forEach { image ->
                     val file = File(image.filePath)
-                    if (!file.exists()) return@forEach
+                    if (!file.exists()) {
+                        if (context.referenceImages.any { it.filePath == image.filePath }) {
+                            return ImageGenResult(error = tr("无法读取参考图片：%s").format(image.name))
+                        }
+                        return@forEach
+                    }
                     output.writeBytes("--$boundary\r\n")
                     output.writeBytes(
                         "Content-Disposition: form-data; name=\"image[]\"; filename=\"${image.name.ifBlank { "previous.png" }}\"\r\n",
@@ -865,14 +878,16 @@ object ProviderApi {
             when {
                 status in 200..299 -> parseImageResponse(body, config, cancellation)
                     ?: ImageGenResult(error = tr("图片端点没有返回图片"))
-                // 端点不支持 edits（路由不存在/方法不允许/类型不收）→ 让调用方回落 generations
+                context.referenceImages.isNotEmpty() && status in setOf(404, 405, 415) ->
+                    ImageGenResult(error = tr("当前图片端点不支持参考图生成"))
+                // 历史多轮兼容回退不能吞掉用户显式上传的参考图。
                 status == 404 || status == 405 || status == 415 -> null
                 else -> ImageGenResult(error = apiError(body).ifBlank { tr("图片生成失败（HTTP %s）").format(status) },
                     retryable = retryableHttpStatus(status))
             }
         } catch (error: Exception) {
             if (cancellation?.isCancelled() == true) ImageGenResult(error = tr("图片生成已停止"))
-            else if (accepted) ImageGenResult(error = error.message ?: tr("图片生成失败"), retryable = retryableConnectionFailure(error))
+            else if (accepted || context.referenceImages.isNotEmpty()) ImageGenResult(error = error.message ?: tr("图片生成失败"), retryable = retryableConnectionFailure(error))
             else null
         } finally {
             cancellation?.detach(connection)
