@@ -323,10 +323,8 @@ internal fun MessageRow(
                 val ordinaryAttachments =
                     chatMessage.attachments.filterNot { it.filePath in inlineImagePaths }
                 if (ordinaryAttachments.isNotEmpty()) {
-                    SentAttachmentRow(
+                    AssistantAttachmentList(
                         attachments = ordinaryAttachments,
-                        alignEnd = false,
-                        scrollKey = chatMessage.id,
                         onOpen = onOpenAttachment,
                     )
                 }
@@ -526,6 +524,36 @@ internal fun StatusSweepText(label: String) {
                     )
                 },
     )
+}
+
+/** Final assistant images keep the same large surface even without ephemeral generation state. */
+@Composable
+internal fun AssistantAttachmentList(
+    attachments: List<ChatAttachment>,
+    onOpen: (ChatAttachment) -> Unit,
+) {
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        attachments.forEach { attachment ->
+            key(attachment.filePath) {
+                if (attachment.isImage) {
+                    ImageGenerationCard(
+                        progress = ImageGenerationProgress(
+                            id = attachment.filePath,
+                            finalAttachment = attachment,
+                            active = false,
+                        ),
+                        onOpen = onOpen,
+                    )
+                } else {
+                    AttachmentCard(attachment, onOpen = { onOpen(attachment) })
+                }
+            }
+        }
+    }
 }
 
 @Composable

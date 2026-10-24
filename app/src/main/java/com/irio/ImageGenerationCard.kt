@@ -72,7 +72,6 @@ internal fun ImageGenerationCard(
     onOpen: (ChatAttachment) -> Unit = {},
 ) {
     if (!progress.active && progress.finalAttachment == null) return
-    val ratio by animateFloatAsState(progress.aspectRatio, irioSpring(stiffness = 360f), label = "imageGenerationRatio")
     val attachment = progress.finalAttachment
     var lastPreview by remember(progress.id) { mutableStateOf(progress.preview) }
     LaunchedEffect(progress.preview) { progress.preview?.let { lastPreview = it } }
@@ -83,6 +82,13 @@ internal fun ImageGenerationCard(
     val finalPainter = rememberAsyncImagePainter(finalImage)
     val finalState by finalPainter.state.collectAsState()
     val finalReady = attachment != null && finalState is AsyncImagePainter.State.Success
+    // History only persists the final attachment, not the live preview dimensions.
+    // Coil decodes off the UI thread; use the loaded image's real ratio after reopening.
+    val finalImageSize = (finalState as? AsyncImagePainter.State.Success)?.result?.image
+    val targetRatio = if (finalImageSize != null && finalImageSize.width > 0 && finalImageSize.height > 0) {
+        finalImageSize.width.toFloat() / finalImageSize.height
+    } else progress.aspectRatio
+    val ratio by animateFloatAsState(targetRatio, irioSpring(stiffness = 360f), label = "imageGenerationRatio")
     LaunchedEffect(finalReady) { if (finalReady) lastPreview = null }
     val layer = if (finalReady) ImageGenerationLayer(finalPath = attachment.filePath) else ImageGenerationLayer(lastPreview)
     BoxWithConstraints(Modifier.widthIn(max = 275.dp)) {
@@ -103,7 +109,8 @@ internal fun ImageGenerationCard(
                 animationSpec = tween(480), label = "imageGenerationPreview",
             ) { visual ->
                 if (visual.finalPath != null) {
-                    Image(finalPainter, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                    Image(finalPainter, contentDescription = null,
+                        modifier = Modifier.testTag("image-generation-final-image").fillMaxSize(), contentScale = ContentScale.Fit)
                 } else if (visual.bitmap != null) {
                     Image(
                         visual.bitmap.asImageBitmap(), contentDescription = null,
