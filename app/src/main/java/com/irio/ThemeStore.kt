@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import kotlin.math.pow
 
 enum class ResolvedTheme {
@@ -100,23 +101,29 @@ internal fun Color.mixOver(base: Color, fraction: Float): Color {
 
 internal data class UserBubbleColors(val background: Color, val content: Color)
 
-/**
- * Light bubbles are a pale mix of the accent into white.
- * Dark bubbles mix that same accent into near-black — not a single navy/gray.
- * [accentColor] is the resolved accent (Monet's dynamic primary).
- */
+/** Only the fill is translucent; a solid bubble matches the composer edit banner. */
 internal fun userBubbleColors(
-    dark: Boolean,
+    backgroundColor: Color,
     accentColor: Color,
     onPanel: Color,
+    onAccent: Color,
     editing: Boolean,
+    opacityPercent: Int = 25,
 ): UserBubbleColors {
     if (editing) return UserBubbleColors(accentColor.copy(alpha = 0.16f), accentColor)
-    return if (dark) {
-        UserBubbleColors(accentColor.mixOver(Color(0xFF141414), 0.28f), onPanel)
-    } else {
-        UserBubbleColors(accentColor.softened(), Color(0xFF1A1A1A))
+    val opacity = opacityPercent.coerceIn(0, 100)
+    val fill = accentColor.copy(alpha = opacity / 100f)
+    val content = when (opacity) {
+        0 -> onPanel
+        100 -> onAccent
+        else -> {
+            val visibleFill = fill.compositeOver(backgroundColor)
+            listOf(onPanel, onAccent, Color.Black, Color.White).maxBy {
+                wcagContrastRatio(it, visibleFill)
+            }
+        }
     }
+    return UserBubbleColors(fill, content)
 }
 
 /** Dark destructive buttons keep white text at WCAG AA contrast (4.5:1 or higher). */
@@ -152,6 +159,7 @@ object ThemeStore {
     private const val LONG_TEXT_PASTE_KEY = "long_text_paste"
     private const val LONG_TEXT_PASTE_THRESHOLD_KEY = "long_text_paste_threshold"
     private const val GLASS_SURFACES_KEY = "glass_surfaces"
+    private const val BUBBLE_OPACITY_KEY = "bubble_opacity"
     private const val CODE_BLOCK_WRAP_KEY = "code_block_wrap"
     private const val CODE_BLOCK_LINE_NUMBERS_KEY = "code_block_line_numbers"
     private const val THINKING_BLOCK_KEY = "thinking_block"
@@ -212,6 +220,10 @@ object ThemeStore {
 
     /** 勾选后对应表面从纯色改为毛玻璃。默认全关。 */
     var glassSurfaces by mutableStateOf(emptySet<GlassSurface>())
+        private set
+
+    /** 用户气泡背景的不透明度，0–100%，默认 25%。文字保持不透明。 */
+    var bubbleOpacity by mutableStateOf(25)
         private set
 
     /** 代码块按气泡宽度自动换行。默认关，超长行横向滚动。 */
@@ -279,6 +291,7 @@ object ThemeStore {
                 .orEmpty()
                 .mapNotNull(GlassSurface::fromStored)
                 .toSet()
+            bubbleOpacity = appearance.getInt(BUBBLE_OPACITY_KEY, 25).coerceIn(0, 100)
             codeBlockWrap = appearance.getBoolean(CODE_BLOCK_WRAP_KEY, false)
             codeBlockLineNumbers = appearance.getBoolean(CODE_BLOCK_LINE_NUMBERS_KEY, false)
             thinkingBlock = appearance.getBoolean(THINKING_BLOCK_KEY, true)
@@ -384,6 +397,15 @@ object ThemeStore {
             .edit()
             .putBoolean(COMPOSER_WRAP_ANIMATION_KEY, enabled)
             .apply()
+    }
+
+    fun saveBubbleOpacity(context: Context, value: Int) {
+        ensureLoaded(context)
+        val next = value.coerceIn(0, 100)
+        if (bubbleOpacity == next) return
+        bubbleOpacity = next
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putInt(BUBBLE_OPACITY_KEY, next).apply()
     }
 
     fun saveEnterToSend(context: Context, enabled: Boolean) {

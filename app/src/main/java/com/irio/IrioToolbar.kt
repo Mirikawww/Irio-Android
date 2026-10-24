@@ -204,19 +204,20 @@ internal fun Modifier.irioSolidOrGlass(
     shape: Shape,
     haze: HazeState? = LocalChatHazeState.current,
     border: Boolean = false,
+    glassTintAlpha: Float? = null,
 ): Modifier {
     if (!enabled) return background(color, shape)
     // 直接模糊这个控件背后已经画好的像素。用户气泡在消息列表里面，不能把那一层当模糊源。
     val glass = clip(shape).hazeBlur(
         input = HazeInput.Backdrop(fallback = haze?.let { HazeInput.Sources(it) }),
-        style = rememberIrioGlassStyle(color),
+        style = rememberIrioGlassStyle(color, glassTintAlpha),
     )
     return if (border) glass.border(1.dp, Color.Black, shape) else glass
 }
 
 @Composable
-private fun rememberIrioGlassStyle(tint: Color): HazeBlurStyle {
-    val frost = if (tint.luminance() >= 0.5f) 0.12f else 0.08f
+private fun rememberIrioGlassStyle(tint: Color, tintAlpha: Float?): HazeBlurStyle {
+    val frost = tintAlpha?.coerceIn(0f, 1f) ?: if (tint.luminance() >= 0.5f) 0.12f else 0.08f
     return remember(tint, frost) {
         HazeBlurStyle {
             blurRadius(16.dp)

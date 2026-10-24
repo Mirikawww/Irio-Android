@@ -190,12 +190,15 @@ internal fun observeIrioTheme() {
 
 @Composable
 internal fun currentUserBubbleColors(editing: Boolean): UserBubbleColors {
-    val resolved = LocalResolvedTheme.current
+    // Keep nested RecyclerView compositions subscribed to resolved theme changes.
+    LocalResolvedTheme.current
     return userBubbleColors(
-        dark = resolved.isDark,
+        backgroundColor = Theme[colors][backgroundColor],
         accentColor = Theme[colors][primaryColor],
         onPanel = Theme[colors][onPanelColor],
+        onAccent = Theme[colors][onPrimaryColor],
         editing = editing,
+        opacityPercent = ThemeStore.bubbleOpacity,
     )
 }
 

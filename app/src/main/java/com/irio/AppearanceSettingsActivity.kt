@@ -502,6 +502,14 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         )
                     }
                 }
+                SettingsSlider(
+                    modifier = Modifier.settingsSearchAnchor("appearance.bubbleOpacity"),
+                    label = tr("气泡透明度"),
+                    value = ThemeStore.bubbleOpacity,
+                    valueRange = 0..100,
+                    valueLabel = { "$it%" },
+                    onValueChange = { ThemeStore.saveBubbleOpacity(context, it) },
+                )
                 val glassArrow by animateFloatAsState(
                     targetValue = if (glassExpanded) 180f else 0f,
                     animationSpec = irioSpring(),

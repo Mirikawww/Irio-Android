@@ -275,6 +275,7 @@ internal fun MessageRow(
                                                     RoundedRectangle(16.dp),
                                                     haze = null,
                                                     border = true,
+                                                    glassTintAlpha = bubble.background.alpha,
                                                 )
                                                 .then(
                                                     if (onEdit != null) {

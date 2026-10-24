@@ -93,6 +93,30 @@ class AmoledThemeTest {
         assertNotEquals("Disabled styling must not erase the button fill", panel, fill)
     }
 
+    @Test
+    fun bubbleOpacityUsesRealThemeColorsAcrossLightDarkAmoledAndMonet() {
+        val context = RuntimeEnvironment.getApplication()
+        ThemeStore.ensureLoaded(context)
+        val previousOpacity = ThemeStore.bubbleOpacity
+        try {
+            for (opacity in listOf(0, 25, 100)) {
+                ThemeStore.saveBubbleOpacity(context, opacity)
+                for (preference in listOf(ThemePreference.LIGHT, ThemePreference.DARK, ThemePreference.AMOLED)) {
+                    for (accent in AccentColor.entries) {
+                        withTheme(preference, accent) {
+                            val bubble = currentUserBubbleColors(editing = false)
+                            assertEquals(Theme[colors][primaryColor].copy(alpha = opacity / 100f), bubble.background)
+                            assertEquals(1f, bubble.content.alpha)
+                            if (opacity == 100) assertEquals(Theme[colors][onPrimaryColor], bubble.content)
+                        }
+                    }
+                }
+            }
+        } finally {
+            ThemeStore.saveBubbleOpacity(context, previousOpacity)
+        }
+    }
+
     private fun withTheme(preference: ThemePreference, accent: AccentColor, check: @Composable () -> Unit) = runTest {
         val context = RuntimeEnvironment.getApplication()
         val previousPreference = ThemeStore.preference

@@ -535,6 +535,7 @@ private val English = mapOf(
     "模型切换器居左" to "Model selector on the left",
     "毛玻璃" to "Frosted glass",
     "用户气泡" to "User bubbles",
+    "气泡透明度" to "Bubble opacity",
     "显示用户头像" to "Show user avatar",
     "侧边栏按钮" to "Sidebar button",
     "模型切换器" to "Model switcher",
