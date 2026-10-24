@@ -2314,9 +2314,10 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     }
 
     fun retryMessage(assistant: ChatMessage) {
-        if (assistant.fromUser || assistant.isPending || assistant.isStreaming) return
-        if (currentConversation.id in preparingIds) return
-        generations[assistant.id]?.cancellation?.cancel()
+        // Check live state as well as the disabled UI: a tap can arrive before recomposition.
+        val busy = generations.values.any { it.conversationId == currentConversation.id } ||
+            preparing.values.any { it == currentConversation.id }
+        if (!canRetryMessage(assistant, busy)) return
         val groupId = assistant.groupId
         val firstIndex = messages.indexOfFirst { !it.fromUser && it.groupId == groupId }
         if (firstIndex <= 0) return
@@ -2379,6 +2380,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         editGroups,
         contextBoundaryId,
         visualizeContext,
+        busyThisChat,
     ) {
         AndroidMessageCallbacks(
         markdownScope = scope,
@@ -2407,10 +2409,8 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
         },
         reactionAnimations = reactionAnimations,
         onRetry = ::retryMessage,
-        canRetry = { chatMessage ->
-            chatMessage.summaryState == SummaryState.NONE &&
-                !chatMessage.fromUser && !chatMessage.isPending && !chatMessage.isStreaming
-        },
+        canRetry = { chatMessage -> canRetryMessage(chatMessage, conversationBusy = false) },
+        retryEnabled = !busyThisChat,
         onPrevVersion = { target ->
             val versions = if (target.fromUser) listOf(target) else retryGroups[target.groupId].orEmpty()
             val index = versions.indexOfFirst { it.id == target.id }.coerceAtLeast(0)
@@ -3646,6 +3646,7 @@ internal fun MessageRow(
     onRetry: () -> Unit,
     canRetry: Boolean,
     versionIndex: Int = 1,
+    retryEnabled: Boolean = true,
     versionCount: Int = 1,
     onPrevVersion: (() -> Unit)? = null,
     onNextVersion: (() -> Unit)? = null,
@@ -3887,6 +3888,7 @@ internal fun MessageRow(
                         speaking = speech.active && speech.messageId == chatMessage.id,
                         onRetry = onRetry,
                         canRetry = canRetry,
+                        retryEnabled = retryEnabled,
                         finishedAt = chatMessage.finishedAt,
                         versionIndex = versionIndex,
                         versionCount = versionCount,
@@ -4994,6 +4996,19 @@ private fun UserEditVersionSwitcher(
 }
 
 @Composable
+internal fun MessageRetryButton(enabled: Boolean, onClick: () -> Unit) {
+    val muted = Theme[colors][mutedColor]
+    Icon(
+        imageVector = IrioIcons.RefreshCw,
+        contentDescription = tr("重试"),
+        modifier = Modifier
+            .size(18.dp)
+            .clickable(enabled = enabled, onClick = onClick),
+        tint = muted.copy(alpha = if (enabled) 1f else 0.35f),
+    )
+}
+
+@Composable
 private fun AssistantActions(
     messageId: Long,
     onCopy: () -> Unit,
@@ -5006,6 +5021,7 @@ private fun AssistantActions(
     onRetry: () -> Unit,
     canRetry: Boolean,
     finishedAt: Long,
+    retryEnabled: Boolean,
     versionIndex: Int,
     versionCount: Int,
     onPrevVersion: (() -> Unit)?,
@@ -5028,14 +5044,7 @@ private fun AssistantActions(
             tint = muted,
         )
         if (canRetry) {
-            Icon(
-                imageVector = IrioIcons.RefreshCw,
-                contentDescription = tr("重试"),
-                modifier = Modifier
-                    .size(18.dp)
-                    .clickable(onClick = onRetry),
-                tint = muted,
-            )
+            MessageRetryButton(enabled = retryEnabled, onClick = onRetry)
         }
         if (onSpeak != null) {
             Icon(

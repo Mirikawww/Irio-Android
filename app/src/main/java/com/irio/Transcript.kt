@@ -94,6 +94,10 @@ internal fun visibleMessages(messages: List<ChatMessage>): List<ChatMessage> {
     return buildTranscriptPresentation("", messages).visible
 }
 
+internal fun canRetryMessage(message: ChatMessage, conversationBusy: Boolean): Boolean =
+    !conversationBusy && message.summaryState == SummaryState.NONE &&
+        !message.fromUser && !message.isPending && !message.isStreaming
+
 /** 发给模型的历史。和界面同一套版本选择，但保留用户看不见的消息。 */
 internal fun contextMessages(messages: List<ChatMessage>): List<ChatMessage> {
     return buildTranscriptPresentation("", messages).context.map { message ->

@@ -53,6 +53,7 @@ internal data class AndroidMessageCallbacks(
     val editVersionInfo: (ChatMessage) -> VersionInfo,
     val newUserMessageId: Long?,
     val outsideContext: (ChatMessage) -> Boolean = { false },
+    val retryEnabled: Boolean = true,
 )
 
 internal data class VersionInfo(val index: Int, val count: Int)
@@ -988,6 +989,7 @@ private fun AndroidMessageRow(
                 onRemoveReaction = { callbacks.onRemoveReaction(message) },
                 onRetry = { callbacks.onRetry(message) },
                 canRetry = callbacks.canRetry(message),
+                retryEnabled = callbacks.retryEnabled,
                 versionIndex = version.index,
                 versionCount = version.count,
                 onPrevVersion = callbacks.onPrevVersion(message),
