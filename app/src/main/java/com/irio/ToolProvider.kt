@@ -372,6 +372,11 @@ internal class ImageGenToolProvider : ToolProvider {
                 context = imageContext,
                 cancellation = context.cancellation,
                 options = options,
+                onProgress = { progress ->
+                    kotlinx.coroutines.runBlocking {
+                        context.onUpdate(ChatStreamUpdate(imageGeneration = listOf(progress)))
+                    }
+                },
             )
             val stopped = context.cancellation.isCancelled() || result.error == tr("图片生成已停止")
             if (result.attachment != null) {

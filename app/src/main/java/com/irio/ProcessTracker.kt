@@ -59,7 +59,7 @@ internal class ProcessTracker {
 
     fun onOutputStarted(now: Long = System.currentTimeMillis(), textLength: Int = -1) {
         finishThinking(now)
-        finishLiveTool()
+        if (events.firstOrNull { it.id == liveToolId }?.imageGeneration?.active != true) finishLiveTool()
         outputStarted = true
         if (textLength >= 0) outputLength = textLength
     }
@@ -165,6 +165,32 @@ internal class ProcessTracker {
         finishLiveTool(content, outcome)
     }
 
+    fun onImageGeneration(progress: ImageGenerationProgress) {
+        val existing = events.indexOfFirst { it.imageGeneration?.id == progress.id }
+            .takeIf { it >= 0 } ?: events.indexOfFirst {
+                it.id == liveToolId && it.toolName == ImageGenTool.NAME && it.imageGeneration == null
+            }
+        if (existing >= 0) {
+            val event = events[existing]
+            events[existing] = event.copy(
+                imageGeneration = if (progress.modelText.isBlank() && event.displayText.isNotBlank()) {
+                    progress.copy(modelText = event.displayText)
+                } else progress,
+                live = progress.active,
+                content = if (progress.finalAttachment != null) ImageGenTool.STATUS_OK else event.content,
+                toolOutcome = if (progress.finalAttachment != null) ToolOutcome.SUCCESS else event.toolOutcome,
+            )
+            if (!progress.active && liveToolId == event.id) liveToolId = null
+        } else {
+            finishThinking()
+            val id = nextId++
+            events += ProcessEvent(id = id, kind = ProcessEventKind.TOOL, toolName = ImageGenTool.NAME,
+                live = progress.active, belowText = outputStarted, textOffset = eventAnchor(), imageGeneration = progress,
+                content = if (progress.finalAttachment != null) ImageGenTool.STATUS_OK else "")
+            if (progress.active) liveToolId = id
+        }
+    }
+
     /** 成功出图不留过程行，图片本身就是结果。 */
     fun dropLiveTool() {
         val id = liveToolId ?: return
@@ -187,6 +213,10 @@ internal class ProcessTracker {
         finishThinking(now)
         liveSearchId?.let { finishSearch(it) }
         finishLiveTool()
+        events.replaceAll { event ->
+            if (event.imageGeneration?.active == true) event.copy(live = false,
+                imageGeneration = event.imageGeneration.copy(active = false, preview = null)) else event
+        }
     }
 
     private fun finishThinking(now: Long = System.currentTimeMillis()) {
@@ -214,6 +244,9 @@ internal class ProcessTracker {
                 content = content.ifBlank { event.content },
                 live = false,
                 toolOutcome = outcome,
+                imageGeneration = event.imageGeneration?.let {
+                    it.copy(active = false, failed = outcome == ToolOutcome.FAILED, preview = null)
+                },
             ) else event
         }
         liveToolId = null

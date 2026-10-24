@@ -744,6 +744,15 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 messages + updated
             }
             if (persist) persistCurrent(messages)
+        } else if (!persist && updated.process.any { it.imageGeneration != null }) {
+            // Keep previews in memory while another conversation is open; never write them to disk.
+            synchronized(conversationCache) {
+                conversationCache[conversationId]?.let { stored ->
+                    conversationCache[conversationId] = stored.copy(messages =
+                        if (stored.messages.any { it.id == replyId }) stored.messages.map { if (it.id == replyId) updated else it }
+                        else stored.messages + updated)
+                }
+            }
         } else if (persist) {
             val stored = conversationContent(conversationId) ?: return
             val next = stored.copy(
@@ -1247,13 +1256,13 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
     fun stopGeneration(conversationId: String = currentConversation.id) {
         val active = generations.values.filter { it.conversationId == conversationId }
         if (active.isEmpty()) return
-        // 立即把占位消息从 streaming 降级为 pending，UI 立刻恢复可点。
+        // 立刻停止流式展示并移除生图占位，不等待网络收尾。
         val replyIds = generations.entries
             .filter { it.value.conversationId == conversationId }
             .map { it.key }
             .toSet()
         messages = messages.map { msg ->
-            if (msg.id in replyIds && msg.isStreaming) msg.copy(isStreaming = false) else msg
+            if (msg.id in replyIds) msg.copy(isStreaming = false).stopImageGenerationPreviews() else msg
         }
         // 断开 HTTP 连接会让 ChatApi 返回 stopped；不要取消协程本身，
         // 否则取消状态会跳过后续收尾逻辑，思考事件无法写入最终消息。
@@ -1503,7 +1512,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                 var attemptToolTextLength = 0
                 // 对话模型本身是生图模型：聊天请求整条改走 /images/generations
                 // （gpt-image 等纯生图模型在 chat/completions 上游必拒），
-                // 最后一条用户消息当 prompt，结果图片作为回复附件回流。非流式，过程行只报生成状态。
+                // 最后一条用户消息当 prompt，预览及实际尺寸流式回流，最终图仍作为普通附件保存。
                 val result = if (provider == null) {
                     ChatCompletionResult(error = tr("请先在设置中添加提供商"))
                 } else if (ModelCatalog.isImageModel(context, requestModel)) {
@@ -1548,7 +1557,19 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                     withContext(Dispatchers.IO) {
                         imageRetries.runRound {
                             val generated = ProviderApi.generateImage(provider, requestModel, prompt, imageContext,
-                                cancellation = requestCancellation, options = requestImageOptions)
+                                cancellation = requestCancellation, options = requestImageOptions,
+                                onProgress = { progress ->
+                                    if (!requestCancellation.isCancelled()) kotlinx.coroutines.runBlocking {
+                                        process.onImageGeneration(progress)
+                                        withContext(Dispatchers.Main.immediate) {
+                                            if (!requestCancellation.isCancelled()) replaceInConversation(
+                                                requestConversationId, reply.id,
+                                                reply.copy(process = process.snapshot(), retryStatus = retryStatus,
+                                                    isPending = false, isStreaming = true),
+                                            )
+                                        }
+                                    }
+                                })
                             val stopped = requestCancellation.isCancelled() || generated.error == tr("图片生成已停止")
                             if (!stopped) {
                                 if (generated.attachment != null) process.dropLiveTool()
@@ -1557,7 +1578,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             when {
                                 stopped -> ChatCompletionResult(stopped = true)
                                 generated.attachment != null -> ChatCompletionResult(
-                                    attachments = listOf(generated.attachment), model = requestModel)
+                                    content = generated.text, attachments = listOf(generated.attachment), model = requestModel)
                                 else -> ChatCompletionResult(error = generated.error ?: tr("图片生成失败"),
                                     retryable = generated.retryable)
                             }
@@ -1689,6 +1710,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                                 if (update.searching == true && !cancelled) process.onSearchStarted(update.searchQuery, update.displayText)
                                 if (update.searching == false) process.onSearchFinished(update.searchPagesDelta, update.searchContent, update.toolOutcome)
                                 if (update.toolActive == true && !cancelled) process.onToolStarted(update.toolName, update.webDomain, update.displayText)
+                                if (!cancelled) update.imageGeneration.forEach(process::onImageGeneration)
                                 if (update.toolOutput != null) process.onToolOutput(update.toolOutput)
                                 if (update.toolActive == false) {
                                     if (update.toolName == ImageGenTool.NAME && update.toolContent == ImageGenTool.STATUS_OK) {
@@ -1702,7 +1724,7 @@ fun MainScreen(restoreLastOpened: Boolean = false) {
                             // 停止后不再把普通增量绘制到 UI；上面的终止事件仍用于闭合过程状态。
                             if (cancelled) return@update
                             val now = System.currentTimeMillis()
-                            val publish = update.retry != null || update.retryCleared || update.resetAttempt || shouldPublishStreamUpdate(
+                            val publish = update.imageGeneration.isNotEmpty() || update.retry != null || update.retryCleared || update.resetAttempt || shouldPublishStreamUpdate(
                                 nowMs = now,
                                 lastPublishAt = lastPublishAt,
                                 deltaLength = update.delta.length,
@@ -3787,9 +3809,11 @@ internal fun MessageRow(
                     }
                 }
             } else {
-                if (chatMessage.attachments.isNotEmpty()) {
+                val inlineImagePaths = chatMessage.process.mapNotNull { it.imageGeneration?.finalAttachment?.filePath }.toSet()
+                val ordinaryAttachments = chatMessage.attachments.filterNot { it.filePath in inlineImagePaths }
+                if (ordinaryAttachments.isNotEmpty()) {
                     SentAttachmentRow(
-                        attachments = chatMessage.attachments,
+                        attachments = ordinaryAttachments,
                         alignEnd = false,
                         scrollKey = chatMessage.id,
                         onOpen = onOpenAttachment,
@@ -3824,7 +3848,7 @@ internal fun MessageRow(
                             }
                             is TranscriptRenderRow.Single -> when (val piece = row.piece) {
                                 is TranscriptPiece.Event -> key("process-${piece.event.id}") {
-                                    ProcessEventRow(piece.event, onOpen = onOpenProcess, onQuote = onQuote)
+                                    ProcessEventRow(piece.event, onOpen = onOpenProcess, onQuote = onQuote, onOpenImage = onOpenAttachment)
                                 }
                                 is TranscriptPiece.Text -> {
                                     val shown = if (seenText) piece.text.trimStart('\n') else piece.text
@@ -3977,7 +4001,14 @@ internal fun ProcessEventRow(
     event: ProcessEvent,
     onOpen: (ProcessEvent) -> Unit,
     onQuote: (String) -> Unit = {},
+    onOpenImage: (ChatAttachment) -> Unit = {},
 ) {
+    event.imageGeneration?.let { progress ->
+        if (progress.active || progress.finalAttachment != null) {
+            key(progress.id) { ImageGenerationCard(progress, onOpenImage) }
+            return
+        }
+    }
     if (isSilentPronunciationLookup(event.toolName, event.toolOutcome)) return
     if (event.toolName == CommonsImageTools.SHOW && event.toolOutcome != ToolOutcome.FAILED && event.toolOutcome != ToolOutcome.STOPPED) {
         CommonsImageBlock(event.content)

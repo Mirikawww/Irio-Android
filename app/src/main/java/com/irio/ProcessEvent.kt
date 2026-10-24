@@ -32,6 +32,8 @@ data class ProcessEvent(
     val displayText: String = "",
     val bubbleColor: String = "",
     val toolOutcome: ToolOutcome? = null,
+    /** Ephemeral preview state; only the final attachment is persisted through ordinary message storage. */
+    val imageGeneration: ImageGenerationProgress? = null,
 )
 
 internal const val MERGED_TOOL_CALLS_NAME = "__merged_tool_calls__"

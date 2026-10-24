@@ -545,6 +545,7 @@ data class ImageGenResult(
     val revisedPrompt: String = "",
     val error: String? = null,
     val retryable: Boolean = false,
+    val text: String = "",
 )
 
 object ProviderApi {
@@ -675,11 +676,15 @@ object ProviderApi {
         context: ImageGenContext? = null,
         cancellation: ChatRequestCancellation? = null,
         options: ImageGenerationOptions? = null,
+        onProgress: (ImageGenerationProgress) -> Unit = {},
     ): ImageGenResult {
         if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
-        if (config.protocol.isGoogleGemini) return generateImagePlain(config, model, prompt, cancellation, context, options)
+        val imageStream = ImageGenerationStream(onProgress, cancelled = { cancellation?.isCancelled() == true },
+            download = { url, revised -> imageFromRemoteUrl(url, revised, config, cancellation) })
+        imageStream.start()
+        if (config.protocol.isGoogleGemini) return generateImagePlain(config, model, prompt, cancellation, context, options, imageStream)
         if (context != null && context.previousImages.isNotEmpty()) {
-            val edited = runCatching { generateImageWithEdits(config, model, prompt, context, cancellation, options) }.getOrNull()
+            val edited = generateImageWithEdits(config, model, prompt, context, cancellation, options, imageStream)
             if (edited != null) return edited
             // edits 不可用（端点 404/405/415 或网络层拒绝）→ 回落 generations，把上轮 prompt 织进文本
             val combined = buildString {
@@ -688,9 +693,9 @@ object ProviderApi {
                 append(tr("。参考图即上一轮的生成结果。本次要求："))
                 append(prompt.trim())
             }
-            return generateImagePlain(config, model, combined, cancellation, options = options)
+            return generateImagePlain(config, model, combined, cancellation, options = options, imageStream = imageStream)
         }
-        return generateImagePlain(config, model, prompt, cancellation, options = options)
+        return generateImagePlain(config, model, prompt, cancellation, options = options, imageStream = imageStream)
     }
 
     internal fun imageRequestBody(
@@ -720,7 +725,7 @@ object ProviderApi {
                         options.aspectRatio?.let { put("aspectRatio", it.label) }
                     })
                 })
-            else -> JSONObject().put("model", model).put("prompt", prompt).put("n", 1).apply {
+            else -> JSONObject().put("model", model).put("prompt", prompt).put("n", 1).put("partial_images", 3).put("stream", true).apply {
                 (options?.openAiFields() ?: mapOf("size" to "1024x1024")).forEach { (name, value) -> put(name, value) }
             }
         }
@@ -733,6 +738,7 @@ object ProviderApi {
         cancellation: ChatRequestCancellation?,
         context: ImageGenContext? = null,
         options: ImageGenerationOptions? = null,
+        imageStream: ImageGenerationStream,
     ): ImageGenResult {
         val connection = runCatching {
             val url = if (config.protocol.isGoogleGemini) ProviderEndpoints.chatUrl(config, model, streaming = false)
@@ -748,7 +754,7 @@ object ProviderApi {
             connection.readTimeout = 300_000
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("Accept", if (config.protocol.isGoogleGemini) "application/json" else "text/event-stream, application/json")
             applyAuth(connection, config)
             val requestBody = imageRequestBody(config, model, prompt, context, options)
             connection.outputStream.use { output ->
@@ -759,6 +765,9 @@ object ProviderApi {
             }
             val status = connection.responseCode
             if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
+            if (status in 200..299 && !config.protocol.isGoogleGemini) {
+                return readImageResponse(connection, config, cancellation, imageStream)
+            }
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
@@ -772,7 +781,9 @@ object ProviderApi {
                     } else GeminiProtocol.parse(body)
                     val image = parsed?.attachments?.firstOrNull { it.isImage }
                     parsed?.attachments?.filter { it != image }?.forEach { File(it.filePath).delete() }
-                    if (image != null) ImageGenResult(attachment = image)
+                    if (image != null) ImageGenResult(attachment = image, text = parsed.delta).also {
+                        imageStream.completeJson(it, "")
+                    }
                     else ImageGenResult(error = parsed?.error ?: tr("图片端点没有返回图片"))
                 } else parseImageResponse(body, config, cancellation)
                     ?: ImageGenResult(error = tr("图片端点没有返回图片"))
@@ -794,12 +805,14 @@ object ProviderApi {
         context: ImageGenContext,
         cancellation: ChatRequestCancellation?,
         options: ImageGenerationOptions?,
+        imageStream: ImageGenerationStream,
     ): ImageGenResult? {
         val connection = runCatching {
             URL(imagesEditsUrl(config.endpointUrl)).openConnection() as HttpURLConnection
         }.getOrNull() ?: return null
         cancellation?.attach(connection)
         val boundary = "irio-${UUID.randomUUID()}"
+        var accepted = false
         return try {
             if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
             connection.requestMethod = "POST"
@@ -807,7 +820,7 @@ object ProviderApi {
             connection.readTimeout = 300_000
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("Accept", "text/event-stream, application/json")
             applyAuth(connection, config)
             DataOutputStream(connection.outputStream).use { output ->
                 fun field(name: String, value: String) {
@@ -819,6 +832,8 @@ object ProviderApi {
                 field("model", model)
                 field("prompt", prompt)
                 field("n", "1")
+                field("partial_images", "3")
+                field("stream", "true")
                 (options?.openAiFields() ?: mapOf("size" to "1024x1024")).forEach { (name, value) -> field(name, value) }
                 context.previousImages.forEach { image ->
                     val file = File(image.filePath)
@@ -835,6 +850,10 @@ object ProviderApi {
             }
             val status = connection.responseCode
             if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
+            if (status in 200..299) {
+                accepted = true
+                return readImageResponse(connection, config, cancellation, imageStream)
+            }
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
@@ -848,10 +867,47 @@ object ProviderApi {
             }
         } catch (error: Exception) {
             if (cancellation?.isCancelled() == true) ImageGenResult(error = tr("图片生成已停止"))
+            else if (accepted) ImageGenResult(error = error.message ?: tr("图片生成失败"), retryable = retryableConnectionFailure(error))
             else null
         } finally {
             cancellation?.detach(connection)
             connection.disconnect()
+        }
+    }
+
+    private fun readImageResponse(
+        connection: HttpURLConnection,
+        config: ProviderConfig,
+        cancellation: ChatRequestCancellation?,
+        imageStream: ImageGenerationStream,
+    ): ImageGenResult {
+        connection.inputStream.bufferedReader().use { reader ->
+            // Compatible gateways sometimes ignore stream=true and return the old JSON envelope.
+            reader.mark(512)
+            var first = reader.read()
+            while (first >= 0 && first.toChar().isWhitespace()) first = reader.read()
+            reader.reset()
+            if (first == '{'.code) {
+                val body = reader.readText()
+                if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
+                val result = parseImageResponse(body, config, cancellation)
+                    ?: return ImageGenResult(error = tr("图片端点没有返回图片"))
+                val size = runCatching { JSONObject(body).optString("size") }.getOrDefault("")
+                imageStream.completeJson(result, size)
+                return result
+            }
+            var error: String? = null
+            var retryable = false
+            readImageSse(reader, { cancellation?.isCancelled() == true }) { payload, event ->
+                val update = imageStream.accept(payload, event)
+                if (update?.error != null) { error = update.error; retryable = update.retryable }
+                update?.done == true || update?.error != null || payload == "[DONE]"
+            }
+            if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
+            if (error != null) return ImageGenResult(error = error, retryable = retryable, text = imageStream.text)
+            return imageStream.attachments.firstOrNull()?.let {
+                ImageGenResult(attachment = it, text = imageStream.text, revisedPrompt = imageStream.prompt)
+            } ?: ImageGenResult(error = tr("图片端点没有返回图片"), text = imageStream.text)
         }
     }
 
@@ -883,7 +939,7 @@ object ProviderApi {
             val revised = item.optString("revised_prompt")
             val b64 = item.optString("b64_json")
             if (b64.isNotBlank()) {
-                val bytes = runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()
+                val bytes = runCatching { java.util.Base64.getMimeDecoder().decode(b64) }.getOrNull()
                 val saved = bytes?.let {
                     saveGeneratedImage(it, root.optString("mimeType").ifBlank { "image/png" }, revised)
                 }
@@ -898,7 +954,7 @@ object ProviderApi {
     }
 
     /** 部分图片端点只回 url（DALL·E 默认），不回 b64_json。下到本地，后续编辑才能读文件。 */
-    private fun imageFromRemoteUrl(
+    internal fun imageFromRemoteUrl(
         url: String,
         revisedPrompt: String,
         config: ProviderConfig,
@@ -962,7 +1018,7 @@ object ProviderApi {
         return mime to bytes
     }
 
-    private fun saveGeneratedImage(bytes: ByteArray, mimeType: String, revisedPrompt: String): ImageGenResult? {
+    internal fun saveGeneratedImage(bytes: ByteArray, mimeType: String, revisedPrompt: String): ImageGenResult? {
         if (bytes.isEmpty()) return null
         val mime = mimeType.ifBlank { "image/png" }
         val file = File.createTempFile("irio-img-", imageExtensionFor(mime))

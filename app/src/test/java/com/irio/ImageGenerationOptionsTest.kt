@@ -8,6 +8,16 @@ import org.junit.Test
 import java.nio.file.Files
 
 class ImageGenerationOptionsTest {
+    @Test fun imagesRequestsAlwaysUseThreePartialImagesWithOrWithoutOptions() {
+        val config = ProviderConfig("fixture", "Fixture", "https://example.invalid/v1", "fixture")
+        ProviderProtocol.entries.filterNot { it.isGoogleGemini }.forEach { protocol ->
+            listOf(null, ImageGenerationOptions()).forEach { options ->
+                val body = ProviderApi.imageRequestBody(config.copy(protocol = protocol), "gpt-image-2", "fixture", options = options)
+                assertEquals(3, body.get("partial_images"))
+            }
+        }
+    }
+
     @Test fun customSelectionSurvivesReopeningEvenWhenItMatchesAPreset() {
         val custom = ImageGenerationOptions(aspectRatio = ImageAspectRatio(2, 3),
             useCustomAspectRatio = true, customRatio = ImageAspectRatio(2, 3))
@@ -81,6 +91,7 @@ class ImageGenerationOptionsTest {
             val json = JSONObject(request.body.readUtf8())
             assertEquals("gpt-image-2", json.getString("model"))
             assertEquals("draw a tree", json.getString("prompt"))
+            assertEquals(3, json.get("partial_images"))
             options.openAiFields().forEach { (name, value) -> assertEquals(value, json.getString(name)) }
             assertFalse(json.has("resolution"))
             assertFalse(json.has("aspect_ratio"))
@@ -101,6 +112,7 @@ class ImageGenerationOptionsTest {
                 val edits = server.takeRequest()
                 assertEquals("/v1/images/edits", edits.path)
                 val multipart = edits.body.readUtf8()
+                assertTrue(multipart.contains("name=\"partial_images\"\r\n\r\n3\r\n"))
                 options.openAiFields().forEach { (name, value) ->
                     assertTrue("Missing edits parameter $name", multipart.contains("name=\"$name\"\r\n\r\n$value\r\n"))
                 }
@@ -108,6 +120,7 @@ class ImageGenerationOptionsTest {
                 val fallback = server.takeRequest()
                 assertEquals("/v1/images/generations", fallback.path)
                 val json = JSONObject(fallback.body.readUtf8())
+                assertEquals(3, json.get("partial_images"))
                 options.openAiFields().forEach { (name, value) -> assertEquals(value, json.getString(name)) }
                 assertTrue(json.getString("prompt").contains("old prompt"))
                 assertTrue(json.getString("prompt").contains("new prompt"))
@@ -127,7 +140,10 @@ class ImageGenerationOptionsTest {
         assertEquals("image", format.getString("type"))
         assertEquals("2K", format.getString("image_size"))
         assertEquals("16:9", format.getString("aspect_ratio"))
-        listOf(generate, interactions).forEach { assertFalse(it.has("quality")); assertFalse(it.has("background")); assertFalse(it.has("size")) }
+        listOf(generate, interactions).forEach {
+            assertFalse(it.has("quality")); assertFalse(it.has("background")); assertFalse(it.has("size"))
+            assertFalse(it.has("partial_images"))
+        }
         val auto = ProviderApi.imageRequestBody(config.copy(protocol = ProviderProtocol.GEMINI), "gemini-3-pro-image", "fixture", options = ImageGenerationOptions())
         assertFalse(auto.getJSONObject("generationConfig").getJSONObject("imageConfig").has("aspectRatio"))
     }

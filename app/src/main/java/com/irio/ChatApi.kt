@@ -132,6 +132,7 @@ data class ChatStreamUpdate(
     val retryCleared: Boolean = false,
     val attemptStarted: Boolean = false,
     val resetAttempt: Boolean = false,
+    val imageGeneration: List<ImageGenerationProgress> = emptyList(),
 )
 
 data class ToolCallDelta(
@@ -599,6 +600,8 @@ object ChatApi {
             val toolCalls = linkedMapOf<String, MutableToolCall>()
             val geminiParser = GeminiProtocol.StreamParser()
             val interactionsParser = GeminiInteractionsProtocol.StreamParser()
+            val responseImages = ImageGenerationStream(cancelled = cancellation::isCancelled,
+                download = { url, revised -> ProviderApi.imageFromRemoteUrl(url, revised, provider, cancellation) })
             val geminiParts = mutableListOf<String>()
             var anthropicBlockType = ""
             var anthropicToolIndex = -1
@@ -615,7 +618,8 @@ object ChatApi {
                     eventData.setLength(0)
                     eventName.setLength(0)
                     if (payload.isBlank()) return false
-                    val update = (if (provider.protocol == ProviderProtocol.GEMINI) geminiParser.parse(payload)
+                    val imageUpdate = if (provider.protocol == ProviderProtocol.RESPONSES) responseImages.accept(payload, name) else null
+                    val parsedUpdate = (if (provider.protocol == ProviderProtocol.GEMINI) geminiParser.parse(payload)
                         else if (provider.protocol == ProviderProtocol.GEMINI_INTERACTIONS) interactionsParser.parse(payload, name) else parseSse(
                         protocol = provider.protocol,
                         eventName = name,
@@ -624,7 +628,14 @@ object ChatApi {
                         onAnthropicBlockType = { anthropicBlockType = it },
                         onAnthropicToolIndex = { anthropicToolIndex = it },
                         anthropicToolIndex = { anthropicToolIndex },
-                    )) ?: return false
+                    ))
+                    val update = (parsedUpdate ?: imageUpdate?.let { ChatStreamUpdate() })?.let {
+                        it.copy(
+                            imageGeneration = imageUpdate?.progress.orEmpty(),
+                            attachments = it.attachments + imageUpdate?.attachments.orEmpty(),
+                            error = it.error ?: imageUpdate?.error,
+                        )
+                    } ?: return false
                     if (update.error != null) {
                         throw StreamFailedException(update.error, retryableProviderError(payload))
                     }
@@ -700,13 +711,14 @@ object ChatApi {
             }
             if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
             val completedTools = ChatProtocol.completedToolCalls(toolCalls)
+            val completedContent = streamedContent.toString().ifBlank { responseImages.text }
             if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
             val wantsTools = finishReason == "tool_calls" ||
                 finishReason == "tool_use" ||
                 completedTools.isNotEmpty()
             when {
                 wantsTools && completedTools.isNotEmpty() -> ChatCompletionResult(
-                    content = streamedContent.toString(),
+                    content = completedContent,
                     thinking = streamedThinking.toString(),
                     attachments = streamedAttachments.values.toList(),
                     model = responseModel,
@@ -714,7 +726,7 @@ object ChatApi {
                     usage = lastUsage,
                     geminiParts = geminiParts,
                 )
-                streamedContent.isBlank() &&
+                completedContent.isBlank() &&
                     streamedAttachments.isEmpty() &&
                     streamedThinking.isBlank() &&
                     completedTools.isEmpty() &&
@@ -722,7 +734,7 @@ object ChatApi {
                         finishReason !in setOf("length", "max_tokens", "MAX_TOKENS", "tool_calls", "tool_use", "function_call")) ->
                     ChatCompletionResult(error = tr("端点返回了空回复"), retryable = true)
                 else -> ChatCompletionResult(
-                    content = streamedContent.toString(),
+                    content = completedContent,
                     thinking = streamedThinking.toString(),
                     attachments = streamedAttachments.values.toList(),
                     model = responseModel,

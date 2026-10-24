@@ -59,6 +59,7 @@ class ImageGenToolTest {
             val body = JSONObject(request.body.readUtf8())
             assertEquals("gpt-image-2", body.getString("model"))
             assertEquals("A blue tree", body.getString("prompt"))
+            assertEquals(3, body.get("partial_images"))
             assertEquals("2048x2048", body.getString("size"))
             assertEquals("transparent", body.getString("background"))
             assertEquals("high", body.getString("quality"))
