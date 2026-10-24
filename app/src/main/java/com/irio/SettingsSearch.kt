@@ -248,6 +248,7 @@ private val settingsSearchEntries = listOf(
     item("appearance.retry.limit", "重试次数上限", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.retry.cooldown", "重试冷却时长", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.glyph", "文本淡入", "外观与偏好", AppearanceSettingsActivity::class.java),
+    item("appearance.imageStreaming", "图片生成流式传输", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.diff", "模型差异", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.pickerLeft", "模型切换器居左", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.scroll", "新消息滚动", "外观与偏好", AppearanceSettingsActivity::class.java),

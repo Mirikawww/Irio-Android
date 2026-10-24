@@ -151,6 +151,7 @@ object ThemeStore {
     private const val LANGUAGE_KEY = "language"
     private const val CONTEXT_RING_KEY = "context_ring"
     private const val GLYPH_FADE_KEY = "glyph_fade"
+    private const val IMAGE_GENERATION_STREAMING_KEY = "image_generation_streaming"
     private const val MODEL_DIFF_KEY = "model_diff"
     private const val MODEL_PICKER_ON_LEFT_KEY = "model_picker_on_left"
     private const val NEW_MESSAGE_SCROLL_KEY = "new_message_scroll"
@@ -194,6 +195,10 @@ object ThemeStore {
 
     /** 流式回复的新字淡入。默认关。 */
     var glyphFade by mutableStateOf(false)
+        private set
+
+    /** 图片生成请求启用流式中间预览。默认关。 */
+    var imageGenerationStreaming by mutableStateOf(false)
         private set
 
     /** 提供商详情里新增/移除模型的绿红底。默认关。 */
@@ -278,6 +283,7 @@ object ThemeStore {
             language = AppLanguage.fromStored(appearance.getString(LANGUAGE_KEY, null))
             contextRing = appearance.getBoolean(CONTEXT_RING_KEY, false)
             glyphFade = appearance.getBoolean(GLYPH_FADE_KEY, false)
+            imageGenerationStreaming = appearance.getBoolean(IMAGE_GENERATION_STREAMING_KEY, false)
             modelDiff = appearance.getBoolean(MODEL_DIFF_KEY, false)
             modelPickerOnLeft = appearance.getBoolean(MODEL_PICKER_ON_LEFT_KEY, false)
             newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, false)
@@ -366,6 +372,14 @@ object ThemeStore {
             .edit()
             .putBoolean(MODEL_DIFF_KEY, enabled)
             .apply()
+    }
+
+    fun saveImageGenerationStreaming(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (imageGenerationStreaming == enabled) return
+        imageGenerationStreaming = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(IMAGE_GENERATION_STREAMING_KEY, enabled).apply()
     }
 
     fun saveNewMessageScroll(context: Context, enabled: Boolean) {

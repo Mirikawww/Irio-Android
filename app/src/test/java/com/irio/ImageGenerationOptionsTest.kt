@@ -8,11 +8,23 @@ import org.junit.Test
 import java.nio.file.Files
 
 class ImageGenerationOptionsTest {
-    @Test fun imagesRequestsAlwaysUseThreePartialImagesWithOrWithoutOptions() {
+    @Test fun imagesRequestsDefaultToNonStreamingWithOrWithoutOptions() {
         val config = ProviderConfig("fixture", "Fixture", "https://example.invalid/v1", "fixture")
         ProviderProtocol.entries.filterNot { it.isGoogleGemini }.forEach { protocol ->
             listOf(null, ImageGenerationOptions()).forEach { options ->
                 val body = ProviderApi.imageRequestBody(config.copy(protocol = protocol), "gpt-image-2", "fixture", options = options)
+                assertFalse(body.getBoolean("stream"))
+                assertFalse(body.has("partial_images"))
+            }
+        }
+    }
+
+    @Test fun streamingRequestsUseThreePartialImagesWithOrWithoutOptions() {
+        val config = ProviderConfig("fixture", "Fixture", "https://example.invalid/v1", "fixture")
+        ProviderProtocol.entries.filterNot { it.isGoogleGemini }.forEach { protocol ->
+            listOf(null, ImageGenerationOptions()).forEach { options ->
+                val body = ProviderApi.imageRequestBody(config.copy(protocol = protocol), "gpt-image-2", "fixture", options = options, streaming = true)
+                assertTrue(body.getBoolean("stream"))
                 assertEquals(3, body.get("partial_images"))
             }
         }
@@ -85,7 +97,7 @@ class ImageGenerationOptionsTest {
             server.enqueue(MockResponse().setResponseCode(503).setBody("""{"error":{"message":"fixture"}}"""))
             val config = ProviderConfig("fixture", "Fixture", server.url("/v1").toString(), "fixture")
             val options = ImageGenerationOptions(ImageResolution.K2, ImageAspectRatio(16, 9), ImageBackground.TRANSPARENT, ImageQuality.HIGH)
-            ProviderApi.generateImage(config, "gpt-image-2", "draw a tree", options = options)
+            ProviderApi.generateImage(config, "gpt-image-2", "draw a tree", options = options, streaming = true)
             val request = server.takeRequest()
             assertEquals("/v1/images/generations", request.path)
             val json = JSONObject(request.body.readUtf8())
@@ -108,7 +120,7 @@ class ImageGenerationOptionsTest {
                 val config = ProviderConfig("fixture", "Fixture", server.url("/v1").toString(), "fixture")
                 val options = ImageGenerationOptions(ImageResolution.K4, ImageAspectRatio(16, 9), ImageBackground.OPAQUE, ImageQuality.LOW)
                 val context = ProviderApi.ImageGenContext("old prompt", listOf(ChatAttachment("previous.png", "image/png", image.absolutePath)))
-                ProviderApi.generateImage(config, "gpt-image-2", "new prompt", context, options = options)
+                ProviderApi.generateImage(config, "gpt-image-2", "new prompt", context, options = options, streaming = true)
                 val edits = server.takeRequest()
                 assertEquals("/v1/images/edits", edits.path)
                 val multipart = edits.body.readUtf8()

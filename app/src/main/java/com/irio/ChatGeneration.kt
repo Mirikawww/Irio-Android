@@ -45,6 +45,7 @@ internal fun ChatScreenState.startGeneration(
     SpeechPlayer.stop()
     val requestModel = selectedModel
     val requestImageOptions = ImageGenerationStore.load(context, activeProviderId, requestModel)
+    val requestImageStreaming = ThemeStore.imageGenerationStreaming
     val effectiveReasoningInfo =
         if (ProviderStore.loadModelsDevReasoning(context)) {
             ModelCatalog.reasoningInfo(context, requestModel, useCatalog = true)
@@ -234,6 +235,7 @@ internal fun ChatScreenState.startGeneration(
                                         imageContext,
                                         cancellation = requestCancellation,
                                         options = requestImageOptions,
+                                        streaming = requestImageStreaming,
                                         onProgress = { progress ->
                                             if (!requestCancellation.isCancelled())
                                                 kotlinx.coroutines.runBlocking {

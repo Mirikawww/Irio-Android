@@ -113,7 +113,7 @@ class ImageGenerationStreamTest {
                     val updates = mutableListOf<ImageGenerationProgress>()
                     val result = ProviderApi.generateImage(ProviderConfig("p", "P", server.url("/v1").toString(), "fixture"),
                         "gpt-image-2", "fixture", ProviderApi.ImageGenContext("old", listOf(ChatAttachment("previous.png", "image/png", source.absolutePath))),
-                        onProgress = { updates += it })
+                        streaming = true, onProgress = { updates += it })
                     try {
                         assertNotNull(result.attachment)
                         assertEquals(1, updates.map { it.id }.distinct().size)
@@ -161,7 +161,7 @@ class ImageGenerationStreamTest {
             server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(sse(partial(0), partial(1), partial(2), final())))
             val updates = mutableListOf<ImageGenerationProgress>()
             val result = ProviderApi.generateImage(ProviderConfig("p", "P", server.url("/v1").toString(), "fixture"),
-                "gpt-image-2", "fixture", onProgress = { updates += it })
+                "gpt-image-2", "fixture", streaming = true, onProgress = { updates += it })
             try {
                 assertNull(result.error)
                 assertNotNull(result.attachment)
@@ -184,7 +184,7 @@ class ImageGenerationStreamTest {
             server.enqueue(MockResponse().setBody(if (json) """{"size":"1536x1024","data":[{"b64_json":"$png"}]}""" else sse(final())))
             val updates = mutableListOf<ImageGenerationProgress>()
             val result = ProviderApi.generateImage(ProviderConfig("p", "P", server.url("/v1").toString(), "fixture"),
-                "gpt-image-2", "fixture", onProgress = { updates += it })
+                "gpt-image-2", "fixture", streaming = true, onProgress = { updates += it })
             try {
                 assertNotNull(result.attachment)
                 assertEquals(2, updates.size)
@@ -200,7 +200,7 @@ class ImageGenerationStreamTest {
             val cancellation = ChatRequestCancellation()
             val updates = mutableListOf<ImageGenerationProgress>()
             val result = ProviderApi.generateImage(ProviderConfig("p", "P", server.url("/v1").toString(), "fixture"),
-                "gpt-image-2", "fixture", cancellation = cancellation, onProgress = {
+                "gpt-image-2", "fixture", cancellation = cancellation, streaming = true, onProgress = {
                     updates += it
                     if (it.partialIndex == 0 && cancel) cancellation.cancel()
                 })

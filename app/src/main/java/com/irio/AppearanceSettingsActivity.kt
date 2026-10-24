@@ -725,6 +725,20 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 Row(
+                    modifier = Modifier.settingsSearchAnchor("appearance.imageStreaming").settingsSwitchRow(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("图片生成流式传输"),
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][onPanelColor],
+                    )
+                    Switch(
+                        checked = ThemeStore.imageGenerationStreaming,
+                        onCheckedChange = { ThemeStore.saveImageGenerationStreaming(context, it) },
+                    )
+                }
+                Row(
                     modifier = Modifier.settingsSearchAnchor("appearance.diff").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

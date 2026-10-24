@@ -676,15 +676,16 @@ object ProviderApi {
         context: ImageGenContext? = null,
         cancellation: ChatRequestCancellation? = null,
         options: ImageGenerationOptions? = null,
+        streaming: Boolean = ThemeStore.imageGenerationStreaming,
         onProgress: (ImageGenerationProgress) -> Unit = {},
     ): ImageGenResult {
         if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
         val imageStream = ImageGenerationStream(onProgress, cancelled = { cancellation?.isCancelled() == true },
             download = { url, revised -> imageFromRemoteUrl(url, revised, config, cancellation) })
         imageStream.start()
-        if (config.protocol.isGoogleGemini) return generateImagePlain(config, model, prompt, cancellation, context, options, imageStream)
+        if (config.protocol.isGoogleGemini) return generateImagePlain(config, model, prompt, cancellation, context, options, imageStream, streaming)
         if (context != null && context.previousImages.isNotEmpty()) {
-            val edited = generateImageWithEdits(config, model, prompt, context, cancellation, options, imageStream)
+            val edited = generateImageWithEdits(config, model, prompt, context, cancellation, options, imageStream, streaming)
             if (edited != null) return edited
             // edits 不可用（端点 404/405/415 或网络层拒绝）→ 回落 generations，把上轮 prompt 织进文本
             val combined = buildString {
@@ -693,9 +694,9 @@ object ProviderApi {
                 append(tr("。参考图即上一轮的生成结果。本次要求："))
                 append(prompt.trim())
             }
-            return generateImagePlain(config, model, combined, cancellation, options = options, imageStream = imageStream)
+            return generateImagePlain(config, model, combined, cancellation, options = options, imageStream = imageStream, streaming = streaming)
         }
-        return generateImagePlain(config, model, prompt, cancellation, options = options, imageStream = imageStream)
+        return generateImagePlain(config, model, prompt, cancellation, options = options, imageStream = imageStream, streaming = streaming)
     }
 
     internal fun imageRequestBody(
@@ -704,6 +705,7 @@ object ProviderApi {
         prompt: String,
         context: ImageGenContext? = null,
         options: ImageGenerationOptions? = null,
+        streaming: Boolean = ThemeStore.imageGenerationStreaming,
     ): JSONObject {
         val messages = buildList {
             if (context != null && context.previousImages.isNotEmpty()) {
@@ -725,7 +727,8 @@ object ProviderApi {
                         options.aspectRatio?.let { put("aspectRatio", it.label) }
                     })
                 })
-            else -> JSONObject().put("model", model).put("prompt", prompt).put("n", 1).put("partial_images", 3).put("stream", true).apply {
+            else -> JSONObject().put("model", model).put("prompt", prompt).put("n", 1).put("stream", streaming).apply {
+                if (streaming) put("partial_images", 3)
                 (options?.openAiFields() ?: mapOf("size" to "1024x1024")).forEach { (name, value) -> put(name, value) }
             }
         }
@@ -739,6 +742,7 @@ object ProviderApi {
         context: ImageGenContext? = null,
         options: ImageGenerationOptions? = null,
         imageStream: ImageGenerationStream,
+        streaming: Boolean,
     ): ImageGenResult {
         val connection = runCatching {
             val url = if (config.protocol.isGoogleGemini) ProviderEndpoints.chatUrl(config, model, streaming = false)
@@ -754,9 +758,9 @@ object ProviderApi {
             connection.readTimeout = 300_000
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            connection.setRequestProperty("Accept", if (config.protocol.isGoogleGemini) "application/json" else "text/event-stream, application/json")
+            connection.setRequestProperty("Accept", if (config.protocol.isGoogleGemini || !streaming) "application/json" else "text/event-stream, application/json")
             applyAuth(connection, config)
-            val requestBody = imageRequestBody(config, model, prompt, context, options)
+            val requestBody = imageRequestBody(config, model, prompt, context, options, streaming)
             connection.outputStream.use { output ->
                 if (cancellation?.isCancelled() == true) return ImageGenResult(error = tr("图片生成已停止"))
                 output.write(
@@ -806,6 +810,7 @@ object ProviderApi {
         cancellation: ChatRequestCancellation?,
         options: ImageGenerationOptions?,
         imageStream: ImageGenerationStream,
+        streaming: Boolean,
     ): ImageGenResult? {
         val connection = runCatching {
             URL(imagesEditsUrl(config.endpointUrl)).openConnection() as HttpURLConnection
@@ -820,7 +825,7 @@ object ProviderApi {
             connection.readTimeout = 300_000
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-            connection.setRequestProperty("Accept", "text/event-stream, application/json")
+            connection.setRequestProperty("Accept", if (streaming) "text/event-stream, application/json" else "application/json")
             applyAuth(connection, config)
             DataOutputStream(connection.outputStream).use { output ->
                 fun field(name: String, value: String) {
@@ -832,8 +837,8 @@ object ProviderApi {
                 field("model", model)
                 field("prompt", prompt)
                 field("n", "1")
-                field("partial_images", "3")
-                field("stream", "true")
+                if (streaming) field("partial_images", "3")
+                field("stream", streaming.toString())
                 (options?.openAiFields() ?: mapOf("size" to "1024x1024")).forEach { (name, value) -> field(name, value) }
                 context.previousImages.forEach { image ->
                     val file = File(image.filePath)
