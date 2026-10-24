@@ -1,5 +1,7 @@
 package com.irio
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
@@ -10,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewRootForTest
@@ -25,6 +28,7 @@ import com.composables.ui.components.Text
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
+import com.composables.ui.theme.secondaryColor
 import com.composeunstyled.theme.Theme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -36,6 +40,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalComposeUiApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -103,7 +108,9 @@ class ReplyErrorRowTest {
         }
     }
 
-    @Test fun onlyExclamationIsRedAndRetryMatchesVersionTextBelowReason() = runTest {
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun onlyExclamationIsRedAndRetryMatchesVersionTextBelowReason() = runTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val clock = BroadcastFrameClock()
         val recomposer = Recomposer(coroutineContext + clock)
@@ -111,6 +118,7 @@ class ReplyErrorRowTest {
         val view = ComposeView(controller.get())
         var normal = Color.Unspecified
         var red = Color.Unspecified
+        var cardFill = Color.Unspecified
         val retry = ChatRetryStatus("fixture error", 2, remainingSeconds = 8)
         try {
             view.setParentCompositionContext(recomposer)
@@ -120,6 +128,7 @@ class ReplyErrorRowTest {
                     AppTheme {
                         normal = Theme[colors][onBackgroundColor]
                         red = irioErrorTextColor()
+                        cardFill = Theme[colors][secondaryColor]
                         Column {
                             ReplyErrorRow(retry)
                             Text("version reference", color = Theme[colors][mutedColor])
@@ -154,6 +163,13 @@ class ReplyErrorRowTest {
             assertTrue(reason.boundsInRoot.left > icon.boundsInRoot.left)
             assertEquals(reason.boundsInRoot.left, retryNode.boundsInRoot.left, 0.5f)
             assertTrue(retryNode.boundsInRoot.top > reason.boundsInRoot.top)
+            val capture = Bitmap.createBitmap(360, 300, Bitmap.Config.ARGB_8888)
+            try {
+                view.draw(Canvas(capture))
+                assertEquals("The error card must use the theme's secondary background", cardFill.toArgb(), capture.getPixel(180, 4))
+                assertNotEquals("The card must keep rounded, unpainted outer corners", cardFill.toArgb(), capture.getPixel(0, 0))
+            } finally { capture.recycle() }
+            assertEquals("The status icon must sit inside the card padding", 12f, icon.boundsInRoot.left, 0.5f)
         } finally {
             view.disposeComposition()
             recomposer.close()

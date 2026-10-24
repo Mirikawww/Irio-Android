@@ -1,13 +1,16 @@
 package com.irio
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -15,12 +18,21 @@ import com.composables.ui.components.Text
 import com.composables.ui.components.Icon
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
+import com.composables.ui.theme.largeShape
+import com.composables.ui.theme.secondaryColor
+import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 
 @Composable
 internal fun ReplyErrorRow(status: ChatRetryStatus) {
     val renderScope = rememberCoroutineScope()
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(Theme[shapes][largeShape])
+            .background(Theme[colors][secondaryColor])
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Icon(
             imageVector = replyErrorIcon(status),
             contentDescription = tr("重试状态"),
