@@ -44,6 +44,13 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SettingsUpdatesTest {
+    @Test fun channelLabelsUsePublicCodenamesWithoutChangingStoredIds() {
+        assertEquals("Iota", UpdateChannel.RELEASE.label)
+        assertEquals("Gamma", UpdateChannel.PRE_RELEASE.label)
+        assertEquals("RELEASE", UpdateChannel.RELEASE.name)
+        assertEquals("PRE_RELEASE", UpdateChannel.PRE_RELEASE.name)
+    }
+
     @Test fun channelDefaultsToReleaseAndPersistsTheSelection() {
         val context = org.robolectric.RuntimeEnvironment.getApplication()
         context.getSharedPreferences("updates", Context.MODE_PRIVATE).edit().clear().commit()
@@ -113,13 +120,16 @@ class SettingsUpdatesTest {
         withUi(content = { SettingsUpdateSection(onNotice = {}) }) { fixture ->
             fixture.click(fixture.tag("update-channel"))
             fixture.frames(30)
+            assertTrue(fixture.nodes().any {
+                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == "Iota" }
+            })
             val preview = fixture.nodes().single {
-                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == "Pre-release" }
+                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == "Gamma" }
             }
             fixture.click(preview)
             fixture.frames(30)
             assertEquals(UpdateChannel.PRE_RELEASE, UpdateChannel.load(fixture.context))
-            assertEquals("Pre-release", fixture.tag("update-channel").config[SemanticsProperties.StateDescription])
+            assertEquals("Gamma", fixture.tag("update-channel").config[SemanticsProperties.StateDescription])
         }
     }
 

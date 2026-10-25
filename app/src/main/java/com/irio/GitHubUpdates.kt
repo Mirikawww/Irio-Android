@@ -21,7 +21,7 @@ import org.json.JSONArray
 import org.json.JSONException
 
 internal enum class UpdateChannel(val label: String) {
-    RELEASE("Release"), PRE_RELEASE("Pre-release");
+    RELEASE("Iota"), PRE_RELEASE("Gamma");
 
     companion object {
         fun load(context: Context): UpdateChannel =
