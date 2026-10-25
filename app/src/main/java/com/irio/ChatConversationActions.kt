@@ -80,8 +80,10 @@ internal fun ChatScreenState.persistCurrent(
                 currentConversation.tokenUsage
                     ?: updatedMessages.lastOrNull { !it.fromUser && it.usage != null }?.usage,
         )
-    currentConversation = stored
-    cacheConversationContent(stored)
+    // Empty pending rows stay out of disk history, but must remain in the runtime snapshot.
+    val live = stored.copy(messages = updatedMessages)
+    currentConversation = live
+    cacheConversationContent(live)
     // 摘要就地更新（filter/map 保留引用相等性，不打乱抽屉滚动位置）；
     // 排序只在顺序真变化时重写引用，避免无谓的整列表重组。
     conversations =
@@ -116,20 +118,19 @@ internal fun ChatScreenState.replaceInConversation(
             } else {
                 messages + updated
             }
-        if (persist) persistCurrent(messages)
-    } else if (!persist && updated.process.any { it.imageGeneration != null }) {
-        // Keep previews in memory while another conversation is open; never write them to disk.
-        synchronized(conversationCache) {
-            conversationCache[conversationId]?.let { stored ->
-                conversationCache[conversationId] =
-                    stored.copy(
-                        messages =
-                            if (stored.messages.any { it.id == replyId })
-                                stored.messages.map { if (it.id == replyId) updated else it }
-                            else stored.messages + updated
-                    )
-            }
+        if (persist) {
+            persistCurrent(messages)
+        } else {
+            cacheConversationContent(currentConversation.copy(messages = messages))
         }
+    } else if (!persist) {
+        // All live reply states are runtime-only, not just image-generation previews.
+        val stored = conversationContent(conversationId) ?: return
+        cacheConversationContent(stored.copy(
+            messages = if (stored.messages.any { it.id == replyId })
+                stored.messages.map { if (it.id == replyId) updated else it }
+            else stored.messages + updated
+        ))
     } else if (persist) {
         val stored = conversationContent(conversationId) ?: return
         val next =

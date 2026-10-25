@@ -20,9 +20,14 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
@@ -36,6 +41,79 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
 class ChatScreenStateTest {
+    @Test
+    fun emptyPendingReplySurvivesSwitchingAwayAndBackWithoutEnteringDiskHistory() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            withState { harness ->
+                val state = harness.state
+                val user = ChatMessage(1, "question", true)
+                val pending = ChatMessage(2, "", false, isPending = true, responseToUserId = user.id)
+                state.messages = listOf(user, pending)
+                state.persistCurrent()
+                val summary = state.currentConversation.summary()
+                assertEquals("The runtime cache must retain the empty request-status row", pending,
+                    state.conversationContent(summary.id)?.messages?.last())
+
+                state.newConversation()
+                state.openConversation(summary)
+                harness.awaitConversation(summary.id)
+                assertEquals(listOf(user, pending), state.messages)
+                assertTrue(state.messages.last().isPending)
+
+                // Await the real asynchronous save; JSON still must not retain a phantom request.
+                val saved = withContext(Dispatchers.IO) {
+                    var loaded: Conversation? = null
+                    repeat(100) {
+                        loaded = ConversationStore.load(state.context, summary.id)
+                        if (loaded != null) return@withContext loaded
+                        Thread.sleep(10)
+                    }
+                    loaded
+                }
+                assertNotNull(saved)
+                assertEquals("Empty in-flight replies are runtime-only",
+                    listOf(user.copy(retryGroup = user.groupId)), saved!!.messages)
+            }
+        } finally { Dispatchers.resetMain() }
+    }
+
+    @Test
+    fun backgroundThinkingAndRetrySnapshotsRemainVisibleBeforeAnyBodyText() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            withState { harness ->
+                val state = harness.state
+                val user = ChatMessage(1, "question", true)
+                val pending = ChatMessage(2, "", false, isPending = true)
+                state.messages = listOf(user, pending)
+                state.persistCurrent()
+                val summary = state.currentConversation.summary()
+                state.newConversation()
+                val otherId = state.currentConversation.id
+                val thinking = pending.copy(isPending = false, isStreaming = true,
+                    process = listOf(ProcessEvent(1, ProcessEventKind.THINKING, live = true)))
+                state.replaceInConversation(summary.id, pending.id, thinking)
+                assertEquals("Background process updates must refresh the cached reply even without text", thinking,
+                    state.conversationContent(summary.id)?.messages?.last())
+                assertEquals(otherId, state.currentConversation.id)
+                assertTrue(state.messages.isEmpty())
+
+                state.openConversation(summary)
+                harness.awaitConversation(summary.id)
+                assertEquals(thinking, state.messages.last())
+                val retry = thinking.copy(process = emptyList(), retryStatus = ChatRetryStatus("offline", 1, remainingSeconds = 3))
+                state.replaceInConversation(summary.id, pending.id, retry)
+                assertEquals("Foreground snapshots also need to survive navigation", retry,
+                    state.conversationContent(summary.id)?.messages?.last())
+                state.newConversation()
+                state.openConversation(summary)
+                harness.awaitConversation(summary.id)
+                assertEquals(retry, state.messages.last())
+            }
+        } finally { Dispatchers.resetMain() }
+    }
+
     @Test
     fun recompositionRetainsTheStateAndComposerDraft() = runTest {
         withState { harness ->
@@ -158,6 +236,15 @@ class ChatScreenStateTest {
             scope.runCurrent()
             clock.sendFrame(16_000_000L)
             scope.runCurrent()
+        }
+
+        suspend fun awaitConversation(id: String) {
+            repeat(100) {
+                scope.runCurrent()
+                if (state.currentConversation.id == id) return
+                withContext(Dispatchers.IO) { Thread.sleep(10) }
+            }
+            assertEquals("The real conversation-open action must finish", id, state.currentConversation.id)
         }
     }
 
