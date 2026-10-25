@@ -225,6 +225,11 @@ private val settingsSearchEntries = listOf(
     page("page.link", "互连", LinkSettingsActivity::class.java),
     page("page.linux", "Linux 沙盒", LinuxSandboxSettingsActivity::class.java),
     page("page.other", "其他", OtherSettingsActivity::class.java),
+    page("page.about", "关于", AboutActivity::class.java),
+    page("page.acknowledgements", "鸣谢", AcknowledgementsActivity::class.java),
+    item("about.version", "版本信息", "关于", AboutActivity::class.java),
+    item("about.project", "项目地址", "关于", AboutActivity::class.java),
+    item("about.docs", "文档与更新日志", "关于", AboutActivity::class.java),
 
     item("appearance.language", "语言", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.theme", "主题", "外观与偏好", AppearanceSettingsActivity::class.java),

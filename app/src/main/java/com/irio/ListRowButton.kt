@@ -42,6 +42,7 @@ import com.composables.ui.components.Icon
 import com.composables.ui.components.Text
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.largeShape
+import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.onPrimaryColor
@@ -66,6 +67,7 @@ fun ListRowButton(
     labelFontWeight: FontWeight? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
     searchId: String? = null,
+    supportingText: String? = null,
 ) {
     val contentColor = if (style == ButtonStyle.Ghost) {
         Theme[colors][onBackgroundColor]
@@ -92,14 +94,22 @@ fun ListRowButton(
             )
             Spacer(Modifier.width(12.dp))
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, fontWeight = labelFontWeight)
-            if (experimental) {
-                Spacer(Modifier.width(8.dp))
-                ExperimentalBadge()
+        Column(
+            modifier = if (supportingText != null) Modifier.weight(1f) else Modifier,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(label, fontWeight = labelFontWeight)
+                if (experimental) {
+                    Spacer(Modifier.width(8.dp))
+                    ExperimentalBadge()
+                }
+            }
+            supportingText?.let {
+                Text(it, color = Theme[colors][mutedColor], fontSize = 13.sp, lineHeight = 18.sp)
             }
         }
-        Spacer(Modifier.weight(1f))
+        if (supportingText == null) Spacer(Modifier.weight(1f))
         if (trailing != null) {
             Spacer(Modifier.width(8.dp))
             trailing()

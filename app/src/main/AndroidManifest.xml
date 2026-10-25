@@ -53,6 +53,18 @@
             android:screenOrientation="portrait"
             android:theme="@style/AppTheme" />
         <activity
+            android:name=".AboutActivity"
+            android:exported="false"
+            android:label="@string/about_title"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".AcknowledgementsActivity"
+            android:exported="false"
+            android:label="@string/acknowledgements_title"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme" />
+        <activity
             android:name=".ProviderSettingsActivity"
             android:exported="false"
             android:label="提供商"

@@ -46,6 +46,7 @@ internal fun <T : Any> AndroidComposeRecyclerList(
     opacity: State<Float>? = null,
     interactionEnabled: Boolean = true,
     prioritizeScrollGestures: Boolean = false,
+    maintainEndPosition: Boolean = false,
     content: @Composable (T) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -65,6 +66,7 @@ internal fun <T : Any> AndroidComposeRecyclerList(
         modifier = modifier,
         factory = { context ->
             ComposeRecyclerView(context, key, content).also { view ->
+                view.maintainEndPosition = maintainEndPosition
                 view.prioritizeScrollGestures = prioritizeScrollGestures
                 view.updateVisibility(opacity?.value ?: 1f, interactionEnabled)
                 view.updateCornerRadius(cornerRadiusPx)
@@ -74,6 +76,7 @@ internal fun <T : Any> AndroidComposeRecyclerList(
             }
         },
         update = { view ->
+            view.maintainEndPosition = maintainEndPosition
             view.prioritizeScrollGestures = prioritizeScrollGestures
             view.updateVisibility(opacity?.value ?: 1f, interactionEnabled)
             view.updateCornerRadius(cornerRadiusPx)
@@ -98,6 +101,10 @@ private class ComposeRecyclerView<T : Any>(
     content: @Composable (T) -> Unit,
 ) : RecyclerView(context) {
     private val listAdapter = ComposeListAdapter(key, content)
+    private val listLayoutManager = EndAnchoredLayoutManager(context)
+    var maintainEndPosition: Boolean
+        get() = listLayoutManager.maintainEndPosition
+        set(value) { listLayoutManager.maintainEndPosition = value }
     private var spacingDecoration: RecyclerSpacingDecoration? = null
     private var cornerRadiusPx = 0f
     private var acceptsTouch = true
@@ -105,7 +112,7 @@ private class ComposeRecyclerView<T : Any>(
     private var lastTouchY = 0f
 
     init {
-        layoutManager = LinearLayoutManager(context)
+        layoutManager = listLayoutManager
         adapter = listAdapter
         itemAnimator = null
         overScrollMode = View.OVER_SCROLL_NEVER
@@ -152,6 +159,8 @@ private class ComposeRecyclerView<T : Any>(
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (!acceptsTouch) return false
+        // A fresh gesture (including expanding a card) starts a new positioning intent.
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) listLayoutManager.releaseEndAnchor()
         // AndroidView must claim DOWN before a Compose sheet's drag detector reaches
         // touch slop and cancels the list. Nested scrolling still hands off at edges.
         if (prioritizeScrollGestures && event.actionMasked == MotionEvent.ACTION_DOWN) {
@@ -206,6 +215,34 @@ private class ComposeRecyclerView<T : Any>(
         if (spacingDecoration?.spacing == next) return
         spacingDecoration?.let(::removeItemDecoration)
         spacingDecoration = RecyclerSpacingDecoration(next).also(::addItemDecoration)
+    }
+}
+
+/** Retain an already-reached end when Compose rows remeasure after a fast scroll. */
+private class EndAnchoredLayoutManager(context: Context) : LinearLayoutManager(context) {
+    var maintainEndPosition = false
+    private var reachedEnd = false
+
+    fun releaseEndAnchor() { reachedEnd = false }
+
+    override fun scrollVerticallyBy(dy: Int, recycler: RecyclerView.Recycler, state: RecyclerView.State): Int {
+        if (dy < 0) reachedEnd = false
+        val consumed = super.scrollVerticallyBy(dy, recycler, state)
+        if (maintainEndPosition && dy > 0) {
+            val last = findViewByPosition(itemCount - 1)
+            reachedEnd = last != null && getDecoratedBottom(last) <= height - paddingBottom
+        }
+        return consumed
+    }
+
+    override fun onLayoutChildren(recycler: RecyclerView.Recycler, state: RecyclerView.State) {
+        val anchorEnd = maintainEndPosition && reachedEnd && !state.isPreLayout
+        super.onLayoutChildren(recycler, state)
+        if (anchorEnd) {
+            val last = findViewByPosition(itemCount - 1) ?: return
+            val overflow = getDecoratedBottom(last) - (height - paddingBottom)
+            if (overflow > 0) super.scrollVerticallyBy(overflow, recycler, state)
+        }
     }
 }
 

@@ -40,16 +40,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.Icon
 import com.composables.ui.components.IconButton
-import com.composables.ui.components.Text
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
-import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.shapes
@@ -69,7 +65,6 @@ class SettingsActivity : ComponentActivity() {
 internal fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val softwareInfo = remember { androidSoftwareInfo(context) }
     var editingName by remember { mutableStateOf(false) }
     var cropSource by remember { mutableStateOf<Bitmap?>(null) }
     var searchQuery by remember { mutableStateOf("") }
@@ -168,13 +163,11 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(20.dp))
-                Text(
-                    softwareInfo,
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Theme[colors][mutedColor],
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                )
+                SettingsHomeGroup {
+                    SettingsHomeRow(tr("关于"), IrioIcons.Info) {
+                        context.startActivity(Intent(context, AboutActivity::class.java))
+                    }
+                }
             }
     }
     }

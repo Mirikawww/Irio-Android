@@ -6,6 +6,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsSearchTest {
+    @Test fun aboutVersionAndAcknowledgementsHaveTheirOwnSearchDestinations() {
+        val about = searchSettings("关于", label = { it }).single { it.id == "page.about" }
+        assertEquals("com.irio.AboutActivity", about.destination.name)
+        val version = searchSettings("版本", label = { it }).single { it.id == "about.version" }
+        assertEquals(about.destination, version.destination)
+        val credits = searchSettings("鸣谢", label = { it }).single { it.id == "page.acknowledgements" }
+        assertEquals("com.irio.AcknowledgementsActivity", credits.destination.name)
+    }
+
     @Test fun enterMatchesTheSendSettingAndHighlightsThatWord() {
         val hits = searchSettings("Enter") { it }
         val hit = hits.single { it.id == "appearance.enter" }
