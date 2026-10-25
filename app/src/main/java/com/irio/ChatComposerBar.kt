@@ -12,7 +12,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -35,7 +34,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.runtime.Composable
@@ -186,24 +184,15 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
         @Composable
         fun AttachmentChips() {
             if (pendingAttachments.isNotEmpty()) {
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    pendingAttachments.forEach { attachment ->
-                        AttachmentCard(
-                            attachment = attachment,
-                            loading = attachment.filePath in writingPastedText,
-                            onRemove = {
-                                pendingAttachments =
-                                    pendingAttachments.filterNot { it == attachment }
-                            },
-                        )
-                    }
-                }
+                ChatAttachmentList(
+                    attachments = pendingAttachments,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                    loadingFiles = writingPastedText,
+                    onRemove = { attachment ->
+                        pendingAttachments = pendingAttachments.filterNot { it == attachment }
+                    },
+                )
             }
         }
 

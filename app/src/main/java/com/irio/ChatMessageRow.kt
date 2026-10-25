@@ -235,6 +235,10 @@ internal fun MessageRow(
                                     attachments = chatMessage.attachments,
                                     alignEnd = true,
                                     scrollKey = chatMessage.id,
+                                    avatarInset =
+                                        if (showAvatar && !hasText)
+                                            UserMessageAvatarSize + UserMessageAvatarGap
+                                        else 0.dp,
                                     uploadProgress = uploadProgress,
                                     onOpen = onOpenAttachment,
                                 )
@@ -562,27 +566,22 @@ private fun SentAttachmentRow(
     attachments: List<ChatAttachment>,
     alignEnd: Boolean,
     scrollKey: Any,
+    avatarInset: Dp = 0.dp,
     uploadProgress: AttachmentUploadProgress? = null,
     onOpen: (ChatAttachment) -> Unit,
 ) {
     // 行宽随内容，短于视口时仍由消息列贴右或贴左。超出后才横向滚动。
     // 用户消息反向滚动，0 停在末尾，条带继续贴着气泡一侧。
+    val gutter = LocalChatImageStripOutset.current
     key(scrollKey) {
-        Row(
-            modifier =
-                Modifier.horizontalScroll(rememberScrollState(), reverseScrolling = alignEnd),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            attachments.forEachIndexed { index, attachment ->
-                AttachmentCard(
-                    attachment,
-                    uploadProgress =
-                        if (alignEnd && index == attachments.lastIndex) uploadProgress else null,
-                    onOpen = { onOpen(attachment) },
-                )
-            }
-        }
+        ChatAttachmentList(
+            attachments = attachments,
+            alignEnd = alignEnd,
+            startOutset = gutter,
+            endOutset = gutter + avatarInset,
+            uploadProgress = uploadProgress,
+            onOpen = onOpen,
+        )
     }
 }
 
