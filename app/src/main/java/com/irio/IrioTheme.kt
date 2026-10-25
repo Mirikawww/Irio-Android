@@ -123,6 +123,7 @@ fun irioBottomSystemUiInsets(): WindowInsets =
 @Composable
 fun AppTheme(content: @Composable () -> Unit) {
     val view = LocalView.current
+    val systemFontWeightScale = rememberSystemFontWeightScale()
     val preference = ThemeStore.preference
     val resolvedTheme = preference.resolve(
         systemDark = isSystemInDarkTheme(),
@@ -152,6 +153,7 @@ fun AppTheme(content: @Composable () -> Unit) {
         LocalAmoledTheme provides (resolvedTheme == ResolvedTheme.AMOLED),
         LocalResolvedTheme provides resolvedTheme,
         LocalDynamicAccent provides monetColors,
+        LocalSystemFontWeightScale provides systemFontWeightScale,
     ) {
         IrioComponentTheme(content)
     }
