@@ -176,15 +176,22 @@ class SmartToolHintsTest {
             .register(LinuxShellToolProvider(backgroundEnabled = true))
             .register(GitHubMcpToolProvider(listOf(McpTool("echo", "Echo", JSONObject("""{"type":"object","properties":{}}""")))) { _, _ -> "fixture" })
         val registry = ToolRegistry(original.providers(), smartToolHints = true)
+        val silentTools = setOf(CommonsImageTools.SHOW, LinguaLibreTool.NAME, MermaidTool.NAME)
         ProviderProtocol.entries.forEach { protocol ->
+            val seenSilentTools = mutableSetOf<String>()
             registry.schemas(protocol).forEach schemaLoop@{ schema ->
                 val definition = schema.optJSONObject("function") ?: schema
+                val name = definition.getString("name")
                 val parameters = definition.optJSONObject("input_schema")
                     ?: definition.optJSONObject("parametersJsonSchema")
                     ?: definition.getJSONObject("parameters")
                 val hint = parameters.optJSONObject("properties")?.optJSONObject("_display_text")
-                if (definition.optString("name") in setOf(CommonsImageTools.SHOW, LinguaLibreTool.NAME)) {
-                    assertNull("Silent tools must not advertise a tool status hint", hint)
+                if (name in silentTools) {
+                    seenSilentTools += name
+                    assertNull("Silent tool $name must not advertise a tool status hint in $protocol", hint)
+                    val required = parameters.optJSONArray("required")
+                    assertTrue("Silent tool $name must not require UI metadata in $protocol",
+                        required == null || (0 until required.length()).none { required.optString(it) == SmartToolHints.ARGUMENT })
                     return@schemaLoop
                 }
                 assertNotNull("Missing UI hint for $protocol: $schema", hint)
@@ -198,6 +205,7 @@ class SmartToolHintsTest {
                     assertTrue(parameters.getJSONArray("required").toString().contains("_display_text"))
                 }
             }
+            assertEquals("Every silent tool must be checked in $protocol", silentTools, seenSilentTools)
             original.schemas(protocol).forEach { schema ->
                 assertFalse("Disabled registry changed: $schema", schema.toString().contains("_display_text"))
             }
