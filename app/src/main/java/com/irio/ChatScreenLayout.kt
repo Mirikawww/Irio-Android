@@ -221,13 +221,12 @@ internal fun ChatScreenLayout(state: ChatScreenState) =
                     }
                 }
                 Box(Modifier.fillMaxSize().zIndex(2f)) {
-                    IrioSnackbar(
-                        visible = titleGeneration.notice != null,
-                        message = titleGeneration.notice.orEmpty(),
+                    ChatNoticeSnackbar(
+                        titleNotice = titleGeneration.notice,
+                        titleNoticeNonce = titleGeneration.noticeNonce,
                         bottomInset =
                             WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
-                        onDismiss = { titleGeneration.notice = null },
-                        restartKey = titleGeneration.noticeNonce,
+                        onDismissTitle = { titleGeneration.notice = null },
                     )
                 }
                 ClearHistoryDialog(

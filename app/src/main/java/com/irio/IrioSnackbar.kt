@@ -12,7 +12,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +33,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.ui.components.Text
+import com.composables.ui.components.Button
+import com.composables.ui.components.ButtonSize
+import com.composables.ui.components.ButtonStyle
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.onPrimaryColor
@@ -53,6 +58,8 @@ internal fun BoxScope.IrioSnackbar(
     bottomInset: Dp,
     onDismiss: () -> Unit,
     restartKey: Int = 0,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
 ) {
     val dismiss by rememberUpdatedState(onDismiss)
     val scope = rememberCoroutineScope()
@@ -111,9 +118,7 @@ internal fun BoxScope.IrioSnackbar(
                 )
             },
         ) {
-            Text(
-                if (visible && !wasVisible) message else displayedMessage,
-                modifier = Modifier
+            val surfaceModifier = Modifier
                     .graphicsLayer { translationX = offsetX }
                     .pointerInput(Unit) {
                         val travel = size.width + 32.dp.toPx()
@@ -149,11 +154,24 @@ internal fun BoxScope.IrioSnackbar(
                     }
                     .fillMaxWidth()
                     .background(Theme[colors][primaryColor], Theme[shapes][largeShape])
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                color = Theme[colors][onPrimaryColor],
-                fontSize = 16.sp,
-                lineHeight = 21.sp,
-            )
+            val text = if (visible && !wasVisible) message else displayedMessage
+            if (actionLabel != null && onAction != null) {
+                Row(
+                    modifier = surfaceModifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(text, modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        color = Theme[colors][onPrimaryColor], fontSize = 16.sp, lineHeight = 21.sp)
+                    Button(onClick = onAction, style = ButtonStyle.Ghost, buttonSize = ButtonSize.Small,
+                        shape = ContinuousCapsule, contentColor = Theme[colors][onPrimaryColor],
+                        modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(actionLabel)
+                    }
+                }
+            } else {
+                Text(text, modifier = surfaceModifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    color = Theme[colors][onPrimaryColor], fontSize = 16.sp, lineHeight = 21.sp)
+            }
         }
     }
 }

@@ -10,6 +10,7 @@ class MainActivity : ComponentActivity() {
         ReplyOpenRequest.publish(intent)
         ReplyLiveNotice.install(this)
         LinkRuntime.ensure(this)
+        StartupUpdates.start(this)
         enableIrioGlassBackdrop()
         setIrioContent { MainScreen(restoreLastOpened = savedInstanceState != null) }
     }

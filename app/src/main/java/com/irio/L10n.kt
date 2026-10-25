@@ -135,6 +135,23 @@ private val TodoistProgressEnglish = mapOf(
 ).flatMap { (action, forms) -> listOf(action to forms.first, "已$action" to forms.second) }.toMap()
 
 private val English = mapOf(
+    "检查更新" to "Check for updates",
+    "正在检查更新" to "Checking for updates",
+    "检查渠道" to "Update channel",
+    "当前已是最新版本" to "You're up to date",
+    "所选渠道暂无已发布版本" to "No published releases in this channel yet",
+    "发现新版本" to "Update available",
+    "发现新版本：%s" to "Update %s is available",
+    "查看" to "View",
+    "前往下载" to "Go to download",
+    "暂无更新说明" to "No release notes provided",
+    "无法识别当前版本" to "Unable to identify the current version",
+    "GitHub 更新响应无效" to "Invalid update response from GitHub",
+    "GitHub 更新列表过长，请前往项目发布页检查" to "Too many releases; check the project's GitHub releases page",
+    "GitHub 请求过于频繁，请稍后重试" to "GitHub rate limit reached. Try again later",
+    "无法访问 GitHub 发布信息" to "GitHub release information is unavailable",
+    "检查更新失败，请稍后重试" to "Couldn't check for updates. Try again later",
+    "检查更新失败，请检查网络后重试" to "Couldn't check for updates. Check your connection and try again",
     "粘贴长文本为文件" to "Paste long text as file",
     "字符阈值" to "Character threshold",
     "%d 个字符" to "%d characters",

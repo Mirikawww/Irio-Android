@@ -79,10 +79,16 @@ internal fun AboutScreen(onBack: () -> Unit, onAcknowledgements: () -> Unit) {
         context.packageManager.getApplicationIcon(context.applicationInfo)
             .toBitmap(iconSize, iconSize).asImageBitmap()
     }
-    var linkError by remember { mutableStateOf(false) }
-    var errorNonce by remember { mutableStateOf(0) }
+    var notice by remember { mutableStateOf("") }
+    var noticeVisible by remember { mutableStateOf(false) }
+    var noticeNonce by remember { mutableStateOf(0) }
+    fun showNotice(message: String) {
+        notice = message
+        noticeVisible = true
+        noticeNonce++
+    }
     fun openLink(url: String) {
-        if (!context.openAboutLink(url)) { linkError = true; errorNonce++ }
+        if (!context.openAboutLink(url)) showNotice(tr("无法打开链接"))
     }
     SettingsHazeScaffold(title = tr("关于"), onBack = onBack) { topInset, bottomInset ->
         Box(Modifier.fillMaxSize()) {
@@ -106,6 +112,8 @@ internal fun AboutScreen(onBack: () -> Unit, onAcknowledgements: () -> Unit) {
                             .settingsSearchAnchor("about.version"), color = Theme[colors][mutedColor],
                             fontSize = 12.sp, lineHeight = 18.sp, textAlign = TextAlign.Center)
                     }
+                    Spacer(Modifier.height(16.dp))
+                    SettingsUpdateSection(onNotice = ::showNotice)
                 }
                 ListRowButton(label = tr("鸣谢"), icon = IrioIcons.Sparkles,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -124,8 +132,8 @@ internal fun AboutScreen(onBack: () -> Unit, onAcknowledgements: () -> Unit) {
                         searchId = "about.docs", onClick = { openLink(IRIO_DOCS_URL) })
                 }
             }
-            IrioSnackbar(visible = linkError, message = tr("无法打开链接"), bottomInset = bottomInset,
-                onDismiss = { linkError = false }, restartKey = errorNonce)
+            IrioSnackbar(visible = noticeVisible, message = notice, bottomInset = bottomInset,
+                onDismiss = { noticeVisible = false }, restartKey = noticeNonce)
         }
     }
 }

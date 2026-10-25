@@ -215,6 +215,8 @@ private fun pinyinRanges(title: String, query: String, pinyinOf: (Char) -> Strin
 }
 
 private val settingsSearchEntries = listOf(
+    item("settings.updates", "检查更新", "关于", AboutActivity::class.java),
+    item("settings.update-channel", "检查渠道", "关于", AboutActivity::class.java),
     page("page.providers", "提供商", ProviderSettingsActivity::class.java),
     page("page.models", "模型", ModelSettingsActivity::class.java),
     page("page.search", "搜索", SearchSettingsActivity::class.java),

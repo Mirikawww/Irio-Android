@@ -98,11 +98,30 @@ class AboutScreenTest {
             frames()
             val version = androidSoftwareInfo(context)
             assertFalse("The Settings footer must no longer display the version", hasText(version))
+            assertFalse("Update controls must not remain on the Settings homepage", nodes().any {
+                it.config.getOrElse(SemanticsProperties.TestTag) { "" } in setOf("check-updates", "update-channel")
+            })
             click(tr("关于"))
             assertEquals(AboutActivity::class.java.name, shadowOf(context).nextStartedActivity.component!!.className)
             about.value = true
             frames()
             assertTrue("The exact installed-version line must move to About", hasText(version))
+            fun assertUpdatesBelowVersion() {
+                val versionBounds = nodes().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "about-version" }.boundsInRoot
+                val check = nodes().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "check-updates" }.boundsInRoot
+                val channel = nodes().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "update-channel" }.boundsInRoot
+                assertTrue("Check for updates belongs directly below the version", check.top >= versionBounds.bottom + 15.5f)
+                assertTrue("The update channel stays to the right", check.right + 7.5f <= channel.left)
+                assertEquals(check.center.y, channel.center.y, 0.5f)
+                val identity = nodes().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "about-identity" }.boundsInRoot
+                assertTrue("Update controls belong to the About identity block", check.bottom <= identity.bottom && channel.bottom <= identity.bottom)
+            }
+            assertUpdatesBelowVersion()
+            for (title in listOf("检查更新", "检查渠道")) {
+                val hit = searchSettings(title, label = { it }).single { it.title == title }
+                assertEquals("关于", hit.page)
+                assertEquals(AboutActivity::class.java, hit.destination)
+            }
             assertTrue("About must show the variant's app name, including Irio Debug for debug builds",
                 hasText(context.getString(R.string.app_name)))
             assertTrue("The project URL must be displayed beneath its title", hasText(IRIO_PROJECT_URL))
@@ -174,6 +193,7 @@ class AboutScreenTest {
                 assertLinkSubtitle("文档与更新日志", IRIO_DOCS_URL)
                 assertRowAlignment()
                 assertResourceGroup()
+                assertUpdatesBelowVersion()
             }
         } finally {
             view.disposeComposition(); recomposer.close(); runner.cancel()
