@@ -81,6 +81,10 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     packaging {
         jniLibs {
             useLegacyPackaging = true
@@ -134,6 +138,9 @@ dependencies {
     // 图片预览：双击/双指缩放，全屏按原图分块采样（PhotoViewer）
     implementation("me.saket.telephoto:zoomable:0.19.0")
     implementation("me.saket.telephoto:sub-sampling-image:0.19.0")
+
+    // Native Mermaid parser/layout and Compose Canvas rendering (no per-diagram WebView).
+    implementation("io.github.swithun-liu:mermaid-compose:0.1.16")
 
     // LaTeX — rikkahub fork of jlatexmath-android (JitPack)
     implementation("com.github.rikkahub.jlatexmath-android:jlatexmath:1.5")

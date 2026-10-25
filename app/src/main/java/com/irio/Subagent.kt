@@ -205,6 +205,10 @@ internal class SubagentTurn {
             tracker.onDisplayedImages(update.displayedImages)
             changed = true
         }
+        if (update.displayedMermaid.isNotEmpty()) {
+            tracker.onDisplayedMermaid(update.displayedMermaid)
+            changed = true
+        }
         return changed
     }
 

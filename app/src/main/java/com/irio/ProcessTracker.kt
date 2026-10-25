@@ -161,6 +161,15 @@ internal class ProcessTracker {
             toolName = CommonsImageTools.SHOW, content = content, belowText = outputStarted, textOffset = eventAnchor())
     }
 
+    fun onDisplayedMermaid(source: String) {
+        if (source.isBlank()) return
+        finishThinking()
+        finishLiveTool()
+        events += ProcessEvent(id = nextId++, kind = ProcessEventKind.TOOL,
+            toolName = MermaidTool.NAME, content = source, belowText = outputStarted,
+            textOffset = eventAnchor(), toolOutcome = ToolOutcome.SUCCESS)
+    }
+
     fun onToolFinished(content: String = "", outcome: ToolOutcome? = null) {
         finishLiveTool(content, outcome)
     }

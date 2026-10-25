@@ -137,15 +137,20 @@ internal fun IrioMarkdown(
         },
         table = { IrioMarkdownTable(it.content, it.node, it.typography.table) },
         codeFence = {
-            MarkdownHighlightedCodeFence(
-                content = it.content,
-                node = it.node,
-                style = it.typography.code,
-                highlightsBuilder = highlightsBuilder,
-                showHeader = true,
-                softWrap = ThemeStore.codeBlockWrap,
-                lineNumbers = ThemeStore.codeBlockLineNumbers,
-            )
+            val diagram = mermaidCodeFenceSource(it.node.getTextInNode(it.content).toString())
+            if (diagram == null) {
+                MarkdownHighlightedCodeFence(
+                    content = it.content,
+                    node = it.node,
+                    style = it.typography.code,
+                    highlightsBuilder = highlightsBuilder,
+                    showHeader = true,
+                    softWrap = ThemeStore.codeBlockWrap,
+                    lineNumbers = ThemeStore.codeBlockLineNumbers,
+                )
+            } else {
+                MermaidMarkdownBlock(diagram)
+            }
         },
         codeBlock = {
             MarkdownHighlightedCodeBlock(

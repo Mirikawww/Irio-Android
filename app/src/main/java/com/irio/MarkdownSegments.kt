@@ -2,6 +2,20 @@ package com.irio
 
 internal const val TEX_LINK_PREFIX = "irio-tex:"
 
+private val mermaidFencePattern = Regex("(?s)^ {0,3}(`{3,}|~{3,})([^\\r\\n]*)\\r?\\n(.*?)\\r?\\n[ \\t]*([`~]+)[ \\t]*$")
+
+/** Return a complete Mermaid fenced block's source; keep all other code fences unchanged. */
+internal fun mermaidCodeFenceSource(fencedBlock: String): String? {
+    val match = mermaidFencePattern.matchEntire(fencedBlock.replace("\r\n", "\n").trimEnd('\n')) ?: return null
+    val marker = match.groupValues[1]
+    val info = Regex("[ \\t]+").split(match.groupValues[2].trim(), limit = 2).first().lowercase()
+    val closing = match.groupValues[4]
+    if (info != "mermaid" || closing.any { it != marker.first() } || closing.length < marker.length) {
+        return null
+    }
+    return match.groupValues[3].trimEnd('\n').takeIf(String::isNotBlank)
+}
+
 internal sealed interface MarkdownSegment {
     val key: String
 
@@ -26,7 +40,7 @@ internal fun markdownSegments(text: String): List<MarkdownSegment> {
             segments += MarkdownSegment.TexBlock("tex$index", tex)
             return@forEachIndexed
         }
-        val rewritten = if (block.trimStart().startsWith("```")) {
+        val rewritten = if (block.trimStart().let { it.startsWith("```") || it.startsWith("~~~") }) {
             block
         } else {
             normalizeMarkdownEmphasis(rewriteInlineTex(block))
@@ -97,23 +111,26 @@ internal fun splitMarkdownBlocks(text: String): List<String> {
     val blocks = ArrayList<String>()
     var start = 0
     var index = 0
-    var inFence = false
+    var fenceMarker: String? = null
     val length = text.length
 
     fun isLineStart(pos: Int) = pos == 0 || text[pos - 1] == '\n'
 
-    fun isFenceAt(pos: Int): Boolean {
-        if (!isLineStart(pos) || pos >= length) return false
+    fun fenceAt(pos: Int): Pair<String, String>? {
+        if (!isLineStart(pos) || pos >= length) return null
         var cursor = pos
         var spaces = 0
         while (cursor < length && text[cursor] == ' ' && spaces < 3) {
             cursor++
             spaces++
         }
-        return cursor + 2 < length &&
-            text[cursor] == '`' &&
-            text[cursor + 1] == '`' &&
-            text[cursor + 2] == '`'
+        val start = cursor
+        val marker = text.getOrNull(cursor)
+        if (marker != '`' && marker != '~') return null
+        while (cursor < length && text[cursor] == marker) cursor++
+        if (cursor - start < 3) return null
+        val end = text.indexOf('\n', cursor).let { if (it < 0) length else it }
+        return text.substring(start, cursor) to text.substring(cursor, end)
     }
 
     fun nextLine(pos: Int): Int {
@@ -122,21 +139,24 @@ internal fun splitMarkdownBlocks(text: String): List<String> {
     }
 
     while (index < length) {
-        if (isFenceAt(index)) {
-            if (!inFence) {
+        val fence = fenceAt(index)
+        if (fence != null) {
+            val activeMarker = fenceMarker
+            if (activeMarker == null) {
                 if (index > start) {
                     blocks += text.substring(start, index)
                     start = index
                 }
-                inFence = true
-            } else {
+                fenceMarker = fence.first
+            } else if (fence.first.first() == activeMarker.first() &&
+                fence.first.length >= activeMarker.length && fence.second.isBlank()) {
                 index = nextLine(index)
                 blocks += text.substring(start, index)
                 start = index
-                inFence = false
+                fenceMarker = null
                 continue
             }
-        } else if (!inFence && text[index] == '\n' && index + 1 < length && text[index + 1] == '\n') {
+        } else if (fenceMarker == null && text[index] == '\n' && index + 1 < length && text[index + 1] == '\n') {
             var end = index + 1
             while (end < length && text[end] == '\n') end++
             blocks += text.substring(start, end)

@@ -85,6 +85,7 @@ internal fun advanceReplyNotice(current: String, update: ChatStreamUpdate, finis
     if (update.subagentJson.isNotEmpty()) step = tr("创建子智能体")
     if (update.coloredBubbles.isNotEmpty()) step = tr("发送彩色气泡")
     if (update.displayedImages.isNotEmpty()) step = tr("展示图片")
+    if (update.displayedMermaid.isNotEmpty()) step = tr("渲染 Mermaid 图表")
     if (update.notifyTool.isNotEmpty() && !isSilentPronunciationLookup(update.notifyTool, update.toolOutcome)) step = MemoryTool.liveLabel(update.notifyTool)
     if (update.delta.isNotEmpty()) step = tr("输出中")
     if (finished) step = preview.ifEmpty { tr("完成") }

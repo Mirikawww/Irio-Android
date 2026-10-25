@@ -29,6 +29,7 @@ internal fun toolFailureLabel(name: String): String = when (name) {
     SubagentTools.STOP -> tr("停止子智能体失败")
     ReactionTool.NAME -> tr("表情回应失败")
     ColoredBubbleTool.NAME -> tr("发送彩色气泡失败")
+    MermaidTool.NAME -> tr("Mermaid 图表渲染失败")
     else -> tr("%s失败").format(MemoryTool.liveLabel(name))
 }
 

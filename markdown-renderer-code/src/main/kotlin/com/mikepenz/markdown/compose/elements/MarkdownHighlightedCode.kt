@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
@@ -139,6 +140,8 @@ fun MarkdownHighlightedCode(
     immediate: Boolean = false,
     softWrap: Boolean = false,
     lineNumbers: Boolean = false,
+    backgroundShape: Shape? = null,
+    outerPadding: PaddingValues = PaddingValues(vertical = 8.dp),
 ) {
     val backgroundCodeColor = LocalMarkdownColors.current.codeBackground
     val codeBackgroundCornerSize = LocalMarkdownDimens.current.codeBackgroundCornerSize
@@ -158,8 +161,8 @@ fun MarkdownHighlightedCode(
 
     MarkdownCodeBackground(
         color = backgroundCodeColor,
-        shape = RoundedCornerShape(codeBackgroundCornerSize),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        shape = backgroundShape ?: RoundedCornerShape(codeBackgroundCornerSize),
+        modifier = Modifier.fillMaxWidth().padding(outerPadding),
         showHeader = false,
         language = language,
         code = code

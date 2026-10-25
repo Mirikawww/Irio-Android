@@ -9,6 +9,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MarkdownSegmentsTest {
+    @Test fun mermaidFenceReturnsTheDiagramSourceWithoutConsumingOtherCodeBlocks() {
+        assertEquals("flowchart LR\n    A --> B", mermaidCodeFenceSource("```mermaid\nflowchart LR\n    A --> B\n```") )
+        assertEquals("sequenceDiagram\n    Alice->>Bob: hello", mermaidCodeFenceSource("~~~mermaid flow\nsequenceDiagram\n    Alice->>Bob: hello\n~~~"))
+        assertEquals("flowchart TB\n  A --> B", mermaidCodeFenceSource("  ```MERMAID title=Demo\r\nflowchart TB\r\n  A --> B\r\n  ```"))
+        assertEquals(null, mermaidCodeFenceSource("```kotlin\nval diagram = true\n```"))
+        assertEquals("flowchart LR\n```", mermaidCodeFenceSource("````mermaid\nflowchart LR\n```\n````"))
+        assertEquals(null, mermaidCodeFenceSource("```mermaid\nflowchart LR\n    A --> B"))
+        assertEquals(null, mermaidCodeFenceSource("```mermaid\nflowchart LR\n```~"))
+        val source = "~~~mermaid\nflowchart LR\n\n  A[\"${'$'}10\"] --> B\n~~~\n"
+        val segment = markdownSegments(source).single() as MarkdownSegment.Text_
+        assertEquals(source, segment.text)
+        assertEquals("flowchart LR\n\n  A[\"${'$'}10\"] --> B", mermaidCodeFenceSource(segment.text))
+    }
+
     @Test
     fun frozenBlockKeepsStableKeyWhileTailGrows() {
         val first = markdownSegments("Hello world\n\nMore")

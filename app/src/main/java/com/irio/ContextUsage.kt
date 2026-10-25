@@ -40,6 +40,7 @@ internal fun chatToolRegistry(
         add(LinguaLibreToolProvider())
         add(ReactionToolProvider())
         add(ColoredBubbleToolProvider())
+        add(MermaidToolProvider())
         add(HistoryToolProvider())
         if (MemoryStore.loadEnabled(context)) add(MemoryToolProvider())
         if (ToolStore.loadSubagents(context)) add(SubagentToolProvider())

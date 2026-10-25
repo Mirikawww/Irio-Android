@@ -115,6 +115,7 @@ internal object ToolCatalog {
         HistoryTool.NAME -> "查询历史会话"
         ReactionTool.NAME -> "表情回应"
         ColoredBubbleTool.NAME -> "发送彩色气泡"
+        MermaidTool.NAME -> "渲染 Mermaid 图表"
         MemoryTool.GET -> "读取记忆"
         MemoryTool.UPDATE -> "写入记忆"
         SubagentTools.CREATE -> "创建子智能体"

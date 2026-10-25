@@ -85,6 +85,10 @@ internal fun ProcessEventRow(
         }
     }
     if (isSilentPronunciationLookup(event.toolName, event.toolOutcome)) return
+    if (event.toolName == MermaidTool.NAME && event.toolOutcome == ToolOutcome.SUCCESS) {
+        MermaidMarkdownBlock(event.content)
+        return
+    }
     if (
         event.toolName == CommonsImageTools.SHOW &&
             event.toolOutcome != ToolOutcome.FAILED &&

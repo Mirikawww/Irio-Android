@@ -418,6 +418,8 @@ internal fun ChatScreenState.startGeneration(
                                                 process.onColoredBubbles(update.coloredBubbles)
                                             if (!cancelled && update.displayedImages.isNotEmpty())
                                                 process.onDisplayedImages(update.displayedImages)
+                                            if (!cancelled && update.displayedMermaid.isNotEmpty())
+                                                process.onDisplayedMermaid(update.displayedMermaid)
                                             if (update.attachments.isNotEmpty()) {
                                                 streamedAttachments =
                                                     (streamedAttachments + update.attachments)
@@ -486,7 +488,8 @@ internal fun ChatScreenState.startGeneration(
                                                             update.toolRecord != null ||
                                                             update.coloredBubbles.isNotEmpty() ||
                                                             update.subagentJson.isNotEmpty() ||
-                                                            update.displayedImages.isNotEmpty(),
+                                                            update.displayedImages.isNotEmpty() ||
+                                                            update.displayedMermaid.isNotEmpty(),
                                                     toolOutputChanged = update.toolOutput != null,
                                                     toolCallDeltaLength =
                                                         update.toolCallDeltas.sumOf {

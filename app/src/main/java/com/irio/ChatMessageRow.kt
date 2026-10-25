@@ -416,7 +416,8 @@ internal fun MessageRow(
                                 !isSilentPronunciationLookup(it.toolName, it.toolOutcome) &&
                                     (it.live ||
                                         it.kind == ProcessEventKind.BUBBLE ||
-                                        it.toolName == CommonsImageTools.SHOW)
+                                        it.toolName == CommonsImageTools.SHOW ||
+                                        (it.toolName == MermaidTool.NAME && it.toolOutcome == ToolOutcome.SUCCESS))
                             }
                     ) {
                         StatusSweepText(tr("请求中"))
