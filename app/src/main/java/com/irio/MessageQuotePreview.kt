@@ -33,7 +33,7 @@ internal fun MessageQuotePreview(
 ) {
     Row(
         modifier = modifier
-            .fillMaxWidth()
+            .then(if (onCancel != null) Modifier.fillMaxWidth() else Modifier)
             .background(Theme[colors][secondaryColor], RoundedRectangle(10.dp))
             .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -45,7 +45,7 @@ internal fun MessageQuotePreview(
             modifier = Modifier.size(18.dp),
             tint = Theme[colors][mutedColor],
         )
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(Modifier.weight(1f, fill = onCancel != null), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(tr("引用"), color = Theme[colors][mutedColor], fontSize = 12.sp)
             Text(
                 quote,

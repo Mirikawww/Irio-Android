@@ -212,15 +212,11 @@ internal fun MessageRow(
                 val hasText = chatMessage.text.isNotBlank()
                 val hasAttachments = chatMessage.attachments.isNotEmpty()
                 if (chatMessage.quote.isNotBlank()) {
-                    if (showAvatar && !hasText && !hasAttachments) {
-                        UserMessageSlot(showAvatar = true, besideFirstLine = false) {
-                            MessageQuotePreview(quote = chatMessage.quote)
-                        }
-                    } else {
-                        MessageQuotePreview(
-                            quote = chatMessage.quote,
-                            modifier = Modifier.fillMaxWidth(0.85f),
-                        )
+                    UserMessageSlot(
+                        showAvatar = showAvatar && !hasText && !hasAttachments,
+                        besideFirstLine = false,
+                    ) {
+                        MessageQuotePreview(quote = chatMessage.quote)
                     }
                 }
                 if (hasAttachments) {
