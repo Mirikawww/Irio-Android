@@ -81,6 +81,9 @@ data class ChatCompletionResult(
     val geminiParts: List<String> = emptyList(),
     val retryable: Boolean = false,
     val http1Fallback: Boolean = false,
+    val partialStreamText: String = "",
+    /** Output arrived before a failure, including thinking or an unfinished tool call. */
+    val hasPartialOutput: Boolean = false,
 )
 
 data class ChatStreamUpdate(
@@ -265,10 +268,10 @@ object ChatApi {
             if (roundIndex > 0) {
                 onUpdate(ChatStreamUpdate(newRound = true))
             }
-            val turn = retries.runRound { attemptUpdate -> streamOnce(
+            val turn = retries.runChatRound(history.toList()) { retryMessages, attemptUpdate -> streamOnce(
                 provider = provider,
                 model = model,
-                messages = if (includeTimestamps) history else history.map { it.copy(createdAt = 0L) },
+                messages = if (includeTimestamps) retryMessages else retryMessages.map { it.copy(createdAt = 0L) },
                 reasoningEffort = reasoningEffort,
                 fastMode = fastMode,
                 systemPrompt = toolRegistry.systemPrompt(systemPrompt),
@@ -582,6 +585,8 @@ object ChatApi {
             .retryOnConnectionFailure(false).build().newCall(request)
         cancellation.attach(call)
         var response: okhttp3.Response? = null
+        val partialStreamText = StringBuilder()
+        var hasPartialOutput = false
 
         return try {
             if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
@@ -596,7 +601,7 @@ object ChatApi {
                 )
             } else {
             var responseModel = model
-            val streamedContent = StringBuilder()
+            val streamedContent = partialStreamText
             val streamedThinking = StringBuilder()
             val streamedAttachments = linkedMapOf<String, ChatAttachment>()
             val toolCalls = linkedMapOf<String, MutableToolCall>()
@@ -642,6 +647,8 @@ object ChatApi {
                         throw StreamFailedException(update.error, retryableProviderError(payload))
                     }
                     if (update.model.isNotBlank()) responseModel = update.model
+                    if (update.delta.isNotEmpty() || update.thinkingDelta.isNotEmpty() || update.toolCallDeltas.isNotEmpty() ||
+                        update.attachments.isNotEmpty() || update.imageGeneration.isNotEmpty()) hasPartialOutput = true
                     if (update.delta.isNotEmpty()) streamedContent.append(update.delta)
                     if (update.thinkingDelta.isNotEmpty()) streamedThinking.append(update.thinkingDelta)
                     update.attachments.forEach { attachment ->
@@ -703,6 +710,12 @@ object ChatApi {
                     }
                 }
                 if (eventData.isNotEmpty()) flush()
+                if (!terminalUpdateSent && hasPartialOutput && !ChatProtocol.shouldEndStream(
+                        done = false, finishReason = finishReason,
+                        completedToolCount = ChatProtocol.completedToolCalls(toolCalls).size,
+                    )) {
+                    throw java.io.IOException("Response stream ended before completion")
+                }
                 if (!terminalUpdateSent) publish(
                     ChatStreamUpdate(
                         done = ChatProtocol.completedToolCalls(toolCalls).isEmpty(),
@@ -747,7 +760,12 @@ object ChatApi {
             }
         } catch (failed: StreamFailedException) {
             if (cancellation.isCancelled()) ChatCompletionResult(stopped = true)
-            else ChatCompletionResult(error = failed.message, retryable = failed.retryable)
+            else ChatCompletionResult(
+                error = failed.message,
+                retryable = failed.retryable,
+                partialStreamText = partialStreamText.toString(),
+                hasPartialOutput = hasPartialOutput,
+            )
         } catch (cancelled: CancellationException) {
             if (cancellation.isCancelled()) ChatCompletionResult(stopped = true) else throw cancelled
         } catch (error: Exception) {
@@ -758,6 +776,8 @@ object ChatApi {
                     error = error.message ?: tr("无法连接到端点"),
                     retryable = retryableConnectionFailure(error),
                     http1Fallback = isHttp2StreamReset(error),
+                    partialStreamText = partialStreamText.toString(),
+                    hasPartialOutput = hasPartialOutput,
                 )
             }
         } finally {

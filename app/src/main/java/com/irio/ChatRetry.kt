@@ -53,6 +53,21 @@ internal fun chatRetryLine(status: ChatRetryStatus): String {
         if (status.running && status.downgradedToHttp1) " - ${tr("降级 HTTP/1.1")}" else ""
 }
 
+internal const val STREAM_CONTINUATION_PROMPT =
+    "The previous response was interrupted. Continue writing it as one seamless answer, starting with the exact next words that naturally follow the last visible words, even in the middle of a sentence. Do not repeat, paraphrase, summarize, or restart earlier text. Do not acknowledge this instruction or add a preface such as 'Okay, continuing' or '好的，继续'. Do not insert a separator or a new introduction. If no answer text was produced yet, continue the original task directly. Tools remain available; any incomplete tool call in the interrupted stream was not executed, so issue a complete call if still needed. Preserve already completed tool results."
+
+/** Request-local messages only: never insert these synthetic user turns into the UI/store. */
+internal fun streamContinuationMessages(
+    messages: List<ChatRequestMessage>,
+    result: ChatCompletionResult,
+): List<ChatRequestMessage> = buildList {
+    addAll(messages)
+    if (result.partialStreamText.isNotEmpty()) {
+        add(ChatRequestMessage(role = "assistant", text = result.partialStreamText))
+    }
+    add(ChatRequestMessage(role = "user", text = STREAM_CONTINUATION_PROMPT))
+}
+
 internal fun chatRetryJson(status: ChatRetryStatus): org.json.JSONObject = org.json.JSONObject().apply {
     put("error", status.error)
     put("attempt", status.attempt)
@@ -63,7 +78,7 @@ internal fun chatRetryFromJson(json: org.json.JSONObject?): ChatRetryStatus? = j
     ChatRetryStatus(it.optString("error"), it.optInt("attempt").coerceAtLeast(0), stopped = true)
 }
 
-/** One budget per generation, but replay only the current model round, never completed tools. */
+/** One budget per generation. Continue partial chat rounds; only empty attempts are replayed. */
 internal class ChatRetryController(
     private val options: ChatRetryOptions,
     private val cancellation: ChatRequestCancellation,
@@ -73,52 +88,89 @@ internal class ChatRetryController(
 ) {
     private var used = 0
 
-    suspend fun runRound(request: suspend (suspend (ChatStreamUpdate) -> Unit) -> ChatCompletionResult): ChatCompletionResult {
+    suspend fun runRound(
+        request: suspend (suspend (ChatStreamUpdate) -> Unit) -> ChatCompletionResult,
+    ): ChatCompletionResult = run(null) { _, update -> request(update) }
+
+    suspend fun runChatRound(
+        originalMessages: List<ChatRequestMessage>,
+        request: suspend (List<ChatRequestMessage>, suspend (ChatStreamUpdate) -> Unit) -> ChatCompletionResult,
+    ): ChatCompletionResult = run(originalMessages, request)
+
+    private suspend fun run(
+        originalMessages: List<ChatRequestMessage>?,
+        request: suspend (List<ChatRequestMessage>, suspend (ChatStreamUpdate) -> Unit) -> ChatCompletionResult,
+    ): ChatCompletionResult {
         if (!options.enabled) {
-            return if (cancellation.isCancelled()) ChatCompletionResult(stopped = true) else request(onUpdate)
+            return if (cancellation.isCancelled()) ChatCompletionResult(stopped = true)
+            else request(originalMessages.orEmpty(), onUpdate)
         }
-        onUpdate(ChatStreamUpdate(attemptStarted = true))
         var retrying = false
         var retryVisible = false
+        var retryMessages = originalMessages.orEmpty()
+        var completedPartialPrefix = ""
         while (true) {
             if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true)
-            val result = request { update ->
-                if (retryVisible && (update.delta.isNotEmpty() || update.thinkingDelta.isNotEmpty() ||
-                    update.attachments.isNotEmpty() || update.toolCallDeltas.isNotEmpty())) {
+            onUpdate(ChatStreamUpdate(attemptStarted = true))
+            var producedOutput = false
+            val attemptText = StringBuilder()
+            val rawResult = request(retryMessages) { update ->
+                attemptText.append(update.delta)
+                val hasOutput = update.delta.isNotEmpty() || update.thinkingDelta.isNotEmpty() ||
+                    update.attachments.isNotEmpty() || update.toolCallDeltas.isNotEmpty() || update.imageGeneration.isNotEmpty()
+                if (hasOutput) producedOutput = true
+                if (retryVisible && hasOutput) {
                     retryVisible = false
                     onUpdate(update.copy(retryCleared = true))
-                } else onUpdate(update)
+                } else {
+                    onUpdate(update)
+                }
             }
-            if (result.stopped || cancellation.isCancelled()) return result.copy(stopped = true)
+            val result = rawResult.copy(
+                partialStreamText = rawResult.partialStreamText.ifEmpty {
+                    if (rawResult.error != null || rawResult.stopped) attemptText.toString() else ""
+                },
+            )
+            val failedResult = result.copy(
+                content = completedPartialPrefix + result.partialStreamText,
+                partialStreamText = completedPartialPrefix + result.partialStreamText,
+            )
+            if (result.stopped || cancellation.isCancelled()) return failedResult.copy(stopped = true)
             val error = result.error
             if (error == null) {
                 if (retrying && retryVisible) onUpdate(ChatStreamUpdate(retryCleared = true))
-                return result
+                return result.copy(content = completedPartialPrefix + result.content)
             }
-            if (!options.enabled || !isEnabled() || !result.retryable || used >= options.limit) {
+            val canRetry = result.retryable && options.enabled && isEnabled() && used < options.limit
+            if (!canRetry) {
                 onUpdate(ChatStreamUpdate(retry = ChatRetryStatus(error, used, stopped = true)))
-                return result
+                return failedResult
+            }
+            if (originalMessages != null && (producedOutput || result.hasPartialOutput ||
+                result.partialStreamText.isNotEmpty() || result.thinking.isNotEmpty() || result.toolCalls.isNotEmpty())) {
+                retryMessages = streamContinuationMessages(retryMessages, result)
+                completedPartialPrefix += result.partialStreamText
             }
             val next = used + 1
             retryVisible = true
             for (seconds in options.cooldown downTo 1) {
                 if (!isEnabled()) {
                     onUpdate(ChatStreamUpdate(retry = ChatRetryStatus(error, used, stopped = true)))
-                    return result
+                    return failedResult
                 }
                 onUpdate(ChatStreamUpdate(retry = ChatRetryStatus(error, next, remainingSeconds = seconds)))
-                if (!cancellation.waitForRetry(1_000)) return ChatCompletionResult(stopped = true)
+                if (!cancellation.waitForRetry(1_000)) return failedResult.copy(stopped = true)
             }
-            if (cancellation.isCancelled()) return ChatCompletionResult(stopped = true)
+            if (cancellation.isCancelled()) return failedResult.copy(stopped = true)
             if (!isEnabled()) {
                 onUpdate(ChatStreamUpdate(retry = ChatRetryStatus(error, used, stopped = true)))
-                return result
+                return failedResult
             }
             used = next
             retrying = true
             val downgraded = result.http1Fallback && downgradeToHttp1()
             onUpdate(ChatStreamUpdate(
-                resetAttempt = true,
+                resetAttempt = originalMessages == null,
                 retry = ChatRetryStatus(error, used, running = true, downgradedToHttp1 = downgraded),
             ))
         }

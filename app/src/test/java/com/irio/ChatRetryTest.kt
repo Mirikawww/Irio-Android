@@ -77,6 +77,114 @@ class ChatRetryTest {
         }
     }
 
+    @Test fun eachInterruptedResponseAddsAnotherHiddenContinuationWithoutLosingPriorText() = runTest {
+        val original = listOf(ChatRequestMessage(role = "user", text = "Explain this"))
+        val seen = mutableListOf<List<ChatRequestMessage>>()
+        val controller = ChatRetryController(
+            ChatRetryOptions(maxRetries = 3, cooldownSeconds = 0), ChatRequestCancellation(), {}, { false },
+        )
+
+        val result = controller.runChatRound(original) { messages, publish ->
+            seen += messages
+            when (seen.size) {
+                1 -> {
+                    publish(ChatStreamUpdate(delta = "first part"))
+                    ChatCompletionResult(error = "stream dropped", retryable = true, partialStreamText = "first part")
+                }
+                2 -> {
+                    publish(ChatStreamUpdate(delta = "second part"))
+                    ChatCompletionResult(error = "stream dropped again", retryable = true, partialStreamText = "second part")
+                }
+                else -> ChatCompletionResult(content = "last part")
+            }
+        }
+
+        assertEquals("first partsecond partlast part", result.content)
+        assertEquals(3, seen.size)
+        val firstRetry = seen[1].drop(1)
+        val secondRetry = seen[2].drop(1)
+        assertEquals(listOf("assistant:first part", "user:$STREAM_CONTINUATION_PROMPT"), firstRetry.map { "${it.role}:${it.text}" })
+        assertEquals(listOf("assistant:first part", "user:$STREAM_CONTINUATION_PROMPT",
+            "assistant:second part", "user:$STREAM_CONTINUATION_PROMPT"),
+            secondRetry.map { "${it.role}:${it.text}" })
+        assertEquals(2, secondRetry.count { it.role == "user" && it.text == STREAM_CONTINUATION_PROMPT })
+    }
+
+    @Test fun emptyContinuationFailuresRetryExactlyTheSameHiddenRequestUntilTheSharedLimit() = runTest {
+        val original = listOf(ChatRequestMessage("user", "Hello"))
+        val seen = mutableListOf<List<ChatRequestMessage>>()
+        val updates = mutableListOf<ChatStreamUpdate>()
+        val result = ChatRetryController(
+            ChatRetryOptions(maxRetries = 5, cooldownSeconds = 0), ChatRequestCancellation(),
+            { updates += it }, { false },
+        ).runChatRound(original) { messages, _ ->
+            seen += messages
+            when (seen.size) {
+                1 -> ChatCompletionResult(error = "initial interrupted", retryable = true, partialStreamText = "Hello there")
+                2 -> ChatCompletionResult(error = "continuation returned nothing", retryable = true)
+                else -> ChatCompletionResult(error = "continuation still returned nothing", retryable = true)
+            }
+        }
+
+        assertEquals(6, seen.size)
+        assertEquals(1, seen[1].count { it.text == STREAM_CONTINUATION_PROMPT })
+        seen.drop(2).forEach { assertEquals(seen[1], it) }
+        assertTrue("Previously received text must never be reset", updates.none { it.resetAttempt })
+        assertEquals("Hello there", result.content)
+        assertEquals("continuation still returned nothing", result.error)
+        assertEquals(ChatRetryStatus(result.error!!, 5, stopped = true), updates.last().retry)
+    }
+
+    @Test fun partialContinuationAlsoCarriesThinkingAndToolContext() {
+        val original = listOf(ChatRequestMessage("user", "run this tool"))
+        val continuation = streamContinuationMessages(original,
+            ChatCompletionResult(error = "dropped", retryable = true, partialStreamText = "text", hasPartialOutput = true))
+        assertEquals("text", continuation[1].text)
+        assertEquals(STREAM_CONTINUATION_PROMPT, continuation.last().text)
+    }
+
+    @Test fun partialTextWithThinkingOrToolContextStillGetsHiddenContinuation() = runTest {
+        var requests = 0
+        val updates = mutableListOf<ChatStreamUpdate>()
+        val result = ChatRetryController(
+            ChatRetryOptions(maxRetries = 3, cooldownSeconds = 0), ChatRequestCancellation(),
+            { updates += it }, { false },
+        ).runChatRound(listOf(ChatRequestMessage("user", "run this tool"))) { _, _ ->
+            requests++
+            if (requests == 1) ChatCompletionResult(
+                error = "stream dropped", retryable = true, partialStreamText = "partial", hasPartialOutput = true,
+            ) else ChatCompletionResult(content = "continued")
+        }
+
+        assertEquals(2, requests)
+        assertEquals("partialcontinued", result.content)
+        assertTrue(updates.none { it.resetAttempt })
+    }
+
+    @Test fun emptyContinuationResponseRetriesTheHiddenRequestWithoutReturningToOriginalUserInput() = runTest {
+        val original = listOf(ChatRequestMessage("user", "Hello"))
+        val seen = mutableListOf<List<ChatRequestMessage>>()
+        val updates = mutableListOf<ChatStreamUpdate>()
+        val result = ChatRetryController(
+            ChatRetryOptions(maxRetries = 4, cooldownSeconds = 0), ChatRequestCancellation(),
+            { updates += it }, { false },
+        ).runChatRound(original) { messages, _ ->
+            seen += messages
+            when (seen.size) {
+                1 -> ChatCompletionResult(error = "initial interrupted", retryable = true, partialStreamText = "Hello there")
+                2 -> ChatCompletionResult(error = "continuation returned nothing", retryable = true)
+                else -> ChatCompletionResult(content = "Hello, welcome back")
+            }
+        }
+
+        assertEquals("Hello thereHello, welcome back", result.content)
+        assertEquals(3, seen.size)
+        assertEquals("Hello", seen[0].single().text)
+        assertEquals(STREAM_CONTINUATION_PROMPT, seen[1].last().text)
+        assertEquals(seen[1], seen[2])
+        assertTrue(updates.none { it.resetAttempt })
+    }
+
     @Test fun stopInterruptsCooldownWithoutAnotherRequest() = runTest {
         val cancellation = ChatRequestCancellation()
         var calls = 0
