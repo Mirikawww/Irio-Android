@@ -9,7 +9,8 @@ internal object GeminiInteractionsProtocol {
         JSONObject().put("type", "function").put("name", name).put("description", description).put("parameters", parameters)
 
     fun requestBody(model: String, messages: List<ChatRequestMessage>, systemPrompt: String?,
-                    tools: List<JSONObject> = emptyList(), streaming: Boolean = false): JSONObject = JSONObject().apply {
+                    tools: List<JSONObject> = emptyList(), streaming: Boolean = false,
+                    uploadEncoding: ImageUploadEncoding = ImageUploadEncoding()): JSONObject = JSONObject().apply {
         put("model", model.removePrefix("models/"))
         put("stream", streaming)
         put("store", false)
@@ -18,9 +19,9 @@ internal object GeminiInteractionsProtocol {
             messages.forEach { message ->
                 when (message.role) {
                     "user" -> put(JSONObject().put("type", "user_input")
-                        .put("content", messageContent(message, ChatApi.stampMessageText(message.text, message.createdAt, true))))
+                        .put("content", messageContent(message, ChatApi.stampMessageText(message.text, message.createdAt, true), uploadEncoding)))
                     "assistant" -> {
-                        val content = messageContent(message, ChatApi.stampMessageText(message.text, message.createdAt, false))
+                        val content = messageContent(message, ChatApi.stampMessageText(message.text, message.createdAt, false), uploadEncoding)
                         if (content.length() > 0) put(JSONObject().put("type", "model_output").put("content", content))
                         message.toolCalls.forEach { call ->
                             put(JSONObject().put("type", "function_call").put("id", call.geminiFunctionId ?: call.id)
@@ -36,11 +37,12 @@ internal object GeminiInteractionsProtocol {
         if (tools.isNotEmpty()) put("tools", JSONArray(tools))
     }
 
-    private fun messageContent(message: ChatRequestMessage, text: String): JSONArray = JSONArray().apply {
+    private fun messageContent(message: ChatRequestMessage, text: String, uploadEncoding: ImageUploadEncoding): JSONArray = JSONArray().apply {
         if (text.isNotBlank()) put(JSONObject().put("type", "text").put("text", text))
         message.attachments.filter { it.isImage }.forEach { attachment ->
-            put(JSONObject().put("type", "image").put("mime_type", attachment.mimeType)
-                .put("data", android.util.Base64.encodeToString(attachment.bytes(), android.util.Base64.NO_WRAP)))
+            val encoded = uploadEncoding.encode(attachment)
+            put(JSONObject().put("type", "image").put("mime_type", encoded.mimeType)
+                .put("data", encoded.base64))
         }
     }
 

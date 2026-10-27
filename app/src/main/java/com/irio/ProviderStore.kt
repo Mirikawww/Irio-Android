@@ -848,6 +848,7 @@ object ProviderApi {
                 if (streaming) field("partial_images", "3")
                 field("stream", streaming.toString())
                 (options?.openAiFields() ?: mapOf("size" to "1024x1024")).forEach { (name, value) -> field(name, value) }
+                val uploadEncoding = ImageUploadEncoding()
                 context.inputImages.forEach { image ->
                     val file = File(image.filePath)
                     if (!file.exists()) {
@@ -856,12 +857,16 @@ object ProviderApi {
                         }
                         return@forEach
                     }
+                    val prepared = uploadEncoding.prepare(image)
+                    val outputExtension = when (prepared.mimeType) { "image/jpeg" -> "jpg"; "image/webp" -> "webp"; else -> null }
+                    val uploadName = if (outputExtension != null && prepared.mimeType != image.mimeType) image.name.substringBeforeLast('.', image.name) + ".$outputExtension"
+                        else image.name.ifBlank { "previous.png" }
                     output.writeBytes("--$boundary\r\n")
                     output.writeBytes(
-                        "Content-Disposition: form-data; name=\"image[]\"; filename=\"${image.name.ifBlank { "previous.png" }}\"\r\n",
+                        "Content-Disposition: form-data; name=\"image[]\"; filename=\"$uploadName\"\r\n",
                     )
-                    output.writeBytes("Content-Type: ${image.mimeType.ifBlank { "image/png" }}\r\n\r\n")
-                    output.write(file.readBytes())
+                    output.writeBytes("Content-Type: ${prepared.mimeType.ifBlank { "image/png" }}\r\n\r\n")
+                    output.write(prepared.bytes)
                     output.writeBytes("\r\n")
                 }
                 output.writeBytes("--$boundary--\r\n")

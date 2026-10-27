@@ -5,7 +5,8 @@ import org.json.JSONObject
 
 /** Native GenerateContent wire format; never send OpenAI-only fields to this API. */
 internal object GeminiProtocol {
-    fun requestBody(messages: List<ChatRequestMessage>, systemPrompt: String?, tools: List<JSONObject> = emptyList()): JSONObject = JSONObject().apply {
+    fun requestBody(messages: List<ChatRequestMessage>, systemPrompt: String?, tools: List<JSONObject> = emptyList(),
+                    uploadEncoding: ImageUploadEncoding = ImageUploadEncoding()): JSONObject = JSONObject().apply {
         val limit = 100L * 1024 * 1024
         val estimatedBytes = messages.sumOf { message ->
             message.text.toByteArray(Charsets.UTF_8).size.toLong() + message.attachments.sumOf { ((it.size + 2) / 3) * 4 }
@@ -30,8 +31,9 @@ internal object GeminiProtocol {
                 else -> {
                     if (message.text.isNotBlank()) parts.put(JSONObject().put("text", ChatApi.stampMessageText(message.text, message.createdAt, message.role == "user")))
                     message.attachments.forEach { attachment ->
-                        parts.put(JSONObject().put("inlineData", JSONObject().put("mimeType", attachment.mimeType)
-                            .put("data", java.util.Base64.getEncoder().encodeToString(attachment.bytes()))))
+                        val encoded = uploadEncoding.encode(attachment)
+                        parts.put(JSONObject().put("inlineData", JSONObject().put("mimeType", encoded.mimeType)
+                            .put("data", encoded.base64)))
                     }
                     message.toolCalls.forEach { call ->
                         parts.put(JSONObject().put("functionCall", JSONObject().apply {

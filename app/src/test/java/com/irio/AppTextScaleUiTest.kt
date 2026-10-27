@@ -220,6 +220,19 @@ class AppTextScaleUiTest {
         }
     }
 
+    @Test fun imageCompressionSettingsUseTheExpectedControlOrderAndDefaults() = runTest {
+        withUi(content = { AppTheme { Column { ImageUploadSettings() } } }) {
+            frames(40)
+            text(tr("图片压缩与转换"))
+            val toggle = nodes().single { it.config.contains(SemanticsProperties.ToggleableState) }
+            assertEquals(androidx.compose.ui.state.ToggleableState.On, toggle.config[SemanticsProperties.ToggleableState])
+            text(tr("转换格式")); text("WebP"); text("JPEG"); text(tr("质量")); text("90%")
+            val slider = nodes().single { it.config.contains(SemanticsActions.SetProgress) }
+            assertEquals(40f..100f, slider.config[SemanticsProperties.ProgressBarRangeInfo].range)
+            assertEquals(90f, slider.config[SemanticsProperties.ProgressBarRangeInfo].current, 0.001f)
+        }
+    }
+
     @Test fun dialogsAndBottomSheetsReceiveCustomScale() = runTest {
         var dialogScale = 0f
         var sheetScale = 0f

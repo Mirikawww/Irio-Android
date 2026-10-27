@@ -227,6 +227,7 @@ object ChatApi {
         onUploadProgress: ((sent: Long, total: Long) -> Unit)? = null,
         retryOptions: ChatRetryOptions = ChatRetryOptions(enabled = false),
     ): ChatCompletionResult {
+        val uploadEncoding = ImageUploadEncoding()
         val history = (if (toolRegistry.handles(ReactionTool.NAME)) reactionRequestMessages(messages) else messages).toMutableList()
         var searchPages = 0
         var displayedBubbles = false
@@ -281,6 +282,7 @@ object ChatApi {
                 onUpdate = attemptUpdate,
                 onUploadProgress = if (roundIndex == 0) onUploadProgress else null,
                 allowEmptyCompletion = displayedBubbles,
+                uploadEncoding = uploadEncoding,
             ) }
             if (turn.usage != null) lastUsage = turn.usage
             if (turn.error != null || turn.stopped || turn.toolCalls.isEmpty()) {
@@ -460,9 +462,10 @@ object ChatApi {
         messages: List<ChatRequestMessage>,
         conversationId: String,
     ): String {
+        val uploadEncoding = ImageUploadEncoding()
         return when (protocol) {
-            ProviderProtocol.GEMINI -> GeminiProtocol.requestBody(messages, systemPrompt).toString()
-            ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.requestBody(model, messages, systemPrompt).toString()
+            ProviderProtocol.GEMINI -> GeminiProtocol.requestBody(messages, systemPrompt, uploadEncoding = uploadEncoding).toString()
+            ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.requestBody(model, messages, systemPrompt, uploadEncoding = uploadEncoding).toString()
             ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().apply {
                 put("model", model)
                 put("stream", false)
@@ -470,7 +473,7 @@ object ChatApi {
                     if (systemPrompt.isNotBlank()) {
                         put(JSONObject().put("role", "system").put("content", systemPrompt))
                     }
-                    messages.forEach { put(it.toChatCompletionsJson()) }
+                    messages.forEach { put(it.toChatCompletionsJson(uploadEncoding)) }
                 })
                 putConversationKey(conversationId)
             }.toString()
@@ -479,7 +482,7 @@ object ChatApi {
                 put("stream", false)
                 if (systemPrompt.isNotBlank()) put("instructions", systemPrompt)
                 put("input", JSONArray().apply {
-                    messages.forEach { message -> message.toResponsesItems().forEach(::put) }
+                    messages.forEach { message -> message.toResponsesItems(uploadEncoding).forEach(::put) }
                 })
                 putConversationKey(conversationId)
             }.toString()
@@ -489,7 +492,7 @@ object ChatApi {
                 put("max_tokens", 4096)
                 if (systemPrompt.isNotBlank()) put("system", systemPrompt)
                 put("messages", JSONArray().apply {
-                    messages.forEach { put(it.toAnthropicJson()) }
+                    messages.forEach { put(it.toAnthropicJson(uploadEncoding)) }
                 })
             }.toString()
         }
@@ -555,13 +558,14 @@ object ChatApi {
         onUpdate: suspend (ChatStreamUpdate) -> Unit,
         onUploadProgress: ((sent: Long, total: Long) -> Unit)? = null,
         allowEmptyCompletion: Boolean = false,
+        uploadEncoding: ImageUploadEncoding = ImageUploadEncoding(),
     ): ChatCompletionResult {
         val publish: suspend (ChatStreamUpdate) -> Unit = { update ->
             onUpdate(update)
         }
         val bodyBytes = try {
             requestBody(provider.protocol, model, messages, reasoningEffort, fastMode, systemPrompt, toolRegistry,
-                conversationId = connectionScope).toByteArray(Charsets.UTF_8)
+                conversationId = connectionScope, uploadEncoding = uploadEncoding).toByteArray(Charsets.UTF_8)
         } catch (error: Exception) {
             return ChatCompletionResult(error = error.message ?: tr("请求内容无效"))
         }
@@ -977,6 +981,7 @@ object ChatApi {
         systemPrompt: String?,
         toolRegistry: ToolRegistry,
         conversationId: String = "",
+        uploadEncoding: ImageUploadEncoding = ImageUploadEncoding(),
     ): String {
         fun toolsArray(): JSONArray? {
             val tools = JSONArray()
@@ -985,10 +990,10 @@ object ChatApi {
             return if (tools.length() > 0) tools else null
         }
         return when (protocol) {
-        ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.requestBody(model, messages, systemPrompt, toolRegistry.schemas(protocol), streaming = true).apply {
+        ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.requestBody(model, messages, systemPrompt, toolRegistry.schemas(protocol), streaming = true, uploadEncoding = uploadEncoding).apply {
             ChatProtocol.putReasoning(this, protocol, reasoningEffort, model)
         }.toString()
-        ProviderProtocol.GEMINI -> GeminiProtocol.requestBody(messages, systemPrompt, toolRegistry.schemas(protocol)).apply {
+        ProviderProtocol.GEMINI -> GeminiProtocol.requestBody(messages, systemPrompt, toolRegistry.schemas(protocol), uploadEncoding).apply {
             ChatProtocol.putReasoning(this, protocol, reasoningEffort, model)
         }.toString()
         ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().apply {
@@ -1002,7 +1007,7 @@ object ChatApi {
                 if (!systemPrompt.isNullOrBlank()) {
                     put(JSONObject().put("role", "system").put("content", systemPrompt))
                 }
-                messages.forEach { put(it.toChatCompletionsJson()) }
+                messages.forEach { put(it.toChatCompletionsJson(uploadEncoding)) }
             })
             putConversationKey(conversationId)
         }.toString()
@@ -1016,7 +1021,7 @@ object ChatApi {
             if (!systemPrompt.isNullOrBlank()) put("instructions", systemPrompt)
             put("input", JSONArray().apply {
                 messages.forEach { message ->
-                    message.toResponsesItems().forEach(::put)
+                    message.toResponsesItems(uploadEncoding).forEach(::put)
                 }
             })
             putConversationKey(conversationId)
@@ -1030,14 +1035,14 @@ object ChatApi {
             if (!systemPrompt.isNullOrBlank()) put("system", systemPrompt)
             put("messages", JSONArray().apply {
                 messages.filter { it.role == "user" || it.role == "assistant" || it.role == "tool" }.forEach {
-                    put(it.toAnthropicJson())
+                    put(it.toAnthropicJson(uploadEncoding))
                 }
             })
         }.toString()
         }
     }
 
-    private fun ChatRequestMessage.toChatCompletionsJson(): JSONObject {
+    private fun ChatRequestMessage.toChatCompletionsJson(uploadEncoding: ImageUploadEncoding = ImageUploadEncoding()): JSONObject {
         val stampedText = text.withTimestampPrefix(createdAt, role == "user")
         return JSONObject().apply {
             when {
@@ -1067,7 +1072,7 @@ object ChatApi {
                 }
                 else -> {
                     put("role", role)
-                    val parts = openAiParts(text = true, overrideText = stampedText)
+                    val parts = openAiParts(text = true, overrideText = stampedText, uploadEncoding = uploadEncoding)
                     if (parts.size == 1 && parts[0].optString("type") == "text") {
                         put("content", parts[0].optString("text"))
                     } else {
@@ -1078,7 +1083,7 @@ object ChatApi {
         }
     }
 
-    private fun ChatRequestMessage.toResponsesItems(): List<JSONObject> {
+    private fun ChatRequestMessage.toResponsesItems(uploadEncoding: ImageUploadEncoding = ImageUploadEncoding()): List<JSONObject> {
         return when {
             role == "tool" -> listOf(
                 JSONObject()
@@ -1088,7 +1093,7 @@ object ChatApi {
             )
             toolCalls.isNotEmpty() -> buildList {
                 // 工具调用前的正文也是上下文：丢掉它，下一轮模型会把已经说过的话再生成一遍。
-                if (text.isNotBlank()) add(toResponsesJson())
+                if (text.isNotBlank()) add(toResponsesJson(uploadEncoding))
                 addAll(toolCalls.map { call ->
                     JSONObject()
                         .put("type", "function_call")
@@ -1097,20 +1102,20 @@ object ChatApi {
                         .put("arguments", call.arguments)
                 })
             }
-            else -> listOf(toResponsesJson())
+            else -> listOf(toResponsesJson(uploadEncoding))
         }
     }
 
-    private fun ChatRequestMessage.toResponsesJson(): JSONObject {
+    private fun ChatRequestMessage.toResponsesJson(uploadEncoding: ImageUploadEncoding): JSONObject {
         return JSONObject().apply {
             put("role", role)
             put("content", JSONArray().apply {
-                openAiParts(text = false, overrideText = text.withTimestampPrefix(createdAt, role == "user")).forEach(::put)
+                openAiParts(text = false, overrideText = text.withTimestampPrefix(createdAt, role == "user"), uploadEncoding = uploadEncoding).forEach(::put)
             })
         }
     }
 
-    private fun ChatRequestMessage.toAnthropicJson(): JSONObject {
+    private fun ChatRequestMessage.toAnthropicJson(uploadEncoding: ImageUploadEncoding = ImageUploadEncoding()): JSONObject {
         val stampedText = text.withTimestampPrefix(createdAt, role == "user")
         return JSONObject().apply {
             when {
@@ -1157,7 +1162,7 @@ object ChatApi {
                             add(JSONObject().put("type", "text").put("text", stampedText))
                         }
                         attachments.forEach { attachment ->
-                            add(attachment.toAnthropicPart())
+                            add(attachment.toAnthropicPart(uploadEncoding))
                         }
                     }.ifEmpty { listOf(JSONObject().put("type", "text").put("text", "")) }
                     put("content", JSONArray().apply { parts.forEach(::put) })
@@ -1166,7 +1171,7 @@ object ChatApi {
         }
     }
 
-    private fun ChatRequestMessage.openAiParts(text: Boolean, overrideText: String? = null): List<JSONObject> {
+    private fun ChatRequestMessage.openAiParts(text: Boolean, overrideText: String? = null, uploadEncoding: ImageUploadEncoding): List<JSONObject> {
         val textType = when {
             text -> "text"
             role == "assistant" -> "output_text"
@@ -1180,7 +1185,7 @@ object ChatApi {
                 add(JSONObject().put("type", textType).put("text", bodyText))
             }
             attachments.forEach { attachment ->
-                val dataUrl = dataUrl(attachment.mimeType, attachment.bytes())
+                val dataUrl = uploadEncoding.encode(attachment).dataUrl()
                 add(
                     if (attachment.isImage) {
                         if (text) {
@@ -1206,8 +1211,8 @@ object ChatApi {
         return parts.ifEmpty { listOf(JSONObject().put("type", textType).put("text", "")) }
     }
 
-    private fun ChatAttachment.toAnthropicPart(): JSONObject {
-        val encoded = Base64.encodeToString(bytes(), Base64.NO_WRAP)
+    private fun ChatAttachment.toAnthropicPart(uploadEncoding: ImageUploadEncoding): JSONObject {
+        val encoded = uploadEncoding.encode(this)
         return if (isImage) {
             JSONObject()
                 .put("type", "image")
@@ -1215,8 +1220,8 @@ object ChatApi {
                     "source",
                     JSONObject()
                         .put("type", "base64")
-                        .put("media_type", mimeType)
-                        .put("data", encoded),
+                        .put("media_type", encoded.mimeType)
+                        .put("data", encoded.base64),
                 )
         } else {
             JSONObject()
@@ -1227,7 +1232,7 @@ object ChatApi {
                     JSONObject()
                         .put("type", "base64")
                         .put("media_type", mimeType.ifBlank { "application/pdf" })
-                        .put("data", encoded),
+                        .put("data", encoded.base64),
                 )
         }
     }

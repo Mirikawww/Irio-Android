@@ -170,6 +170,9 @@ object ThemeStore {
     private const val APP_FONT_KEY = "app_font"
     private const val TEXT_SCALE_MODE_KEY = "text_scale_mode"
     private const val TEXT_SCALE_PERCENT_KEY = "text_scale_percent"
+    private const val IMAGE_UPLOAD_COMPRESSION_KEY = "image_upload_compression"
+    private const val IMAGE_UPLOAD_QUALITY_KEY = "image_upload_quality"
+    private const val IMAGE_UPLOAD_FORMAT_KEY = "image_upload_format"
     private const val AUTO_RETRY_KEY = "auto_retry"
     private const val RETRY_LIMIT_KEY = "retry_limit"
     private const val RETRY_COOLDOWN_KEY = "retry_cooldown_seconds"
@@ -266,6 +269,16 @@ object ThemeStore {
     var textScalePercent by mutableStateOf(DefaultTextScalePercent)
         private set
 
+    var imageUploadCompression by mutableStateOf(true)
+        private set
+    var imageUploadQuality by mutableStateOf(90)
+        private set
+
+    internal var imageUploadFormat by mutableStateOf(ImageUploadFormat.WEBP)
+        private set
+
+    internal fun imageUploadOptions() = ImageUploadOptions(imageUploadCompression, imageUploadQuality, imageUploadFormat)
+
     var autoRetry by mutableStateOf(true)
         private set
     var retryLimit by mutableStateOf(5)
@@ -314,6 +327,9 @@ object ThemeStore {
             appFont = AppFont.fromStored(appearance.getString(APP_FONT_KEY, null))
             textScaleMode = TextScaleMode.fromStored(appearance.getString(TEXT_SCALE_MODE_KEY, null))
             textScalePercent = appearance.getInt(TEXT_SCALE_PERCENT_KEY, DefaultTextScalePercent).coerceIn(TextScalePercentRange)
+            imageUploadCompression = appearance.getBoolean(IMAGE_UPLOAD_COMPRESSION_KEY, true)
+            imageUploadQuality = appearance.getInt(IMAGE_UPLOAD_QUALITY_KEY, 90).coerceIn(40, 100)
+            imageUploadFormat = ImageUploadFormat.fromStored(appearance.getString(IMAGE_UPLOAD_FORMAT_KEY, null))
             autoRetry = appearance.getBoolean(AUTO_RETRY_KEY, true)
             retryLimit = appearance.getInt(RETRY_LIMIT_KEY, 5).coerceIn(1, 20)
             retryCooldownSeconds = appearance.getInt(RETRY_COOLDOWN_KEY, 10).coerceIn(0, 300)
@@ -534,6 +550,24 @@ object ThemeStore {
             .edit()
             .putString(APP_FONT_KEY, value.stored)
             .apply()
+    }
+
+    fun saveImageUploadCompression(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        imageUploadCompression = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(IMAGE_UPLOAD_COMPRESSION_KEY, enabled).apply()
+    }
+
+    internal fun saveImageUploadFormat(context: Context, format: ImageUploadFormat) {
+        ensureLoaded(context)
+        imageUploadFormat = format
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(IMAGE_UPLOAD_FORMAT_KEY, format.stored).apply()
+    }
+
+    fun saveImageUploadQuality(context: Context, quality: Int) {
+        ensureLoaded(context)
+        imageUploadQuality = quality.coerceIn(40, 100)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(IMAGE_UPLOAD_QUALITY_KEY, imageUploadQuality).apply()
     }
 
     fun saveTextScaleMode(context: Context, value: TextScaleMode) {

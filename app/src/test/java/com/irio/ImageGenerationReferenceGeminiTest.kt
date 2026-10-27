@@ -11,12 +11,20 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ImageGenerationReferenceGeminiTest {
     @Test fun geminiProtocolsSendUploadedReferencesInTheCurrentUserTurn() {
-        val image = File.createTempFile("gemini-reference-", ".png").apply { writeBytes(byteArrayOf(1, 2, 3, 4, 5)) }
+        val image = File.createTempFile("gemini-reference-", ".png")
+        val bitmap = android.graphics.Bitmap.createBitmap(80, 60, android.graphics.Bitmap.Config.ARGB_8888)
+        try {
+            bitmap.eraseColor(android.graphics.Color.BLUE)
+            image.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        } finally { bitmap.recycle() }
+        val original = image.readBytes()
         try {
             for (protocol in listOf(ProviderProtocol.GEMINI, ProviderProtocol.GEMINI_INTERACTIONS)) {
                 MockWebServer().use { server ->
@@ -37,8 +45,11 @@ class ImageGenerationReferenceGeminiTest {
                     val inline = if (protocol == ProviderProtocol.GEMINI) {
                         parts.getJSONObject(1).getJSONObject("inlineData")
                     } else parts.getJSONObject(1)
-                    assertEquals("image/png", inline.getString(if (protocol == ProviderProtocol.GEMINI) "mimeType" else "mime_type"))
-                    assertArrayEquals(image.readBytes(), Base64.getDecoder().decode(inline.getString("data")))
+                    assertEquals("image/webp", inline.getString(if (protocol == ProviderProtocol.GEMINI) "mimeType" else "mime_type"))
+                    val sentBytes = Base64.getDecoder().decode(inline.getString("data"))
+                    val sent = android.graphics.BitmapFactory.decodeByteArray(sentBytes, 0, sentBytes.size)!!
+                    try { assertEquals(80, sent.width); assertEquals(60, sent.height) } finally { sent.recycle() }
+                    assertArrayEquals(original, image.readBytes())
                     assertEquals(1, server.requestCount)
                 }
             }

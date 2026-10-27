@@ -517,6 +517,9 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 }
             }
             SettingsSectionCard {
+                ImageUploadSettings()
+            }
+            SettingsSectionCard {
                 val pasteArrow by animateFloatAsState(
                     targetValue = if (longTextPasteExpanded) 180f else 0f,
                     animationSpec = irioSpring(),
