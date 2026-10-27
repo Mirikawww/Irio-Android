@@ -39,7 +39,7 @@ import com.composables.ui.components.IconButton
 import com.composables.ui.components.DropdownMenu
 import com.composables.ui.components.DropdownMenuAlignment
 import com.composables.ui.components.DropdownMenuItem
-import com.composables.ui.components.DropdownMenuPanel
+import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
 import com.composables.ui.components.ProgressIndicator
 import com.composables.ui.components.Text
 import com.composables.ui.theme.backgroundColor

@@ -942,7 +942,7 @@ private class AndroidMessageViewHolder(
                                 composeView.visibility = View.VISIBLE
                             }
                         }
-                        AndroidMessageRow(currentMessage, currentCallbacks)
+                        ProvideAppTextScale { AndroidMessageRow(currentMessage, currentCallbacks) }
                     }
                 }
             }

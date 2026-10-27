@@ -52,7 +52,7 @@ import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.DropdownMenu
 import com.composables.ui.components.DropdownMenuAlignment
-import com.composables.ui.components.DropdownMenuPanel
+import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
 import com.composables.ui.components.Text
 import com.composables.ui.theme.ColorScheme
 import com.composables.ui.theme.LocalColorScheme

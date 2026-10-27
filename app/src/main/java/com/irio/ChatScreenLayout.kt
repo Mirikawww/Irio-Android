@@ -288,6 +288,7 @@ private fun ClearHistoryDialog(visible: Boolean, onDismiss: () -> Unit, onConfir
         backgroundColor = Theme[colors][panelColor],
         contentColor = Theme[colors][onPanelColor],
     ) {
+        ProvideAppTextScale {
         Column {
             DialogTitle(tr("删除全部历史"))
             Spacer(Modifier.height(12.dp))
@@ -299,6 +300,7 @@ private fun ClearHistoryDialog(visible: Boolean, onDismiss: () -> Unit, onConfir
                 onCancel = onDismiss,
                 confirmStyle = ButtonStyle.Destructive,
             )
+        }
         }
     }
 }

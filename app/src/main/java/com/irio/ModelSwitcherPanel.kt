@@ -109,7 +109,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
-import com.composables.ui.components.DropdownMenuPanel
+import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
 import com.composables.ui.components.DropdownMenuScope
 import com.composables.ui.components.Icon
 import com.composables.ui.components.IconButton

@@ -56,7 +56,7 @@ import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.DropdownMenu
 import com.composables.ui.components.DropdownMenuAlignment
 import com.composables.ui.components.DropdownMenuItem
-import com.composables.ui.components.DropdownMenuPanel
+import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
 import com.composables.ui.components.DropdownMenuSide
 import com.composables.ui.components.Icon
 import com.composables.ui.components.IconButton

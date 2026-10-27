@@ -168,6 +168,8 @@ object ThemeStore {
     private const val MERGE_TOOL_CALLS_KEY = "merge_tool_calls"
     private const val SHOW_USER_AVATAR_KEY = "show_user_avatar"
     private const val APP_FONT_KEY = "app_font"
+    private const val TEXT_SCALE_MODE_KEY = "text_scale_mode"
+    private const val TEXT_SCALE_PERCENT_KEY = "text_scale_percent"
     private const val AUTO_RETRY_KEY = "auto_retry"
     private const val RETRY_LIMIT_KEY = "retry_limit"
     private const val RETRY_COOLDOWN_KEY = "retry_cooldown_seconds"
@@ -259,6 +261,11 @@ object ThemeStore {
     var appFont by mutableStateOf(AppFont.SANS)
         private set
 
+    var textScaleMode by mutableStateOf(TextScaleMode.SYSTEM)
+        private set
+    var textScalePercent by mutableStateOf(DefaultTextScalePercent)
+        private set
+
     var autoRetry by mutableStateOf(true)
         private set
     var retryLimit by mutableStateOf(5)
@@ -305,6 +312,8 @@ object ThemeStore {
             mergeToolCalls = appearance.getBoolean(MERGE_TOOL_CALLS_KEY, false)
             showUserAvatar = appearance.getBoolean(SHOW_USER_AVATAR_KEY, false)
             appFont = AppFont.fromStored(appearance.getString(APP_FONT_KEY, null))
+            textScaleMode = TextScaleMode.fromStored(appearance.getString(TEXT_SCALE_MODE_KEY, null))
+            textScalePercent = appearance.getInt(TEXT_SCALE_PERCENT_KEY, DefaultTextScalePercent).coerceIn(TextScalePercentRange)
             autoRetry = appearance.getBoolean(AUTO_RETRY_KEY, true)
             retryLimit = appearance.getInt(RETRY_LIMIT_KEY, 5).coerceIn(1, 20)
             retryCooldownSeconds = appearance.getInt(RETRY_COOLDOWN_KEY, 10).coerceIn(0, 300)
@@ -525,6 +534,23 @@ object ThemeStore {
             .edit()
             .putString(APP_FONT_KEY, value.stored)
             .apply()
+    }
+
+    fun saveTextScaleMode(context: Context, value: TextScaleMode) {
+        ensureLoaded(context)
+        if (textScaleMode == value) return
+        textScaleMode = value
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(TEXT_SCALE_MODE_KEY, value.stored).apply()
+    }
+
+    fun saveTextScalePercent(context: Context, value: Int) {
+        ensureLoaded(context)
+        val normalized = value.coerceIn(TextScalePercentRange)
+        if (textScalePercent == normalized) return
+        textScalePercent = normalized
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt(TEXT_SCALE_PERCENT_KEY, normalized).apply()
     }
 
     fun saveAutoRetry(context: Context, enabled: Boolean) {

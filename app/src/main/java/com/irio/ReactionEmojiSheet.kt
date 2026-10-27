@@ -28,7 +28,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.composables.ui.components.BottomSheet
+import com.irio.ScaledBottomSheet as BottomSheet
 import com.composables.ui.components.BottomSheetState
 import com.composables.ui.components.Text
 import com.composables.ui.theme.colors

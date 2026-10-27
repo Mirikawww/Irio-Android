@@ -28,7 +28,9 @@ fun IrioAlertDialog(
         backgroundColor = backgroundColor,
         contentColor = contentColor,
     ) {
-        DismissComposerFocusWhenImeHides()
-        content()
+        ProvideAppTextScale {
+            DismissComposerFocusWhenImeHides()
+            content()
+        }
     }
 }

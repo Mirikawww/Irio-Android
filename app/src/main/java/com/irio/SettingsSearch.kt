@@ -249,6 +249,7 @@ private val settingsSearchEntries = listOf(
     item("appearance.font", "字体", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.font.sans", "非衬线体", "外观与偏好", AppearanceSettingsActivity::class.java, anchor = "appearance.font"),
     item("appearance.font.serif", "衬线体", "外观与偏好", AppearanceSettingsActivity::class.java, anchor = "appearance.font"),
+    item("appearance.textScale", "文本缩放", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.paste", "粘贴长文本为文件", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.paste.threshold", "字符阈值", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.retry", "自动重试", "外观与偏好", AppearanceSettingsActivity::class.java),

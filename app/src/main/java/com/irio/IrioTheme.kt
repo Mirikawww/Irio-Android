@@ -155,7 +155,7 @@ fun AppTheme(content: @Composable () -> Unit) {
         LocalDynamicAccent provides monetColors,
         LocalSystemFontWeightScale provides systemFontWeightScale,
     ) {
-        IrioComponentTheme(content)
+        ProvideAppTextScale { IrioComponentTheme(content) }
     }
 }
 

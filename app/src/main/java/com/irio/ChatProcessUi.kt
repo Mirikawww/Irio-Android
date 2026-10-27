@@ -38,7 +38,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.composables.ui.components.BottomSheet
+import com.irio.ScaledBottomSheet as BottomSheet
 import com.composables.ui.components.BottomSheetState
 import com.composables.ui.components.Icon
 import com.composables.ui.components.Text

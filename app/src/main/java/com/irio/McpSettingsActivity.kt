@@ -1,5 +1,7 @@
 package com.irio
 
+import com.irio.ScaledBottomSheet as BottomSheet
+
 import android.content.ClipData
 import android.content.Intent
 import android.net.Uri

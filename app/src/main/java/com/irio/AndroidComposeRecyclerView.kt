@@ -306,7 +306,7 @@ private class ComposeListViewHolder<T : Any>(
         composeView.setContent {
             val currentItem = item
             if (currentItem != null) {
-                contentState.value(currentItem)
+                ProvideAppTextScale { contentState.value(currentItem) }
             }
         }
     }

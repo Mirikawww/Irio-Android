@@ -534,6 +534,8 @@ private val English = mapOf(
     "代码块自动换行" to "Wrap code blocks",
     "代码块行号" to "Code block line numbers",
     "字体" to "Font",
+    "文本缩放" to "Text scaling",
+    "缩放比例" to "Scale",
     "非衬线体" to "Sans",
     "衬线体" to "Serif",
     "默认折叠思考块" to "Collapse thinking blocks by default",
