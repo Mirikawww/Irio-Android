@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.BroadcastFrameClock
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Recomposer
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -46,6 +47,86 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
 class ReplyErrorRowTest {
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun iconIsCenteredOnTheFirstRenderedLineAcrossMarkdownAndFontScales() = runTest {
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        val clock = BroadcastFrameClock()
+        val recomposer = Recomposer(coroutineContext + clock)
+        val runner = launch(clock) { recomposer.runRecomposeAndApplyChanges() }
+        val view = ComposeView(controller.get())
+        val error = mutableStateOf("Request failed")
+        val fontScale = mutableStateOf(1f)
+        ThemeStore.ensureLoaded(controller.get())
+        val originalFont = ThemeStore.appFont
+        val fixtures = listOf(
+            "Request failed",
+            "网络请求失败，请检查连接后再试。这是一段需要自动换行的详细报错说明。",
+            "# Request failed\n\nA detailed explanation below the heading.",
+            "### Request failed\n\nA detailed explanation below the heading.",
+            "**Request failed**\n\nA second paragraph must not move the icon.",
+            "[Request failed](https://example.com)\n\nAn explanation below a link.",
+            "- Request failed\n- Check your network connection",
+        )
+        fixtures.forEach { FinishedMarkdownCache.prepare(it, this) }
+        var frameTime = 0L
+        fun frames() {
+            repeat(8) {
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+                Snapshot.sendApplyNotifications()
+                runCurrent()
+                clock.sendFrame(frameTime.also { frameTime += 16_000_000L })
+                runCurrent()
+                view.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(1500, View.MeasureSpec.EXACTLY))
+                view.layout(0, 0, 360, 1500)
+            }
+        }
+        fun descend(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descend)
+        try {
+            view.setParentCompositionContext(recomposer)
+            controller.get().setContentView(view)
+            view.setContent {
+                CompositionLocalProvider(LocalDensity provides Density(1f, fontScale.value)) {
+                    AppTheme {
+                        key(error.value) { ReplyErrorRow(ChatRetryStatus(error.value, 2, remainingSeconds = 8)) }
+                    }
+                }
+            }
+            for (font in AppFont.entries) {
+                ThemeStore.saveAppFont(controller.get(), font)
+                for (scale in listOf(1f, 1.6f)) {
+                    fontScale.value = scale
+                    for (fixture in fixtures) {
+                        error.value = fixture
+                        frames()
+                        val nodes = descend((view.getChildAt(0) as ViewRootForTest).semanticsOwner.unmergedRootSemanticsNode)
+                        val icon = nodes.single { it.config.getOrElse(ContentDescription) { emptyList() }.contains(tr("重试状态")) }
+                        val firstText = nodes.filter {
+                            it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text ->
+                                text.text.contains("Request failed") || text.text.startsWith("网络请求失败")
+                            } && it.config.contains(SemanticsActions.GetTextLayoutResult)
+                        }.minBy { it.boundsInRoot.top }
+                        val results = mutableListOf<TextLayoutResult>()
+                        firstText.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(results)
+                        val layout = results.single()
+                        val firstLineCenter = firstText.boundsInRoot.top + (layout.getLineTop(0) + layout.getLineBottom(0)) / 2f
+                        assertEquals("Icon must follow the first rendered line ($font, scale=$scale, $fixture)",
+                            firstLineCenter, icon.boundsInRoot.center.y, 0.75f)
+                        assertEquals("Icon must retain its 20dp size", 20f, icon.boundsInRoot.height, 0.5f)
+                        if (fixture.startsWith("网络")) {
+                            assertTrue("The fixture must actually wrap", layout.lineCount > 1)
+                        }
+                    }
+                }
+            }
+        } finally {
+            view.disposeComposition(); recomposer.close(); runner.cancel()
+            ThemeStore.saveAppFont(controller.get(), originalFont)
+            controller.pause().stop().destroy()
+        }
+    }
+
     @Test fun errorReasonsRenderMarkdownWhileRetryStatusRemainsPlainText() = runTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val clock = BroadcastFrameClock()

@@ -5,11 +5,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isUnspecified
+import androidx.compose.ui.layout.HorizontalAlignmentLine
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -22,6 +26,7 @@ import com.mikepenz.markdown.annotator.DefaultAnnotatorSettings
 import com.mikepenz.markdown.annotator.buildMarkdownAnnotatedString
 import com.mikepenz.markdown.compose.LocalMarkdownAnnotator
 import com.mikepenz.markdown.compose.LocalMarkdownColors
+import com.mikepenz.markdown.compose.LocalMarkdownExtendedSpans
 import com.mikepenz.markdown.compose.LocalMarkdownTypography
 import com.mikepenz.markdown.compose.LocalReferenceLinkHandler
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
@@ -33,6 +38,12 @@ import org.intellij.markdown.MarkdownTokenTypes
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.findChildOfType
 import kotlin.math.min
+import kotlin.math.roundToInt
+
+// Propagates the earliest text line's center through nested Markdown columns/lists.
+// Opt in only for leading-icon rows; ordinary assistant messages stay unchanged.
+internal val MarkdownFirstLineCenter = HorizontalAlignmentLine { a, b -> min(a, b) }
+internal val LocalMarkdownFirstLineAlignment = staticCompositionLocalOf { false }
 
 /** Agora's glyph fade: 2 alpha per second, so a new code point settles in 500ms. */
 internal const val STREAM_TAIL_ALPHA_PER_SECOND = 2f
@@ -318,11 +329,24 @@ internal fun FadingMarkdownAnnotated(
         nodeStart = child.startOffset,
         nodeEnd = child.endOffset,
     )
+    val firstLineCenter = if (LocalMarkdownFirstLineAlignment.current) remember { mutableIntStateOf(0) } else null
+    val lineAlignment = if (firstLineCenter == null) Modifier else Modifier.layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        layout(placeable.width, placeable.height, mapOf(MarkdownFirstLineCenter to firstLineCenter.intValue)) {
+            placeable.placeRelative(0, 0)
+        }
+    }
     MarkdownText(
         content = rendered,
         node = node,
+        modifier = lineAlignment,
         style = style,
         sourceContent = content,
+        onTextLayout = if (firstLineCenter == null) null else { result, _ ->
+            firstLineCenter.intValue = ((result.getLineTop(0) + result.getLineBottom(0)) / 2f).roundToInt()
+        },
+        // The onTextLayout overload does not supply the renderer's spans by default.
+        extendedSpans = LocalMarkdownExtendedSpans.current.extendedSpans?.invoke(),
     )
 }
 

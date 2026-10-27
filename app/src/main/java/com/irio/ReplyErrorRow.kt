@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,11 +37,13 @@ internal fun ReplyErrorRow(status: ChatRetryStatus) {
         Icon(
             imageVector = replyErrorIcon(status),
             contentDescription = tr("重试状态"),
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(20.dp).alignBy { it.measuredHeight / 2 },
             tint = irioErrorTextColor(),
         )
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            AssistantMarkdown(text = status.error, streaming = false, renderScope = renderScope)
+        Column(Modifier.weight(1f).alignBy(MarkdownFirstLineCenter), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            CompositionLocalProvider(LocalMarkdownFirstLineAlignment provides true) {
+                AssistantMarkdown(text = status.error, streaming = false, renderScope = renderScope)
+            }
             if (status.attempt > 0) {
                 Text(chatRetryLine(status), color = Theme[colors][mutedColor], fontSize = 13.sp, lineHeight = 18.sp)
             }
