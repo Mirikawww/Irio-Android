@@ -7,6 +7,7 @@ import android.graphics.Rect
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import kotlin.math.abs
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,6 +20,12 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [35], qualifiers = "mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class LauncherIconScaleTest {
+    @Test fun debugBuildKeepsItsOwnLauncherNameAndPackage() {
+        val context = RuntimeEnvironment.getApplication()
+        assertEquals("Irio Debug", context.getString(R.string.app_name))
+        assertEquals("com.irio.debug", context.packageName)
+    }
+
     @Test fun gammaForegroundMatchesIotaPaddingAtDifferentIconSizes() {
         val context = RuntimeEnvironment.getApplication()
         for (iconId in listOf(R.mipmap.ic_launcher, R.mipmap.ic_launcher_round)) {
