@@ -23,6 +23,7 @@ import com.composables.ui.theme.onSecondaryColor
 import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.secondaryColor
+import com.composables.ui.theme.switchSelectedTrackColor
 import com.composeunstyled.theme.Theme
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -66,6 +67,28 @@ class AmoledThemeTest {
                     assertEquals(accent.color, Theme[colors][primaryColor])
                     assertEquals(accent.onContent(), Theme[colors][onPrimaryColor])
                 }
+            }
+        }
+    }
+
+    @Test
+    fun cyanAccentPersistsAndFeedsThemeTokensAcrossThemes() {
+        val cyan = AccentColor.fromStored("cyan")
+        assertEquals("cyan", cyan.stored)
+        for (preference in listOf(ThemePreference.LIGHT, ThemePreference.DARK, ThemePreference.AMOLED)) {
+            withTheme(preference, cyan) {
+                val context = LocalView.current.context
+                val stored = context.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
+                    .getString("accent_color", null)
+                assertEquals("cyan", stored)
+                assertEquals(cyan, AccentColor.fromStored(stored))
+                assertEquals(cyan, ThemeStore.accent)
+                assertEquals(cyan.color, Theme[colors][primaryColor])
+                assertEquals(cyan.onContent(), Theme[colors][onPrimaryColor])
+                assertEquals(cyan.color, Theme[colors][switchSelectedTrackColor])
+                assertEquals(cyan.color, accentDisplayColor(cyan))
+                assertTrue(wcagContrastRatio(Theme[colors][primaryColor], Theme[colors][onPrimaryColor]) >= 4.5f)
+                assertTrue(wcagContrastRatio(Theme[colors][primaryColor], Theme[colors][backgroundColor]) >= 3f)
             }
         }
     }

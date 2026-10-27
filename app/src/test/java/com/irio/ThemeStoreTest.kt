@@ -38,6 +38,19 @@ class ThemeStoreTest {
     }
 
     @Test
+    fun cyanAccentIsAvailableLocalizedAndReadable() {
+        val cyan = AccentColor.fromStored("cyan")
+        assertEquals("cyan", cyan.stored)
+        assertTrue(AccentColor.entries.contains(cyan))
+        assertEquals(cyan, AccentColor.fromStored("CYAN"))
+        assertEquals("青色", cyan.label)
+        assertEquals("Cyan", translate(AppLanguage.EN, cyan.label))
+        assertEquals(Color(0xFF0E7490), cyan.color)
+        assertTrue(wcagContrastRatio(cyan.color, cyan.onContent()) >= 4.5f)
+        assertEquals(AccentColor.BLUE, AccentColor.fromStored(null))
+    }
+
+    @Test
     fun resolvedAmoledIsDark() {
         assertTrue(ResolvedTheme.AMOLED.isDark)
         assertTrue(ResolvedTheme.DARK.isDark)
