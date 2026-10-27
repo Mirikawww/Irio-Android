@@ -49,6 +49,7 @@ import com.composables.ui.theme.borderColor
 import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -350,7 +351,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                         } catch (_: Exception) { showDetailsError(tr("无法移除 Todoist 集成，请重试")) }
                     } }, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
                         modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text(tr("移除集成"))
+                        Text(tr("移除集成"), color = LocalContentColor.current)
                     }
                  } ?: TodoistButton(tr("安装"), method = "OAuth",
                      modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth(),
@@ -406,7 +407,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                     } catch (_: Exception) { showDetailsError(tr("无法移除 GitHub 集成，请重试")) }
                 } }, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
                     modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
-                    Text(tr("移除集成"))
+                    Text(tr("移除集成"), color = LocalContentColor.current)
                 }
             }
             }

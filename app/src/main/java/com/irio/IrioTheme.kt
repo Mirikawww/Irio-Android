@@ -76,7 +76,6 @@ import com.composables.ui.theme.switchThumbColor
 import com.composables.ui.theme.switchTrackColor
 import com.composables.ui.theme.textSelectionColors
 import com.composables.ui.theme.thumbColor
-import com.composeunstyled.LocalContentColor
 import com.composeunstyled.LocalTextStyle
 import com.composeunstyled.theme.Theme
 import com.composeunstyled.theme.ThemeComposable
@@ -297,5 +296,7 @@ private val SurfaceOverride: ThemeComposable = buildTheme {
     // 显式写上字体，避免上一帧已经提供的衬线样式在切回非衬线时被原样读回来。
     val appFontFamily = rememberAppFontFamily() ?: FontFamily.Default
     defaultTextStyle = LocalTextStyle.current.merge(TextStyle(fontFamily = appFontFamily))
-    defaultContentColor = LocalContentColor.current
+    // A screen root has no semantic parent surface to supply a foreground.
+    // Resolve it here; buttons, fields and dialogs still provide their own locals.
+    defaultContentColor = Theme[colors][onBackgroundColor]
 }

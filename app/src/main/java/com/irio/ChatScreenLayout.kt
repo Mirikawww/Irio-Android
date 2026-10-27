@@ -292,7 +292,7 @@ private fun ClearHistoryDialog(visible: Boolean, onDismiss: () -> Unit, onConfir
         Column {
             DialogTitle(tr("删除全部历史"))
             Spacer(Modifier.height(12.dp))
-            Text(tr("确定要删除全部历史聊天记录吗？此操作无法撤销。"))
+            Text(tr("确定要删除全部历史聊天记录吗？此操作无法撤销。"), color = Theme[colors][onPanelColor])
             Spacer(Modifier.height(16.dp))
             DialogButtonRow(
                 confirmLabel = tr("删除"),

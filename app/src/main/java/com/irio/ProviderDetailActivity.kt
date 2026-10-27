@@ -76,6 +76,7 @@ import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.hazeBlur
@@ -146,6 +147,7 @@ private fun ProviderDetailScreen(
             Text(
                 tr("找不到这个提供商"),
                 modifier = Modifier.padding(top = capsuleHeight).padding(16.dp),
+                color = content,
             )
         } else {
             Box(Modifier.fillMaxSize()) {
@@ -322,7 +324,7 @@ private fun ProviderDetailScreen(
         Column {
             DialogTitle(tr("删除提供商"))
             Spacer(Modifier.height(12.dp))
-            Text(tr("确定要删除“%s”吗？相关模型和已选模型也会被清除。").format(provider?.name.orEmpty()))
+            Text(tr("确定要删除“%s”吗？相关模型和已选模型也会被清除。").format(provider?.name.orEmpty()), color = Theme[colors][onPanelColor])
             Spacer(Modifier.height(16.dp))
             DialogButtonRow(
                 confirmLabel = tr("删除"),
@@ -346,7 +348,7 @@ private enum class ProviderDetailPage(val label: String) {
 private val RefreshModelGap = 8.dp
 
 @Composable
-private fun ProviderConfigPage(
+internal fun ProviderConfigPage(
     name: TextFieldState,
     endpoint: TextFieldState,
     apiKey: TextFieldState,
@@ -388,7 +390,7 @@ private fun ProviderConfigPage(
             ProviderField(tr("密钥"), apiKey, KeyboardType.Password, mask = true, readOnly = saving, trailingSpace = false)
             ProviderHeadersEditor(headers, enabled = !saving)
             if (formError != null) {
-                Text(formError)
+                Text(formError, color = irioErrorTextColor())
             }
             Button(
                 onClick = onSave,
@@ -396,7 +398,7 @@ private fun ProviderConfigPage(
                 modifier = Modifier.fillMaxWidth(),
                 style = ButtonStyle.Primary,
             ) {
-                Text(if (saving) tr("保存中") else tr("保存"))
+                Text(if (saving) tr("保存中") else tr("保存"), color = LocalContentColor.current)
             }
             Button(
                 onClick = onDelete,
@@ -404,7 +406,7 @@ private fun ProviderConfigPage(
                 modifier = Modifier.fillMaxWidth(),
                 style = ButtonStyle.Destructive,
             ) {
-                Text(tr("删除提供商"))
+                Text(tr("删除提供商"), color = LocalContentColor.current)
             }
         }
         ProviderTopHaze(hazeState, onHeightChanged = { hazePx = it }) {
@@ -414,7 +416,7 @@ private fun ProviderConfigPage(
 }
 
 @Composable
-private fun ProviderModelsPage(
+internal fun ProviderModelsPage(
     provider: ProviderConfig,
     refreshing: Boolean,
     refreshDiff: ModelRefreshDiff,
@@ -440,7 +442,7 @@ private fun ProviderModelsPage(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (provider.models.isEmpty() && (!showRemoved || refreshDiff.removed.isEmpty())) {
-                Text(tr("还没有模型"))
+                Text(tr("还没有模型"), color = Theme[colors][onBackgroundColor])
             } else {
                 modelDiffRows(provider.models, refreshDiff, showRemoved).forEach { entry ->
                     val removed = entry.kind == ModelDiffKind.Removed
@@ -467,7 +469,7 @@ private fun ProviderModelsPage(
                     .padding(top = RefreshModelGap),
                 style = ButtonStyle.Secondary,
             ) {
-                Text(if (refreshing) tr("刷新中") else tr("刷新模型"))
+                Text(if (refreshing) tr("刷新中") else tr("刷新模型"), color = LocalContentColor.current)
             }
         }
     }

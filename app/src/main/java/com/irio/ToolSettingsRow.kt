@@ -70,6 +70,7 @@ import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 
 @Composable
 internal fun ToolSettingsRow(
@@ -215,13 +216,13 @@ internal fun ToolSettingsRow(
                         style = ButtonStyle.Ghost,
                         buttonSize = ButtonSize.Small,
                         contentColor = Theme[colors][onPanelColor],
-                    ) { Text(tr("恢复默认描述")) }
+                    ) { Text(tr("恢复默认描述"), color = LocalContentColor.current) }
                     Button(
                         onClick = onSave,
                         modifier = Modifier.weight(1f).testTag("tool-save:${entry.name}"),
                         style = ButtonStyle.Primary,
                         buttonSize = ButtonSize.Small,
-                    ) { Text(tr("保存")) }
+                    ) { Text(tr("保存"), color = LocalContentColor.current) }
                 }
             }
         }

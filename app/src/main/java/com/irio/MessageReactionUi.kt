@@ -28,6 +28,7 @@ import com.composables.ui.components.Icon
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
+import com.composables.ui.theme.onBackgroundColor
 import com.composeunstyled.theme.Theme
 
 /** Tapback hangs over the upper-left corner, with a thought-bubble trail and room to scale. */
@@ -68,6 +69,7 @@ internal fun UserBubbleReaction(
                         BasicText(
                             emoji,
                             style = TextStyle(
+                                color = Theme[colors][onBackgroundColor],
                                 fontSize = emojiSize,
                                 lineHeight = emojiLineHeight,
                                 textAlign = TextAlign.Center,
@@ -119,6 +121,7 @@ internal fun AssistantReactionButton(
                 emoji,
                 modifier = Modifier.wrapContentSize(unbounded = true).padding(2.dp),
                 style = TextStyle(
+                    color = Theme[colors][onBackgroundColor],
                     fontSize = 16.sp,
                     lineHeight = 22.sp,
                     textAlign = TextAlign.Center,

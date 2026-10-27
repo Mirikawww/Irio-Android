@@ -52,6 +52,7 @@ import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPrimaryColor
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.blur.hazeBlur
 import java.text.SimpleDateFormat
@@ -148,7 +149,7 @@ internal fun ChatConversationDrawer(state: ChatScreenState, drawerOpenProgress: 
                                                 conversationAction = null
                                             }
                                         ) {
-                                            Text(if (conversation.pinned) tr("取消置顶") else tr("置顶"))
+                                            Text(if (conversation.pinned) tr("取消置顶") else tr("置顶"), color = LocalContentColor.current)
                                         }
                                         DropdownMenuItem(
                                             onClick = {
@@ -174,7 +175,7 @@ internal fun ChatConversationDrawer(state: ChatScreenState, drawerOpenProgress: 
                                                 conversationAction = null
                                             }
                                         ) {
-                                            Text(tr("删除对话"))
+                                            Text(tr("删除对话"), color = LocalContentColor.current)
                                         }
                                     }
                                 },
@@ -258,7 +259,7 @@ internal fun ChatConversationDrawer(state: ChatScreenState, drawerOpenProgress: 
                                     contentDescription = null,
                                     modifier = Modifier.size(20.dp),
                                 )
-                                Text(tr("新对话"))
+                                Text(tr("新对话"), color = LocalContentColor.current)
                             }
                         }
                     }

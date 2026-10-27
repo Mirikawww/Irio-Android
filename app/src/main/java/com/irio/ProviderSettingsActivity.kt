@@ -75,6 +75,7 @@ import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
@@ -215,7 +216,7 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
                 ProviderHeadersEditor(headers, enabled = !saving)
                 Spacer(Modifier.height(12.dp))
                 if (formError != null) {
-                    Text(formError!!)
+                    Text(formError!!, color = irioErrorTextColor())
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -276,6 +277,7 @@ internal fun ProviderField(
         placeholder = {
             Text(
                 label,
+                color = Theme[colors][mutedColor],
                 style = FieldTextStyle.copy(baselineShift = BaselineShift(0.12f)),
             )
         },
@@ -379,13 +381,13 @@ internal fun DialogButtonRow(
             enabled = cancelEnabled,
             modifier = Modifier.weight(1f),
             style = ButtonStyle.Secondary,
-        ) { Text(cancelLabel) }
+        ) { Text(cancelLabel, color = LocalContentColor.current) }
         Button(
             onClick = onConfirm,
             enabled = confirmEnabled,
             modifier = Modifier.weight(1f),
             style = confirmStyle,
-        ) { Text(confirmLabel) }
+        ) { Text(confirmLabel, color = LocalContentColor.current) }
     }
 }
 
@@ -422,6 +424,7 @@ internal val FieldTextStyle = TextStyle(
 internal fun DialogTitle(text: String) {
     Text(
         text,
+        color = Theme[colors][onPanelColor],
         fontSize = 20.sp,
         fontWeight = FontWeight.Bold,
     )

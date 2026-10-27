@@ -73,6 +73,7 @@ import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.fieldShape
 import com.composables.ui.theme.mutedColor
+import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.shapes
@@ -150,7 +151,7 @@ internal fun SettingsProfileHeader(
         Column {
             DialogTitle(tr("删除头像"))
             Spacer(Modifier.height(12.dp))
-            Text(tr("确定要删除头像吗？"))
+            Text(tr("确定要删除头像吗？"), color = Theme[colors][onPanelColor])
             Spacer(Modifier.height(16.dp))
             DialogButtonRow(
                 confirmLabel = tr("删除"),
@@ -185,6 +186,7 @@ internal fun ProfileNameDialog(visible: Boolean, onDismiss: () -> Unit) {
                 placeholder = {
                     Text(
                         tr("用户"),
+                        color = Theme[colors][mutedColor],
                         style = FieldTextStyle.copy(baselineShift = BaselineShift(0.12f)),
                     )
                 },

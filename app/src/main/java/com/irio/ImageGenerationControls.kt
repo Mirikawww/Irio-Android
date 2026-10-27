@@ -210,7 +210,7 @@ private fun ImageAspectRatioInput(
                             widthFocused = state.hasFocus
                             if (lostFocus) saveOnBlur()
                         },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), placeholder = { Text(tr("宽度")) })
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), placeholder = { Text(tr("宽度"), color = Theme[colors][mutedColor]) })
                 Text(":", color = Theme[colors][onBackgroundColor])
                 TextField(state = height, enabled = active && selected,
                     modifier = Modifier.weight(1f).then(rememberInputFieldBorder()).semantics { contentDescription = tr("高度") }
@@ -219,7 +219,7 @@ private fun ImageAspectRatioInput(
                             heightFocused = state.hasFocus
                             if (lostFocus) saveOnBlur()
                         },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), placeholder = { Text(tr("高度")) })
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), placeholder = { Text(tr("高度"), color = Theme[colors][mutedColor]) })
             }
             Text(tr("宽高比范围为 1:3 至 3:1"), fontSize = 13.sp, lineHeight = 18.sp, color = Theme[colors][mutedColor])
         }

@@ -49,6 +49,7 @@ import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.onPanelColor
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -177,7 +178,7 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
         Column {
             DialogTitle(tr("删除所有历史"))
             Spacer(Modifier.height(12.dp))
-            Text(tr("确定要删除所有历史聊天记录吗？此操作无法撤销。"))
+            Text(tr("确定要删除所有历史聊天记录吗？此操作无法撤销。"), color = Theme[colors][onPanelColor])
             Spacer(Modifier.height(16.dp))
             DialogButtonRow(
                 confirmLabel = tr("删除"),
@@ -207,8 +208,8 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                 alignment = DropdownMenuAlignment.End,
                 panel = {
                     DropdownMenuPanel {
-                        DropdownMenuItem(onClick = { importOverwrite = false; importModeMenuOpen = false }, modifier = Modifier.fillMaxWidth()) { Text(tr("增量恢复")) }
-                        DropdownMenuItem(onClick = { importOverwrite = true; importModeMenuOpen = false }, modifier = Modifier.fillMaxWidth()) { Text(tr("覆盖恢复")) }
+                        DropdownMenuItem(onClick = { importOverwrite = false; importModeMenuOpen = false }, modifier = Modifier.fillMaxWidth()) { Text(tr("增量恢复"), color = LocalContentColor.current) }
+                        DropdownMenuItem(onClick = { importOverwrite = true; importModeMenuOpen = false }, modifier = Modifier.fillMaxWidth()) { Text(tr("覆盖恢复"), color = LocalContentColor.current) }
                     }
                 },
             ) {

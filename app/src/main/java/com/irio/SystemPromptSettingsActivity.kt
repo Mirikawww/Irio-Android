@@ -30,6 +30,7 @@ import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.fieldShape
 import com.composables.ui.theme.onBackgroundColor
+import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 
@@ -64,7 +65,7 @@ private fun SystemPromptSettingsScreen(onBack: () -> Unit) {
                 state = state,
                 modifier = Modifier.fillMaxWidth().then(rememberInputFieldBorder()),
                 accessibilityLabel = tr("系统提示词"),
-                placeholder = { Text(tr("以系统身份注入每次对话的指令")) },
+                placeholder = { Text(tr("以系统身份注入每次对话的指令"), color = Theme[colors][mutedColor]) },
                 textStyle = FieldTextStyle,
                 lineHeight = 20.sp,
                 fontSize = 16.sp,

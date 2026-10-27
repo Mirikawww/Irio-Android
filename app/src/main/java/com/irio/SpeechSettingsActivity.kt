@@ -55,6 +55,7 @@ import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -333,7 +334,7 @@ private fun SttModelMenu(
                                 if (option == model) Icon(IrioIcons.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                                 else Spacer(Modifier.size(16.dp))
                             },
-                        ) { Text(option) }
+                        ) { Text(option, color = LocalContentColor.current) }
                     }
                 }
             }
@@ -404,7 +405,7 @@ private fun SttLanguageMenu(
                             if (code == language) Icon(IrioIcons.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                             else Spacer(Modifier.size(16.dp))
                         },
-                    ) { Text(label) }
+                    ) { Text(label, color = LocalContentColor.current) }
                 }
             }
         },

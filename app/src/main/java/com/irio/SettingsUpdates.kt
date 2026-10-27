@@ -37,6 +37,10 @@ import com.composables.ui.components.DropdownMenuItem
 import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
 import com.composables.ui.components.Icon
 import com.composables.ui.components.Text
+import com.composeunstyled.LocalContentColor
+import com.composeunstyled.theme.Theme
+import com.composables.ui.theme.colors
+import com.composables.ui.theme.onPanelColor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -119,14 +123,14 @@ internal fun UpdateDialogContent(release: GitHubUpdate, onClose: () -> Unit, onD
     ) {
         DialogTitle(tr("发现新版本"))
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(release.tag, fontSize = 18.sp, lineHeight = 24.sp)
-            Text(if (release.prerelease) UpdateChannel.PRE_RELEASE.label else UpdateChannel.RELEASE.label)
+            Text(release.tag, color = Theme[colors][onPanelColor], fontSize = 18.sp, lineHeight = 24.sp)
+            Text(if (release.prerelease) UpdateChannel.PRE_RELEASE.label else UpdateChannel.RELEASE.label, color = Theme[colors][onPanelColor])
         }
         Column(
             modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
                 .testTag("update-release-notes").verticalScroll(rememberScrollState()),
         ) {
-            if (release.notes.isBlank()) Text(tr("暂无更新说明"))
+            if (release.notes.isBlank()) Text(tr("暂无更新说明"), color = Theme[colors][onPanelColor])
             else AssistantMarkdown(text = release.notes, streaming = false, renderScope = renderScope)
         }
         DialogButtonRow(
@@ -157,7 +161,7 @@ internal fun SettingsUpdateButtons(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
             modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("check-updates")
                 .settingsSearchAnchor("settings.updates"),
-        ) { Text(tr(if (checking) "正在检查更新" else "检查更新")) }
+        ) { Text(tr(if (checking) "正在检查更新" else "检查更新"), color = LocalContentColor.current) }
         DropdownMenu(
             expanded = menuOpen && !checking,
             onExpandedChange = { menuOpen = it },
@@ -172,7 +176,7 @@ internal fun SettingsUpdateButtons(
                                 if (option == channel) Icon(IrioIcons.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                                 else Spacer(Modifier.size(16.dp))
                             },
-                        ) { Text(option.label) }
+                        ) { Text(option.label, color = LocalContentColor.current) }
                     }
                 }
             },
@@ -187,7 +191,7 @@ internal fun SettingsUpdateButtons(
                     .settingsSearchAnchor("settings.update-channel")
                     .semantics { contentDescription = tr("检查渠道"); stateDescription = channel.label },
             ) {
-                Text(channel.label)
+                Text(channel.label, color = LocalContentColor.current)
                 Icon(IrioIcons.ChevronDown, contentDescription = null, modifier = Modifier.size(18.dp))
             }
         }

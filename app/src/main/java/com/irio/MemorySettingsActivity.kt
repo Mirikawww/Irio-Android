@@ -139,6 +139,7 @@ private fun MemoryField(state: TextFieldState) {
         placeholder = {
             Text(
                 tr("要记住的内容"),
+                color = Theme[colors][mutedColor],
                 style = FieldTextStyle.copy(baselineShift = BaselineShift(0.12f)),
             )
         },

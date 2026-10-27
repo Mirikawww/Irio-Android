@@ -75,6 +75,7 @@ import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 
 class LinkSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -218,7 +219,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     onClick = { LinkRuntime.pairWithCode(codeState.text.toString()) },
                     modifier = Modifier.fillMaxWidth(),
                     style = ButtonStyle.Primary,
-                ) { Text(tr("配对")) }
+                ) { Text(tr("配对"), color = LocalContentColor.current) }
                     Button(
                         onClick = { LinkRuntime.refreshPort() },
                         modifier = Modifier
@@ -226,7 +227,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                             .background(Theme[colors][panelColor], ContinuousCapsule),
                         style = ButtonStyle.Ghost,
                         contentColor = Theme[colors][onPanelColor],
-                    ) { Text(tr("刷新端口")) }
+                    ) { Text(tr("刷新端口"), color = LocalContentColor.current) }
                 }
                 LinkCard(verticalPadding = SettingsCardInset, spacing = 0.dp) {
                 DropdownMenu(
@@ -298,7 +299,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     enabled = !state.syncing,
                     style = ButtonStyle.Primary,
-                ) { Text(if (state.syncing) tr("正在同步") else tr("立即同步")) }
+                ) { Text(if (state.syncing) tr("正在同步") else tr("立即同步"), color = LocalContentColor.current) }
                 if (state.syncing) {
                     ProgressIndicator(
                         progress = state.syncProgress.coerceIn(0f, 1f),

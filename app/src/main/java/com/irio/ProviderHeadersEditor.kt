@@ -20,9 +20,9 @@ import com.composables.ui.components.Button
 import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.Text
 import com.composables.ui.theme.colors
-import com.composables.ui.theme.destructiveColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 
 internal class ProviderHeaderFields(header: ProviderHeader) {
     val name = TextFieldState(header.name)
@@ -94,18 +94,18 @@ internal fun ProviderHeadersEditor(state: ProviderHeadersState, enabled: Boolean
                             onClick = { state.rows.remove(row) },
                             enabled = enabled,
                             style = ButtonStyle.Destructive,
-                        ) { Text(tr("删除请求头")) }
+                        ) { Text(tr("删除请求头"), color = LocalContentColor.current) }
                     }
                 }
             }
         }
         state.validationError?.let { error ->
-            Text(tr(error), color = Theme[colors][destructiveColor])
+            Text(tr(error), color = irioErrorTextColor())
         }
         Button(
             onClick = { state.rows.add(ProviderHeaderFields(ProviderHeader("", ""))) },
             enabled = enabled,
             style = ButtonStyle.Secondary,
-        ) { Text(tr("添加请求头")) }
+        ) { Text(tr("添加请求头"), color = LocalContentColor.current) }
     }
 }

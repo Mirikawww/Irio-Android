@@ -42,6 +42,7 @@ import com.composables.ui.theme.onPrimaryColor
 import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -165,7 +166,7 @@ internal fun BoxScope.IrioSnackbar(
                     Button(onClick = onAction, style = ButtonStyle.Ghost, buttonSize = ButtonSize.Small,
                         shape = ContinuousCapsule, contentColor = Theme[colors][onPrimaryColor],
                         modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text(actionLabel)
+                        Text(actionLabel, color = LocalContentColor.current)
                     }
                 }
             } else {

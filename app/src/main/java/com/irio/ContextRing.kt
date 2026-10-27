@@ -61,6 +61,7 @@ import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onPanelColor
 import com.composables.ui.theme.primaryColor
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 
 /** 用量来自接口 usage，窗口来自 OpenRouter `context_length`。点击弹出分段用量。压缩打开时才带压缩次数和压缩按钮。 */
 @Composable
@@ -233,7 +234,7 @@ private fun ContextRingMenu(
                     style = ButtonStyle.Primary,
                     buttonSize = ButtonSize.Small,
                 ) {
-                    Text(tr("压缩上下文"))
+                    Text(tr("压缩上下文"), color = LocalContentColor.current)
                 }
             }
         },

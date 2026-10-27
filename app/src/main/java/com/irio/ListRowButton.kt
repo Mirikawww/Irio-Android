@@ -49,6 +49,7 @@ import com.composables.ui.theme.onPrimaryColor
 import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 
 @Composable
 fun ListRowButton(
@@ -99,7 +100,7 @@ fun ListRowButton(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label, fontWeight = labelFontWeight)
+                Text(label, color = LocalContentColor.current, fontWeight = labelFontWeight)
                 if (experimental) {
                     Spacer(Modifier.width(8.dp))
                     ExperimentalBadge()

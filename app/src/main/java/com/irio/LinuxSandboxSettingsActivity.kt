@@ -51,6 +51,7 @@ import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.secondaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 import kotlinx.coroutines.delay
 
 class LinuxSandboxSettingsActivity : ComponentActivity() {
@@ -280,7 +281,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                 enabled = LinuxSandboxPolicy.canDelete(installed, preparing = showPrepare, deleting = deleting),
                 modifier = Modifier.settingsSearchAnchor("linux.delete", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp).fillMaxWidth(),
                 style = ButtonStyle.Destructive,
-            ) { Text(tr("删除 Linux 沙盒")) }
+            ) { Text(tr("删除 Linux 沙盒"), color = LocalContentColor.current) }
         }
         IrioSnackbar(
             visible = operationError != null,
@@ -299,7 +300,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
         Column {
             DialogTitle(tr("删除 Linux 沙盒"))
             Spacer(Modifier.height(12.dp))
-            Text(tr("确定要删除 Linux 沙盒吗？沙盒内的软件包和文件将被永久删除，正在运行的命令会停止。设备共享存储里的文件不会删除。此操作无法撤销，再次启用会重新准备环境。"))
+            Text(tr("确定要删除 Linux 沙盒吗？沙盒内的软件包和文件将被永久删除，正在运行的命令会停止。设备共享存储里的文件不会删除。此操作无法撤销，再次启用会重新准备环境。"), color = Theme[colors][onPanelColor])
             Spacer(Modifier.height(16.dp))
             DialogButtonRow(
                 confirmLabel = tr("删除"),
@@ -335,7 +336,7 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
         Column {
             DialogTitle(tr("重新准备环境"))
             Spacer(Modifier.height(12.dp))
-            Text(tr("用安装包里的 Alpine 重新准备会删掉当前环境，包括之后安装的软件包。设备共享存储里的文件不会删，关闭开关也不会删。"))
+            Text(tr("用安装包里的 Alpine 重新准备会删掉当前环境，包括之后安装的软件包。设备共享存储里的文件不会删，关闭开关也不会删。"), color = Theme[colors][onPanelColor])
             Spacer(Modifier.height(16.dp))
             DialogButtonRow(
                 confirmLabel = tr("重新准备"),

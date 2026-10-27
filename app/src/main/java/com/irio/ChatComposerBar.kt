@@ -70,6 +70,7 @@ import com.composables.ui.theme.onPrimaryColor
 import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalContentColor
 import com.kyant.shapes.RoundedRectangle
 
 @Composable
@@ -109,7 +110,7 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
                                 )
                             },
                         ) {
-                            Text(tr("照片"))
+                            Text(tr("照片"), color = LocalContentColor.current)
                         }
                         DropdownMenuItem(
                             onClick = {
@@ -124,7 +125,7 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
                                 )
                             },
                         ) {
-                            Text(tr("文件"))
+                            Text(tr("文件"), color = LocalContentColor.current)
                         }
                     }
                 },
