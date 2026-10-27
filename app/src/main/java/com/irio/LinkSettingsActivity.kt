@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -32,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -99,7 +103,9 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     val shake = remember { Animatable(0f) }
     var pairInvalid by remember { mutableStateOf(false) }
-    var pairSnackbarVisible by remember { mutableStateOf(false) }
+    val notice = remember { LinkSettingsNotice() }
+
+    LaunchedEffect(state.statusNonce, state.status) { notice.onStatus(state.status) }
 
     LaunchedEffect(Unit) {
         LinkRuntime.ensure(context)
@@ -112,7 +118,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
             return@LaunchedEffect
         }
         pairInvalid = true
-        pairSnackbarVisible = true
+        notice.onPairError(tr("配对失败"))
         shake.snapTo(0f)
         listOf(-10f, 10f, -8f, 8f, -4f, 4f, 0f).forEach { target ->
             shake.animateTo(target, irioSpring<Float>(stiffness = 2600f, dampingRatio = 0.78f))
@@ -123,7 +129,7 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
         if (state.pairSuccessNonce == 0) return@LaunchedEffect
         codeState.clearText()
         pairInvalid = false
-        pairSnackbarVisible = false
+        notice.dismiss()
     }
 
     DismissComposerFocusWhenImeHides()
@@ -321,19 +327,47 @@ private fun LinkSettingsScreen(onBack: () -> Unit) {
                     }
                 }
             }
-            state.status?.let { message ->
-                Text(message, color = irioErrorTextColor(), fontSize = 13.sp)
-            }
         }
-        IrioSnackbar(
-            visible = pairSnackbarVisible,
-            message = tr("配对失败"),
-            bottomInset = bottomInset,
-            onDismiss = { pairSnackbarVisible = false },
-            restartKey = state.pairErrorNonce,
+        OperationErrorSnackbar(
+            visible = notice.visible,
+            message = notice.message,
+            bottomInset = maxOf(bottomInset, with(LocalDensity.current) { WindowInsets.ime.getBottom(this).toDp() }),
+            onDismiss = notice::dismiss,
+            restartKey = notice.nonce,
         )
         }
     }
+}
+
+/** One visible notice for pairing and runtime status; preserve its text throughout exit. */
+internal class LinkSettingsNotice {
+    var visible by mutableStateOf(false)
+        private set
+    var message by mutableStateOf("")
+        private set
+    var nonce by mutableIntStateOf(0)
+        private set
+    private var statusNotice = false
+
+    fun onStatus(value: String?) {
+        if (value == null) {
+            if (statusNotice) dismiss()
+        } else {
+            message = value
+            statusNotice = true
+            nonce++
+            visible = true
+        }
+    }
+
+    fun onPairError(value: String) {
+        message = value
+        statusNotice = false
+        nonce++
+        visible = true
+    }
+
+    fun dismiss() { visible = false }
 }
 
 @Composable

@@ -464,6 +464,8 @@ private val English = mapOf(
     "请求头名称不能重复" to "Header names must be unique",
     "请求头值只能包含可打印的 ASCII 字符或制表符" to "Header values may only contain printable ASCII characters or tabs",
     "自定义请求头无效" to "Invalid custom request headers",
+    "名称和端点 URL 不能为空" to "Name and endpoint URL are required",
+    "错误详情" to "Error details",
     "搜索已停止" to "Search stopped",
     "无法连接到端点" to "Can't connect to the endpoint",
     "未知设备" to "Unknown device",

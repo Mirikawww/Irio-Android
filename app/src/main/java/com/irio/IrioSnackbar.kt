@@ -27,6 +27,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
@@ -71,7 +72,6 @@ internal fun BoxScope.IrioSnackbar(
     var swipeOff by remember { mutableStateOf(false) }
     LaunchedEffect(visible, message) {
         if (!visible) {
-            displayedMessage = message
             replacing = false
             wasVisible = false
             return@LaunchedEffect
@@ -100,6 +100,7 @@ internal fun BoxScope.IrioSnackbar(
     }
     Box(
         modifier = Modifier
+            .testTag("irio-snackbar")
             .align(Alignment.BottomCenter)
             .padding(start = 16.dp, end = 16.dp, bottom = bottomInset + 16.dp)
             .fillMaxWidth(),

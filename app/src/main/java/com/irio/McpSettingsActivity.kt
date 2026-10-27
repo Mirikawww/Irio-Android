@@ -85,7 +85,6 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
     // Tokens must not enter savedInstanceState, clipboard, logs or backup files.
     val pat = remember { TextFieldState() }
     var deviceCode by remember { mutableStateOf<GitHubDeviceCode?>(null) }
-    val error = sheets.loginError
     val detailsError = sheets.detailsError
     var detailsErrorNonce by remember { mutableIntStateOf(0) }
     var busy by remember { mutableStateOf(false) }
@@ -412,7 +411,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
             }
             }
         }
-        IrioSnackbar(
+        OperationErrorSnackbar(
             visible = detailsError != null,
             message = detailsError.orEmpty(),
             bottomInset = with(LocalDensity.current) { WindowInsets.navigationBars.getBottom(this).toDp() },
@@ -423,6 +422,7 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
     }
     if (login != null) BottomSheet(state = loginSheet, onDismissRequest = { clearLogin() },
         contentPadding = PaddingValues(start = 24.dp, top = 32.dp, end = 24.dp, bottom = 16.dp)) {
+        Box(Modifier.fillMaxWidth()) {
         SheetBody {
             if (login == GitHubLogin.TODOIST) {
                 TodoistLogo(64.dp, Modifier.align(Alignment.CenterHorizontally))
@@ -465,7 +465,6 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                         onClick = { if (!openGitHubPage(context, code.verificationUri)) sheets.loginError = tr("未找到可打开网页的浏览器") })
                 }
             }
-            error?.let { Text(it, color = content, fontSize = 14.sp) }
             if (deviceCode == null || !busy) {
                 val actionLabel = when {
                     busy && login == GitHubLogin.TODOIST -> tr("正在连接")
@@ -484,7 +483,22 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
             }
             GitHubButton(tr("取消"), modifier = Modifier.fillMaxWidth(), secondary = true, onClick = { clearLogin() })
         }
+        McpLoginErrorSnackbar(sheets)
+        }
     }
+}
+
+@Composable
+internal fun BoxScope.McpLoginErrorSnackbar(sheets: GitHubMcpSheetState) {
+    OperationErrorSnackbar(
+        visible = sheets.loginError != null,
+        message = sheets.loginError.orEmpty(),
+        bottomInset = with(LocalDensity.current) {
+            maxOf(WindowInsets.ime.getBottom(this), WindowInsets.navigationBars.getBottom(this)).toDp()
+        },
+        onDismiss = { sheets.loginError = null },
+        restartKey = sheets.loginErrorNonce,
+    )
 }
 
 @Composable

@@ -123,7 +123,7 @@ object LinkRuntime {
         stopServer()
         serverJob = scope.launch {
             val bound = runCatching { LinkProtocol.bindFresh(avoid) }.getOrElse {
-                _state.update { it.copy(status = tr("无法在局域网端口 %s 监听").format(avoid)) }
+                _state.update { it.copy(status = tr("无法在局域网端口 %s 监听").format(avoid), statusNonce = it.statusNonce + 1) }
                 return@launch
             }
             acceptClients(context, bound)
@@ -173,7 +173,7 @@ object LinkRuntime {
         stopServer()
         serverJob = scope.launch {
             val bound = runCatching { LinkProtocol.bind(port) }.getOrElse {
-                _state.update { it.copy(status = tr("无法在局域网端口 %s 监听").format(port)) }
+                _state.update { it.copy(status = tr("无法在局域网端口 %s 监听").format(port), statusNonce = it.statusNonce + 1) }
                 return@launch
             }
             acceptClients(context, bound)
@@ -364,7 +364,7 @@ object LinkRuntime {
         val settings = LinkStore.load(context)
         val peers = settings.peers
         if (peers.isEmpty()) {
-            if (report) _state.update { it.copy(status = tr("还没有已配对设备")) }
+            if (report) _state.update { it.copy(status = tr("还没有已配对设备"), statusNonce = it.statusNonce + 1) }
             return
         }
         if (report) _state.update { it.copy(syncing = true, syncProgress = 0.08f, status = null) }

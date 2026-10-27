@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -107,10 +108,12 @@ class ProviderDetailActivity : ComponentActivity() {
 }
 
 @Composable
-private fun ProviderDetailScreen(
+internal fun ProviderDetailScreen(
     providerId: String,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
+    loadProvider: (android.content.Context, String) -> ProviderConfig? = { context, id -> ProviderStore.loadProvider(context, id) },
+    fetchModels: (ProviderConfig) -> ModelFetchResult = ProviderApi::fetchModels,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -118,15 +121,14 @@ private fun ProviderDetailScreen(
     val disabledSaveLock = remember { Any() }
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
-    var provider by remember { mutableStateOf(ProviderStore.loadProvider(context, providerId)) }
+    var provider by remember { mutableStateOf(loadProvider(context, providerId)) }
     var deleteDialogOpen by rememberSaveable { mutableStateOf(false) }
     var protocolMenuOpen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
     var refreshDiff by remember { mutableStateOf(ModelRefreshDiff()) }
-    var formError by rememberSaveable { mutableStateOf<String?>(null) }
-    var refreshError by remember { mutableStateOf<String?>(null) }
-    var refreshErrorNonce by remember { mutableIntStateOf(0) }
+    var operationNotice by remember { mutableStateOf<String?>(null) }
+    var operationNoticeNonce by remember { mutableIntStateOf(0) }
     val name = rememberTextFieldState(provider?.name.orEmpty())
     val endpoint = rememberTextFieldState(provider?.endpointUrl.orEmpty())
     val apiKey = rememberTextFieldState(provider?.apiKey.orEmpty())
@@ -181,12 +183,15 @@ private fun ProviderDetailScreen(
                                 protocolMenuOpen = protocolMenuOpen,
                                 onProtocolMenuExpanded = { protocolMenuOpen = it },
                                 onProtocol = { protocol = it },
-                                formError = formError,
                                 saving = saving || refreshing,
                                 onSave = save@{
                                     if (saving || refreshing) return@save
                                     val currentProvider = provider ?: return@save
-                                    val customHeaders = headers.validatedHeaders() ?: return@save
+                                    val customHeaders = headers.validatedHeaders() ?: run {
+                                        operationNotice = tr(headers.validationError ?: "自定义请求头无效")
+                                        operationNoticeNonce++
+                                        return@save
+                                    }
                                     val updated = currentProvider.copy(
                                         name = name.text.toString().trim(),
                                         endpointUrl = endpoint.text.toString().trim(),
@@ -195,21 +200,24 @@ private fun ProviderDetailScreen(
                                         customHeaders = customHeaders,
                                     )
                                     if (updated.name.isBlank() || updated.endpointUrl.isBlank()) {
+                                        operationNotice = tr("名称和端点 URL 不能为空")
+                                        operationNoticeNonce++
                                         return@save
                                     }
                                     saving = true
-                                    formError = null
+                                    operationNotice = null
                                     scope.launch {
                                         val result = withContext(Dispatchers.IO) {
-                                            ProviderApi.fetchModels(updated)
+                                            fetchModels(updated)
                                         }
                                         saving = false
                                         if (result.error == null) {
                                             refreshDiff = modelRefreshDiff(currentProvider.models, result.models)
                                             ProviderStore.saveProvider(context, updated.copy(models = result.models))
-                                            provider = ProviderStore.loadProvider(context, currentProvider.id)
+                                            provider = loadProvider(context, currentProvider.id)
                                         } else {
-                                            formError = result.error
+                                            operationNotice = result.error
+                                            operationNoticeNonce++
                                         }
                                     }
                                 },
@@ -227,19 +235,19 @@ private fun ProviderDetailScreen(
                                     val currentProvider = provider ?: return@refresh
                                     if (refreshing || saving) return@refresh
                                     refreshing = true
-                                    refreshError = null
+                                    operationNotice = null
                                     scope.launch {
                                         val result = withContext(Dispatchers.IO) {
-                                            ProviderApi.fetchModels(currentProvider)
+                                            fetchModels(currentProvider)
                                         }
                                         refreshing = false
                                         if (result.error == null) {
                                             refreshDiff = modelRefreshDiff(currentProvider.models, result.models)
                                             ProviderStore.saveProvider(context, currentProvider.copy(models = result.models))
-                                            provider = ProviderStore.loadProvider(context, currentProvider.id)
+                                            provider = loadProvider(context, currentProvider.id)
                                         } else {
-                                            refreshError = result.error
-                                            refreshErrorNonce++
+                                            operationNotice = result.error
+                                            operationNoticeNonce++
                                         }
                                     }
                                 },
@@ -290,7 +298,7 @@ private fun ProviderDetailScreen(
                             selected = page,
                             onSelect = { next ->
                                 if (next != ProviderDetailPage.Config) protocolMenuOpen = false
-                                if (next != ProviderDetailPage.Models) refreshError = null
+                                operationNotice = null
                                 page = next
                             },
                         )
@@ -306,12 +314,12 @@ private fun ProviderDetailScreen(
                 .zIndex(2f),
             onHeightChanged = { capsulePx.intValue = it },
         )
-        IrioSnackbar(
-            visible = refreshError != null,
-            message = refreshError.orEmpty(),
-            bottomInset = tabContentPadding,
-            onDismiss = { refreshError = null },
-            restartKey = refreshErrorNonce,
+        OperationErrorSnackbar(
+            visible = operationNotice != null,
+            message = operationNotice.orEmpty(),
+            bottomInset = maxOf(tabContentPadding, with(LocalDensity.current) { WindowInsets.ime.getBottom(this).toDp() }),
+            onDismiss = { operationNotice = null },
+            restartKey = operationNoticeNonce,
         )
     }
 
@@ -357,7 +365,6 @@ internal fun ProviderConfigPage(
     protocolMenuOpen: Boolean,
     onProtocolMenuExpanded: (Boolean) -> Unit,
     onProtocol: (ProviderProtocol) -> Unit,
-    formError: String?,
     saving: Boolean,
     onSave: () -> Unit,
     onDelete: () -> Unit,
@@ -389,9 +396,6 @@ internal fun ProviderConfigPage(
             ProviderField(tr("端点 URL"), endpoint, KeyboardType.Uri, readOnly = saving, trailingSpace = false)
             ProviderField(tr("密钥"), apiKey, KeyboardType.Password, mask = true, readOnly = saving, trailingSpace = false)
             ProviderHeadersEditor(headers, enabled = !saving)
-            if (formError != null) {
-                Text(formError, color = irioErrorTextColor())
-            }
             Button(
                 onClick = onSave,
                 enabled = !saving,

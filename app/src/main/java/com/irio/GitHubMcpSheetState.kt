@@ -2,6 +2,7 @@ package com.irio
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import com.composables.ui.components.BottomSheetDetent
 import com.composables.ui.components.BottomSheetState
@@ -16,7 +17,15 @@ internal class GitHubMcpSheetState(
     var login by mutableStateOf<GitHubLogin?>(null)
         private set
 
-    var loginError by mutableStateOf<String?>(null)
+    private var loginErrorValue by mutableStateOf<String?>(null)
+    var loginErrorNonce by mutableIntStateOf(0)
+        private set
+    var loginError: String?
+        get() = loginErrorValue
+        set(value) {
+            loginErrorValue = value
+            if (value != null) loginErrorNonce++
+        }
     var detailsError by mutableStateOf<String?>(null)
 
     fun openLogin(method: GitHubLogin) {

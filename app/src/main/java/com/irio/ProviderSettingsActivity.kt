@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -43,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -92,17 +94,22 @@ class ProviderSettingsActivity : ComponentActivity() {
 }
 
 @Composable
-private fun ProviderSettingsScreen(onBack: () -> Unit) {
+internal fun ProviderSettingsScreen(
+    onBack: () -> Unit,
+    loadProviders: (android.content.Context) -> List<ProviderConfig> = ProviderStore::loadProviders,
+    fetchModels: (ProviderConfig) -> ModelFetchResult = ProviderApi::fetchModels,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pendingEnabled = remember { ConcurrentHashMap<String, Boolean>() }
     val enabledSaveLock = remember { Any() }
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
-    var providers by remember { mutableStateOf(ProviderStore.loadProviders(context)) }
+    var providers by remember { mutableStateOf(loadProviders(context)) }
     var dialogOpen by rememberSaveable { mutableStateOf(false) }
     var saving by rememberSaveable { mutableStateOf(false) }
     var formError by rememberSaveable { mutableStateOf<String?>(null) }
+    var formErrorNonce by rememberSaveable { mutableStateOf(0) }
     var protocol by rememberSaveable { mutableStateOf(ProviderProtocol.CHAT_COMPLETIONS) }
     var protocolMenuOpen by remember { mutableStateOf(false) }
     val name = rememberTextFieldState()
@@ -112,7 +119,7 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
 
     fun reload() {
-        providers = ProviderStore.loadProviders(context)
+        providers = loadProviders(context)
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -187,6 +194,7 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
     val addDialogMaxHeight = with(LocalDensity.current) {
         (LocalWindowInfo.current.containerSize.height - WindowInsets.ime.getBottom(this)).toDp() - 64.dp
     }.coerceAtLeast(160.dp)
+    var dialogButtonsHeight by remember { mutableStateOf(0) }
 
     IrioAlertDialog(
         visible = dialogOpen,
@@ -195,7 +203,8 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
         backgroundColor = Theme[colors][panelColor],
         contentColor = Theme[colors][onPanelColor],
     ) {
-        Column(modifier = Modifier.heightIn(max = addDialogMaxHeight)) {
+        Box(Modifier.fillMaxWidth().heightIn(max = addDialogMaxHeight)) {
+        Column(modifier = Modifier.fillMaxWidth().heightIn(max = addDialogMaxHeight)) {
             DialogTitle(tr("添加提供商"))
             Spacer(Modifier.height(16.dp))
             Column(
@@ -215,19 +224,20 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
                 ProviderField(tr("密钥"), apiKey, KeyboardType.Password, mask = true, readOnly = saving)
                 ProviderHeadersEditor(headers, enabled = !saving)
                 Spacer(Modifier.height(12.dp))
-                if (formError != null) {
-                    Text(formError!!, color = irioErrorTextColor())
-                    Spacer(Modifier.height(8.dp))
-                }
             }
             Spacer(Modifier.height(16.dp))
+            Box(Modifier.onSizeChanged { dialogButtonsHeight = it.height }) {
             DialogButtonRow(
                 confirmLabel = if (saving) tr("保存中") else tr("保存"),
                 confirmEnabled = !saving &&
                     name.text.isNotBlank() &&
                     endpoint.text.toString().isNotBlank(),
                 onConfirm = confirm@{
-                    val customHeaders = headers.validatedHeaders() ?: return@confirm
+                    val customHeaders = headers.validatedHeaders() ?: run {
+                        formError = headers.validationError?.let(::tr) ?: tr("自定义请求头无效")
+                        formErrorNonce++
+                        return@confirm
+                    }
                     val config = ProviderConfig(
                         id = UUID.randomUUID().toString(),
                         name = name.text.toString().trim(),
@@ -240,7 +250,7 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
                     formError = null
                     scope.launch {
                         val result = withContext(Dispatchers.IO) {
-                            ProviderApi.fetchModels(config)
+                            fetchModels(config)
                         }
                         if (result.error == null) {
                             ProviderStore.saveProvider(context, config.copy(models = result.models))
@@ -249,6 +259,7 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
                             dialogOpen = false
                         } else {
                             formError = result.error
+                            formErrorNonce++
                         }
                         saving = false
                     }
@@ -256,6 +267,15 @@ private fun ProviderSettingsScreen(onBack: () -> Unit) {
                 onCancel = { if (!saving) dialogOpen = false },
                 cancelEnabled = !saving,
             )
+            }
+        }
+        OperationErrorSnackbar(
+            visible = dialogOpen && formError != null,
+            message = formError.orEmpty(),
+            bottomInset = with(LocalDensity.current) { dialogButtonsHeight.toDp() },
+            onDismiss = { formError = null },
+            restartKey = formErrorNonce,
+        )
         }
     }
 }

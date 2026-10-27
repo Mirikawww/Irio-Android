@@ -4,6 +4,8 @@ import android.os.Looper
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.BroadcastFrameClock
@@ -13,6 +15,7 @@ import androidx.compose.runtime.Recomposer
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewRootForTest
@@ -78,40 +81,26 @@ class TextForegroundThemeTest {
         assertEquals(destructive, harness.color("destructive"))
     }
 
-    @Test fun providerSaveErrorUsesReadableErrorColorAcrossThemes() = verify { harness ->
-        var errorInk = Color.Unspecified
+    @Test fun snackbarKeepsAccentForegroundAndSemanticButtonColorsAcrossThemes() = verify { harness ->
         var saveInk = Color.Unspecified
         var deleteInk = Color.Unspecified
+        var snackbarInk = Color.Unspecified
         harness.content {
-            errorInk = irioErrorTextColor()
             saveInk = Theme[colors][onPrimaryColor]
             deleteInk = Theme[colors][onDestructiveColor]
-            ProviderConfigPage(
-                name = rememberTextFieldState("Fixture"),
-                endpoint = rememberTextFieldState("https://example.test"),
-                apiKey = rememberTextFieldState(), headers = rememberProviderHeadersState(),
-                protocol = ProviderProtocol.CHAT_COMPLETIONS, protocolMenuOpen = false,
-                onProtocolMenuExpanded = {}, onProtocol = {}, formError = "HTTP 403: fixture error",
-                saving = false, onSave = {}, onDelete = {}, scroll = rememberScrollState(),
-                hazeState = rememberHazeState(), capsuleHeight = 0.dp, contentPaddingBottom = 0.dp,
-            )
+            snackbarInk = Theme[colors][onPrimaryColor]
+            Box(Modifier.fillMaxSize()) {
+                IrioSnackbar(visible = true, message = "HTTP 403: fixture error", bottomInset = 0.dp, onDismiss = {})
+                Column {
+                    Button(onClick = {}, style = ButtonStyle.Primary) { Text(tr("保存"), color = LocalContentColor.current) }
+                    Button(onClick = {}, style = ButtonStyle.Destructive) { Text(tr("删除提供商"), color = LocalContentColor.current) }
+                }
+            }
         }
         harness.frames()
-        assertEquals("Provider save failures must not use inherited black", errorInk, harness.color("HTTP 403: fixture error"))
+        assertEquals(snackbarInk, harness.color("HTTP 403: fixture error"))
         assertEquals(saveInk, harness.color(tr("保存")))
         assertEquals(deleteInk, harness.color(tr("删除提供商")))
-    }
-
-    @Test fun headerValidationUsesTextErrorColorNotTheDestructiveButtonFill() = verify { harness ->
-        var expected = Color.Unspecified
-        harness.content {
-            expected = irioErrorTextColor()
-            val headers = rememberProviderHeadersState(listOf(ProviderHeader("invalid name", "fixture")))
-            headers.validatedHeaders()
-            ProviderHeadersEditor(headers)
-        }
-        harness.frames()
-        assertEquals(expected, harness.color(tr("请求头名称无效")))
     }
 
     @Test fun providerPlaceholderAndSharedDialogTitleHaveExplicitThemeColors() = verify { harness ->

@@ -44,6 +44,7 @@ data class LinkUiState(
     val syncing: Boolean = false,
     val syncProgress: Float = 0f,
     val status: String? = null,
+    val statusNonce: Int = 0,
     val pairErrorNonce: Int = 0,
     val pairSuccessNonce: Int = 0,
 )

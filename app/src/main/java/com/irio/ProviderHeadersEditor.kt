@@ -99,9 +99,6 @@ internal fun ProviderHeadersEditor(state: ProviderHeadersState, enabled: Boolean
                 }
             }
         }
-        state.validationError?.let { error ->
-            Text(tr(error), color = irioErrorTextColor())
-        }
         Button(
             onClick = { state.rows.add(ProviderHeaderFields(ProviderHeader("", ""))) },
             enabled = enabled,
