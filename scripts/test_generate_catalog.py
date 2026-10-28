@@ -13,6 +13,72 @@ SCRATCH = pathlib.Path.home() / "AppData/Local/hermes/cache/scratch"
 
 
 class ReasoningCatalogTest(unittest.TestCase):
+    def test_targeted_patch_only_updates_the_requested_model_and_bare_id(self):
+        fixture = {"data": [{
+            "id": "qwen/qwen3.8-max-0902", "name": "Qwen: Qwen3.8 Max (0902)",
+            "context_length": 1000000, "reasoning": {"mandatory": True, "supported_efforts": ["high", "low"]},
+        }, {"id": "unrelated/model", "name": "Unrelated: Changed", "context_length": 999}]}
+        requested = []
+
+        def response(request, **kwargs):
+            requested.append(request.full_url)
+            self.assertEqual("https://openrouter.ai/api/v1/models", request.full_url)
+            return io.BytesIO(json.dumps(fixture).encode())
+
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            root = pathlib.Path(directory)
+            assets = root / "app/src/main/assets"
+            assets.mkdir(parents=True)
+            filenames = ("model-names.json", "model-context.json", "model-reasoning.json")
+            for filename in filenames:
+                (assets / filename).write_text('{"untouched":"sentinel"}', encoding="utf-8")
+            (assets / "model-image.json").write_text("untouched image bytes", encoding="utf-8")
+            import os
+            previous = os.getcwd()
+            try:
+                os.chdir(root)
+                with patch("urllib.request.urlopen", side_effect=response), patch("sys.argv", [str(SCRIPT), "--patch-model=qwen/qwen3.8-max"]):
+                    runpy.run_path(str(SCRIPT), run_name="__main__")
+                self.assertEqual(["https://openrouter.ai/api/v1/models"], requested)
+                for filename in filenames:
+                    catalog = json.loads((assets / filename).read_text(encoding="utf-8"))
+                    self.assertEqual({"untouched", "qwen/qwen3.8-max", "qwen3.8-max"}, set(catalog), filename)
+                    self.assertEqual("sentinel", catalog["untouched"])
+                self.assertEqual("untouched image bytes", (assets / "model-image.json").read_text(encoding="utf-8"))
+            finally:
+                os.chdir(previous)
+
+    def test_qwen_max_alias_survives_catalog_generation(self):
+        canonical = "qwen/qwen3.8-max-0902"
+        fixture = {"data": [{
+            "id": canonical, "name": "Qwen: Qwen3.8 Max (0902)",
+            "context_length": 1000000,
+            "reasoning": {"mandatory": True, "supported_efforts": ["xhigh", "high", "medium", "low", "minimal"]},
+        }]}
+
+        def response(request, **kwargs):
+            return io.BytesIO(json.dumps(fixture if "openrouter.ai" in request.full_url else {}).encode())
+
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            root = pathlib.Path(directory)
+            assets = root / "app/src/main/assets"
+            assets.mkdir(parents=True)
+            import os
+            previous = os.getcwd()
+            try:
+                os.chdir(root)
+                with patch("urllib.request.urlopen", side_effect=response), patch("sys.argv", [str(SCRIPT)]):
+                    runpy.run_path(str(SCRIPT), run_name="__main__")
+                for filename in ("model-names.json", "model-context.json", "model-reasoning.json"):
+                    catalog = json.loads((assets / filename).read_text(encoding="utf-8"))
+                    for alias in ("qwen/qwen3.8-max", "qwen3.8-max"):
+                        self.assertIn(alias, catalog, filename)
+                        self.assertEqual(catalog[canonical], catalog[alias], filename)
+            finally:
+                os.chdir(previous)
+
     def test_reasoning_only_does_not_fetch_or_overwrite_other_catalogs(self):
         requested = []
 

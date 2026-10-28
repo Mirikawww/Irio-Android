@@ -4,7 +4,8 @@
 Names, reasoning and context windows come from OpenRouter /api/v1/models
 (`name`, model-level `context_length` — not `top_provider.context_length`).
 Image flags still come from https://models.dev/api.json.
-Run from the Irio Android repo root; --reasoning-only leaves other catalogs untouched."""
+Run from the Irio Android repo root; --reasoning-only leaves other catalogs untouched.
+--patch-model=vendor/id updates just that id and its bare alias in existing OpenRouter assets."""
 import json, sys, urllib.request
 from typing import Any
 
@@ -22,7 +23,8 @@ def get_json(url):
 
 
 reasoning_only = "--reasoning-only" in sys.argv[1:]
-data = {} if reasoning_only else get_json(API)
+patch_model = next((arg.split("=", 1)[1] for arg in sys.argv[1:] if arg.startswith("--patch-model=")), None)
+data = {} if reasoning_only or patch_model else get_json(API)
 openrouter_data = get_json(OPENROUTER_MODELS_API)
 names, reasoning, image, context = {}, {}, {}, {}
 for provider in data.values():
@@ -41,7 +43,7 @@ for provider in data.values():
 
 # OpenRouter 的 name / context_length 是显示名和上下文窗口的来源。
 # 去掉 name 的 provider 前缀。窗口用模型级 context_length，不用 top_provider。
-# OpenRouter 未收录的别名只在下方补显示名，不编造窗口。
+# 未收录的别名只有经上游确认映射后才能复用窗口和能力，否则只补显示名。
 for model in openrouter_data.get("data", []):
     if not isinstance(model, dict):
         continue
@@ -75,6 +77,19 @@ for model in openrouter_data.get("data", []):
     window = model.get("context_length")
     if isinstance(window, (int, float)) and not isinstance(window, bool) and window > 0:
         context[mid] = int(window)
+
+# OpenRouter /models omits this rolling alias, but
+# /api/v1/models/qwen/qwen3.8-max/endpoints resolves it to qwen3.8-max-0902
+# (verified 2026-10-28). Use the canonical metadata, never infer from a name suffix.
+# If OpenRouter lists the alias explicitly later, its own values take precedence.
+for alias, canonical in {"qwen/qwen3.8-max": "qwen/qwen3.8-max-0902"}.items():
+    if canonical in names:
+        names.setdefault(alias, names[canonical])
+        names.setdefault(alias.split("/")[-1], names[alias])
+    if canonical in reasoning:
+        reasoning.setdefault(alias, dict(reasoning[canonical]))
+    if canonical in context:
+        context.setdefault(alias, context[canonical])
 
 # 裸 id 只在它本身不是另一条 OpenRouter 模型时写入；同一尾段取较大窗口。
 tails = {}
@@ -134,6 +149,9 @@ names["openai/gpt-5.3-codex-spark"] = "GPT-5.3-Codex-Spark"
 names["gpt-image-2"] = "GPT Image 2"
 names.setdefault("gpt-image-1", "GPT Image 1")
 
+if patch_model and not any(patch_model in catalog for catalog in (names, reasoning, context)):
+    raise ValueError(f"No OpenRouter catalog metadata for {patch_model}")
+
 for path, payload in (
     (OUT_NAMES, names),
     (OUT_REASONING, reasoning),
@@ -142,6 +160,17 @@ for path, payload in (
 ):
     if reasoning_only and path != OUT_REASONING:
         continue
+    if patch_model:
+        if path == OUT_IMAGE:
+            continue
+        selected = {key: payload[key] for key in (patch_model, patch_model.split("/")[-1]) if key in payload}
+        if not selected:
+            continue
+        with open(path, encoding="utf-8") as existing:
+            payload = json.load(existing)
+        if all(payload.get(key) == value for key, value in selected.items()):
+            continue
+        payload.update(selected)
     with open(path, "w", encoding="utf-8") as output:
         json.dump(payload, output, separators=(",", ":"), ensure_ascii=False)
 print(f"names={len(names)} reasoning={len(reasoning)} image={len(image)} context={len(context)}")
