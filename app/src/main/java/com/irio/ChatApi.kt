@@ -560,9 +560,6 @@ object ChatApi {
         allowEmptyCompletion: Boolean = false,
         uploadEncoding: ImageUploadEncoding = ImageUploadEncoding(),
     ): ChatCompletionResult {
-        val publish: suspend (ChatStreamUpdate) -> Unit = { update ->
-            onUpdate(update)
-        }
         val bodyBytes = try {
             requestBody(provider.protocol, model, messages, reasoningEffort, fastMode, systemPrompt, toolRegistry,
                 conversationId = connectionScope, uploadEncoding = uploadEncoding).toByteArray(Charsets.UTF_8)
@@ -592,7 +589,7 @@ object ChatApi {
         val partialStreamText = StringBuilder()
         var hasPartialOutput = false
 
-        return try {
+        suspend fun receive(publish: suspend (ChatStreamUpdate) -> Unit): ChatCompletionResult = try {
             if (cancellation.isCancelled()) throw CancellationException(tr("请求已停止"))
             response = call.execute()
             val status = response.code
@@ -788,6 +785,8 @@ object ChatApi {
             cancellation.detach(call)
             response?.close()
         }
+        val result = withQueuedStreamUpdates(onUpdate, cancelProducer = call::cancel, receive = ::receive)
+        return if (cancellation.isCancelled()) ChatCompletionResult(stopped = true) else result
     }
 
     private fun isHttp2StreamReset(error: Throwable): Boolean {
