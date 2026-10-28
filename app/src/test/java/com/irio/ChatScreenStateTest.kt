@@ -48,6 +48,34 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE, shadows = [ChatScreenStateTest.CountingTokenizer::class])
 class ChatScreenStateTest {
+    @Test fun drawerOpensAtFifteenPercentAndReturnsBelowTheThreshold() = runTest {
+        withState { harness ->
+            val state = harness.state
+            for (progress in listOf(0.149f, 0.15f, 0.16f)) {
+                state.drawerStartProgress = 0f
+                state.drawerProgress = progress
+                state.drawerDragging = true
+                state.settleDrawer(progress)
+                assertEquals("Opening at $progress", if (progress >= 0.15f) 1f else 0f, state.drawerProgress)
+                assertFalse(state.drawerDragging)
+            }
+        }
+    }
+
+    @Test fun drawerClosesAtFifteenPercentAndReturnsBelowTheThreshold() = runTest {
+        withState { harness ->
+            val state = harness.state
+            for (progress in listOf(0.851f, 0.85f, 0.84f)) {
+                state.drawerStartProgress = 1f
+                state.drawerProgress = progress
+                state.drawerDragging = true
+                state.settleDrawer(progress)
+                assertEquals("Closing at $progress", if (progress <= 0.85f) 0f else 1f, state.drawerProgress)
+                assertFalse(state.drawerDragging)
+            }
+        }
+    }
+
     @Test fun idleRecoveryDoesNotRetokenizeWhileASendIsPreparing() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val context = RuntimeEnvironment.getApplication()

@@ -44,11 +44,10 @@ internal fun ChatScreenState.cacheConversationContent(conversation: Conversation
 
 internal fun ChatScreenState.settleDrawer(progress: Float) {
     drawerDragging = false
-    val delta = progress - drawerStartProgress
     drawerProgress =
         when {
-            delta >= 0.35f -> 1f
-            delta <= -0.35f -> 0f
+            progress >= drawerStartProgress + 0.15f -> 1f
+            progress <= drawerStartProgress - 0.15f -> 0f
             else -> if (drawerStartProgress >= 0.5f) 1f else 0f
         }
 }
