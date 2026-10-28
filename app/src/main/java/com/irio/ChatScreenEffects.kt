@@ -51,6 +51,24 @@ private fun ObserveChatRecording(state: ChatScreenState) =
         }
     }
 
+/** Reopened/settled transcripts need local estimates, but a preparing send owns its own snapshot. */
+@Composable
+internal fun ObserveIdleContextEstimate(state: ChatScreenState) = with(state) {
+    LaunchedEffect(currentConversation.id, messages, busyThisChat, ThemeStore.contextRing) {
+        if (busyThisChat || !ThemeStore.contextRing) return@LaunchedEffect
+        val conversationId = currentConversation.id
+        val messageSnapshot = messages
+        val parts = withContext(Dispatchers.Default) {
+            val included = contextMessages(messageSnapshot)
+            estimateRequestTokens(modelRequestMessages(included)) to estimateToolContextTokens(included)
+        }
+        if (!busyThisChat && currentConversation.id == conversationId && messages === messageSnapshot) {
+            contextToolTokens = conversationId to parts.second
+            liveContextEstimate = conversationId to parts.first
+        }
+    }
+}
+
 @Composable
 private fun ObserveChatPresentation(state: ChatScreenState) =
     with(state) {
@@ -73,28 +91,7 @@ private fun ObserveChatPresentation(state: ChatScreenState) =
                 transcriptPresentation = next
             }
         }
-        // 缺少接口统计的旧会话也能恢复本地估算；不在主线程或每个流式增量上重算历史。
-        LaunchedEffect(
-            currentConversation.id,
-            messages,
-            generatingThisChat,
-            ThemeStore.contextRing,
-        ) {
-            if (generatingThisChat || !ThemeStore.contextRing) return@LaunchedEffect
-            val conversationId = currentConversation.id
-            val messageSnapshot = messages
-            val parts =
-                withContext(Dispatchers.Default) {
-                    val included = contextMessages(messageSnapshot)
-                    estimateRequestTokens(modelRequestMessages(included)) to
-                        estimateToolContextTokens(included)
-                }
-            if (currentConversation.id == conversationId && messages === messageSnapshot) {
-                contextToolTokens = conversationId to parts.second
-                // 接口总量也需要配套的本地分类估算，恢复会话时不能只更新工具。
-                liveContextEstimate = conversationId to parts.first
-            }
-        }
+        ObserveIdleContextEstimate(state)
         LaunchedEffect(
             ThemeStore.contextRing,
             activeProviderId,

@@ -36,11 +36,113 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.Implements
+import org.robolectric.annotation.Implementation
+import org.robolectric.shadows.ShadowEnvironment
+import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.MockResponse
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [33], manifest = Config.NONE)
+@Config(sdk = [33], manifest = Config.NONE, shadows = [ChatScreenStateTest.CountingTokenizer::class])
 class ChatScreenStateTest {
+    @Test fun idleRecoveryDoesNotRetokenizeWhileASendIsPreparing() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val context = RuntimeEnvironment.getApplication()
+        ThemeStore.ensureLoaded(context)
+        val oldRing = ThemeStore.contextRing
+        try {
+            ThemeStore.saveContextRing(context, true)
+            withState(observeIdleContext = true) { harness ->
+                val state = harness.state
+                val user = ChatMessage(6001, "idle recovery fixture", true)
+                state.messages = listOf(user)
+                state.preparing = mapOf(6002L to state.currentConversation.id)
+                countedTexts.clear()
+                harness.recompose()
+                assertEquals("Preparing sends must not start idle tokenization", 0, countedTexts[user.text]?.get() ?: 0)
+                state.preparing = emptyMap()
+                harness.recompose()
+                repeat(100) {
+                    runCurrent()
+                    if (state.liveContextEstimate.second == 4 + user.text.length) return@repeat
+                    withContext(Dispatchers.IO) { Thread.sleep(5) }
+                    harness.recompose()
+                }
+                assertEquals(state.currentConversation.id to (4 + user.text.length), state.liveContextEstimate)
+                assertEquals("Settled/reopened history must still recover exactly once", 1, countedTexts[user.text]?.get() ?: 0)
+            }
+        } finally { ThemeStore.saveContextRing(context, oldRing); Dispatchers.resetMain() }
+    }
+
+    @Test fun sendingWithoutCompressionTokenizesTheRequestHistoryOnlyOnce() = verifySingleRequestEstimate(false, "fixture-model")
+    @Test fun compressionPreflightAndGenerationReuseTheSameEstimate() = verifySingleRequestEstimate(true, "gpt-4o")
+    @Test fun unknownWindowDoesNotTokenizeBeforeGeneration() = verifySingleRequestEstimate(true, "fixture-model")
+
+    private fun verifySingleRequestEstimate(enabled: Boolean, model: String) = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val context = RuntimeEnvironment.getApplication()
+        ShadowEnvironment.addExternalDir(context.cacheDir.resolve("token-test-external").absolutePath)
+        ThemeStore.ensureLoaded(context)
+        val compression = ToolStore.loadContextCompression(context)
+        val trigger = ToolStore.loadCompressionTrigger(context)
+        val ring = ThemeStore.contextRing
+        try {
+            ToolStore.saveContextCompression(context, enabled)
+            ToolStore.saveCompressionTrigger(context, 90)
+            if (model == "gpt-4o") assertTrue("The test must exercise a known model window", ModelCatalog.contextWindow(context, model) > 0)
+            ThemeStore.saveContextRing(context, true)
+            MockWebServer().use { server ->
+                IrioHttp.resetForTests()
+                server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream")
+                    .setBody("data: {\"choices\":[{\"delta\":{\"content\":\"local answer\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
+                withState { harness ->
+                    val state = harness.state
+                    state.requestReplyNotification = {}
+                    state.providers = listOf(ProviderConfig("token-test", "Fixture", server.url("/v1").toString(), "", models = listOf(model)))
+                    state.activeProviderId = "token-test"
+                    state.selectedModel = model
+                    state.currentConversation = state.currentConversation.copy(title = "Fixture", titlePending = false)
+                    val user = ChatMessage(7001, "unique token request fixture", true)
+                    val reply = ChatMessage(7002, "", false, isPending = true, responseToUserId = user.id)
+                    state.messages = listOf(user, reply)
+                    countedTexts.clear()
+                    state.sendOrCompress(state.currentConversation.id, listOf(user), reply)
+                    repeat(200) {
+                        runCurrent()
+                        if (!state.busyThisChat) return@repeat
+                        withContext(Dispatchers.IO) { Thread.sleep(5) }
+                    }
+                    assertFalse("The local request must finish", state.busyThisChat)
+                    assertEquals(1, server.requestCount)
+                    assertEquals("local answer", state.messages.last().text)
+                    assertEquals("Preflight and generation must not repeat history tokenization ($enabled / $model)",
+                        1, countedTexts[user.text]?.get() ?: 0)
+                    assertEquals("The existing message overhead and estimate must be retained",
+                        state.currentConversation.id to (4 + user.text.length + "local answer".length), state.liveContextEstimate)
+                }
+            }
+        } finally {
+            ToolStore.saveContextCompression(context, compression)
+            ToolStore.saveCompressionTrigger(context, trigger)
+            ThemeStore.saveContextRing(context, ring)
+            IrioHttp.resetForTests(); Dispatchers.resetMain()
+        }
+    }
+
+    companion object {
+        val countedTexts = ConcurrentHashMap<String, AtomicInteger>()
+    }
+    @Implements(TokenEstimator::class, isInAndroidSdk = false)
+    class CountingTokenizer {
+        @Implementation fun count(text: String): Int {
+            if (text.isNotEmpty()) countedTexts.computeIfAbsent(text) { AtomicInteger() }.incrementAndGet()
+            return text.length
+        }
+    }
+
     @Test
     fun emptyPendingReplySurvivesSwitchingAwayAndBackWithoutEnteringDiskHistory() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -193,8 +295,8 @@ class ChatScreenStateTest {
         }
     }
 
-    private suspend fun TestScope.withState(block: suspend (Harness) -> Unit) {
-        val harness = Harness(this)
+    private suspend fun TestScope.withState(observeIdleContext: Boolean = false, block: suspend (Harness) -> Unit) {
+        val harness = Harness(this, observeIdleContext)
         try {
             harness.start()
             block(harness)
@@ -206,13 +308,14 @@ class ChatScreenStateTest {
         }
     }
 
-    private class Harness(val scope: TestScope) {
+    private class Harness(val scope: TestScope, val observeIdleContext: Boolean = false) {
         val clock = BroadcastFrameClock()
         val recomposer = Recomposer(scope.coroutineContext + clock)
         val runner = scope.launch(clock) { recomposer.runRecomposeAndApplyChanges() }
         val composition = Composition(NoNodesApplier(), recomposer)
         val revision = mutableIntStateOf(0)
         lateinit var state: ChatScreenState
+        private var frameTime = 0L
 
         fun start() {
             composition.setContent {
@@ -225,6 +328,7 @@ class ChatScreenStateTest {
                     LocalWindowInfo provides TestWindowInfo,
                 ) {
                     state = rememberChatScreenState()
+                    if (observeIdleContext) ObserveIdleContextEstimate(state)
                 }
             }
             scope.runCurrent()
@@ -234,7 +338,7 @@ class ChatScreenStateTest {
             revision.intValue++
             Snapshot.sendApplyNotifications()
             scope.runCurrent()
-            clock.sendFrame(16_000_000L)
+            clock.sendFrame(frameTime.also { frameTime += 16_000_000L })
             scope.runCurrent()
         }
 

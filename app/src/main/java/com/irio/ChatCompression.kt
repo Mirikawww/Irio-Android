@@ -86,28 +86,22 @@ internal fun ChatScreenState.sendOrCompress(
     val requestModel = selectedModel
     val compressionEnabled = ToolStore.loadContextCompression(context)
     val compressionTrigger = ToolStore.loadCompressionTrigger(context)
+    val requestPreparation = GenerationRequestPreparation(source)
     scope.launch {
         try {
-            // jtokkit 估算 + 压缩决策是发送路径最重的同步块，放到后台线程。
-            // source 是调用方传入的不可变快照，跨线程共享安全。
+            // Disabled compression skips preflight entirely. Otherwise its worker estimate is
+            // retained on this send snapshot and reused by generation, not tokenized twice.
             val plan =
-                withContext(Dispatchers.Default) {
-                    val window = ModelCatalog.contextWindow(context, requestModel)
-                    val estimate = estimateRequestTokens(modelRequestMessages(source))
-                    val compress =
-                        !ModelCatalog.isImageModel(context, requestModel) &&
-                            shouldAutoCompress(
-                                enabled = compressionEnabled,
-                                windowTokens = window,
-                                triggerPercent = compressionTrigger,
-                                estimatedTokens = estimate,
-                            )
-                    val covered =
-                        if (source.lastOrNull()?.fromUser == true) source.dropLast(1) else source
-                    if (compress) planCompression(covered) else null
+                if (!compressionEnabled) null else withContext(Dispatchers.Default) {
+                    requestPreparation.compressionPlan(
+                        enabled = compressionEnabled,
+                        triggerPercent = compressionTrigger,
+                        isImageModel = { ModelCatalog.isImageModel(context, requestModel) },
+                        contextWindow = { ModelCatalog.contextWindow(context, requestModel) },
+                    )
                 }
             if (plan == null) {
-                startGeneration(conversationId, source, reply)
+                startGeneration(conversationId, source, reply, requestPreparation)
                 return@launch
             }
             val card =

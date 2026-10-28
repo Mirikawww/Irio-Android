@@ -34,6 +34,7 @@ internal fun ChatScreenState.startGeneration(
     requestConversationId: String,
     requestSource: List<ChatMessage>,
     reply: ChatMessage,
+    requestPreparation: GenerationRequestPreparation = GenerationRequestPreparation(requestSource),
 ) {
     ReplyNotifications.requestPermissionIfNeeded(
         granted =
@@ -257,11 +258,10 @@ internal fun ChatScreenState.startGeneration(
                     } else if (requestModel.isBlank()) {
                         ChatCompletionResult(error = tr("请先选择一个可用模型"))
                     } else {
-                        val requestMessages = modelRequestMessages(requestSource)
+                        val requestMessages = requestPreparation.messages
                         val baseContext =
                             withContext(Dispatchers.Default) {
-                                estimateRequestTokens(requestMessages) to
-                                    estimateToolContextTokens(requestSource)
+                                requestPreparation.requestTokens to requestPreparation.toolContextTokens
                             }
                         val baseContextTokens = baseContext.first
                         if (currentConversation.id == requestConversationId) {
