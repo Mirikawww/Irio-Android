@@ -4,6 +4,8 @@ import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.MotionEvent
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +56,68 @@ import org.robolectric.shadows.ShadowWindowManagerImpl
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class OperationSnackbarMigrationTest {
+    @Test fun providerErrorsCanBeShownAgainAfterSwipingOnThePageAndInTheDialog() = runTest {
+        for (inDialog in listOf(false, true)) {
+            var requests = 0
+            val message = "Repeated provider failure"
+            withUi {
+                if (inDialog) ProviderSettingsScreen(onBack = {}, loadProviders = { emptyList() },
+                    fetchModels = { requests++; ModelFetchResult(error = message) })
+                else ProviderDetailScreen("fixture", {}, {},
+                    loadProvider = { _, _ -> ProviderConfig("fixture", "Fixture", "https://example.test", "") },
+                    fetchModels = { requests++; ModelFetchResult(error = message) })
+            }.use { ui ->
+                ui.frames(30)
+                if (inDialog) {
+                    ui.click(tr("添加提供商")); ui.frames(40)
+                    ui.edit(tr("名称"), "Draft fixture")
+                    ui.edit(tr("端点 URL"), "https://example.test")
+                }
+                for (direction in listOf(-1f, 1f)) {
+                    ui.click(tr("保存"))
+                    ui.until { ui.hasText(message) }
+                    ui.frames(30)
+                    assertTrue(ui.isSnackbarText(message))
+                    val before = ui.text(message).boundsInRoot
+                    ui.swipeText(message, direction)
+                    ui.frames(60)
+                    assertFalse("Swiped feedback must leave its owning surface", ui.hasText(message))
+                    ui.click(tr("保存"))
+                    ui.until { ui.hasText(message) }
+                    ui.frames(40)
+                    val after = ui.text(message).boundsInRoot
+                    assertEquals("Repeated feedback must return to the same visible position", before.left, after.left, 1f)
+                    assertEquals(before.width, after.width, 1f)
+                    assertTrue(ui.isSnackbarText(message))
+                    if (inDialog) assertEquals(ui.ownerOfText(tr("取消")), ui.ownerOfText(message))
+                }
+                assertEquals(4, requests)
+            }
+        }
+    }
+
+    @Test fun toolPrerequisiteNoticeStillShowsAfterASwipeAndAnotherTap() = runTest {
+        val entry = ToolSettingsEntry(MemoryTool.GET, "读取记忆", "Read memory", ToolBlockedReason.MEMORY)
+        val message = entry.blockedReason!!.message()
+        withUi { ToolSettingsScreen(onBack = {}, loadTools = { listOf(entry) }) }.use { ui ->
+            ui.frames(40)
+            fun trigger() {
+                val node = ui.all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "tool-expand:${entry.name}" }
+                assertTrue(node.config[SemanticsActions.OnClick].action!!.invoke())
+                ui.frames(40)
+            }
+            trigger()
+            val initial = ui.text(message).boundsInRoot
+            ui.swipeText(message, 1f)
+            ui.frames(60)
+            assertFalse(ui.hasText(message))
+            trigger()
+            assertTrue(ui.isSnackbarText(message))
+            assertEquals(initial.left, ui.text(message).boundsInRoot.left, 1f)
+            assertEquals(initial.width, ui.text(message).boundsInRoot.width, 1f)
+        }
+    }
+
     @Test fun sharedSnackbarDoesNotClearItsTextWhileExiting() = runTest {
         val visible = mutableStateOf(false)
         val message = mutableStateOf("")
@@ -258,7 +322,8 @@ class OperationSnackbarMigrationTest {
         fun hasText(value: String) = all().any { it.hasText(value) }
         fun SemanticsNode.hasText(value: String) = config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == value }
         fun text(value: String) = all().single { it.hasText(value) }
-        fun ownerOfText(value: String) = roots().single { root -> nodes(root).any { it.hasText(value) } }
+        // A visible Activity's decor can also contain view; prefer the direct host listed first.
+        fun ownerOfText(value: String) = roots().first { root -> nodes(root).any { it.hasText(value) } }
         fun isSnackbarText(value: String) = all().any { node ->
             node.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-snackbar" && descend(node).any { it.hasText(value) }
         }
@@ -266,6 +331,20 @@ class OperationSnackbarMigrationTest {
             val results = mutableListOf<TextLayoutResult>()
             text(value).config[SemanticsActions.GetTextLayoutResult].action!!.invoke(results)
             return results.single().layoutInput.style.color
+        }
+        fun swipeText(value: String, direction: Float) {
+            val root = ownerOfText(value)
+            val bounds = text(value).boundsInRoot
+            val down = SystemClock.uptimeMillis()
+            fun touch(action: Int, step: Int) {
+                val event = MotionEvent.obtain(down, down + step * 16L, action,
+                    bounds.center.x + direction * 300f * step.coerceAtMost(8) / 8f, bounds.center.y, 0)
+                try { root.dispatchTouchEvent(event) } finally { event.recycle() }
+                frames(1)
+            }
+            touch(MotionEvent.ACTION_DOWN, 0)
+            (1..8).forEach { touch(MotionEvent.ACTION_MOVE, it) }
+            touch(MotionEvent.ACTION_UP, 9)
         }
         fun click(value: String) {
             val node = all().filter { it.config.contains(SemanticsActions.OnClick) && descend(it).any { n -> n.hasText(value) } }
