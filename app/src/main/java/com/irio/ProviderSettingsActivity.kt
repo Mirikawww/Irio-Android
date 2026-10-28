@@ -27,6 +27,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
@@ -288,9 +289,12 @@ internal fun ProviderField(
     mask: Boolean = false,
     readOnly: Boolean = false,
     trailingSpace: Boolean = true,
+    multiline: Boolean = false,
 ) {
     TextField(
         state = state,
+        lineLimits = if (multiline) TextFieldLineLimits.MultiLine(minHeightInLines = 3, maxHeightInLines = 6)
+            else TextFieldLineLimits.SingleLine,
         modifier = Modifier.fillMaxWidth().then(rememberInputFieldBorder()),
         readOnly = readOnly,
         accessibilityLabel = label,
@@ -308,7 +312,7 @@ internal fun ProviderField(
         contentPadding = PaddingValues(12.dp),
         keyboardOptions = KeyboardOptions(
             keyboardType = keyboardType,
-            imeAction = ImeAction.Next
+            imeAction = if (multiline) ImeAction.Default else ImeAction.Next
         ),
         outputTransformation = if (mask) PasswordMask else null,
     )

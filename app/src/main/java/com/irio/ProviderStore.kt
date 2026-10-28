@@ -52,6 +52,8 @@ data class ProviderConfig(
     val enabled: Boolean = true,
     val selectedModel: String = "",
     val customHeaders: List<ProviderHeader> = emptyList(),
+    /** Manually supplied IDs stay available when the remote model catalog is refreshed. */
+    val customModels: List<String> = emptyList(),
 )
 
 data class ModelFetchResult(
@@ -61,6 +63,23 @@ data class ModelFetchResult(
 
 /** 提供商详情里关掉的模型不进任何模型菜单。缺省集合表示全部开启。 */
 fun ProviderConfig.enabledModels(): List<String> = models.filter { it !in disabledModels }
+
+internal fun ProviderConfig.withRefreshedModels(remote: List<String>): ProviderConfig =
+    copy(models = (remote + customModels).distinct())
+
+internal fun customModelIds(input: String): List<String> =
+    input.lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
+
+internal fun customModelIdError(input: String, existing: List<String>): String? {
+    val ids = customModelIds(input)
+    if (ids.isEmpty()) return "模型 ID 不能为空"
+    val seen = existing.toMutableSet()
+    for (id in ids) {
+        if (id.any { it.isWhitespace() || it.isISOControl() }) return "模型 ID 不能包含空白字符"
+        if (!seen.add(id)) return "模型 ID 已存在"
+    }
+    return null
+}
 
 /** 更新列表不代表选择模型；仅唯一且开启的当前提供商允许补选被删除的模型。 */
 internal fun selectedModelAfterProviderSave(
@@ -171,7 +190,8 @@ object ProviderStore {
                     val protocol = runCatching {
                         ProviderProtocol.valueOf(item.optString("protocol"))
                     }.getOrDefault(ProviderProtocol.CHAT_COMPLETIONS)
-                    val models = stringList(item.optJSONArray("models"))
+                    val customModels = stringList(item.optJSONArray("custom_models")).distinct()
+                    val models = (stringList(item.optJSONArray("models")) + customModels).distinct()
                     val disabled = stringList(item.optJSONArray("disabled_models")).filter { it in models }.toSet()
                     val selected = item.optString("selected_model").takeIf { it in models }.orEmpty()
                     val headers = runCatching {
@@ -189,6 +209,7 @@ object ProviderStore {
                             customHeaders = headers,
                             protocol = protocol,
                             models = models,
+                            customModels = customModels,
                             disabledModels = disabled,
                             enabled = item.optBoolean("enabled", true),
                             selectedModel = selected,
@@ -233,6 +254,29 @@ object ProviderStore {
         val stored = config.copy(selectedModel = selected, disabledModels = disabled)
         if (index >= 0) providers[index] = stored else providers.add(stored)
         persist(context, providers, activeId)
+    }
+
+    /** Validate the whole newline-separated batch before saving; no discovery or selection change. */
+    fun addCustomModel(context: Context, providerId: String, input: String): String? {
+        val current = loadProviders(context).firstOrNull { it.id == providerId }
+            ?: return "找不到这个提供商"
+        customModelIdError(input, current.models)?.let { return it }
+        val ids = customModelIds(input)
+        saveProvider(context, current.copy(models = current.models + ids, customModels = current.customModels + ids,
+            disabledModels = current.disabledModels - ids.toSet()))
+        return null
+    }
+
+    /** Refuse to remove discovered-only models through the manual model action. */
+    fun deleteCustomModel(context: Context, providerId: String, model: String): Boolean {
+        val current = loadProviders(context).firstOrNull { it.id == providerId } ?: return false
+        if (model !in current.customModels) return false
+        saveProvider(context, current.copy(
+            models = current.models - model,
+            customModels = current.customModels - model,
+            disabledModels = current.disabledModels - model,
+        ))
+        return true
     }
 
     fun saveDisabledModels(context: Context, providerId: String, disabled: Set<String>) {
@@ -347,6 +391,7 @@ object ProviderStore {
                         put("encrypted_headers", encrypt(providerHeadersJson(provider.customHeaders).toString()))
                         put("protocol", provider.protocol.name)
                         put("models", JSONArray().apply { provider.models.forEach(::put) })
+                        put("custom_models", JSONArray().apply { provider.customModels.forEach(::put) })
                         put("disabled_models", JSONArray().apply { provider.disabledModels.forEach(::put) })
                         put("enabled", provider.enabled)
                         put("selected_model", provider.selectedModel)
@@ -381,6 +426,7 @@ object ProviderStore {
                                 put("customHeaders", providerHeadersJson(provider.customHeaders))
                                 put("protocol", provider.protocol.name)
                                 put("models", JSONArray().apply { provider.models.forEach(::put) })
+                                put("custom_models", JSONArray().apply { provider.customModels.forEach(::put) })
                                 put("disabled_models", JSONArray().apply { provider.disabledModels.forEach(::put) })
                                 put("enabled", provider.enabled)
                                 put("selected_model", provider.selectedModel)
@@ -422,7 +468,8 @@ object ProviderStore {
                 val protocol = runCatching {
                     ProviderProtocol.valueOf(item.optString("protocol"))
                 }.getOrDefault(ProviderProtocol.CHAT_COMPLETIONS)
-                val models = stringList(item.optJSONArray("models"))
+                val customModels = stringList(item.optJSONArray("custom_models")).distinct()
+                val models = (stringList(item.optJSONArray("models")) + customModels).distinct()
                 val disabled = stringList(item.optJSONArray("disabled_models")).filter { it in models }.toSet()
                 val selected = item.optString("selected_model").takeIf { it in models }.orEmpty()
                 val headers = runCatching {
@@ -437,6 +484,7 @@ object ProviderStore {
                         customHeaders = headers,
                         protocol = protocol,
                         models = models,
+                        customModels = customModels,
                         disabledModels = disabled,
                         enabled = item.optBoolean("enabled", true),
                         selectedModel = selected,

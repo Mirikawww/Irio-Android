@@ -56,6 +56,225 @@ import org.robolectric.shadows.ShadowWindowManagerImpl
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class OperationSnackbarMigrationTest {
+    @Test fun manualModelDeleteActionDoesNotIncreaseTheModelRowHeight() = runTest {
+        withUi {
+            ProviderDetailScreen("fixture", {}, {}, loadProvider = { _, _ ->
+                ProviderConfig("fixture", "Fixture", "https://example.test", "",
+                    models = listOf("remote", "manual"), customModels = listOf("manual"))
+            })
+        }.use { ui ->
+            ui.frames(40)
+            ui.click(tr("模型")); ui.frames(40)
+            fun row(id: String) = ui.all().single {
+                it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "provider-model:$id"
+            }
+            val remote = row("remote").boundsInRoot
+            val manual = row("manual").boundsInRoot
+            assertEquals("The normal model row must retain the established compact height", 52f, remote.height, 0.5f)
+            assertEquals("Adding a delete action must not make a custom model row taller", remote.height, manual.height, 0.5f)
+            val delete = ui.descend(row("manual")).first { node ->
+                node.config.contains(SemanticsActions.OnClick) && ui.descend(node).any { child ->
+                    child.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }
+                        .contains(tr("删除模型 %s").format("manual"))
+                }
+            }
+            assertTrue("Keep a usable delete touch target", delete.boundsInRoot.height >= 48f)
+            val icon = ui.descend(delete).single { node ->
+                node.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }
+                    .contains(tr("删除模型 %s").format("manual"))
+            }
+            assertEquals("The delete glyph must stay compact inside its touch target", 20f, icon.boundsInRoot.width, 0.5f)
+            assertEquals(20f, icon.boundsInRoot.height, 0.5f)
+        }
+    }
+
+    @Test fun customModelButtonStaysAboveTabsButMovesWithTheModelPageLikeRefresh() = runTest {
+        withUi {
+            ProviderDetailScreen("fixture", {}, {}, loadProvider = { _, _ ->
+                ProviderConfig("fixture", "Fixture", "https://example.test", "", models = List(30) { "model-$it" })
+            })
+        }.use { ui ->
+            ui.frames(40)
+            ui.click(tr("模型")); ui.frames(40)
+            val before = ui.text(tr("添加模型")).boundsInRoot
+            assertTrue("Entry must be visible directly above tabs without scrolling the model list",
+                before.height > 1f && before.bottom < ui.text(tr("模型")).boundsInRoot.top)
+            var addButton: SemanticsNode? = ui.text(tr("添加模型"))
+            while (addButton != null && !addButton.config.contains(SemanticsActions.OnClick)) addButton = addButton.parent
+            var tab: SemanticsNode? = ui.text(tr("模型"))
+            while (tab != null && !tab.config.contains(SemanticsActions.OnClick)) tab = tab.parent
+            assertEquals("Do not count the shared haze bleed as extra spacing between the action and tabs",
+                16f, tab!!.boundsInRoot.top - addButton!!.boundsInRoot.bottom, 1f)
+            var scroll: SemanticsNode? = ui.text("model-0")
+            while (scroll != null && !scroll.config.contains(SemanticsProperties.VerticalScrollAxisRange)) scroll = scroll.parent
+            assertNotNull(scroll)
+            assertTrue(scroll!!.config[SemanticsActions.ScrollBy].action!!.invoke(0f, 100_000f))
+            ui.frames(40)
+            val entry = ui.text(tr("添加模型"))
+            assertEquals("List scrolling must not move the page's bottom action", before.top, entry.boundsInRoot.top, 1f)
+            val addStart = entry.positionInRoot.x
+            val refreshStart = ui.text(tr("刷新模型")).positionInRoot.x
+            ui.click(tr("配置"))
+            val frames = (0 until 40).map {
+                ui.frames(1)
+                val nodes = ui.all()
+                fun x(label: String) = nodes.firstOrNull { node ->
+                    node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == label }
+                }?.positionInRoot?.x
+                x(tr("添加模型"))?.minus(addStart) to x(tr("刷新模型"))?.minus(refreshStart)
+            }
+            val paired = frames.mapNotNull { (add, refresh) -> if (add != null && refresh != null) add to refresh else null }
+            assertTrue("Both actions must ride the outgoing model page", paired.any { it.first > 5f })
+            paired.forEach { (add, refresh) -> assertEquals("Add and refresh must use the same page translation", refresh, add, 1f) }
+            ui.frames(40)
+            val outgoing = ui.all().firstOrNull { node ->
+                node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == tr("添加模型") }
+            }
+            assertTrue("Outgoing model action must no longer be visible: ${outgoing?.boundsInRoot}, ${outgoing?.positionInRoot}",
+                outgoing == null || outgoing.boundsInRoot.width <= 1f)
+        }
+    }
+
+    @Test fun customModelDialogAnimatesInAndOutAtItsStableCompositionSite() = runTest {
+        withUi {
+            ProviderDetailScreen("fixture", {}, {}, loadProvider = { _, _ ->
+                ProviderConfig("fixture", "Fixture", "https://example.test", "")
+            })
+        }.use { ui ->
+            ui.frames(40)
+            ui.click(tr("模型")); ui.frames(40)
+            repeat(2) {
+                ui.click(tr("添加模型"))
+                val widths = (0 until 40).map {
+                    ui.frames(1)
+                    ui.all().firstOrNull { node ->
+                        node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == tr("取消") }
+                    }?.boundsInRoot?.width ?: 0f
+                }
+                val settled = widths.last()
+                assertTrue("Dialog should have an intermediate entrance frame, not appear at full size immediately",
+                    widths.any { it > 1f && it < settled - 0.5f })
+                ui.click(tr("取消"))
+                ui.frames(1)
+                assertTrue("Dialog content must remain for the exit animation", ui.hasText(tr("取消")))
+                ui.frames(40)
+                assertFalse(ui.hasText(tr("取消")))
+            }
+        }
+    }
+
+    @Test fun customModelEntryIsAboveModelTabsAndTheDialogSavesWithoutFetching() = runTest {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val keyField = ProviderStore::class.java.getDeclaredField("cachedSecretKey").apply { isAccessible = true }
+        val oldKey = keyField.get(ProviderStore)
+        keyField.set(ProviderStore, javax.crypto.spec.SecretKeySpec(ByteArray(32) { 7 }, "AES"))
+        try {
+            ProviderStore.preferences(context).edit().clear().commit()
+            ProviderStore.saveProvider(context, ProviderConfig("custom-fixture", "Fixture", "https://example.test", "fixture",
+                models = listOf("existing"), selectedModel = "existing"))
+            var requests = 0
+            withUi {
+                ProviderDetailScreen("custom-fixture", {}, {}, fetchModels = {
+                    requests++
+                    ModelFetchResult(models = listOf("refreshed"))
+                })
+            }.use { ui ->
+                ui.frames(40)
+                assertFalse("The entry belongs only on the models page", ui.hasText(tr("添加模型")))
+                ui.click(tr("模型")); ui.frames(40)
+                assertTrue("Missing custom model entry", ui.hasText(tr("添加模型")))
+                assertTrue("The entry must sit above the bottom tabs",
+                    ui.text(tr("添加模型")).boundsInRoot.bottom < ui.text(tr("模型")).boundsInRoot.top)
+                ui.click(tr("添加模型")); ui.frames(40)
+                ui.click(tr("添加")); ui.frames(30)
+                assertTrue(ui.isSnackbarText(tr("模型 ID 不能为空")))
+                ui.edit(tr("模型 ID"), "  vendor/My-Model:custom  \ngpt-5.6-sol\ngpt-5.6-terra\ngpt-5.6-luna")
+                ui.click(tr("添加")); ui.frames(40)
+                assertFalse(ui.hasEditableText("  vendor/My-Model:custom  "))
+                assertTrue(ui.hasText("vendor/My-Model:custom"))
+                assertEquals(0, requests)
+                val saved = ProviderStore.loadProvider(context, "custom-fixture")!!
+                assertTrue(saved.enabledModels().contains("vendor/My-Model:custom"))
+                assertTrue(saved.enabledModels().containsAll(listOf("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna")))
+                assertEquals("existing", saved.selectedModel)
+                ui.click(tr("刷新模型"))
+                ui.until { ui.hasText("refreshed") }
+                assertTrue("Custom model must survive a server refresh", ui.hasText("vendor/My-Model:custom"))
+                assertEquals(1, requests)
+                ui.click(tr("添加模型")); ui.frames(40)
+                ui.edit(tr("模型 ID"), "vendor/My-Model:custom")
+                ui.click(tr("添加")); ui.frames(30)
+                assertTrue(ui.isSnackbarText(tr("模型 ID 已存在")))
+                assertEquals(ui.ownerOfText(tr("取消")), ui.ownerOfText(tr("模型 ID 已存在")))
+                ui.edit(tr("模型 ID"), "bad model")
+                ui.click(tr("添加")); ui.frames(30)
+                assertTrue(ui.isSnackbarText(tr("模型 ID 不能包含空白字符")))
+                ui.click(tr("取消")); ui.frames(40)
+                assertFalse(ProviderStore.loadProvider(context, "custom-fixture")!!.models.contains("bad model"))
+                fun deleteAction(id: String): SemanticsNode? {
+                    var node = ui.all().firstOrNull { candidate ->
+                        candidate.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }
+                            .contains(tr("删除模型 %s").format(id))
+                    }
+                    while (node != null && !node.config.contains(SemanticsActions.OnClick)) node = node.parent
+                    return node
+                }
+                assertNull("Discovered models do not get a manual-delete action", deleteAction("refreshed"))
+                val delete = deleteAction("gpt-5.6-sol")
+                assertNotNull("A manual model needs a delete action after its switch", delete)
+                val row = ui.text("gpt-5.6-sol").parent!!
+                val toggle = ui.descend(row).first { it.config.contains(SemanticsProperties.ToggleableState) }
+                assertTrue(delete!!.boundsInRoot.left > toggle.boundsInRoot.left)
+                assertTrue(delete.config[SemanticsActions.OnClick].action!!.invoke())
+                ui.frames(40)
+                assertTrue("Opening confirmation must not delete", "gpt-5.6-sol" in ProviderStore.loadProvider(context, "custom-fixture")!!.models)
+                assertTrue(ui.hasText(tr("确定要删除模型“%s”吗？").format("gpt-5.6-sol")))
+                ui.click(tr("取消")); ui.frames(40)
+                assertTrue("gpt-5.6-sol" in ProviderStore.loadProvider(context, "custom-fixture")!!.models)
+                assertTrue(deleteAction("gpt-5.6-sol")!!.config[SemanticsActions.OnClick].action!!.invoke())
+                ui.frames(40)
+                ui.click(tr("删除")); ui.frames(40)
+                val afterDelete = ProviderStore.loadProvider(context, "custom-fixture")!!
+                assertFalse("gpt-5.6-sol" in afterDelete.models)
+                assertFalse("gpt-5.6-sol" in afterDelete.customModels)
+                assertFalse(ui.hasText("gpt-5.6-sol"))
+                assertTrue(ui.hasText("gpt-5.6-terra"))
+            }
+        } finally {
+            ProviderStore.preferences(context).edit().clear().commit()
+            keyField.set(ProviderStore, oldKey)
+        }
+    }
+
+    @Test fun customModelDialogUsesLocalizedControlsAndCancelDoesNotAdd() = runTest {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        ThemeStore.ensureLoaded(context)
+        val previous = ThemeStore.language
+        try {
+            for (language in AppLanguage.entries) {
+                ThemeStore.saveLanguage(context, language)
+                var adds = 0
+                var dismissals = 0
+                withUi {
+                    ProviderCustomModelDialog(visible = true, onDismiss = { dismissals++ }, onAdd = { adds++; null })
+                }.use { ui ->
+                    ui.frames(40)
+                    assertTrue(ui.hasText(if (language == AppLanguage.EN) "Add model" else "添加模型"))
+                    ui.edit(tr("模型 ID"), "draft-id")
+                    val cancel = ui.text(tr("取消")).boundsInRoot
+                    val add = ui.text(tr("添加")).boundsInRoot
+                    assertEquals("Dialog actions remain on one row", cancel.center.y, add.center.y, 1f)
+                    assertTrue(cancel.right < add.left)
+                    ui.click(tr("取消"))
+                    assertEquals(1, dismissals)
+                    assertEquals(0, adds)
+                }
+            }
+        } finally {
+            ThemeStore.saveLanguage(context, previous)
+        }
+    }
+
     @Test fun providerErrorsCanBeShownAgainAfterSwipingOnThePageAndInTheDialog() = runTest {
         for (inDialog in listOf(false, true)) {
             var requests = 0

@@ -3,9 +3,12 @@ package com.irio
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -31,6 +34,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldState
@@ -54,6 +58,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Constraints
@@ -123,6 +128,9 @@ internal fun ProviderDetailScreen(
     val content = Theme[colors][onBackgroundColor]
     var provider by remember { mutableStateOf(loadProvider(context, providerId)) }
     var deleteDialogOpen by rememberSaveable { mutableStateOf(false) }
+    var customModelDialogOpen by rememberSaveable { mutableStateOf(false) }
+    var deleteCustomModel by rememberSaveable { mutableStateOf<String?>(null) }
+    var retainedDeleteCustomModel by remember { mutableStateOf("") }
     var protocolMenuOpen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
@@ -135,10 +143,12 @@ internal fun ProviderDetailScreen(
     val headers = rememberProviderHeadersState(provider?.customHeaders.orEmpty())
     var protocol by remember { mutableStateOf(provider?.protocol ?: ProviderProtocol.CHAT_COMPLETIONS) }
     var page by rememberSaveable { mutableStateOf(ProviderDetailPage.Config) }
+    val pageTransition = updateTransition(page, label = "providerDetailPage")
     val configScroll = rememberScrollState()
     val modelScroll = rememberScrollState()
     val hazeState = rememberHazeState()
     var tabOverlayHeightPx by remember { mutableIntStateOf(0) }
+    var modelActionHeightPx by remember { mutableIntStateOf(0) }
     val tabContentPadding = with(LocalDensity.current) { tabOverlayHeightPx.toDp() }
 
     val capsulePx = remember { mutableIntStateOf(0) }
@@ -153,25 +163,12 @@ internal fun ProviderDetailScreen(
             )
         } else {
             Box(Modifier.fillMaxSize()) {
-                AnimatedContent(
-                    targetState = page,
+                pageTransition.AnimatedContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .clipToBounds(),
                         contentAlignment = Alignment.TopStart,
-                        transitionSpec = {
-                            val forward = targetState.ordinal > initialState.ordinal
-                            val slide = irioSpring<IntOffset>(stiffness = 420f)
-                            val fade = irioSpring<Float>(stiffness = 520f)
-                            (
-                                slideInHorizontally(slide) { full -> if (forward) full else -full } +
-                                    fadeIn(fade)
-                                ) togetherWith (
-                                slideOutHorizontally(slide) { full -> if (forward) -full else full } +
-                                    fadeOut(fade)
-                                ) using SizeTransform(clip = true)
-                        },
-                        label = "providerDetailPage",
+                        transitionSpec = { providerPageTransition() },
                     ) { current ->
                         when (current) {
                             ProviderDetailPage.Config -> ProviderConfigPage(
@@ -212,8 +209,9 @@ internal fun ProviderDetailScreen(
                                         }
                                         saving = false
                                         if (result.error == null) {
-                                            refreshDiff = modelRefreshDiff(currentProvider.models, result.models)
-                                            ProviderStore.saveProvider(context, updated.copy(models = result.models))
+                                            val refreshed = updated.withRefreshedModels(result.models)
+                                            refreshDiff = modelRefreshDiff(currentProvider.models, refreshed.models)
+                                            ProviderStore.saveProvider(context, refreshed)
                                             provider = loadProvider(context, currentProvider.id)
                                         } else {
                                             operationNotice = result.error
@@ -225,12 +223,16 @@ internal fun ProviderDetailScreen(
                                 scroll = configScroll,
                                 hazeState = hazeState,
                                 capsuleHeight = capsuleHeight,
-                                contentPaddingBottom = tabContentPadding,
+                                contentPaddingBottom = tabContentPadding + ChatComposerHazeBleed,
                             )
                             ProviderDetailPage.Models -> ProviderModelsPage(
                                 provider = provider!!,
                                 refreshing = refreshing || saving,
                                 refreshDiff = refreshDiff,
+                                onDeleteCustomModel = { model ->
+                                    retainedDeleteCustomModel = model
+                                    deleteCustomModel = model
+                                },
                                 onRefresh = refresh@{
                                     val currentProvider = provider ?: return@refresh
                                     if (refreshing || saving) return@refresh
@@ -242,8 +244,9 @@ internal fun ProviderDetailScreen(
                                         }
                                         refreshing = false
                                         if (result.error == null) {
-                                            refreshDiff = modelRefreshDiff(currentProvider.models, result.models)
-                                            ProviderStore.saveProvider(context, currentProvider.copy(models = result.models))
+                                            val refreshed = currentProvider.withRefreshedModels(result.models)
+                                            refreshDiff = modelRefreshDiff(currentProvider.models, refreshed.models)
+                                            ProviderStore.saveProvider(context, refreshed)
                                             provider = loadProvider(context, currentProvider.id)
                                         } else {
                                             operationNotice = result.error
@@ -271,7 +274,8 @@ internal fun ProviderDetailScreen(
                                 scroll = modelScroll,
                                 hazeState = hazeState,
                                 capsuleHeight = capsuleHeight,
-                                contentPaddingBottom = tabContentPadding,
+                                contentPaddingBottom = tabContentPadding + ChatComposerHazeBleed +
+                                    with(LocalDensity.current) { modelActionHeightPx.toDp() },
                             )
                         }
                     }
@@ -280,16 +284,36 @@ internal fun ProviderDetailScreen(
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .zIndex(1f)
-                        .onSizeChanged { tabOverlayHeightPx = it.height }
                         .hazeBlur(
                             input = HazeInput.Sources(hazeState),
                             style = chatComposerHazeStyle(),
                         ),
                 ) {
                     Spacer(Modifier.height(ChatComposerHazeBleed))
+                    // Same transition as the refresh overlay, on the shared tabs backdrop.
+                    pageTransition.AnimatedContent(
+                        modifier = Modifier.fillMaxWidth().clipToBounds(),
+                        transitionSpec = { providerPageTransition() },
+                    ) { current ->
+                        if (current == ProviderDetailPage.Models) {
+                            Box(Modifier.fillMaxWidth().onSizeChanged { modelActionHeightPx = it.height }) {
+                                Button(
+                                    onClick = { customModelDialogOpen = true },
+                                    enabled = !saving && !refreshing,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
+                                    style = ButtonStyle.Secondary,
+                                ) {
+                                    Text(tr("添加模型"), color = LocalContentColor.current)
+                                }
+                            }
+                        } else {
+                            Spacer(Modifier.fillMaxWidth().height(0.dp))
+                        }
+                    }
                     Box(
                         Modifier
                             .fillMaxWidth()
+                            .onSizeChanged { tabOverlayHeightPx = it.height }
                             .windowInsetsPadding(
                                 WindowInsets.navigationBars.only(WindowInsetsSides.Bottom),
                             ),
@@ -317,10 +341,45 @@ internal fun ProviderDetailScreen(
         OperationErrorSnackbar(
             visible = operationNotice != null,
             message = operationNotice.orEmpty(),
-            bottomInset = maxOf(tabContentPadding, with(LocalDensity.current) { WindowInsets.ime.getBottom(this).toDp() }),
+            bottomInset = maxOf(tabContentPadding + ChatComposerHazeBleed + if (page == ProviderDetailPage.Models) {
+                with(LocalDensity.current) { modelActionHeightPx.toDp() }
+            } else 0.dp, with(LocalDensity.current) { WindowInsets.ime.getBottom(this).toDp() }),
             onDismiss = { operationNotice = null },
             restartKey = operationNoticeNonce,
         )
+    }
+
+    ProviderCustomModelDialog(
+        visible = customModelDialogOpen,
+        onDismiss = { customModelDialogOpen = false },
+        onAdd = { input ->
+            val error = ProviderStore.addCustomModel(context, providerId, input)
+            if (error == null) {
+                provider = loadProvider(context, providerId)
+                val ids = customModelIds(input).toSet()
+                refreshDiff = refreshDiff.copy(added = refreshDiff.added + ids, removed = refreshDiff.removed.filterNot { it in ids })
+            }
+            error
+        },
+    )
+
+    IrioAlertDialog(visible = deleteCustomModel != null, onDismissRequest = { deleteCustomModel = null }) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            DialogTitle(tr("删除模型"))
+            Text(tr("确定要删除模型“%s”吗？").format(retainedDeleteCustomModel), color = Theme[colors][onPanelColor])
+            DialogButtonRow(
+                confirmLabel = tr("删除"), confirmStyle = ButtonStyle.Destructive,
+                onConfirm = {
+                    val model = deleteCustomModel
+                    if (model != null && ProviderStore.deleteCustomModel(context, providerId, model)) {
+                        provider = loadProvider(context, providerId)
+                        refreshDiff = refreshDiff.copy(added = refreshDiff.added - model, removed = refreshDiff.removed - model)
+                    }
+                    deleteCustomModel = null
+                },
+                onCancel = { deleteCustomModel = null },
+            )
+        }
     }
 
     IrioAlertDialog(
@@ -351,6 +410,15 @@ internal fun ProviderDetailScreen(
 private enum class ProviderDetailPage(val label: String) {
     Config("配置"),
     Models("模型"),
+}
+
+private fun AnimatedContentTransitionScope<ProviderDetailPage>.providerPageTransition(): ContentTransform {
+    val forward = targetState.ordinal > initialState.ordinal
+    val slide = irioSpring<IntOffset>(stiffness = 420f)
+    val fade = irioSpring<Float>(stiffness = 520f)
+    return ((slideInHorizontally(slide) { full -> if (forward) full else -full } + fadeIn(fade)) togetherWith
+        (slideOutHorizontally(slide) { full -> if (forward) -full else full } + fadeOut(fade)))
+        .using(SizeTransform(clip = true))
 }
 
 private val RefreshModelGap = 8.dp
@@ -430,6 +498,7 @@ internal fun ProviderModelsPage(
     hazeState: HazeState,
     capsuleHeight: Dp,
     contentPaddingBottom: Dp,
+    onDeleteCustomModel: (String) -> Unit = {},
 ) {
     val showRemoved = ThemeStore.modelDiff
     var hazePx by remember { mutableIntStateOf(0) }
@@ -458,6 +527,8 @@ internal fun ProviderModelsPage(
                             onModelCheckedChange(entry.model, on)
                         },
                         diff = entry.kind,
+                        onDelete = if (!removed && entry.model in provider.customModels) ({ onDeleteCustomModel(entry.model) }) else null,
+                        deleteEnabled = !refreshing,
                     )
                 }
             }
@@ -583,6 +654,8 @@ private fun ModelEnabledRow(
     enabled: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     diff: ModelDiffKind = ModelDiffKind.Unchanged,
+    onDelete: (() -> Unit)? = null,
+    deleteEnabled: Boolean = true,
 ) {
     val card = Theme[colors][secondaryColor]
     val ink = Theme[colors][onBackgroundColor]
@@ -596,20 +669,33 @@ private fun ModelEnabledRow(
     Row(
         modifier = Modifier
             .settingsRow()
+            .testTag("provider-model:$model")
             .background(background, Theme[shapes][largeShape])
-            .padding(start = 16.dp, end = 8.dp, top = SettingsRowInset, bottom = SettingsRowInset),
+            .padding(start = 16.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             model,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).padding(vertical = SettingsRowInset),
             color = ink,
         )
         Switch(
+            modifier = Modifier.padding(vertical = SettingsRowInset),
             checked = if (interactive) enabled else false,
             onCheckedChange = onCheckedChange,
             enabled = interactive,
         )
+        if (onDelete != null) {
+            IconButton(
+                onClick = onDelete,
+                enabled = deleteEnabled,
+                style = ButtonStyle.Ghost,
+                modifier = Modifier.padding(start = 4.dp).size(48.dp),
+            ) {
+                Icon(imageVector = IrioIcons.Trash, contentDescription = tr("删除模型 %s").format(model),
+                    tint = ink, modifier = Modifier.size(20.dp))
+            }
+        }
     }
 }
 
