@@ -316,6 +316,7 @@ private val settingsSearchEntries = listOf(
     item("linux.rebuild", "用安装包里的版本重新准备", "Linux 沙盒", LinuxSandboxSettingsActivity::class.java),
     item("linux.commands", "单次命令数", "Linux 沙盒", LinuxSandboxSettingsActivity::class.java),
     item("linux.background", "后台命令", "Linux 沙盒", LinuxSandboxSettingsActivity::class.java),
+    item("linux.attachmentPaths", "附带上传文件路径", "Linux 沙盒", LinuxSandboxSettingsActivity::class.java),
     item("linux.delete", "删除 Linux 沙盒", "Linux 沙盒", LinuxSandboxSettingsActivity::class.java),
 
     item("other.history", "删除所有历史", "其他", OtherSettingsActivity::class.java),

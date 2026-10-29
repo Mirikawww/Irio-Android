@@ -224,6 +224,7 @@ internal object LinuxSandboxSession {
                 storage = storage,
                 hostTmp = hostTmp.absolutePath,
                 command = command,
+                attachmentsDirectory = LinuxAttachmentPaths.forRequest(context).directory?.absolutePath,
             ),
         ).redirectErrorStream(true).directory(hostTmp).apply {
             environment().clear()

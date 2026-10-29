@@ -1034,6 +1034,7 @@ private val English = mapOf(
     "处理后台命令" to "Checking background commands",
     "已处理后台命令" to "Checked background commands",
     "后台命令" to "Background commands",
+    "附带上传文件路径" to "Include uploaded file paths",
     "%s 个后台命令" to "%s background commands",
     "停止" to "Stop",
     "已在后台运行，编号 %s" to "Running in the background as %s",

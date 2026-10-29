@@ -97,6 +97,14 @@ internal object LinuxSandboxStore {
         update(file) { it.put("backgroundCommands", enabled) }
     }
 
+    /** Local upload paths are opt-in, including for existing installations. */
+    fun loadAttachmentPaths(file: File): Boolean =
+        runCatching { JSONObject(file.readText()).optBoolean("attachmentPaths", false) }.getOrDefault(false)
+
+    fun saveAttachmentPaths(file: File, enabled: Boolean) {
+        update(file) { it.put("attachmentPaths", enabled) }
+    }
+
     /** 删除环境，但保留命令设置和应用的其他数据。 */
     fun delete(layout: LinuxSandboxLayout, hostTmp: File) {
         saveEnabled(layout.stateFile, false)
@@ -274,6 +282,7 @@ internal fun linuxSandboxProotArguments(
     storage: String?,
     hostTmp: String,
     command: String,
+    attachmentsDirectory: String? = null,
 ): List<String> = buildList {
     add(proot)
     // Termux proot 的长选项必须写成 --name=value，空格分开会直接退出。
@@ -282,6 +291,7 @@ internal fun linuxSandboxProotArguments(
     add("--bind=/proc")
     add("--bind=/sys")
     add("--bind=$hostTmp:/tmp")
+    if (!attachmentsDirectory.isNullOrBlank()) add("--bind=$attachmentsDirectory:$attachmentsDirectory")
     if (!storage.isNullOrBlank()) {
         add("--bind=$storage:/sdcard")
         add("--bind=$storage:/storage/emulated/0")

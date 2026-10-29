@@ -228,6 +228,7 @@ object ChatApi {
         retryOptions: ChatRetryOptions = ChatRetryOptions(enabled = false),
     ): ChatCompletionResult {
         val uploadEncoding = ImageUploadEncoding()
+        val attachmentPaths = LinuxAttachmentPaths.forRequest(appContext)
         val history = (if (toolRegistry.handles(ReactionTool.NAME)) reactionRequestMessages(messages) else messages).toMutableList()
         var searchPages = 0
         var displayedBubbles = false
@@ -272,7 +273,9 @@ object ChatApi {
             val turn = retries.runChatRound(history.toList()) { retryMessages, attemptUpdate -> streamOnce(
                 provider = provider,
                 model = model,
-                messages = if (includeTimestamps) retryMessages else retryMessages.map { it.copy(createdAt = 0L) },
+                messages = attachmentPaths.decorate(
+                    if (includeTimestamps) retryMessages else retryMessages.map { it.copy(createdAt = 0L) },
+                ),
                 reasoningEffort = reasoningEffort,
                 fastMode = fastMode,
                 systemPrompt = toolRegistry.systemPrompt(systemPrompt),

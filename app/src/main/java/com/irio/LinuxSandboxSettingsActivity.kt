@@ -85,6 +85,9 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
     var backgroundCommands by remember {
         mutableStateOf(LinuxSandboxStore.loadBackgroundEnabled(layout.stateFile))
     }
+    var attachmentPaths by remember {
+        mutableStateOf(LinuxSandboxStore.loadAttachmentPaths(layout.stateFile))
+    }
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -273,6 +276,23 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                         LinuxSandboxStore.saveBackgroundEnabled(layout.stateFile, want)
                         backgroundCommands = want
                         if (!want) LinuxBackgroundJobs.stopAll()
+                    },
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .settingsRow()
+                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                    .settingsSearchAnchor("linux.attachmentPaths", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(tr("附带上传文件路径"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
+                Switch(
+                    checked = attachmentPaths,
+                    onCheckedChange = { want ->
+                        LinuxSandboxStore.saveAttachmentPaths(layout.stateFile, want)
+                        attachmentPaths = want
                     },
                 )
             }
