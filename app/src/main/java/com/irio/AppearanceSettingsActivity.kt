@@ -691,7 +691,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ExperimentalLabel(
-                        tr("新消息滚动"),
+                        tr("发送新消息时滚动到新消息"),
                         color = Theme[colors][onPanelColor],
                         modifier = Modifier.weight(1f),
                     )

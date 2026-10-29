@@ -547,7 +547,7 @@ private val English = mapOf(
     "公式大小" to "Formula size",
     "文本淡入" to "Text fade-in",
     "图片生成流式传输" to "Stream image generation",
-    "新消息滚动" to "New message scroll",
+    "发送新消息时滚动到新消息" to "Scroll to the new message when sending",
     "消息框延展动画" to "Message box stretch animation",
     "按 Enter 发送" to "Send with Enter",
     "代码块自动换行" to "Wrap code blocks",

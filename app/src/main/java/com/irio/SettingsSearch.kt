@@ -262,7 +262,7 @@ private val settingsSearchEntries = listOf(
     item("appearance.imageStreaming", "图片生成流式传输", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.diff", "模型差异", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.pickerLeft", "模型切换器居左", "外观与偏好", AppearanceSettingsActivity::class.java),
-    item("appearance.scroll", "新消息滚动", "外观与偏好", AppearanceSettingsActivity::class.java),
+    item("appearance.scroll", "发送新消息时滚动到新消息", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.composerAnim", "消息框延展动画", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.enter", "按 Enter 发送", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.wrap", "代码块自动换行", "外观与偏好", AppearanceSettingsActivity::class.java),

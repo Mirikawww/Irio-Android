@@ -71,7 +71,7 @@ class ThemeStoreTest {
         assertEquals("Formula size", translate(AppLanguage.EN, "公式大小"))
         assertEquals("Text fade-in", translate(AppLanguage.EN, "文本淡入"))
         assertEquals("Model diff", translate(AppLanguage.EN, "模型差异"))
-        assertEquals("New message scroll", translate(AppLanguage.EN, "新消息滚动"))
+        assertEquals("Scroll to the new message when sending", translate(AppLanguage.EN, "发送新消息时滚动到新消息"))
         assertEquals("Experimental", translate(AppLanguage.EN, "实验性"))
         assertEquals("Context compression", translate(AppLanguage.EN, "上下文压缩"))
         assertEquals("Compressing context", translate(AppLanguage.EN, "上下文压缩中"))

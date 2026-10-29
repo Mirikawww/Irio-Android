@@ -6,6 +6,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsSearchTest {
+    @Test fun newMessageScrollUsesTheExplicitSendLabelAndKeepsItsDestination() {
+        val title = "发送新消息时滚动到新消息"
+        val hit = searchSettings(title, label = { it }).single { it.id == "appearance.scroll" }
+        assertEquals(title, hit.title)
+        assertEquals("appearance.scroll", hit.anchor)
+        assertEquals("com.irio.AppearanceSettingsActivity", hit.destination.name)
+        val englishTitle = "Scroll to the new message when sending"
+        val englishHit = searchSettings(englishTitle, label = { translate(AppLanguage.EN, it) })
+            .single { it.id == "appearance.scroll" }
+        assertEquals(englishTitle, englishHit.title)
+    }
+
     @Test fun aboutVersionAndAcknowledgementsHaveTheirOwnSearchDestinations() {
         val about = searchSettings("关于", label = { it }).single { it.id == "page.about" }
         assertEquals("com.irio.AboutActivity", about.destination.name)
