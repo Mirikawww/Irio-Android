@@ -110,6 +110,7 @@ internal class MessageRecyclerController {
             field = value
             if (!value) {
                 recyclerView?.tailPrefetch = false
+                recyclerView?.sendPrefetchPixels = 0
                 finishOpen()
             }
         }
@@ -126,8 +127,7 @@ internal class MessageRecyclerController {
     private var glideClockStarted = false
     private var glideStartUptime = 0L
     private var glidePreviousProgress = 0f
-    private var glideDeferred = false
-    private var glideUnmeasuredWaits = 0
+    private var glidePreparedOverflow: Int? = null
     private var unlaidWaits = 0
     private var idleConfirms = 0
     private var programmaticPosts = 0
@@ -200,6 +200,7 @@ internal class MessageRecyclerController {
         openJumpPending = true
         chasing = false
         gliding = false
+        view.sendPrefetchPixels = 0
         idleConfirms = 0
         unlaidWaits = 0
         view.tailPrefetch = true
@@ -257,14 +258,20 @@ internal class MessageRecyclerController {
     fun revealTail() {
         val view = recyclerView ?: return
         openPinUntil = 0L
+        // Opening may still have posted alignment work. Sending must never inherit its jump.
+        instantOpen = false
+        openJumpPending = false
+        openRevealSpring?.cancel()
+        openRevealSpring = null
+        openHidden = false
+        view.alpha = 1f
         scrollRequested = true
         chasing = false
         idleConfirms = 0
         gliding = true
         glideClockStarted = false
         glidePreviousProgress = 0f
-        glideDeferred = false
-        glideUnmeasuredWaits = 0
+        glidePreparedOverflow = null
         unlaidWaits = 0
         view.tailPrefetch = true
         programmaticPosts++
@@ -460,8 +467,9 @@ internal class MessageRecyclerController {
     }
 
     /**
-     * 固定时长滑到已经量准的尾部。高度还没量准时不按滚动范围估，
-     * 免得滚过了再被拉回来。量准后先空一帧，再按真实超出像素走。
+     * Keep the current anchor while laying out the path offscreen. Preparation never scrolls:
+     * one-pixel probes cannot reach a distant tail, and moving first makes the send flash.
+     * Once real row measurements settle, consume the distance on one fixed ease-in-out clock.
      */
     private fun stepGlide(current: MessageRecyclerView) {
         if (!gliding || !scrollRequested) {
@@ -490,28 +498,14 @@ internal class MessageRecyclerController {
         )
         if (!glideClockStarted) {
             if (overflow == null) {
-                if (glideUnmeasuredWaits++ >= 24) {
-                    gliding = false
-                    scrollRequested = false
-                    return
-                }
-                scrollByProgrammatic(
-                    current,
-                    unmeasuredTailPrepareStep(
-                        itemCount = sample.itemCount,
-                        lastVisibleIndex = sample.lastIndex,
-                        lastSize = sample.lastSize,
-                        lastEdge = sample.lastEdge,
-                        viewportEnd = sample.viewportEnd,
-                        lastMeasuredIsTrustworthy = sample.ready,
-                    ),
-                )
+                current.prepareSendTail()
+                glidePreparedOverflow = null
                 current.requestLayout()
                 postGlide()
                 return
             }
-            if (!glideDeferred) {
-                glideDeferred = true
+            if (glidePreparedOverflow != overflow) {
+                glidePreparedOverflow = overflow
                 postGlide()
                 return
             }
@@ -536,16 +530,6 @@ internal class MessageRecyclerController {
             postGlide()
             return
         }
-        val restSample = current.tailSample()
-        val rest = measuredTailOverflow(
-            itemCount = restSample.itemCount,
-            lastVisibleIndex = restSample.lastIndex,
-            lastSize = restSample.lastSize,
-            lastEdge = restSample.lastEdge,
-            viewportEnd = restSample.viewportEnd,
-            measurementReady = restSample.ready,
-        ) ?: 0
-        scrollByProgrammatic(current, rest)
         gliding = false
         scrollRequested = false
     }
@@ -658,6 +642,13 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
             field = value
             requestLayout()
         }
+    // Extra layout is temporary and retains the visible anchor; never scroll to measure a target.
+    var sendPrefetchPixels: Int = 0
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+        }
     private var lastNotifiedFirst = RecyclerView.NO_POSITION
     private var lastNotifiedLast = RecyclerView.NO_POSITION
 
@@ -666,7 +657,7 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
             override fun calculateExtraLayoutSpace(state: RecyclerView.State, extraLayoutSpace: IntArray) {
                 super.calculateExtraLayoutSpace(state, extraLayoutSpace)
                 if (tailPrefetch) {
-                    val extra = this@MessageRecyclerView.height
+                    val extra = maxOf(this@MessageRecyclerView.height, sendPrefetchPixels)
                     if (extra > 0) extraLayoutSpace[1] = maxOf(extraLayoutSpace[1], extra)
                 }
             }
@@ -723,6 +714,14 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
 
     fun isMessageUpdatePending(): Boolean = messageAdapter.isUpdatePending()
 
+    fun prepareSendTail() {
+        val manager = layoutManager as? LinearLayoutManager ?: return
+        if (manager.findViewByPosition(itemCountValue() - 1) != null) return
+        // Grow offscreen layout only as needed. No position reanchor or scrollbar estimates.
+        sendPrefetchPixels = (maxOf(height, sendPrefetchPixels).toLong() * 2)
+            .coerceAtMost(Int.MAX_VALUE / 4L).toInt()
+    }
+
     fun tailSample(): TailSample {
         val count = itemCountValue()
         val viewportEnd = height - paddingBottom
@@ -746,15 +745,14 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
                 childIsReady(child, position),
             )
         }
-        val ready = childIsReady(tail, count - 1) && neighborReady(count - 2)
+        val ready = (0 until childCount).all { index ->
+            val child = getChildAt(index)
+            val position = getChildAdapterPosition(child)
+            position != NO_POSITION && childIsReady(child, position)
+        }
         return TailSample(count, count - 1, tail.height, tail.bottom, viewportEnd, ready)
     }
 
-    private fun neighborReady(position: Int): Boolean {
-        if (position < 0) return true
-        val child = (layoutManager as? LinearLayoutManager)?.findViewByPosition(position) ?: return true
-        return childIsReady(child, position)
-    }
 
     private fun childIsReady(child: View, position: Int): Boolean {
         val holder = getChildViewHolder(child) as? AndroidMessageViewHolder ?: return false

@@ -213,9 +213,9 @@ internal fun tailFollowStep(remainingPx: Int, instant: Boolean): Int =
 internal fun tailChaseSettled(overflow: Int?, instant: Boolean): Boolean =
     if (instant) overflow == 0 else overflow == null || overflow <= 0
 
-/** 先快后慢，固定时长结束时进度为 1。 */
+/** 慢—快—慢，固定时长结束时进度为 1。 */
 internal fun sendScrollEase(t: Float): Float {
-    return IrioEaseOut.transform(t.coerceIn(0f, 1f))
+    return IrioEaseInOut.transform(t.coerceIn(0f, 1f))
 }
 
 /**

@@ -172,11 +172,16 @@ class TranscriptFollowTest {
     fun sendScrollFinishesInFixedProgressRegardlessOfDistance() {
         assertEquals(0f, sendScrollEase(0f), 0.001f)
         assertEquals(1f, sendScrollEase(1f), 0.001f)
-        assertTrue(sendScrollEase(0.5f) > 0.5f)
+        assertEquals(0.5f, sendScrollEase(0.5f), 0.001f)
+        val early = sendScrollEase(0.1f) - sendScrollEase(0f)
+        val middle = sendScrollEase(0.55f) - sendScrollEase(0.45f)
+        val late = sendScrollEase(1f) - sendScrollEase(0.9f)
+        assertTrue("Sending must accelerate from rest", early < middle)
+        assertTrue("Sending must decelerate to rest", late < middle)
         assertEquals(0, fixedDurationScrollStep(20_000, 0f, 0f))
         assertEquals(20_000, fixedDurationScrollStep(20_000, 0.2f, 1f))
         val halfway = fixedDurationScrollStep(20_000, 0f, sendScrollEase(0.5f))
-        assertTrue(halfway > 10_000)
+        assertTrue(halfway in 9_999..10_001)
         assertTrue(halfway < 20_000)
     }
 
