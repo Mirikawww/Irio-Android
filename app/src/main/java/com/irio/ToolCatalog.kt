@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal enum class ToolBlockedReason {
-    WEB_SEARCH, SEARCH_KEY, IMAGE_SEARCH_KEY, IMAGE_MODEL, MEMORY, SUBAGENTS, LINUX, STORAGE, LINUX_BACKGROUND, GITHUB, TODOIST;
+    WEB_SEARCH, SEARCH_KEY, IMAGE_SEARCH_KEY, IMAGE_MODEL, MEMORY, SUBAGENTS, LINUX, STORAGE, LINUX_BACKGROUND, GITHUB, TODOIST, IRIO_DOCS;
 
     fun message(): String = tr(when (this) {
         WEB_SEARCH -> "请先在对话中开启「网络搜索」"
@@ -19,6 +19,7 @@ internal enum class ToolBlockedReason {
         LINUX_BACKGROUND -> "请先在「Linux 沙盒」中开启「后台命令」"
         GITHUB -> "请先在「MCP」中登录 GitHub 并开启「在对话中启用」"
         TODOIST -> "请先在「MCP」中连接 Todoist 并开启「在对话中启用」"
+        IRIO_DOCS -> "请先在「MCP」中开启 Irio Docs"
     })
 }
 
@@ -34,6 +35,7 @@ internal data class ToolFeatureState(
     val backgroundEnabled: Boolean = false,
     val githubUsable: Boolean = false,
     val todoistUsable: Boolean = false,
+    val irioDocsEnabled: Boolean = true,
 )
 
 internal data class ToolSettingsEntry(
@@ -61,8 +63,9 @@ internal object ToolCatalog {
             backgroundEnabled = LinuxSandboxStore.loadBackgroundEnabled(sandbox),
             githubUsable = github?.usable() == true,
             todoistUsable = todoist?.usable() == true,
+            irioDocsEnabled = IrioDocsMcpStore.loadEnabled(context),
         )
-        entries(features, LinuxSandboxStore.loadCommandsPerCall(sandbox), github?.tools.orEmpty(), todoist?.tools.orEmpty())
+        entries(features, LinuxSandboxStore.loadCommandsPerCall(sandbox), github?.tools.orEmpty(), todoist?.tools.orEmpty(), IrioDocsMcpStore.tools(context))
     }
 
     fun entries(
@@ -70,6 +73,7 @@ internal object ToolCatalog {
         commandsPerCall: Int = LinuxSandboxStore.COMMANDS_UNLIMITED,
         mcpTools: List<McpTool> = emptyList(),
         todoistMcpTools: List<McpTool> = emptyList(),
+        irioDocsTools: List<McpTool> = emptyList(),
     ): List<ToolSettingsEntry> {
         val providers = ToolRegistry.default().providers() + listOf(
             MemoryToolProvider(),
@@ -100,6 +104,10 @@ internal object ToolCatalog {
                 tool.description,
                 if (features.todoistUsable) null else ToolBlockedReason.TODOIST,
             )
+        } + irioDocsTools.map { tool ->
+            val name = IrioDocsMcpToolProvider.PREFIX + tool.name
+            ToolSettingsEntry(name, IrioDocsMcpToolProvider.progressLabel(name, completed = false), tool.description,
+                if (features.irioDocsEnabled) null else ToolBlockedReason.IRIO_DOCS)
         }
     }
 

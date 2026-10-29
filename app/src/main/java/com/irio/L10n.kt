@@ -135,6 +135,23 @@ private val TodoistProgressEnglish = mapOf(
 ).flatMap { (action, forms) -> listOf(action to forms.first, "已$action" to forms.second) }.toMap()
 
 private val English = mapOf(
+    "访问权限" to "Access",
+    "连接 Irio Docs MCP，在对话中搜索官方文档、读取说明和查询版本更新。仅访问公开资料，无需登录。" to "Connect to Irio Docs MCP to search official documentation, read guides and look up releases in conversations. Public information only; no sign-in required.",
+    "查询官方文档与更新日志" to "Search official documentation and release notes",
+    "请先在「MCP」中开启 Irio Docs" to "Enable Irio Docs in MCP settings first",
+    "Irio Docs 查询失败，请检查网络后重试" to "Irio Docs query failed. Check your connection and try again",
+    "Irio Docs 查询已停止" to "Irio Docs query stopped",
+    "Irio Docs 集成已关闭" to "Irio Docs integration is disabled",
+    "Irio Docs 工具无效" to "Invalid Irio Docs tool",
+    "Irio Docs 参数无效" to "Invalid Irio Docs arguments",
+    "搜索 Irio 文档" to "Searching Irio documentation",
+    "已搜索 Irio 文档" to "Searched Irio documentation",
+    "读取 Irio 文档" to "Reading Irio documentation",
+    "已读取 Irio 文档" to "Read Irio documentation",
+    "查询 Irio 更新日志" to "Looking up Irio releases",
+    "已查询 Irio 更新日志" to "Looked up Irio releases",
+    "查询 Irio Docs" to "Querying Irio Docs",
+    "已查询 Irio Docs" to "Queried Irio Docs",
     "检查更新" to "Check for updates",
     "正在检查更新" to "Checking for updates",
     "检查渠道" to "Update channel",

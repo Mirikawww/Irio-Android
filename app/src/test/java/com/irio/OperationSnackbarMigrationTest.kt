@@ -56,6 +56,79 @@ import org.robolectric.shadows.ShadowWindowManagerImpl
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class OperationSnackbarMigrationTest {
+    @Test fun docsMcpManagementMatchesPeerSheetsAndPreservesEnablementOnOpen() = runTest {
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        org.robolectric.shadows.ShadowEnvironment.addExternalDir(app.cacheDir.resolve("external").absolutePath)
+        IrioDocsMcpStore.saveEnabled(app, true)
+        withUi { McpSettingsScreen(onBack = {}) }.use { ui ->
+            ui.frames(40)
+            val card = ui.all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-docs-mcp" }
+            assertFalse("List card must not expose an inline switch", ui.descend(card).any { it.config.contains(SemanticsProperties.ToggleableState) })
+            val manage = ui.descend(card).single { node -> node.config.contains(SemanticsActions.OnClick) && ui.descend(node).any {
+                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == tr("管理") }
+            } }
+            assertTrue("Same compact management action as peers", manage.config[SemanticsActions.OnClick].action!!.invoke())
+            ui.frames(40)
+            assertTrue("Opening management must not disable tools", IrioDocsMcpStore.loadEnabled(app))
+            assertTrue(ui.hasText(tr("信息")))
+            assertTrue(ui.hasText(tr("开发者")))
+            assertTrue(ui.hasText("Pirikawww"))
+            assertTrue(ui.hasText("irio.mirikawww.workers.dev"))
+            assertFalse("Do not add an access-permission information row", ui.hasText(tr("访问权限")))
+            assertTrue(ui.hasText(tr("工具数量")))
+            assertTrue(ui.hasText("3"))
+            assertTrue(ui.hasText(tr("移除集成")))
+            val toggle = ui.all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-docs-mcp-enabled" }
+            assertTrue(toggle.config[SemanticsActions.OnClick].action!!.invoke()); ui.frames(10)
+            assertFalse(IrioDocsMcpStore.loadEnabled(app))
+            assertFalse(chatToolRegistry(app, false, "").handles("irio_docs_mcp_search_irio_docs"))
+            assertTrue(toggle.config[SemanticsActions.OnClick].action!!.invoke()); ui.frames(10)
+            assertTrue(IrioDocsMcpStore.loadEnabled(app))
+            assertTrue(chatToolRegistry(app, false, "").handles("irio_docs_mcp_search_irio_docs"))
+        }
+        withUi { McpSettingsScreen(onBack = {}) }.use { ui ->
+            ui.frames(40)
+            val card = ui.all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-docs-mcp" }
+            assertTrue(ui.descend(card).any { it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == tr("管理") } })
+            assertTrue(IrioDocsMcpStore.loadEnabled(app))
+        }
+        assertTrue(searchSettings("Irio Docs").any { it.id == "mcp.irio_docs" })
+    }
+
+    @Test fun docsMcpRemovalAndAnonymousReinstallUseTheSameManagementHierarchy() = runTest {
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        org.robolectric.shadows.ShadowEnvironment.addExternalDir(app.cacheDir.resolve("external").absolutePath)
+        IrioDocsMcpStore.install(app)
+        withUi { McpSettingsScreen(onBack = {}) }.use { ui ->
+            ui.frames(40)
+            fun card() = ui.all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-docs-mcp" }
+            fun open(label: String) {
+                val action = ui.descend(card()).single { node -> node.config.contains(SemanticsActions.OnClick) && ui.descend(node).any {
+                    it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == tr(label) }
+                } }
+                assertTrue(action.config[SemanticsActions.OnClick].action!!.invoke()); ui.frames(40)
+            }
+            open("管理")
+            ui.click(tr("移除集成")); ui.frames(40)
+            assertFalse(IrioDocsMcpStore.loadInstalled(app))
+            assertFalse(IrioDocsMcpStore.loadEnabled(app))
+            assertFalse(chatToolRegistry(app, false, "").handles("irio_docs_mcp_search_irio_docs"))
+            open("安装")
+            assertTrue(ui.hasText(tr("开发者")))
+            assertFalse(ui.hasText(tr("移除集成")))
+            assertFalse(ui.hasText(tr("使用 OAuth 登录")))
+            assertFalse(ui.hasText("Personal Access Token"))
+            assertFalse("Opening install details must not install implicitly", IrioDocsMcpStore.loadInstalled(app))
+            // Target the detail action, not an Install button behind the modal.
+            val install = ui.all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-docs-mcp-install" }
+            assertTrue(install.config[SemanticsActions.OnClick].action!!.invoke()); ui.frames(40)
+            assertTrue(IrioDocsMcpStore.loadInstalled(app))
+            assertTrue(IrioDocsMcpStore.loadEnabled(app))
+            assertTrue(ui.hasText(tr("工具数量")))
+            assertTrue(ui.hasText(tr("移除集成")))
+        }
+    }
+
     @Test fun manualModelDeleteActionDoesNotIncreaseTheModelRowHeight() = runTest {
         withUi {
             ProviderDetailScreen("fixture", {}, {}, loadProvider = { _, _ ->

@@ -42,6 +42,7 @@ internal fun chatToolRegistry(
         add(ColoredBubbleToolProvider())
         add(MermaidToolProvider())
         add(HistoryToolProvider())
+        IrioDocsMcpStore.toolProvider(context)?.let(::add)
         if (MemoryStore.loadEnabled(context)) add(MemoryToolProvider())
         if (ToolStore.loadSubagents(context)) add(SubagentToolProvider())
         val sandbox = LinuxSandboxLayout.of(context.filesDir).stateFile

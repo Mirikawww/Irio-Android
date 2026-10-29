@@ -1585,6 +1585,7 @@ internal object MemoryTool {
         SubagentTools.MESSAGE -> tr("联系子智能体")
         SubagentTools.STOP -> tr("停止子智能体")
         else -> when {
+            name.startsWith(IrioDocsMcpToolProvider.PREFIX) -> IrioDocsMcpToolProvider.progressLabel(name, completed = false)
             name.startsWith(GitHubMcpToolProvider.PREFIX) -> GitHubMcpToolProvider.progressLabel(name, completed = false)
             name.startsWith(TodoistMcpToolProvider.PREFIX) -> TodoistMcpToolProvider.progressLabel(name, completed = false)
             else -> tr("调用工具")
@@ -1615,6 +1616,7 @@ internal object MemoryTool {
             SubagentTools.MESSAGE -> tr("已联系子智能体")
             SubagentTools.STOP -> tr("已停止子智能体")
             else -> when {
+                name.startsWith(IrioDocsMcpToolProvider.PREFIX) -> IrioDocsMcpToolProvider.progressLabel(name, completed = true)
                 name.startsWith(GitHubMcpToolProvider.PREFIX) -> GitHubMcpToolProvider.progressLabel(name, completed = true)
                 name.startsWith(TodoistMcpToolProvider.PREFIX) -> TodoistMcpToolProvider.progressLabel(name, completed = true)
                 else -> tr("已调用工具")

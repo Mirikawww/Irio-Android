@@ -305,6 +305,7 @@ private val settingsSearchEntries = listOf(
 
     item("mcp.github", "GitHub", "MCP", McpSettingsActivity::class.java),
     item("mcp.todoist", "Todoist", "MCP", McpSettingsActivity::class.java),
+    item("mcp.irio_docs", "Irio Docs", "MCP", McpSettingsActivity::class.java),
 
     item("link.enabled", "启用互连", "互连", LinkSettingsActivity::class.java),
     item("link.mode", "同步方式", "互连", LinkSettingsActivity::class.java),

@@ -65,10 +65,10 @@ class McpSettingsActivity : ComponentActivity() {
     }
 }
 
-private enum class McpIntegration { GITHUB, TODOIST }
+private enum class McpIntegration { GITHUB, TODOIST, IRIO_DOCS }
 
 @Composable
-private fun McpSettingsScreen(onBack: () -> Unit) {
+internal fun McpSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val store = remember { GitHubMcpStore.of(context.applicationContext) }
@@ -80,6 +80,9 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
     var installation by remember { mutableStateOf<GitHubMcpInstallation?>(null) }
     var todoistInstallation by remember { mutableStateOf<TodoistMcpInstallation?>(null) }
     var selectedIntegration by remember { mutableStateOf(McpIntegration.GITHUB) }
+    var docsInstalled by remember { mutableStateOf(IrioDocsMcpStore.loadInstalled(context)) }
+    var docsEnabled by remember { mutableStateOf(IrioDocsMcpStore.loadEnabled(context)) }
+    val docsToolCount = remember(context) { IrioDocsMcpStore.tools(context).size }
     var loaded by remember { mutableStateOf(false) }
     val login = sheets.login
     // Tokens must not enter savedInstanceState, clipboard, logs or backup files.
@@ -287,6 +290,13 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
                          details.targetDetent = BottomSheetDetent.FullyExpanded
                      })
             }
+            IrioDocsMcpSettingsCard(installed = docsInstalled, loaded = loaded, onManage = {
+                selectedIntegration = McpIntegration.IRIO_DOCS
+                docsInstalled = IrioDocsMcpStore.loadInstalled(context)
+                docsEnabled = IrioDocsMcpStore.loadEnabled(context)
+                sheets.detailsError = null
+                details.targetDetent = BottomSheetDetent.FullyExpanded
+            })
             Row(Modifier.fillMaxWidth().background(Theme[colors][secondaryColor], Theme[shapes][largeShape]).settingsSearchAnchor("mcp.todoist", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
                 .padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TodoistLogo(48.dp)
@@ -303,9 +313,34 @@ private fun McpSettingsScreen(onBack: () -> Unit) {
         contentPadding = PaddingValues(top = 32.dp, bottom = 16.dp)) {
         Box(Modifier.fillMaxWidth()) {
         SheetBody {
-            if (selectedIntegration == McpIntegration.GITHUB) GitHubLogo(80.dp, Modifier.align(Alignment.CenterHorizontally))
-             else TodoistLogo(80.dp, Modifier.align(Alignment.CenterHorizontally))
-            if (selectedIntegration == McpIntegration.TODOIST) {
+            when (selectedIntegration) {
+                McpIntegration.GITHUB -> GitHubLogo(80.dp, Modifier.align(Alignment.CenterHorizontally))
+                McpIntegration.TODOIST -> TodoistLogo(80.dp, Modifier.align(Alignment.CenterHorizontally))
+                McpIntegration.IRIO_DOCS -> IrioDocsMcpLogo(80.dp, Modifier.align(Alignment.CenterHorizontally))
+            }
+            if (selectedIntegration == McpIntegration.IRIO_DOCS) {
+                IrioDocsMcpManagement(
+                    installed = docsInstalled, enabled = docsEnabled, toolCount = docsToolCount,
+                    onWebsite = {
+                        if (!openGitHubPage(context, "https://irio.mirikawww.workers.dev")) showDetailsError(tr("未找到可打开网页的浏览器"))
+                    },
+                    onEnabledChange = { enabled ->
+                        IrioDocsMcpStore.saveEnabled(context, enabled)
+                        docsEnabled = IrioDocsMcpStore.loadEnabled(context)
+                    },
+                    onInstall = {
+                        IrioDocsMcpStore.install(context)
+                        docsInstalled = IrioDocsMcpStore.loadInstalled(context)
+                        docsEnabled = IrioDocsMcpStore.loadEnabled(context)
+                    },
+                    onRemove = {
+                        IrioDocsMcpStore.remove(context)
+                        docsInstalled = IrioDocsMcpStore.loadInstalled(context)
+                        docsEnabled = IrioDocsMcpStore.loadEnabled(context)
+                        details.targetDetent = BottomSheetDetent.Hidden
+                    },
+                )
+            } else if (selectedIntegration == McpIntegration.TODOIST) {
                 Text("Todoist", Modifier.fillMaxWidth(), color = content, fontSize = 24.sp,
                     fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Text(
@@ -522,7 +557,7 @@ private fun GitHubLogo(size: androidx.compose.ui.unit.Dp, modifier: Modifier = M
 }
 
 @Composable
-private fun GitHubButton(label: String, method: String? = null, modifier: Modifier = Modifier,
+internal fun GitHubButton(label: String, method: String? = null, modifier: Modifier = Modifier,
     enabled: Boolean = true, compact: Boolean = false, secondary: Boolean = false, onClick: () -> Unit) {
     val dark = Theme[colors][backgroundColor].luminance() < 0.5f
     val ink = if (secondary) Theme[colors][secondaryColor] else if (dark) Color.White else Color.Black
@@ -634,7 +669,7 @@ private fun GitHubAccountRow(account: GitHubMcpAccount?, loading: Boolean) {
 }
 
 @Composable
-private fun GitHubInfoRow(subtitle: String, label: String, onClick: (() -> Unit)? = null) {
+internal fun GitHubInfoRow(subtitle: String, label: String, onClick: (() -> Unit)? = null) {
     val labelColor = if (onClick != null) {
         if (Theme[colors][backgroundColor].luminance() < 0.5f) Color(0xFF93C5FD) else Color(0xFF2563EB)
     } else Theme[colors][onPanelColor]
@@ -646,7 +681,7 @@ private fun GitHubInfoRow(subtitle: String, label: String, onClick: (() -> Unit)
 }
 
 @Composable
-private fun GitHubInfoDivider() {
+internal fun GitHubInfoDivider() {
     Box(Modifier.fillMaxWidth().height(1.dp).background(Theme[colors][borderColor]))
 }
 
