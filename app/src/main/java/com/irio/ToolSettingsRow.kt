@@ -127,6 +127,7 @@ internal fun ToolSettingsRow(
             if (available) {
                 Switch(
                     checked = checked,
+                    enabled = entry.canDisable,
                     onCheckedChange = onCheckedChange,
                     modifier = Modifier.testTag("tool-toggle:${entry.name}").semantics { contentDescription = entry.title },
                 )

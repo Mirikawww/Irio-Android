@@ -43,6 +43,7 @@ internal data class ToolSettingsEntry(
     val title: String,
     val defaultDescription: String,
     val blockedReason: ToolBlockedReason? = null,
+    val canDisable: Boolean = true,
 )
 
 internal object ToolCatalog {
@@ -81,13 +82,15 @@ internal object ToolCatalog {
             LinuxShellToolProvider(commandsPerCall, features.backgroundEnabled),
         )
         val schemas = providers.flatMap { it.definitions(ProviderProtocol.CHAT_COMPLETIONS) } +
+            listOf(ToolGuideSearchTool.schema(ProviderProtocol.CHAT_COMPLETIONS)) +
             // Keep the background tool visible even when its feature is off.
             if (features.backgroundEnabled) emptyList() else listOf(LinuxBackgroundTool.schemaFor(ProviderProtocol.CHAT_COMPLETIONS))
         val visibleMcpTools = mcpTools.ifEmpty { GitHubMcpToolProvider.catalogTools() }
         return schemas.map { schema ->
             val function = schema.getJSONObject("function")
             val name = function.getString("name")
-            ToolSettingsEntry(name, title(name), function.getString("description"), blockedReason(name, features))
+            ToolSettingsEntry(name, title(name), function.getString("description"), blockedReason(name, features),
+                canDisable = name != ToolGuideSearchTool.NAME)
         } + visibleMcpTools.map { tool ->
             val name = GitHubMcpToolProvider.PREFIX + tool.name
             ToolSettingsEntry(
@@ -121,6 +124,7 @@ internal object ToolCatalog {
         TimeTool.NAME -> "获取时间"
         LinguaLibreTool.NAME -> "检索发音"
         HistoryTool.NAME -> "查询历史会话"
+        ToolGuideSearchTool.NAME -> "搜索工具教程"
         ReactionTool.NAME -> "表情回应"
         ColoredBubbleTool.NAME -> "发送彩色气泡"
         MermaidTool.NAME -> "渲染 Mermaid 图表"

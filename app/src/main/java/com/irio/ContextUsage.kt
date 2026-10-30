@@ -42,6 +42,8 @@ internal fun chatToolRegistry(
         add(ColoredBubbleToolProvider())
         add(MermaidToolProvider())
         add(HistoryToolProvider())
+        // Local retrieval stays available even when the independent remote Irio Docs MCP is off.
+        add(ToolGuideProvider(ToolGuideIndex.load(context)))
         IrioDocsMcpStore.toolProvider(context)?.let(::add)
         if (MemoryStore.loadEnabled(context)) add(MemoryToolProvider())
         if (ToolStore.loadSubagents(context)) add(SubagentToolProvider())

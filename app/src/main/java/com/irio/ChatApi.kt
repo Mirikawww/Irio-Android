@@ -1578,6 +1578,7 @@ internal object MemoryTool {
         TimeTool.NAME -> tr("获取时间")
         LinguaLibreTool.NAME -> tr("检索发音中")
         HistoryTool.NAME -> tr("查询历史会话")
+        ToolGuideSearchTool.NAME -> tr("正在搜索工具教程")
         LinuxShellTool.NAME -> tr("运行命令中")
         LinuxBackgroundTool.NAME -> tr("处理后台命令")
         WebFetchTool.NAME -> tr("浏览网页中").let { status ->
@@ -1609,6 +1610,7 @@ internal object MemoryTool {
             CommonsImageTools.SEARCH -> CommonsImageTools.doneLabel(content)
             CommonsImageTools.VIEW -> CommonsImageTools.viewDoneLabel(content)
             HistoryTool.NAME -> HistoryTool.doneLabel(content)
+            ToolGuideSearchTool.NAME -> tr("已搜索工具教程")
             LinuxShellTool.NAME -> tr("已运行命令")
             LinuxBackgroundTool.NAME -> tr("已处理后台命令")
             WebFetchTool.NAME -> tr("已浏览网页").let { status ->

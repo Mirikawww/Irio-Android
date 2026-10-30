@@ -22,11 +22,15 @@ class ToolCatalogTest {
     fun catalogContainsEveryBuiltInEvenWhenAllFeaturesAreOff() {
         val expected = (ToolRegistry.default().providers() + listOf(
             MemoryToolProvider(), SubagentToolProvider(), LinuxShellToolProvider(backgroundEnabled = true),
-        )).flatMap { it.toolNames() }.toSet() + GitHubMcpToolProvider.catalogTools().map { GitHubMcpToolProvider.PREFIX + it.name }
+        )).flatMap { it.toolNames() }.toSet() + ToolGuideSearchTool.NAME +
+            GitHubMcpToolProvider.catalogTools().map { GitHubMcpToolProvider.PREFIX + it.name }
         val entries = ToolCatalog.entries(ToolFeatureState())
         assertEquals("The settings catalog must include all built-in tools, even unavailable ones", expected, entries.map { it.name }.toSet())
         assertEquals("A tool must appear exactly once", entries.size, entries.map { it.name }.toSet().size)
         assertTrue(entries.all { it.title.isNotBlank() && it.defaultDescription.isNotBlank() })
+        val guides = entries.single { it.name == ToolGuideSearchTool.NAME }
+        assertFalse("The local guide tool is not user-disableable", guides.canDisable)
+        assertNull(guides.blockedReason)
     }
 
     @Test

@@ -152,7 +152,7 @@ internal fun ToolSettingsScreen(
                             }
                             ToolSettingsRow(
                                 entry = entry,
-                                checked = preferences.isEnabled(entry.name),
+                                checked = !entry.canDisable || preferences.isEnabled(entry.name),
                                 expanded = expanded[entry.name] == true,
                                 description = draft,
                                 onExpandedChange = { next ->

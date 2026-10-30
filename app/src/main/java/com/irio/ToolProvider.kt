@@ -73,6 +73,9 @@ interface ToolProvider {
         .mapNotNull { schemaToolName(it) }
         .toSet()
 
+    /** Tools returned here ignore per-tool disable preferences. */
+    fun alwaysEnabledToolNames(): Set<String> = emptySet()
+
     /** Whether this provider owns [name]. */
     fun handles(name: String): Boolean
 
@@ -94,6 +97,7 @@ class ToolRegistry(
 ) {
     private val registered = LinkedHashMap<String, ToolProvider>()
     private val owners = LinkedHashMap<String, String>()
+    private val alwaysEnabled = linkedSetOf<String>()
 
     init {
         providers.forEach(::register)
@@ -111,6 +115,9 @@ class ToolRegistry(
         }
         registered[provider.id] = provider
         toolNames.forEach { owners[it] = provider.id }
+        val protected = provider.alwaysEnabledToolNames()
+        require(protected.all { it in toolNames }) { "Provider ${provider.id} protects an unregistered tool" }
+        alwaysEnabled += protected
         return this
     }
 
@@ -123,7 +130,7 @@ class ToolRegistry(
             val name = schemaToolName(schema)
                 ?: error("Tool definition from registry has no name")
             require(names.add(name)) { "Tool name is duplicated in ${protocol.name}: $name" }
-        }.filter { schema -> preferences.isEnabled(schemaToolName(schema)!!) }.map { schema ->
+        }.filter { schema -> isToolEnabled(schemaToolName(schema)!!) }.map { schema ->
             val name = schemaToolName(schema)
             // A provider may reuse schemas; neither user descriptions nor hints may mutate them.
             val copy = JSONObject(schema.toString())
@@ -138,7 +145,7 @@ class ToolRegistry(
     fun systemPrompt(base: String?): String? = buildList {
         base?.takeIf { it.isNotBlank() }?.let(::add)
         registered.values.mapNotNull { provider ->
-            val enabled = provider.toolNames().filterTo(linkedSetOf(), preferences::isEnabled)
+            val enabled = provider.toolNames().filterTo(linkedSetOf(), ::isToolEnabled)
             if (enabled.isEmpty()) null else provider.systemInstructions(enabled)?.takeIf(String::isNotBlank)
         }.forEach(::add)
         if (smartToolHints) add(SmartToolHints.INSTRUCTIONS)
@@ -148,7 +155,9 @@ class ToolRegistry(
     fun schemas(protocol: ProviderProtocol): List<JSONObject> = definitions(protocol)
 
     fun providerFor(name: String): ToolProvider? =
-        if (preferences.isEnabled(name)) registered.values.firstOrNull { it.handles(name) } else null
+        if (isToolEnabled(name)) registered.values.firstOrNull { it.handles(name) } else null
+
+    private fun isToolEnabled(name: String): Boolean = name in alwaysEnabled || preferences.isEnabled(name)
 
     fun handles(name: String): Boolean = providerFor(name) != null
 
@@ -200,7 +209,7 @@ class ToolRegistry(
         val result = try {
             // Reject stale calls before invoking any provider or its side effects.
             when {
-                !preferences.isEnabled(call.name) -> ToolExecutionResult(
+                !isToolEnabled(call.name) -> ToolExecutionResult(
                     "Tool ${call.name} is disabled by user preferences.", outcome = ToolOutcome.FAILED)
                 context.cancellation.isCancelled() -> ToolExecutionResult(tr("工具已停止"), outcome = ToolOutcome.STOPPED)
                 else -> providerFor(call.name)?.execute(SmartToolHints.executionCall(call), executionContext)

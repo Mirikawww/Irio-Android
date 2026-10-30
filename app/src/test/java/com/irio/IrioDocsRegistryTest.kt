@@ -57,6 +57,7 @@ class IrioDocsRegistryTest {
             val registry = chatToolRegistry(app, false, "")
             val actual = registry.definitions(protocol).map { (it.optJSONObject("function") ?: it).getString("name") }.toSet()
             assertTrue("Missing Docs tools in actual $protocol chat factory: $actual", actual.containsAll(names))
+            assertTrue("Local tool guide must be present independently", "search_tool_guides" in actual)
             assertTrue(registry.systemPrompt(null).orEmpty().contains("Irio Docs"))
             assertTrue(registry.withoutSubagents().definitions(protocol).map { (it.optJSONObject("function") ?: it).getString("name") }.containsAll(names))
         }
@@ -68,6 +69,8 @@ class IrioDocsRegistryTest {
         for (protocol in ProviderProtocol.entries) {
             val off = chatToolRegistry(app, false, "")
             assertFalse(off.definitions(protocol).any { it.toString().contains("irio_docs_mcp_") })
+            assertTrue("Disabling remote Docs MCP must not disable local tutorials", off.handles("search_tool_guides"))
+            assertTrue(off.systemPrompt(null).orEmpty().contains("Local tool tutorials"))
             assertFalse(off.systemPrompt(null).orEmpty().contains("Irio Docs"))
         }
     }

@@ -17,6 +17,7 @@ internal fun toolFailureLabel(name: String): String = when (name) {
     CommonsImageTools.VIEW -> tr("图片查看失败")
     CommonsImageTools.SHOW -> tr("图片展示失败")
     HistoryTool.NAME -> tr("历史会话查询失败")
+    ToolGuideSearchTool.NAME -> tr("工具教程搜索失败")
     TimeTool.NAME -> tr("获取时间失败")
     LinguaLibreTool.NAME -> tr("检索发音失败")
     MemoryTool.GET -> tr("读取记忆失败")
@@ -41,6 +42,7 @@ internal fun toolStoppedLabel(name: String, webDomain: String = ""): String = wh
     CommonsImageTools.SEARCH -> tr("图片搜索已停止")
     CommonsImageTools.VIEW -> tr("图片查看已停止")
     HistoryTool.NAME -> tr("历史会话查询已停止")
+    ToolGuideSearchTool.NAME -> tr("工具教程搜索已停止")
     else -> tr("%s已停止").format(MemoryTool.liveLabel(name, webDomain))
 }
 
