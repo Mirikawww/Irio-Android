@@ -39,6 +39,7 @@ internal fun replyNotificationPreview(text: String, limit: Int = REPLY_NOTIFICAT
 internal fun replyStatusChip(step: String): String {
     val english = ThemeStore.language == AppLanguage.EN
     val short = when (step) {
+        tr("请求中") -> if (english) "Wait" else "请求"
         tr("响应中") -> if (english) "Live" else "响应"
         tr("思考中") -> if (english) "Think" else "思考"
         tr("输出中") -> if (english) "Write" else "输出"
@@ -62,9 +63,10 @@ internal fun appInForeground(): Boolean = ReplyLiveNotice.foreground()
  * 同一次更新里后面的信号覆盖前面的，结束时改成最终输出的前 25 个字符。
  */
 internal fun advanceReplyNotice(current: String, update: ChatStreamUpdate, finished: Boolean = false, preview: String = ""): String {
-    var step = current
+    var step = if (update.newRound || update.resetAttempt) tr("请求中") else current
+    update.retry?.let { step = chatRetryLine(it) }
     val silentPronunciation = isSilentPronunciationLookup(update.toolName, update.toolOutcome)
-    if (update.thinkingDelta.isNotEmpty()) step = tr("思考中")
+    if (update.thinkingDelta.isNotBlank()) step = tr("思考中")
     if (update.searching == true) {
         step = update.displayText.ifEmpty { searchStatusLabel(update.searchQuery) }
     }
@@ -87,7 +89,7 @@ internal fun advanceReplyNotice(current: String, update: ChatStreamUpdate, finis
     if (update.displayedImages.isNotEmpty()) step = tr("展示图片")
     if (update.displayedMermaid.isNotEmpty()) step = tr("渲染 Mermaid 图表")
     if (update.notifyTool.isNotEmpty() && !isSilentPronunciationLookup(update.notifyTool, update.toolOutcome)) step = MemoryTool.liveLabel(update.notifyTool)
-    if (update.delta.isNotEmpty()) step = tr("输出中")
+    if (update.delta.isNotBlank()) step = tr("输出中")
     if (finished) step = preview.ifEmpty { tr("完成") }
     return step
 }
@@ -136,14 +138,14 @@ internal object ReplyLiveNotice {
         else main.post { app.registerActivityLifecycleCallbacks(callbacks) }
     }
 
-    fun publish(context: Context, conversationId: String, title: String, text: String, finished: Boolean) {
+    fun publish(context: Context, conversationId: String, title: String, text: String, finished: Boolean, requestStarted: Boolean = false) {
         if (text.isEmpty() || conversationId.isBlank()) return
         val app = context.applicationContext
         install(app)
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            publishOnMain(app, conversationId, title, text, finished)
+            publishOnMain(app, conversationId, title, text, finished, requestStarted)
         } else {
-            main.post { publishOnMain(app, conversationId, title, text, finished) }
+            main.post { publishOnMain(app, conversationId, title, text, finished, requestStarted) }
         }
     }
 
@@ -156,7 +158,7 @@ internal object ReplyLiveNotice {
         else main.post { ReplyNotifications.cancel(app, conversationId) }
     }
 
-    private fun publishOnMain(context: Context, conversationId: String, title: String, text: String, finished: Boolean) {
+    private fun publishOnMain(context: Context, conversationId: String, title: String, text: String, finished: Boolean, requestStarted: Boolean) {
         hideFinished.remove(conversationId)?.let { main.removeCallbacks(it) }
         if (finished) {
             shown.remove(conversationId)
@@ -189,7 +191,7 @@ internal object ReplyLiveNotice {
             main.postDelayed(hide, REPLY_DONE_VISIBLE_MS)
             return
         }
-        if (text == tr("响应中")) dismissed.remove(conversationId)
+        if (requestStarted) dismissed.remove(conversationId)
         states[conversationId] = State(conversationId, title, text, finished = false)
         if (conversationId in dismissed) return
         if (foreground()) {
@@ -221,7 +223,9 @@ internal object ReplyLiveNotice {
         states.values.toList().forEach { state ->
             hideFinished.remove(state.conversationId)?.let { main.removeCallbacks(it) }
             shown.remove(state.conversationId)
-            states.remove(state.conversationId)
+            // Foreground hides the notification, not the in-flight request state.
+            // Waiting for a token is not a state change: background must restore it as-is.
+            if (state.finished) states.remove(state.conversationId)
             ReplyNotifications.cancel(context, state.conversationId)
         }
     }

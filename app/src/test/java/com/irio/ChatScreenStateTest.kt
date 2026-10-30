@@ -48,6 +48,59 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE, shadows = [ChatScreenStateTest.CountingTokenizer::class])
 class ChatScreenStateTest {
+    @Test fun newGenerationPublishesRequestingBeforeAnyServerOutputInsteadOfKeepingOldWriting() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val app = RuntimeEnvironment.getApplication()
+        ShadowEnvironment.addExternalDir(app.cacheDir.resolve("notice-external").absolutePath)
+        org.robolectric.Shadows.shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        val oldRetry = ThemeStore.autoRetry
+        ThemeStore.saveAutoRetry(app, false)
+        try {
+            MockWebServer().use { server ->
+                server.enqueue(MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE))
+                IrioHttp.resetForTests()
+                withState { harness ->
+                    val state = harness.state
+                    state.requestReplyNotification = {}
+                    state.providers = listOf(ProviderConfig("notice-test", "Fixture", server.url("/v1").toString(), "", models = listOf("fixture-model")))
+                    state.activeProviderId = "notice-test"
+                    state.selectedModel = "fixture-model"
+                    state.currentConversation = state.currentConversation.copy(title = "Fixture", titlePending = false)
+                    val id = state.currentConversation.id
+                    val user = ChatMessage(9001, "local notification fixture", true)
+                    val reply = ChatMessage(9002, "", false, isPending = true, responseToUserId = user.id)
+                    state.messages = listOf(user, reply)
+                    ReplyLiveNotice.publish(app, id, "Fixture", tr("输出中"), false)
+                    val manager = org.robolectric.Shadows.shadowOf(app.getSystemService(android.app.NotificationManager::class.java))
+                    try {
+                        state.startGeneration(id, listOf(user), reply)
+                        repeat(100) {
+                            runCurrent()
+                            if (server.requestCount > 0) return@repeat
+                            withContext(Dispatchers.IO) { Thread.sleep(5) }
+                        }
+                        assertEquals(1, server.requestCount)
+                        val notice = manager.getNotification(id.hashCode())
+                        assertNotNull("A pending request must publish its own notification", notice)
+                        assertEquals("请求中", notice.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString())
+                        assertEquals("The server has not returned any content", "", state.messages.last().text)
+                    } finally {
+                        state.stopGeneration(id)
+                        repeat(100) {
+                            runCurrent()
+                            if (!state.busyThisChat) return@repeat
+                            withContext(Dispatchers.IO) { Thread.sleep(5) }
+                        }
+                        ReplyLiveNotice.dismiss(app, id)
+                    }
+                }
+            }
+        } finally {
+            ThemeStore.saveAutoRetry(app, oldRetry)
+            IrioHttp.resetForTests(); Dispatchers.resetMain()
+        }
+    }
+
     @Test fun drawerOpensAtFifteenPercentAndReturnsBelowTheThreshold() = runTest {
         withState { harness ->
             val state = harness.state

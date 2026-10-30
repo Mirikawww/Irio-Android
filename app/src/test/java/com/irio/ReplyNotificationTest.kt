@@ -6,6 +6,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReplyNotificationTest {
+    @Test fun blankFramesAndNewRoundsNeverPretendTheModelIsWriting() {
+        assertEquals("请求中", advanceReplyNotice("请求中", ChatStreamUpdate(delta = " \n\t")))
+        assertEquals("请求中", advanceReplyNotice("输出中", ChatStreamUpdate(newRound = true)))
+        assertEquals("请求中", advanceReplyNotice("已获取时间", ChatStreamUpdate(newRound = true)))
+        assertEquals("请求中", advanceReplyNotice("请求中", ChatStreamUpdate(model = "model", usage = TokenUsage(10, 0, 10))))
+        assertEquals("思考中", advanceReplyNotice("请求中", ChatStreamUpdate(thinkingDelta = "reasoning", delta = "\n")))
+        assertEquals("输出中", advanceReplyNotice("请求中", ChatStreamUpdate(delta = "正文")))
+        assertEquals("思考中", advanceReplyNotice("输出中", ChatStreamUpdate(newRound = true, thinkingDelta = "reasoning")))
+        assertEquals("请求", replyStatusChip("请求中"))
+        assertEquals("请求中", advanceReplyNotice("请求中", ChatProtocol.parseChatCompletions(
+            """{"choices":[{"delta":{"role":"assistant","content":null}}]}"""
+        )!!))
+    }
+
     @Test
     fun previewKeepsOnlyTheFirst25Characters() {
         val text = "一二三四五六七八九十一二三四五六七八九十甲乙丙丁戊多出来"

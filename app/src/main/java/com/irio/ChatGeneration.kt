@@ -116,7 +116,7 @@ internal fun ChatScreenState.startGeneration(
                 var streamedAttachments = emptyList<ChatAttachment>()
                 var toolRecords = emptyList<ChatToolRecord>()
                 val process = ProcessTracker()
-                var notice = tr("响应中")
+                var notice = ""
                 fun noticeTitle(): String {
                     val stored =
                         if (currentConversation.id == requestConversationId) {
@@ -126,7 +126,7 @@ internal fun ChatScreenState.startGeneration(
                         }
                     return displayConversationTitle(stored)
                 }
-                fun pushNotice(text: String, finished: Boolean) {
+                fun pushNotice(text: String, finished: Boolean, requestStarted: Boolean = false) {
                     if (text == notice && !finished) return
                     notice = text
                     ReplyLiveNotice.publish(
@@ -135,9 +135,10 @@ internal fun ChatScreenState.startGeneration(
                         noticeTitle(),
                         text,
                         finished,
+                        requestStarted = requestStarted,
                     )
                 }
-                pushNotice(notice, finished = false)
+                pushNotice(tr("请求中"), finished = false, requestStarted = true)
                 var lastPublishAt = 0L
                 var publishedBodyLength = 0
                 var publishedThinking = false
