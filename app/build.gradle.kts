@@ -119,7 +119,7 @@ dependencies {
     implementation("io.github.kyant0:shapes:1.2.1") {
         exclude(group = "org.jetbrains.compose.ui")
     }
-    implementation("com.composables:composeunstyled-slider:2.10.1")
+    implementation("com.composables:composeunstyled-slider:2.10.2")
 
     // Haze progressive blur (chat toolbar)
     implementation("dev.chrisbanes.haze:haze:2.0.1")
@@ -140,7 +140,7 @@ dependencies {
     implementation("me.saket.telephoto:sub-sampling-image:0.19.0")
 
     // Native Mermaid parser/layout and Compose Canvas rendering (no per-diagram WebView).
-    implementation("io.github.swithun-liu:mermaid-compose:0.1.16")
+    implementation("io.github.swithun-liu:mermaid-compose:0.1.21")
 
     // LaTeX — rikkahub fork of jlatexmath-android (JitPack)
     implementation("com.github.rikkahub.jlatexmath-android:jlatexmath:1.5")

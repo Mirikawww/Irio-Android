@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,7 +48,9 @@ import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCode
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.model.markdownDimens
 import com.mikepenz.markdown.model.markdownPadding
-import com.swithun.cmpmermaid.compose.MermaidDiagram
+import com.swithun.cmpmermaid.compose.AndroidMermaidAssetProvider
+import com.swithun.cmpmermaid.compose.MermaidSceneCanvas
+import com.swithun.cmpmermaid.compose.rememberMermaidScene
 import com.swithun.cmpmermaid.core.GMResult
 import com.swithun.cmpmermaid.core.MermaidTheme
 import com.swithun.cmpmermaid.core.MermaidThemePreset
@@ -65,6 +68,7 @@ internal fun MermaidMarkdownBlock(source: String) {
     var showSource by remember(source) { mutableStateOf(false) }
     var failure by remember(source, dark) { mutableStateOf<String?>(null) }
     var ratio by remember(source, dark) { mutableStateOf<Float?>(null) }
+    val assets = remember { AndroidMermaidAssetProvider() }
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val copied = rememberCopyConfirmation(source.hashCode().toLong())
@@ -117,19 +121,25 @@ internal fun MermaidMarkdownBlock(source: String) {
                 .clip(bodyShape),
         ) {
             val height = ratio?.let { (maxWidth / it).coerceIn(112.dp, 480.dp) } ?: 180.dp
+            // Own the viewport and render state here: the upstream 0.1.21 Diagram wrapper
+            // can lose its Canvas after subcomposition, although scene preparation succeeds.
+            val scene = rememberMermaidScene(source = source, theme = theme).value
+            LaunchedEffect(scene) {
+                when (scene) {
+                    is GMResult.Ok -> if (scene.value.width > 0f && scene.value.height > 0f) {
+                        ratio = scene.value.width / scene.value.height
+                    }
+                    is GMResult.Err -> failure = scene.error.message
+                    null -> Unit
+                }
+            }
             Box {
-                MermaidDiagram(
-                    source = source,
+                if (scene is GMResult.Ok) MermaidSceneCanvas(
+                    scene = scene.value,
                     modifier = Modifier.testTag("mermaid-diagram").fillMaxWidth().height(height),
-                    theme = theme,
                     contentDescription = tr("Mermaid 图表"),
+                    assetProvider = assets,
                     respectSourceViewportSizing = false,
-                    onRenderResult = { result ->
-                        if (result is GMResult.Ok && result.value.width > 0f && result.value.height > 0f) {
-                            ratio = result.value.width / result.value.height
-                        }
-                    },
-                    onError = { failure = it.message },
                 )
                 if (ratio == null) {
                     Text(tr("图表渲染中"), modifier = Modifier.align(Alignment.Center),

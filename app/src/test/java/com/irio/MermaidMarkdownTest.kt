@@ -132,6 +132,14 @@ class MermaidMarkdownTest {
                     android.graphics.Color.alpha(bitmap.getPixel(diagram.right.toInt() - 1, bottom)))
                 assertTrue("The middle of the diagram background must still be painted",
                     android.graphics.Color.alpha(bitmap.getPixel(diagram.center.x.toInt(), bottom)) > 0)
+                val painted = mutableSetOf<Int>()
+                for (y in diagram.top.toInt() + 2 until bottom - 1) {
+                    for (x in diagram.left.toInt() + 2 until diagram.right.toInt() - 2) {
+                        painted += bitmap.getPixel(x, y)
+                    }
+                }
+                assertTrue("The real canvas must paint nodes, edges and labels, not only a placeholder background",
+                    painted.size > 16)
             } finally { bitmap.recycle() }
             click(tr("复制"))
             frames()
