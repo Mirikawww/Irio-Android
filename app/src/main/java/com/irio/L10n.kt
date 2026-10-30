@@ -867,6 +867,7 @@ private val English = mapOf(
     "获取时间" to "Getting the time",
     "蓝色" to "Blue",
     "青色" to "Cyan",
+    "紫色" to "Purple",
     "要记住的内容" to "What to remember",
     "覆盖" to "Overwrite",
     "记忆内容" to "Memory",

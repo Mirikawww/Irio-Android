@@ -68,6 +68,7 @@ enum class AccentColor(val label: String, val stored: String, val color: Color) 
     BLUE("蓝色", "blue", Color(0xFF3B82F6)),
     PINK("粉色", "pink", Color(0xFFEC4899)),
     CYAN("青色", "cyan", Color(0xFF0E7490)),
+    PURPLE("紫色", "purple", Color(0xFF7C3AED)),
     MONET("莫奈", "monet", Color(0xFF6750A4));
 
     companion object {

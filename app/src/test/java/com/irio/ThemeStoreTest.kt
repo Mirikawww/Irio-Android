@@ -51,6 +51,19 @@ class ThemeStoreTest {
     }
 
     @Test
+    fun purpleAccentIsAvailableLocalizedAndReadable() {
+        val purple = AccentColor.fromStored("purple")
+        assertEquals("purple", purple.stored)
+        assertTrue(AccentColor.entries.contains(purple))
+        assertEquals(purple, AccentColor.fromStored("PURPLE"))
+        assertEquals("紫色", purple.label)
+        assertEquals("Purple", translate(AppLanguage.EN, purple.label))
+        assertEquals(Color(0xFF7C3AED), purple.color)
+        assertTrue(wcagContrastRatio(purple.color, purple.onContent()) >= 4.5f)
+        assertEquals(AccentColor.BLUE, AccentColor.fromStored(null))
+    }
+
+    @Test
     fun resolvedAmoledIsDark() {
         assertTrue(ResolvedTheme.AMOLED.isDark)
         assertTrue(ResolvedTheme.DARK.isDark)

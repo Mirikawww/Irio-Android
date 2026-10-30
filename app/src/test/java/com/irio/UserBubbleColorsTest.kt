@@ -36,6 +36,7 @@ class UserBubbleColorsTest {
         for ((accent, ink) in listOf(
             AccentColor.BLUE.color to Color.White,
             AccentColor.PINK.color to Color.White,
+            AccentColor.PURPLE.color to Color.White,
             Color(0xFF006B5E) to Color.White,
             Color(0xFF80D5C3) to Color(0xFF00382F),
         )) {
@@ -55,7 +56,7 @@ class UserBubbleColorsTest {
 
     @Test fun intermediateTextContrastsWithTheCompositedFillAcrossThemesAndAccents() {
         for (background in listOf(Color.White, Color(0xFF141414), Color.Black)) {
-            for (accent in listOf(AccentColor.BLUE.color, AccentColor.PINK.color, Color(0xFF006B5E), Color(0xFF80D5C3))) {
+            for (accent in listOf(AccentColor.BLUE.color, AccentColor.PINK.color, AccentColor.PURPLE.color, Color(0xFF006B5E), Color(0xFF80D5C3))) {
                 for (opacity in 1..99) {
                     val colors = palette(opacity, background, accent)
                     assertTrue("$background / $accent / $opacity", wcagContrastRatio(
