@@ -879,6 +879,7 @@ private val English = mapOf(
     "请先配置 STT 提供商" to "Configure an STT provider first",
     "请先选择一个可用模型" to "Select an available model first",
     "请求中" to "Requesting",
+    "滚动到底部" to "Scroll to bottom",
     "请求失败" to "Request failed",
     "请求已停止" to "Request stopped",
     "读取记忆" to "Reading memory",

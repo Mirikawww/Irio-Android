@@ -105,6 +105,36 @@ internal fun AndroidMessageList(
 
 internal class MessageRecyclerController {
     private var recyclerView: MessageRecyclerView? = null
+    var atBottom by mutableStateOf(true)
+        private set
+    private var recentMotion by mutableStateOf(false)
+    private var userMotion by mutableStateOf(false)
+    val scrollButtonHidden: Boolean get() = atBottom || recentMotion || userMotion || gliding || instantOpen
+    private val motionSettled = Runnable {
+        recentMotion = false
+        refreshViewport()
+    }
+    private val motionListener = object : RecyclerView.OnScrollListener() {
+        override fun onScrollStateChanged(view: RecyclerView, state: Int) {
+            userMotion = state != RecyclerView.SCROLL_STATE_IDLE
+            refreshViewport()
+        }
+
+        override fun onScrolled(view: RecyclerView, dx: Int, dy: Int) {
+            if (dy != 0) {
+                recentMotion = true
+                view.removeCallbacks(motionSettled)
+                view.postDelayed(motionSettled, 120L)
+            }
+            refreshViewport()
+        }
+    }
+
+    private fun refreshViewport() {
+        val view = recyclerView ?: return
+        if (view.isMessageUpdatePending()) return
+        isPinnedToBottom(2)?.let { atBottom = it }
+    }
     private var scrollRequested = false
         set(value) {
             field = value
@@ -115,14 +145,14 @@ internal class MessageRecyclerController {
             }
         }
     // 打开会话：列表先隐藏，直接跳到尾部再淡入，不让用户看到从顶上滚下来。
-    private var instantOpen = false
+    private var instantOpen by mutableStateOf(false)
     private var openJumpPending = false
     private var openHidden = false
     private var openRevealSpring: SpringAnimation? = null
     private var alignScheduled = false
     private var chasing = false
     private var chasePosted = false
-    private var gliding = false
+    private var gliding by mutableStateOf(false)
     private var glidePosted = false
     private var glideClockStarted = false
     private var glideStartUptime = 0L
@@ -143,11 +173,20 @@ internal class MessageRecyclerController {
     fun attach(view: MessageRecyclerView) {
         if (recyclerView === view) return
         recyclerView?.removeOnLayoutChangeListener(layoutListener)
+        recyclerView?.removeOnScrollListener(motionListener)
+        recyclerView?.removeCallbacks(motionSettled)
+        recyclerView?.onViewportChanged = null
         recyclerView = view
+        recentMotion = false
+        userMotion = view.scrollState != RecyclerView.SCROLL_STATE_IDLE
+        view.onViewportChanged = ::refreshViewport
         view.addOnLayoutChangeListener(layoutListener)
+        view.addOnScrollListener(motionListener)
+        refreshViewport()
     }
 
     private fun onViewLayoutPass() {
+        refreshViewport()
         if (openPinUntil == 0L || pinPosted) return
         val view = recyclerView ?: return
         pinPosted = true
@@ -636,6 +675,7 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
     var onVisibleRangeChanged: ((first: Int, last: Int) -> Unit)? = null
     var onScrollStateChanged: ((scrollState: Int) -> Unit)? = null
     var onUserScrollSample: ((scrollDeltaY: Int) -> Unit)? = null
+    var onViewportChanged: (() -> Unit)? = null
     var tailPrefetch: Boolean = false
         set(value) {
             if (field == value) return
@@ -651,6 +691,11 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
         }
     private var lastNotifiedFirst = RecyclerView.NO_POSITION
     private var lastNotifiedLast = RecyclerView.NO_POSITION
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        super.onLayout(changed, l, t, r, b)
+        onViewportChanged?.invoke()
+    }
 
     init {
         layoutManager = object : LinearLayoutManager(context) {
@@ -770,6 +815,7 @@ internal class MessageRecyclerView(context: Context) : RecyclerView(context) {
     }
 
     fun notifyVisibleRange() {
+        onViewportChanged?.invoke()
         val manager = layoutManager as? LinearLayoutManager ?: return
         val first = manager.findFirstVisibleItemPosition()
         val last = manager.findLastVisibleItemPosition()

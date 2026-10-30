@@ -188,6 +188,18 @@ internal fun ChatScreenLayout(state: ChatScreenState) =
 
                                 ChatComposerBar(state, maxHeight)
 
+                                ScrollToBottomButton(
+                                    visible = !messageRecyclerController.scrollButtonHidden &&
+                                        shownTranscript.isNotEmpty() && !composerFullscreen &&
+                                        pendingConversationScroll != currentConversation.id,
+                                    responding = busyThisChat,
+                                    bottomInset = composerBarHeight,
+                                    onClick = {
+                                        stickToBottom = true
+                                        messageRecyclerController.revealTail()
+                                    },
+                                )
+
                                 ChatToolbar(state)
                                 IrioSnackbar(
                                     visible = composerStatus != null,

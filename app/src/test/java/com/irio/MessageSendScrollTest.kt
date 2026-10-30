@@ -34,6 +34,31 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class MessageSendScrollTest {
+    @Test fun bottomButtonTracksExactViewportAndAllMotionIncludingIdleScrollBy() = runTest {
+        withTranscript {
+            assertEquals(false, controller.atBottom)
+            assertEquals(false, controller.scrollButtonHidden)
+            list.scrollBy(0, 60)
+            assertEquals("Programmatic pixel scrolls keep RecyclerView IDLE but must hide the button", true,
+                controller.scrollButtonHidden)
+            repeat(12) { frame() }
+            assertEquals(false, controller.scrollButtonHidden)
+            controller.revealTail()
+            assertEquals("Hide immediately on click, before the first animated pixel", true, controller.scrollButtonHidden)
+            repeat(85) { frame() }
+            assertEquals(true, controller.atBottom)
+            assertEquals(true, controller.scrollButtonHidden)
+            // A small upward move can stay within the same first/last visible row indices.
+            list.scrollBy(0, -12)
+            repeat(12) { frame() }
+            assertEquals("Position changes inside one row must still update visibility", false, controller.atBottom)
+            assertEquals(false, controller.scrollButtonHidden)
+            controller.revealTail()
+            repeat(40) { frame() }
+            assertEquals(true, controller.atBottom)
+        }
+    }
+
     @Test fun growingTailAndChangingComposerInsetKeepTheOriginalDeadline() = runTest {
         withTranscript {
             var lastMove = 0L
