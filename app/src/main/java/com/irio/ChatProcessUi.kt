@@ -307,6 +307,7 @@ internal fun ProcessEventSheet(
         onDismissRequest = onDismiss,
         contentColor = content,
         contentPadding = PaddingValues(start = 16.dp, top = 32.dp, end = 16.dp, bottom = 8.dp),
+        scrollableBody = true,
     ) {
         val minSheetHeight =
             with(LocalDensity.current) {
@@ -332,6 +333,7 @@ internal fun ProcessEventSheet(
                 modifier =
                     Modifier.fillMaxWidth().heightIn(min = minSheetHeight, max = maxSheetHeight),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = LocalBottomSheetBottomPadding.current),
             ) {
                 items(chunks.size) { index ->
                     Text(chunks[index], fontSize = 16.sp, color = content)
@@ -341,6 +343,7 @@ internal fun ProcessEventSheet(
             Column(
                 modifier =
                     Modifier.fillMaxWidth().heightIn(min = minSheetHeight, max = maxSheetHeight)
+                        .padding(bottom = LocalBottomSheetBottomPadding.current)
             ) {
                 if (body.isNotBlank()) {
                     Text(body, fontSize = 16.sp, color = content)
@@ -363,6 +366,7 @@ internal fun TerminalCommandSheet(
         backgroundColor = Color.Black,
         contentColor = textColor,
         contentPadding = PaddingValues(start = 16.dp, top = 32.dp, end = 16.dp, bottom = 16.dp),
+        scrollableBody = true,
     ) {
         val minSheetHeight =
             with(LocalDensity.current) {
@@ -383,6 +387,7 @@ internal fun TerminalCommandSheet(
                 Modifier.fillMaxWidth()
                     .heightIn(min = minSheetHeight, max = maxSheetHeight)
                     .verticalScroll(scroll)
+                    .padding(bottom = LocalBottomSheetBottomPadding.current)
         ) {
             SelectionContainer {
                 Text(

@@ -7,14 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import com.kyant.shapes.RoundedRectangle
 import androidx.compose.runtime.Composable
@@ -59,10 +54,10 @@ internal fun ReactionEmojiSheet(
         onDismissRequest = onDismiss,
         contentColor = content,
         contentPadding = PaddingValues(start = 12.dp, top = 28.dp, end = 12.dp, bottom = 8.dp),
+        scrollableBody = true,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().height(sheetHeight)
-                .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)),
+            modifier = Modifier.fillMaxWidth().height(sheetHeight),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(tr("添加响应"), fontSize = 18.sp, color = content, modifier = Modifier.padding(horizontal = 4.dp))
@@ -90,6 +85,7 @@ internal fun ReactionEmojiSheet(
                 category = categories.getOrNull(categoryIndex),
                 color = content,
                 modifier = Modifier.fillMaxWidth().weight(1f),
+                bottomPadding = 8.dp + LocalBottomSheetBottomPadding.current,
                 onSelect = onSelect,
             )
         }

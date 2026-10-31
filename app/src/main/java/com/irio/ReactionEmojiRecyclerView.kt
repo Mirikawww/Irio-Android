@@ -12,6 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
@@ -26,12 +29,15 @@ internal fun ReactionEmojiGrid(
     category: ReactionEmojiCategory?,
     color: Color,
     modifier: Modifier = Modifier,
+    bottomPadding: Dp = 8.dp,
     onSelect: (String) -> Unit,
 ) {
+    val bottomPaddingPx = with(LocalDensity.current) { bottomPadding.roundToPx() }
     AndroidView(
         modifier = modifier,
         factory = { ReactionEmojiRecyclerView(it) },
         update = { view ->
+            if (view.paddingBottom != bottomPaddingPx) view.setPadding(0, 0, 0, bottomPaddingPx)
             view.update(category?.name.orEmpty(), category?.emojis.orEmpty(), color.toArgb(), onSelect)
         },
         onRelease = { it.release() },
@@ -56,6 +62,7 @@ internal class ReactionEmojiRecyclerView(context: Context) : RecyclerView(contex
         setItemViewCacheSize(16)
         isNestedScrollingEnabled = true
         overScrollMode = View.OVER_SCROLL_NEVER
+        clipToPadding = false
         setPadding(0, 0, 0, (8 * resources.displayMetrics.density).roundToInt())
         addItemDecoration(object : ItemDecoration() {
             override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: State) {

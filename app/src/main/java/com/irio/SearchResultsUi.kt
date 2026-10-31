@@ -35,7 +35,7 @@ import com.composeunstyled.theme.Theme
 internal fun SearchResultsSheetContent(body: String, modifier: Modifier = Modifier) {
     val results = remember(body) { searchResultsContent(body) }
     if (results.items.isEmpty()) {
-        Column(modifier) {
+        Column(modifier.padding(bottom = LocalBottomSheetBottomPadding.current)) {
             Text(
                 results.fallback.ifBlank { tr("没有搜索结果") },
                 fontSize = 16.sp,
@@ -49,7 +49,7 @@ internal fun SearchResultsSheetContent(body: String, modifier: Modifier = Modifi
         items = results.items.withIndex().toList(),
         key = { "${it.index}:${it.value.url}" },
         modifier = modifier,
-        contentPadding = PaddingValues(bottom = 16.dp),
+        contentPadding = PaddingValues(bottom = 16.dp + LocalBottomSheetBottomPadding.current),
         itemSpacing = 24.dp,
         prioritizeScrollGestures = true,
     ) { SearchResultRow(it.value) }

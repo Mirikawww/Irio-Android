@@ -310,7 +310,7 @@ internal fun McpSettingsScreen(onBack: () -> Unit) {
         }
     }
     BottomSheet(state = details, onDismissRequest = { details.targetDetent = BottomSheetDetent.Hidden },
-        contentPadding = PaddingValues(top = 32.dp, bottom = 16.dp)) {
+        contentPadding = PaddingValues(top = 32.dp, bottom = 16.dp), scrollableBody = true) {
         Box(Modifier.fillMaxWidth()) {
         SheetBody {
             when (selectedIntegration) {
@@ -456,7 +456,7 @@ internal fun McpSettingsScreen(onBack: () -> Unit) {
         }
     }
     if (login != null) BottomSheet(state = loginSheet, onDismissRequest = { clearLogin() },
-        contentPadding = PaddingValues(start = 24.dp, top = 32.dp, end = 24.dp, bottom = 16.dp)) {
+        contentPadding = PaddingValues(start = 24.dp, top = 32.dp, end = 24.dp, bottom = 16.dp), scrollableBody = true) {
         Box(Modifier.fillMaxWidth()) {
         SheetBody {
             if (login == GitHubLogin.TODOIST) {
@@ -539,8 +539,9 @@ internal fun BoxScope.McpLoginErrorSnackbar(sheets: GitHubMcpSheetState) {
 @Composable
 private fun SheetBody(content: @Composable ColumnScope.() -> Unit) {
     val maxHeight = with(LocalDensity.current) { (LocalWindowInfo.current.containerSize.height * 0.85f).toDp() }
-    Column(Modifier.fillMaxWidth().heightIn(max = maxHeight).imePadding().navigationBarsPadding()
-        .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
+    Column(Modifier.fillMaxWidth().heightIn(max = maxHeight).imePadding()
+        .verticalScroll(rememberScrollState()).padding(bottom = LocalBottomSheetBottomPadding.current),
+        verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
 }
 
 @Composable
