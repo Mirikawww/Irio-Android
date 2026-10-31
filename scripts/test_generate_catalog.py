@@ -161,5 +161,68 @@ class ReasoningCatalogTest(unittest.TestCase):
         self.assertEqual(catalog["vendor/plain"], catalog["plain"])
 
 
+class ImageCatalogTest(unittest.TestCase):
+    def generate(self, models_dev, image_only=False):
+        requested = []
+
+        def response(request, **kwargs):
+            requested.append(request.full_url)
+            self.assertTrue(request.get_header("User-agent"))
+            payload = {"data": []} if "openrouter.ai" in request.full_url else models_dev
+            return io.BytesIO(json.dumps(payload).encode("utf-8"))
+
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            root = pathlib.Path(directory)
+            assets = root / "app/src/main/assets"
+            assets.mkdir(parents=True)
+            untouched = ("model-names.json", "model-reasoning.json", "model-context.json")
+            for name in untouched:
+                (assets / name).write_text('{"sentinel":true}', encoding="utf-8")
+            # Regeneration must replace stale classifications, not merge them back.
+            (assets / "model-image.json").write_text('{"gpt-5-nano":true}', encoding="utf-8")
+            import os
+            previous = os.getcwd()
+            try:
+                os.chdir(root)
+                args = [str(SCRIPT)] + (["--image-only"] if image_only else [])
+                with patch("urllib.request.urlopen", side_effect=response), patch("sys.argv", args):
+                    runpy.run_path(str(SCRIPT), run_name="__main__")
+                images = json.loads((assets / "model-image.json").read_text(encoding="utf-8"))
+                other_assets = {name: (assets / name).read_text(encoding="utf-8") for name in untouched}
+            finally:
+                os.chdir(previous)
+        return images, requested, other_assets
+
+    def test_chat_models_with_image_capabilities_do_not_become_generation_endpoints(self):
+        fixture = {"provider": {"models": {
+            "openai/gpt-5-nano": {"modalities": {"input": ["text", "image"], "output": ["text"]}, "tool_call": True},
+            # Real shape of the noisy Poe entry: image output alone does not mean Images API.
+            "openai/gpt-5.4": {"modalities": {"output": ["text", "image"]}, "tool_call": True},
+            "vendor/multimodal-chat": {"modalities": {"output": ["text", "image"]}, "tool_call": True},
+            "vendor/vision-reader": {"modalities": {"input": ["image"], "output": ["text"]}, "tool_call": False},
+            "openai/gpt-image-2": {"modalities": {"output": ["image"]}, "tool_call": False},
+            "openai/gpt-image-1.5": {"modalities": {"output": ["text", "image"]}, "tool_call": False},
+            # Tool metadata may itself be noisy on an image-only endpoint.
+            "google/imagen-fixture": {"modalities": {"output": ["image"]}, "tool_call": True},
+            "vendor/malformed": {"modalities": None},
+        }}}
+        images, _, _ = self.generate(fixture)
+        for model in ("gpt-5-nano", "gpt-5.4", "multimodal-chat", "vision-reader", "malformed"):
+            self.assertNotIn(model, images)
+            self.assertFalse(any(key.endswith("/" + model) for key in images), model)
+        for model in ("openai/gpt-image-2", "gpt-image-2", "openai/gpt-image-1.5", "gpt-image-1.5", "google/imagen-fixture", "imagen-fixture", "gpt-image-2.5"):
+            self.assertTrue(images[model], model)
+
+    def test_image_only_refresh_does_not_fetch_or_rewrite_openrouter_catalogs(self):
+        images, requested, other_assets = self.generate({"provider": {"models": {
+            "fixture-image": {"modalities": {"output": ["image"]}},
+        }}}, image_only=True)
+        self.assertEqual(["https://models.dev/api.json"], requested)
+        self.assertIn("fixture-image", images)
+        self.assertNotIn("gpt-5-nano", images)
+        self.assertTrue(all(value == '{"sentinel":true}' for value in other_assets.values()))
+
+
 if __name__ == "__main__":
     unittest.main()

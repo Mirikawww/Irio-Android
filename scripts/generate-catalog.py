@@ -5,6 +5,7 @@ Names, reasoning and context windows come from OpenRouter /api/v1/models
 (`name`, model-level `context_length` — not `top_provider.context_length`).
 Image flags still come from https://models.dev/api.json.
 Run from the Irio Android repo root; --reasoning-only leaves other catalogs untouched.
+--image-only refreshes just image endpoint classifications from models.dev.
 --patch-model=vendor/id updates just that id and its bare alias in existing OpenRouter assets."""
 import json, sys, urllib.request
 from typing import Any
@@ -23,9 +24,12 @@ def get_json(url):
 
 
 reasoning_only = "--reasoning-only" in sys.argv[1:]
+image_only = "--image-only" in sys.argv[1:]
 patch_model = next((arg.split("=", 1)[1] for arg in sys.argv[1:] if arg.startswith("--patch-model=")), None)
+if sum((reasoning_only, image_only, bool(patch_model))) > 1:
+    raise ValueError("Choose only one catalog refresh mode")
 data = {} if reasoning_only or patch_model else get_json(API)
-openrouter_data = get_json(OPENROUTER_MODELS_API)
+openrouter_data = {"data": []} if image_only else get_json(OPENROUTER_MODELS_API)
 names, reasoning, image, context = {}, {}, {}, {}
 for provider in data.values():
     if not isinstance(provider, dict):
@@ -36,7 +40,11 @@ for provider in data.values():
         tail = mid.split("/")[-1]
         mod = m.get("modalities")
         outs = (mod.get("output") or []) if isinstance(mod, dict) else []
-        if "image" in outs:
+        # A multimodal chat model may advertise image output through tools. That does
+        # not make it an /images/generations model; exporting its bare alias would
+        # otherwise incorrectly route the same model at every provider to that API.
+        # Image-only endpoints remain valid even when tool_call metadata is noisy.
+        if isinstance(outs, list) and "image" in outs and ("text" not in outs or m.get("tool_call") is not True):
             image.setdefault(mid, True)
             if tail != mid:
                 image.setdefault(tail, True)
@@ -159,6 +167,8 @@ for path, payload in (
     (OUT_CONTEXT, context),
 ):
     if reasoning_only and path != OUT_REASONING:
+        continue
+    if image_only and path != OUT_IMAGE:
         continue
     if patch_model:
         if path == OUT_IMAGE:
