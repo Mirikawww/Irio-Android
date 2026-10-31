@@ -278,6 +278,7 @@ internal fun MessageRow(
                                                     border = true,
                                                     glassTintAlpha = bubble.background.alpha,
                                                 )
+                                                .clip(RoundedRectangle(16.dp))
                                                 .then(
                                                     if (onEdit != null) {
                                                         Modifier.clickable(onClick = onEdit)
