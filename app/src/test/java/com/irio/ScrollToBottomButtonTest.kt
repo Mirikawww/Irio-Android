@@ -1,7 +1,14 @@
 package com.irio
 
 import android.view.View
+import android.os.Looper
+import android.os.SystemClock
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.IndicationNodeFactory
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.BroadcastFrameClock
@@ -10,6 +17,10 @@ import androidx.compose.runtime.Recomposer
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.node.DelegatableNode
+import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
@@ -25,6 +36,7 @@ import com.composables.ui.theme.primaryColor
 import com.composeunstyled.theme.Theme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
@@ -39,6 +51,92 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33], manifest = Config.NONE)
 @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
 class ScrollToBottomButtonTest {
+    @Test fun clickIndicationIsClippedToTheButtonWithoutRemovingTheClick() = runTest {
+        val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        val clock = BroadcastFrameClock()
+        val recomposer = Recomposer(coroutineContext + clock)
+        val runner = launch(clock) { recomposer.runRecomposeAndApplyChanges() }
+        val view = ComposeView(activity.get())
+        var clicked = 0
+        var time = 0L
+        fun frames() = repeat(8) {
+            Snapshot.sendApplyNotifications()
+            advanceTimeBy(16L)
+            runCurrent()
+            time += 16_000_000L
+            clock.sendFrame(time)
+            runCurrent()
+            org.robolectric.Shadows.shadowOf(Looper.getMainLooper()).idle()
+            view.requestLayout()
+            view.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(800, View.MeasureSpec.EXACTLY))
+            view.layout(0, 0, 360, 800)
+        }
+        try {
+            view.setParentCompositionContext(recomposer)
+            activity.get().setContentView(view)
+            view.setContent {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    AppTheme {
+                        CompositionLocalProvider(LocalIndication provides SolidIndication) {
+                            Box(Modifier.fillMaxSize().background(Color.White)) {
+                                ScrollToBottomButton(
+                                    visible = true, followingBottom = false, responding = false,
+                                    bottomInset = 100.dp, onClick = { clicked++ },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            frames()
+            fun descend(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descend)
+            val button = descend((view.getChildAt(0) as ViewRootForTest).semanticsOwner.unmergedRootSemanticsNode)
+                .single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "scroll-to-bottom" }
+            val bounds = button.boundsInRoot
+            assertEquals(44f, bounds.width, 0.1f)
+            assertEquals(44f, bounds.height, 0.1f)
+            val downTime = SystemClock.uptimeMillis()
+            fun touch(action: Int) {
+                val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action,
+                    bounds.center.x, bounds.center.y, 0)
+                try { view.dispatchTouchEvent(event) } finally { event.recycle() }
+                frames()
+            }
+            touch(MotionEvent.ACTION_DOWN)
+            val bitmap = android.graphics.Bitmap.createBitmap(360, 800, android.graphics.Bitmap.Config.ARGB_8888)
+            try {
+                view.draw(android.graphics.Canvas(bitmap))
+                assertEquals("Click feedback must still draw inside the button", android.graphics.Color.MAGENTA,
+                    bitmap.getPixel(bounds.center.x.toInt(), bounds.top.toInt() + 4))
+                for ((x, y) in listOf(
+                    bounds.left.toInt() + 1 to bounds.top.toInt() + 1,
+                    bounds.right.toInt() - 2 to bounds.top.toInt() + 1,
+                    bounds.left.toInt() + 1 to bounds.bottom.toInt() - 2,
+                    bounds.right.toInt() - 2 to bounds.bottom.toInt() - 2,
+                )) {
+                    assertEquals("Click feedback must not escape the circular button at ($x, $y)",
+                        android.graphics.Color.WHITE, bitmap.getPixel(x, y))
+                }
+            } finally { bitmap.recycle() }
+            touch(MotionEvent.ACTION_UP)
+            assertEquals("A tap must still request scrolling to the bottom", 1, clicked)
+        } finally {
+            view.disposeComposition(); recomposer.close(); runner.cancel()
+            activity.pause().stop().destroy()
+        }
+    }
+
+    // Fill the real clickable's draw boundary without platform ripple timing.
+    private data object SolidIndication : IndicationNodeFactory {
+        override fun create(interactionSource: InteractionSource): DelegatableNode = object : Modifier.Node(), DrawModifierNode {
+            override fun ContentDrawScope.draw() {
+                drawContent()
+                drawRect(Color.Magenta)
+            }
+        }
+    }
+
     @Test fun buttonMovesAndFadesAtBottomRightHidesWhileScrollingAndHasOneResponseRing() = runTest {
         val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val clock = BroadcastFrameClock()

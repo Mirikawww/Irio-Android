@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -61,6 +62,7 @@ internal fun BoxScope.ScrollToBottomButton(
                 modifier = Modifier
                     .size(44.dp)
                     .background(Theme[colors][panelColor], ContinuousCapsule)
+                    .clip(ContinuousCapsule)
                     .clickable(role = Role.Button, onClick = onClick)
                     .semantics { contentDescription = tr("滚动到底部") }
                     .testTag("scroll-to-bottom"),
