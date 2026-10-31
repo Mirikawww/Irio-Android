@@ -466,6 +466,7 @@ internal fun ChatScreenState.startGeneration(
                                                 process.onSearchStarted(
                                                     update.searchQuery,
                                                     update.displayText,
+                                                    update.toolArguments,
                                                 )
                                             if (update.searching == false)
                                                 process.onSearchFinished(
@@ -478,6 +479,7 @@ internal fun ChatScreenState.startGeneration(
                                                     update.toolName,
                                                     update.webDomain,
                                                     update.displayText,
+                                                    update.toolArguments,
                                                 )
                                             if (!cancelled)
                                                 update.imageGeneration.forEach(

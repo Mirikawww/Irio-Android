@@ -2,6 +2,7 @@ package com.irio
 
 import android.content.Context
 import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -14,6 +15,33 @@ import org.robolectric.annotation.Config
 class ToolFailureStatusAndroidTest {
     private val app get() = RuntimeEnvironment.getApplication() as Context
     private val provider = ProviderConfig("fixture", "Fixture", "https://example.test", "fixture")
+
+    @Test fun failedCallsKeepTheirExactInputsThroughTrackingStorageAndLink() = runBlocking {
+        val registry = ToolRegistry()
+        val turn = SubagentTurn()
+        val context = ToolExecutionContext(provider, "model", onUpdate = { turn.apply(it) })
+        val calls = listOf(
+            ChatToolCall("one", "missing", """{"value":"first","nested":{"limit":7}}"""),
+            ChatToolCall("two", "missing", "{invalid-json"),
+            ChatToolCall("three", WebSearchTool.NAME, """{"query":"failed search","max_results":3}"""),
+        )
+        calls.forEach { assertEquals(ToolOutcome.FAILED, registry.execute(it, context).outcome) }
+        val events = turn.process()
+        val encoded = subagentProcessJson(events)
+        calls.forEachIndexed { index, call ->
+            assertEquals("Each failed invocation must keep its own original arguments", call.arguments,
+                encoded.getJSONObject(index).optString("toolArguments"))
+        }
+        assertEquals(events, subagentProcessFrom(encoded))
+        val conversation = Conversation("failure-inputs", "Fixture", 1L,
+            listOf(ChatMessage(1L, "", false, process = events)))
+        val local = ConversationStore.parseConversation(JSONObject(ConversationStore.conversationJson(conversation).toString()))
+        val linked = LinkConversationJson.decode(JSONObject(LinkConversationJson.encode(local).toString()))
+        assertEquals(events, local.messages.single().process)
+        assertEquals(events, linked.messages.single().process)
+        val legacy = processEventsFrom(JSONObject("""{"process":[{"id":1,"kind":"TOOL","content":"old error","toolOutcome":"FAILED"}]}"""))
+        assertEquals("Old records must remain readable", "old error", legacy.single().content)
+    }
 
     @Test fun disabledMemoryAndEmptyWritesFailWhileNormalReadAndWriteSucceed() = runBlocking {
         val registry = ToolRegistry(listOf(MemoryToolProvider()))

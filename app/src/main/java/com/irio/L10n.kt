@@ -135,6 +135,10 @@ private val TodoistProgressEnglish = mapOf(
 ).flatMap { (action, forms) -> listOf(action to forms.first, "已$action" to forms.second) }.toMap()
 
 private val English = mapOf(
+    "输入参数" to "Input arguments",
+    "错误信息" to "Error details",
+    "未记录输入参数" to "Input arguments were not recorded",
+    "工具执行失败" to "Tool execution failed",
     "访问权限" to "Access",
     "连接 Irio Docs MCP，在对话中搜索官方文档、读取说明和查询版本更新。仅访问公开资料，无需登录。" to "Connect to Irio Docs MCP to search official documentation, read guides and look up releases in conversations. Public information only; no sign-in required.",
     "查询官方文档与更新日志" to "Search official documentation and release notes",

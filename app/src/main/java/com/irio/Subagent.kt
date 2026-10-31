@@ -108,6 +108,7 @@ internal fun subagentProcessJson(events: List<ProcessEvent>): JSONArray = JSONAr
                 if (event.belowText) put("belowText", true)
                 if (event.textOffset > 0) put("textOffset", event.textOffset)
                 if (event.toolName.isNotBlank()) put("toolName", event.toolName)
+                if (event.toolArguments.isNotEmpty()) put("toolArguments", event.toolArguments)
                 if (event.searchQuery.isNotBlank()) put("searchQuery", event.searchQuery)
                 if (event.webDomain.isNotBlank()) put("webDomain", event.webDomain)
                 if (event.displayText.isNotEmpty()) put("displayText", event.displayText)
@@ -170,7 +171,7 @@ internal class SubagentTurn {
             changed = true
         }
         if (update.searching == true) {
-            tracker.onSearchStarted(update.searchQuery, update.displayText)
+            tracker.onSearchStarted(update.searchQuery, update.displayText, update.toolArguments)
             changed = true
         }
         if (update.searching == false) {
@@ -178,7 +179,7 @@ internal class SubagentTurn {
             changed = true
         }
         if (update.toolActive == true) {
-            tracker.onToolStarted(update.toolName, update.webDomain, update.displayText)
+            tracker.onToolStarted(update.toolName, update.webDomain, update.displayText, update.toolArguments)
             changed = true
         }
         if (update.toolOutput != null) {

@@ -131,7 +131,7 @@ internal fun ProcessEventRow(
     val terminal = event.kind == ProcessEventKind.TOOL && event.toolName == LinuxShellTool.NAME
     val openable =
         (event.toolName != ImageGenTool.NAME || event.toolOutcome == ToolOutcome.FAILED) &&
-            (terminal || (!event.live && event.content.isNotBlank()))
+            (terminal || (!event.live && (event.content.isNotBlank() || event.toolOutcome == ToolOutcome.FAILED)))
     val label =
         when (event.kind) {
             ProcessEventKind.THINKING ->
@@ -297,6 +297,11 @@ internal fun ProcessEventSheet(
     state: BottomSheetState,
     onDismiss: () -> Unit,
 ) {
+    if (event != null && event.toolOutcome == ToolOutcome.FAILED &&
+        (event.kind == ProcessEventKind.TOOL || event.kind == ProcessEventKind.SEARCH)) {
+        ToolFailureSheet(event, state, onDismiss)
+        return
+    }
     if (event?.kind == ProcessEventKind.TOOL && event.toolName == LinuxShellTool.NAME) {
         TerminalCommandSheet(event, state, onDismiss)
         return

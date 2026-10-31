@@ -142,6 +142,8 @@ data class ChatStreamUpdate(
     val attemptStarted: Boolean = false,
     val resetAttempt: Boolean = false,
     val imageGeneration: List<ImageGenerationProgress> = emptyList(),
+    /** Original model arguments attached by the request-scoped tool registry. */
+    val toolArguments: String = "",
 )
 
 data class ToolCallDelta(

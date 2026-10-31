@@ -169,7 +169,8 @@ class ToolRegistry(
         var terminal: ChatStreamUpdate? = null
         var latestOutput = ""
         suspend fun publish(update: ChatStreamUpdate) {
-            context.onUpdate(update.copy(displayText = displayText))
+            context.onUpdate(update.copy(displayText = displayText,
+                toolArguments = if (update.toolActive != null || update.searching != null) call.arguments else update.toolArguments))
         }
         suspend fun start() {
             if (started) return
