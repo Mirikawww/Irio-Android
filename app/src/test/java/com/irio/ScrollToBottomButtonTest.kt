@@ -46,6 +46,7 @@ class ScrollToBottomButtonTest {
         val runner = launch(clock) { recomposer.runRecomposeAndApplyChanges() }
         val view = ComposeView(activity.get())
         val pinned = mutableStateOf(true)
+        val followingBottom = mutableStateOf(false)
         val scrolling = mutableStateOf(false)
         val responding = mutableStateOf(false)
         var clicked = 0
@@ -79,6 +80,7 @@ class ScrollToBottomButtonTest {
                 Box(Modifier.fillMaxSize()) {
                     ScrollToBottomButton(
                         visible = !pinned.value && !scrolling.value,
+                        followingBottom = followingBottom.value,
                         responding = responding.value,
                         bottomInset = 100.dp,
                         onClick = { clicked++; pinned.value = true },
@@ -128,6 +130,22 @@ class ScrollToBottomButtonTest {
             } finally { capture.recycle() }
             assertEquals(0f, generatingRippleAlpha(0f), 0f)
             assertEquals(0f, generatingRippleAlpha(1f), 0f)
+            followingBottom.value = true
+            repeat(40) { frame() }
+            assertNull("Automatic bottom following hides the button even while the viewport is behind", node("scroll-to-bottom"))
+            // Slow streaming can leave long IDLE gaps between layout growth and catch-up.
+            repeat(3) {
+                pinned.value = true
+                repeat(20) { frame() }
+                pinned.value = false
+                repeat(40) { frame() }
+                assertNull("Streaming growth must not restart the button entrance", node("scroll-to-bottom"))
+                assertNull(node("scroll-to-bottom-ripple"))
+            }
+            followingBottom.value = false
+            repeat(40) { frame() }
+            assertNotNull("Reading history during a response must still expose the return button", node("scroll-to-bottom"))
+            assertNotNull(node("scroll-to-bottom-ripple"))
             scrolling.value = true
             val exitAlpha = List(40) { frame(); buttonAlpha }
             assertTrue("Hiding during scrolling must fade out", exitAlpha.any { it in 1..254 })

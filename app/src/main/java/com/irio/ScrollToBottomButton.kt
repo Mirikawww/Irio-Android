@@ -41,12 +41,14 @@ internal const val ScrollToBottomRippleCount = 1
 @Composable
 internal fun BoxScope.ScrollToBottomButton(
     visible: Boolean,
+    followingBottom: Boolean,
     responding: Boolean,
     bottomInset: Dp,
     onClick: () -> Unit,
 ) {
     AnimatedVisibility(
-        visible = visible,
+        // Tail growth can temporarily move the viewport off bottom between follow frames.
+        visible = visible && !followingBottom,
         modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = bottomInset + 12.dp),
         enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 4 },
         exit = fadeOut(tween(140)) + slideOutVertically(tween(140)) { it / 4 },

@@ -192,6 +192,7 @@ internal fun ChatScreenLayout(state: ChatScreenState) =
                                     visible = !messageRecyclerController.scrollButtonHidden &&
                                         shownTranscript.isNotEmpty() && !composerFullscreen &&
                                         pendingConversationScroll != currentConversation.id,
+                                    followingBottom = stickToBottom,
                                     responding = busyThisChat,
                                     bottomInset = composerBarHeight,
                                     onClick = {
