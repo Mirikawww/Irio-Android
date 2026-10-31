@@ -15,6 +15,7 @@ object ToolStore {
     private const val PREFS = "tool_settings"
     private const val MAX_ROUNDS = "max_tool_rounds"
     private const val IMAGE_GEN_MODEL = "image_gen_model"
+    private const val VIDEO_GEN_MODEL = "video_gen_model"
     private const val TITLE_MODEL = "title_model"
     private const val MESSAGE_TIMESTAMPS = "message_timestamps"
     private const val CONTEXT_COMPRESSION = "context_compression"
@@ -64,6 +65,14 @@ object ToolStore {
 
     fun saveImageGenModel(context: Context, model: String) {
         preferences(context).edit().putString(IMAGE_GEN_MODEL, model).apply()
+    }
+
+    /** 视频生成工具使用的默认模型 id；空串表示未配置。 */
+    fun loadVideoGenModel(context: Context): String =
+        preferences(context).getString(VIDEO_GEN_MODEL, "").orEmpty()
+
+    fun saveVideoGenModel(context: Context, model: String) {
+        preferences(context).edit().putString(VIDEO_GEN_MODEL, model).apply()
     }
 
     /** 标题生成使用的模型 id；空串表示跟随当前对话模型。 */

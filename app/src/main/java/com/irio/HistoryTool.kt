@@ -51,7 +51,7 @@ internal object HistoryTool {
                 .put("description", "Maximum results/lines, chosen by you. Default 20 for list/search, 200 for read.")))
             .put("required", JSONArray().put("action")).put("additionalProperties", false)
         return when (protocol) {
-            ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().put("type", "function").put("function",
+            ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> JSONObject().put("type", "function").put("function",
                 JSONObject().put("name", NAME).put("description", DESCRIPTION).put("parameters", parameters))
             ProviderProtocol.RESPONSES -> JSONObject().put("type", "function").put("name", NAME)
                 .put("description", DESCRIPTION).put("parameters", parameters).put("strict", false)

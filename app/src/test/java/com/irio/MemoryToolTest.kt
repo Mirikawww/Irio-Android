@@ -43,7 +43,7 @@ class MemoryToolTest {
         ProviderProtocol.entries.forEach { protocol ->
             val schema = MemoryTool.getSchema(protocol)
             val params: JSONObject = when (protocol) {
-                ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
+                ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> schema.getJSONObject("function").getJSONObject("parameters")
                 ProviderProtocol.RESPONSES -> schema.getJSONObject("parameters")
                 ProviderProtocol.ANTHROPIC -> schema.getJSONObject("input_schema")
                 ProviderProtocol.GEMINI -> schema.getJSONObject("parametersJsonSchema")
@@ -60,7 +60,7 @@ class MemoryToolTest {
         ProviderProtocol.entries.forEach { protocol ->
             val schema = MemoryTool.updateSchema(protocol)
             val params: JSONObject = when (protocol) {
-                ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
+                ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> schema.getJSONObject("function").getJSONObject("parameters")
                 ProviderProtocol.RESPONSES -> schema.getJSONObject("parameters")
                 ProviderProtocol.ANTHROPIC -> schema.getJSONObject("input_schema")
                 ProviderProtocol.GEMINI -> schema.getJSONObject("parametersJsonSchema")
@@ -77,11 +77,11 @@ class MemoryToolTest {
             val get = MemoryTool.getSchema(protocol)
             val update = MemoryTool.updateSchema(protocol)
             val getName = when (protocol) {
-                ProviderProtocol.CHAT_COMPLETIONS -> get.getJSONObject("function").optString("name")
+                ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> get.getJSONObject("function").optString("name")
                 else -> get.optString("name")
             }
             val updateName = when (protocol) {
-                ProviderProtocol.CHAT_COMPLETIONS -> update.getJSONObject("function").optString("name")
+                ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> update.getJSONObject("function").optString("name")
                 else -> update.optString("name")
             }
             assertEquals("get_memory", getName)

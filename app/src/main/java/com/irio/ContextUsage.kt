@@ -20,7 +20,10 @@ internal fun chatSystemPrompt(context: Context): String? = buildString {
 internal fun configuredImageGenModel(context: Context, chatModelId: String): String =
     ToolStore.loadImageGenModel(context)
         .takeIf { ModelCatalog.isImageModel(context, it) }
-        .takeUnless { ModelCatalog.isImageModel(context, chatModelId) } ?: ""
+        .takeUnless { ModelCatalog.isImageModel(context, chatModelId) || ModelCatalog.isVideoModel(context, chatModelId) } ?: ""
+
+internal fun configuredVideoGenModel(context: Context): String =
+    ToolStore.loadVideoGenModel(context).takeIf { ModelCatalog.isVideoModel(context, it) }.orEmpty()
 
 /** 这一轮会放进请求的工具。GitHub 集成由调用方再注册，它要走挂起的读取。 */
 internal fun chatToolRegistry(
@@ -36,6 +39,7 @@ internal fun chatToolRegistry(
             if (imageSearch) add(CommonsImageToolProvider())
         }
         if (imageGenModel.isNotBlank()) add(ImageGenToolProvider())
+        configuredVideoGenModel(context).takeIf(String::isNotBlank)?.let { add(VideoGenToolProvider(it)) }
         add(TimeToolProvider())
         add(LinguaLibreToolProvider())
         add(ReactionToolProvider())
@@ -81,7 +85,7 @@ internal suspend fun loadContextRequestOverhead(
     protocol: ProviderProtocol,
     modelId: String,
 ): Int = withContext(Dispatchers.IO) {
-    if (modelId.isNotBlank() && ModelCatalog.isImageModel(context, modelId)) return@withContext 0
+    if (modelId.isNotBlank() && (ModelCatalog.isImageModel(context, modelId) || ModelCatalog.isVideoModel(context, modelId))) return@withContext 0
     val registry = chatToolRegistry(
         context,
         SearchStore.isWebSearchActive(context),

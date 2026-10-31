@@ -173,8 +173,9 @@ class ChatRetryApiTest {
     }
 
     @Test fun everyChatProtocolRetainsTextAndResendsAnEmptyHiddenRequestWithoutAnotherNudge() = runBlocking {
-        for (protocol in ProviderProtocol.entries) {
+        for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) {
             val partial = when (protocol) {
+                ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
                 ProviderProtocol.CHAT_COMPLETIONS -> "data: {\"choices\":[{\"delta\":{\"content\":\"Hello, how can\"}}]}\n\n"
                 ProviderProtocol.RESPONSES -> "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Hello, how can\"}\n\n"
                 ProviderProtocol.ANTHROPIC -> "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello, how can\"}}\n\n"
@@ -187,6 +188,7 @@ class ChatRetryApiTest {
                 else -> "event: error\ndata: {\"type\":\"error\",\"error\":{\"message\":\"temporary connection drop\"}}\n\n"
             }
             val final = when (protocol) {
+                ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
                 ProviderProtocol.CHAT_COMPLETIONS -> "data: {\"choices\":[{\"delta\":{\"content\":\" I help?\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
                 ProviderProtocol.RESPONSES -> "data: {\"type\":\"response.output_text.delta\",\"delta\":\" I help?\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{}}\n\n"
                 ProviderProtocol.ANTHROPIC -> "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\" I help?\"}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"

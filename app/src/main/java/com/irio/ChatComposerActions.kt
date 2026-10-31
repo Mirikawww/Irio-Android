@@ -161,6 +161,7 @@ internal fun ChatScreenState.pasteTextAsAttachment(text: String): Boolean {
 }
 
 internal fun ChatScreenState.openAttachment(attachment: ChatAttachment) {
+    if (attachment.isGeneratedVideo && !attachment.downloaded) return
     if (attachment.isImage) {
         viewingPhoto = attachment
         return
@@ -168,12 +169,7 @@ internal fun ChatScreenState.openAttachment(attachment: ChatAttachment) {
     runCatching {
         val file = File(attachment.filePath)
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        val intent =
-            Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, attachment.mimeType.ifBlank { "*/*" })
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-        context.startActivity(Intent.createChooser(intent, attachment.name))
+        context.startActivity(attachmentViewChooser(uri, attachment))
     }
 }
 

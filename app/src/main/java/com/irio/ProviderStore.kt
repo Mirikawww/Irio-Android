@@ -24,6 +24,7 @@ enum class ProviderProtocol(val label: String, val defaultEndpoint: String) {
     ANTHROPIC("Anthropic Messages", "https://api.anthropic.com"),
     GEMINI("Google Gemini generateContent API", "https://generativelanguage.googleapis.com/v1beta"),
     GEMINI_INTERACTIONS("Google Gemini Interactions API", "https://generativelanguage.googleapis.com/v1beta"),
+    MINIMAX_VIDEO("MiniMax Video Generation V2", "https://api.minimax.io"),
 }
 
 internal val ProviderProtocol.isGoogleGemini: Boolean
@@ -598,6 +599,8 @@ data class ImageGenResult(
 
 object ProviderApi {
     fun fetchModels(config: ProviderConfig): ModelFetchResult {
+        // V2 has no video-model discovery endpoint. Never query the text-model /models API.
+        if (config.protocol == ProviderProtocol.MINIMAX_VIDEO) return ModelFetchResult(models = VideoGenerationOptions.models)
         if (config.protocol.isGoogleGemini) return fetchGeminiModels(config)
         val connection = runCatching {
             URL(modelsUrl(config.endpointUrl, config.protocol)).openConnection() as HttpURLConnection
@@ -693,6 +696,7 @@ object ProviderApi {
     }.getOrDefault("")
 
     private fun modelsUrl(endpointUrl: String, protocol: ProviderProtocol): String {
+        require(protocol != ProviderProtocol.MINIMAX_VIDEO) { "MiniMax video models use a local catalog" }
         val clean = endpointUrl.trim().trimEnd('/')
         val base = when {
             clean.endsWith("/chat/completions") -> clean.removeSuffix("/chat/completions")

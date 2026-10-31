@@ -299,6 +299,7 @@ private fun ObserveChatStores(state: ChatScreenState) =
                         if (
                             full != null &&
                                 currentConversation.id == currentId &&
+                                currentId !in preparing.values &&
                                 currentId !in generations.values.map { it.conversationId }
                         ) {
                             currentConversation = full
@@ -419,6 +420,12 @@ private fun ObserveChatStores(state: ChatScreenState) =
 @Composable
 private fun ObserveChatBackgroundResults(state: ChatScreenState) =
     with(state) {
+        DisposableEffect(Unit) {
+            val remove = VideoGenerationJobs.observe(context) { job ->
+                scope.launch(Dispatchers.Main.immediate) { noteVideoFinished(job) }
+            }
+            onDispose { remove() }
+        }
         LaunchedEffect(backgroundCommandId) {
             val id = backgroundCommandId ?: return@LaunchedEffect
             while (true) {

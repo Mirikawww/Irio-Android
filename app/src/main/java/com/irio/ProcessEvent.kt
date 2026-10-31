@@ -54,7 +54,7 @@ internal fun renderedProcessEvents(events: List<ProcessEvent>, mergeToolCalls: B
     val mergeableEvents = visibleEvents.filter {
         it.toolOutcome != ToolOutcome.FAILED && it.toolOutcome != ToolOutcome.STOPPED &&
             (it.kind == ProcessEventKind.SEARCH ||
-                (it.kind == ProcessEventKind.TOOL && it.toolName !in setOf(ImageGenTool.NAME, CommonsImageTools.SHOW, MermaidTool.NAME)))
+                (it.kind == ProcessEventKind.TOOL && it.toolName !in setOf(ImageGenTool.NAME, VideoGenTool.NAME, CommonsImageTools.SHOW, MermaidTool.NAME)))
     }
     if (mergeableEvents.isEmpty()) return visibleEvents
     val mergeableIds = mergeableEvents.mapTo(hashSetOf()) { it.id }

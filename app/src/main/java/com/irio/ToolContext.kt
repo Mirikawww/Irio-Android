@@ -10,7 +10,8 @@ internal fun ChatMessage.requestMessages(): List<ChatRequestMessage> {
     val body = ChatRequestMessage(
         role = if (fromUser) "user" else "assistant",
         text = messageBodyText(),
-        attachments = attachments,
+        // Generated videos are output artifacts, not an implicit multi-megabyte re-upload.
+        attachments = attachments.filterNot { it.isGeneratedVideo },
         thinking = thinking,
         createdAt = createdAt,
         reactionTargetId = id.takeIf { fromUser && !hidden },
@@ -84,6 +85,13 @@ internal fun ChatMessage.contextText(): String {
 /** 发给模型的正文，不含工具执行记录。 */
 internal fun ChatMessage.messageBodyText(): String = buildString {
     append(requestText())
+    attachments.filter { it.isGeneratedVideo }.forEach { video ->
+        if (isNotEmpty()) append("\n\n")
+        append("[Generated video: ")
+        append(video.name)
+        append("]\n")
+        append(video.remoteUrl)
+    }
     if (!fromUser && toolRecords.none { it.call.name == ColoredBubbleTool.NAME }) {
         process.filter { it.kind == ProcessEventKind.BUBBLE }.forEach { bubble ->
             if (isNotEmpty()) append("\n\n")

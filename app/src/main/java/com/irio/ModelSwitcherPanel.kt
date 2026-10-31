@@ -158,7 +158,11 @@ internal fun modelSwitcherCompactInteractive(modelsExpanded: Boolean, phase: Flo
 internal fun modelSwitcherListComposed(listPrepared: Boolean, modelsExpanded: Boolean): Boolean =
     listPrepared || modelsExpanded
 
-internal fun modelSwitcherCompactHeight(imageModel: Boolean): Dp = if (imageModel) 396.dp else 220.dp
+internal fun modelSwitcherCompactHeight(imageModel: Boolean, videoModel: Boolean = false): Dp = when {
+    imageModel -> 396.dp
+    videoModel -> 352.dp
+    else -> 220.dp
+}
 
 /** The entire surface changes to the list during the initial fast extension. */
 @Composable
@@ -188,6 +192,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
     val accent = Theme[colors][primaryColor]
     val context = LocalContext.current
     val imageModel = remember(selectedModel) { ModelCatalog.isImageModel(context, selectedModel) }
+    val videoModel = remember(selectedModel) { ModelCatalog.isVideoModel(context, selectedModel) }
     var imageOptions by remember(activeProviderId, selectedModel) {
         mutableStateOf(ImageGenerationStore.load(context, activeProviderId, selectedModel))
     }
@@ -195,7 +200,15 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
         imageOptions = options
         ImageGenerationStore.save(context, activeProviderId, selectedModel, options)
     }
-    var aspectRatioPage by remember { mutableStateOf(false) }
+    var videoOptions by remember(activeProviderId, selectedModel) {
+        mutableStateOf(VideoGenerationStore.load(context, activeProviderId, selectedModel))
+    }
+    fun saveVideoOptions(options: VideoGenerationOptions) {
+        videoOptions = options
+        VideoGenerationStore.save(context, activeProviderId, selectedModel, options)
+    }
+    var aspectRatioPage by remember(activeProviderId, selectedModel) { mutableStateOf(false) }
+    var videoChoicePage by remember(activeProviderId, selectedModel) { mutableStateOf<VideoGenerationChoice?>(null) }
     var modelsExpanded by remember { mutableStateOf(false) }
     var listPrepared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -210,8 +223,11 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
         motion.animateTo(modelsExpanded)
     }
     androidx.activity.compose.BackHandler(enabled = modelsExpanded) { modelsExpanded = false }
-    val compactHeight = modelSwitcherCompactHeight(imageModel)
-    val naturalHeight = if (aspectRatioPage && imageModel) ((imageAspectRatioPresets.size + 1) * 36 + 152).dp else rows.sumOf {
+    val compactHeight = modelSwitcherCompactHeight(imageModel, videoModel)
+    val videoChoice = videoChoicePage
+    val naturalHeight = if (aspectRatioPage && imageModel) ((imageAspectRatioPresets.size + 1) * 36 + 152).dp
+    else if (videoChoice != null && videoModel) (videoGenerationChoiceValues(videoChoice, selectedModel).size * 36 + 8).dp
+    else rows.sumOf {
         when (it) {
             is ModelPickerRow.Model -> 36
             is ModelPickerRow.GroupLabel -> 26
@@ -240,6 +256,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                         .modelSwitcherClickable {
                             if (compactInteractive) {
                                 aspectRatioPage = false
+                                videoChoicePage = null
                                 modelsExpanded = true
                             }
                         }
@@ -280,6 +297,14 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                     onWebSearchChange = onWebSearchChange,
                     onAutoReadChange = onAutoReadChange,
                     onImageOptionsChange = ::saveImageOptions,
+                    videoModel = videoModel,
+                    videoOptions = videoOptions,
+                    selectedModel = selectedModel,
+                    onVideoOptionsChange = ::saveVideoOptions,
+                    onVideoChoice = {
+                        videoChoicePage = it
+                        modelsExpanded = true
+                    },
                     onAspectRatio = {
                         aspectRatioPage = true
                         modelsExpanded = true
@@ -300,6 +325,20 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                         },
                         onCustomChange = {
                             saveImageOptions(imageOptions.copy(aspectRatio = it, useCustomAspectRatio = true, customRatio = it))
+                        },
+                    )
+                } else if (videoChoice != null && videoModel) {
+                    VideoGenerationChoiceList(
+                        choice = videoChoice,
+                        model = selectedModel,
+                        options = videoOptions,
+                        modifier = Modifier.fillMaxWidth().height(listHeight)
+                            .semantics { if (listOpacity() < 0.5f) invisibleToUser() },
+                        opacity = listOpacityState,
+                        active = modelsExpanded,
+                        onSelect = {
+                            saveVideoOptions(it)
+                            modelsExpanded = false
                         },
                     )
                 } else {
@@ -360,11 +399,18 @@ internal fun ModelSwitcherParameterControls(
     onAutoReadChange: (Boolean) -> Unit,
     onImageOptionsChange: (ImageGenerationOptions) -> Unit,
     onAspectRatio: () -> Unit,
+    videoModel: Boolean = false,
+    videoOptions: VideoGenerationOptions = VideoGenerationOptions(),
+    selectedModel: String = "MiniMax-H3",
+    onVideoOptionsChange: (VideoGenerationOptions) -> Unit = {},
+    onVideoChoice: (VideoGenerationChoice) -> Unit = {},
 ) {
-    ThinkingDepthSlider(reasoningEffort, supportsThinking, reasoningLevels, onReasoningChange, active = compactInteractive)
+    ThinkingDepthSlider(reasoningEffort, supportsThinking && !videoModel, reasoningLevels, onReasoningChange, active = compactInteractive)
     Spacer(Modifier.height(2.dp))
     if (imageModel) {
         ImageGenerationControls(imageOptions, compactInteractive, supportsOpenAiOptions, onImageOptionsChange, onAspectRatio)
+    } else if (videoModel) {
+        VideoGenerationControls(videoOptions, compactInteractive, selectedModel, onVideoOptionsChange, onVideoChoice)
     }
     ModelSwitcherToggle(tr("网络搜索"), webSearchAvailable && webSearchEnabled, webSearchAvailable) {
         if (compactInteractive) onWebSearchChange(it)

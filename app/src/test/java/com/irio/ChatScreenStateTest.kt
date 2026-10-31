@@ -376,6 +376,135 @@ class ChatScreenStateTest {
         }
     }
 
+    @Test fun videoCompletionWaitsForChatAndDoesNotLeakIntoTheVisibleOtherConversation() = runTest {
+        withState { harness ->
+            val state = harness.state
+            state.providers = emptyList()
+            val original = state.currentConversation.copy(title = "Video fixture", titlePending = false,
+                messages = listOf(ChatMessage(7101, "make video", true)))
+            state.currentConversation = original
+            state.messages = original.messages
+            state.cacheConversationContent(original)
+            ConversationStore.save(state.context, original)
+            val active = Job()
+            state.generations = mapOf(7102L to ActiveGeneration(original.id, active, ChatRequestCancellation()))
+            val completed = VideoGenerationJob("queue-test", original.id, "call", "video", "MiniMax-H3", "removed-chat-provider", "chat-model",
+                url = "https://cdn.example.test/result.mp4", finished = true)
+            state.noteVideoFinished(completed)
+            assertEquals(1, state.messages.size)
+            assertEquals(1, state.pendingVideoResults.size)
+            state.currentConversation = ConversationStore.newConversation()
+            state.messages = emptyList()
+            state.generations = emptyMap()
+            active.complete()
+            state.flushVideoResults(original.id)
+            assertTrue(state.messages.isEmpty())
+            val delivered = state.conversationContent(original.id)!!.messages
+            assertEquals(1, delivered.count { it.hidden })
+            assertEquals(1, delivered.flatMap { it.attachments }.count { it.isGeneratedVideo })
+            assertTrue(contextMessages(delivered).any { it.hidden })
+            assertFalse(visibleMessages(delivered).any { it.hidden })
+            state.noteVideoFinished(completed)
+            assertEquals("A replayed terminal notification must not append another hidden turn", delivered, state.conversationContent(original.id)!!.messages)
+            runCurrent()
+            ConversationStore.delete(state.context, original.id)
+        }
+    }
+
+    @Test fun directVideoSelectionKeepsOneStaticPromptWhileQueryWaits() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val app = RuntimeEnvironment.getApplication()
+        ShadowEnvironment.addExternalDir(app.cacheDir.resolve("video-external").absolutePath)
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("""{"task_id":"direct-test"}"""))
+            server.enqueue(MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE))
+            try {
+                withState { harness ->
+                    val state = harness.state
+                    state.requestReplyNotification = {}
+                    state.providers = listOf(ProviderConfig("direct", "Video", server.url("/").toString(), "", ProviderProtocol.MINIMAX_VIDEO,
+                        models = listOf("MiniMax-H3")))
+                    state.activeProviderId = "direct"
+                    state.selectedModel = "MiniMax-H3"
+                    val user = ChatMessage(7201, "A protocol test, not a paid call", true)
+                    val reply = ChatMessage(7202, "", false, isPending = true, responseToUserId = user.id)
+                    state.messages = listOf(user, reply)
+                    val id = state.currentConversation.id
+                    try {
+                        state.startGeneration(id, listOf(user), reply)
+                        repeat(100) {
+                            runCurrent()
+                            if (server.requestCount < 2) withContext(Dispatchers.IO) { Thread.sleep(10) }
+                        }
+                        assertEquals(2, server.requestCount)
+                        assertTrue(state.busyThisChat)
+                        val waiting = state.messages.single { it.id == reply.id }
+                        assertEquals("", waiting.text)
+                        assertEquals(1, waiting.process.size)
+                        assertEquals(VideoGenTool.NAME, waiting.process.single().toolName)
+                        assertTrue(waiting.process.single().live)
+                        assertNull(waiting.process.single().imageGeneration)
+                    } finally {
+                        state.stopGeneration(id)
+                        repeat(100) {
+                            runCurrent()
+                            if (state.busyThisChat) withContext(Dispatchers.IO) { Thread.sleep(10) }
+                        }
+                        ConversationStore.delete(app, id)
+                    }
+                }
+            } finally { Dispatchers.resetMain() }
+        }
+    }
+
+    @Test fun hiddenVideoCompletionUsesTheOriginalChatModelAfterTheUserSelectsAVideoModel() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val app = RuntimeEnvironment.getApplication()
+        ShadowEnvironment.addExternalDir(app.cacheDir.resolve("video-completion-external").absolutePath)
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+                "data: {\"choices\":[{\"delta\":{\"content\":\"Video ready\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
+            try {
+                withState { harness ->
+                    val state = harness.state
+                    state.requestReplyNotification = {}
+                    state.currentConversation = state.currentConversation.copy(title = "Video fixture", titlePending = false)
+                    val id = state.currentConversation.id
+                    state.messages = listOf(ChatMessage(7301, "make a video", true))
+                    ConversationStore.save(app, state.currentConversation.copy(messages = state.messages))
+                    state.providers = listOf(
+                        ProviderConfig("original-chat", "Chat", server.url("/v1").toString(), "", models = listOf("original-model")),
+                        ProviderConfig("currently-selected-video", "Video", "https://not-contacted.example.test", "", ProviderProtocol.MINIMAX_VIDEO,
+                            models = listOf("MiniMax-H3")),
+                    )
+                    state.activeProviderId = "currently-selected-video"
+                    state.selectedModel = "MiniMax-H3"
+                    try {
+                        state.noteVideoFinished(VideoGenerationJob("original-model-test", id, "call", "video", "MiniMax-H3", "original-chat", "original-model",
+                            url = "https://cdn.example.test/video.mp4", finished = true))
+                        repeat(200) {
+                            runCurrent()
+                            if (server.requestCount == 0 || state.busyThisChat) withContext(Dispatchers.IO) { Thread.sleep(10) }
+                        }
+                        assertEquals(1, server.requestCount)
+                        val request = server.takeRequest()
+                        assertEquals("/v1/chat/completions", request.path)
+                        val body = org.json.JSONObject(request.body.readUtf8())
+                        assertEquals("original-model", body.getString("model"))
+                        assertTrue(body.toString().contains(videoCompletionMarker("original-model-test")))
+                        assertEquals(1, state.messages.count { it.hidden })
+                        assertEquals("MiniMax-H3", state.selectedModel)
+                        assertEquals("currently-selected-video", state.activeProviderId)
+                    } finally {
+                        state.stopGeneration(id)
+                        runCurrent()
+                        ConversationStore.delete(app, id)
+                    }
+                }
+            } finally { IrioHttp.resetForTests(); Dispatchers.resetMain() }
+        }
+    }
+
     private suspend fun TestScope.withState(observeIdleContext: Boolean = false, block: suspend (Harness) -> Unit) {
         val harness = Harness(this, observeIdleContext)
         try {

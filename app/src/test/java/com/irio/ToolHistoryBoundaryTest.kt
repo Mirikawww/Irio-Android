@@ -116,7 +116,7 @@ class ToolHistoryBoundaryTest {
         IrioHttp.resetForTests()
         try {
             MockWebServer().use { server ->
-                for (protocol in ProviderProtocol.entries) {
+                for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) {
                     server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody("data: [DONE]\n\n"))
                     ChatApi.streamChat(ProviderConfig("test", "Test", server.url("/v1beta").toString(), "key", protocol),
                         "model", history, ReasoningEffort.OFF, false, toolRegistry = ToolRegistry(),
@@ -125,6 +125,7 @@ class ToolHistoryBoundaryTest {
                     assertFalse("$protocol must not send UI-only arguments", body.toString().contains(SmartToolHints.ARGUMENT))
                     assertFalse("$protocol must not put serialized records in model prose", body.toString().contains("[Tool execution record:"))
                     when (protocol) {
+                        ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
                         ProviderProtocol.CHAT_COMPLETIONS -> {
                             val messages = body.getJSONArray("messages")
                             val assistant = messages.getJSONObject(1)

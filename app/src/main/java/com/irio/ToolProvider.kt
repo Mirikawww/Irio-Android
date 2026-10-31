@@ -237,6 +237,7 @@ class ToolRegistry(
                 WebFetchToolProvider(),
                 CommonsImageToolProvider(),
                 ImageGenToolProvider(),
+                VideoGenToolProvider(),
                 TimeToolProvider(),
                 LinguaLibreToolProvider(),
                 ReactionToolProvider(),

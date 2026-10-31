@@ -52,7 +52,7 @@ internal fun BoxScope.ChatToolbar(state: ChatScreenState) {
                         suppressProviderEcho.fn()
                         selectedModel = model
                         // 记录最近一次选中的非图片对话模型（标题生成在图片模型场景的回退目标）
-                        if (!ModelCatalog.isImageModel(context, model)) {
+                        if (!ModelCatalog.isImageModel(context, model) && !ModelCatalog.isVideoModel(context, model)) {
                             ProviderStore.saveLastChatModel(context, model)
                         }
                         // 持久化走 IO：persist 会对每个 provider 做 AndroidKeyStore 加密

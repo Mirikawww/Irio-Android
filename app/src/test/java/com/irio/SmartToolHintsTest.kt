@@ -14,7 +14,7 @@ class SmartToolHintsTest {
         IrioHttp.resetForTests(IrioHttp.defaultClient())
         try {
             MockWebServer().use { server ->
-                ProviderProtocol.entries.forEach { protocol ->
+                ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }.forEach { protocol ->
                     listOf(false, true).forEach { enabled ->
                         server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(""))
                         ChatApi.streamChat(
@@ -26,6 +26,7 @@ class SmartToolHintsTest {
                         )
                         val body = JSONObject(server.takeRequest(2, TimeUnit.SECONDS)!!.body.readUtf8())
                         val prompt = when (protocol) {
+                            ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
                             ProviderProtocol.CHAT_COMPLETIONS -> body.getJSONArray("messages").getJSONObject(0).getString("content")
                             ProviderProtocol.RESPONSES -> body.getString("instructions")
                             ProviderProtocol.ANTHROPIC -> body.getString("system")

@@ -324,6 +324,7 @@ object ConversationStore {
                                                 put("name", attachment.name)
                                                 put("mimeType", attachment.mimeType)
                                                 put("filePath", attachment.filePath)
+                                                if (attachment.remoteUrl.isNotBlank()) put("remoteUrl", attachment.remoteUrl)
                                             }
                                         )
                                     }
@@ -346,12 +347,14 @@ object ConversationStore {
                     for (attachmentIndex in 0 until attachmentsJson.length()) {
                         val attachment = attachmentsJson.optJSONObject(attachmentIndex) ?: continue
                         val path = attachment.optString("filePath")
-                        if (path.isBlank() || !File(path).exists()) continue
+                        val remoteUrl = attachment.optString("remoteUrl")
+                        if ((path.isBlank() || !File(path).isFile) && remoteUrl.isBlank()) continue
                         add(
                             ChatAttachment(
                                 name = attachment.optString("name"),
                                 mimeType = attachment.optString("mimeType"),
                                 filePath = path,
+                                remoteUrl = remoteUrl,
                             )
                         )
                     }

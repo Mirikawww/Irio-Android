@@ -10,6 +10,7 @@ class ToolCatalogTest {
         searchConfigured = true,
         imageSearchConfigured = true,
         imageConfigured = true,
+        videoConfigured = true,
         memoryEnabled = true,
         subagentsEnabled = true,
         linuxEnabled = true,
@@ -42,6 +43,8 @@ class ToolCatalogTest {
         assertEquals(ToolBlockedReason.WEB_SEARCH, blocked(CommonsImageTools.VIEW, available.copy(searchEnabled = false)))
         assertEquals(ToolBlockedReason.IMAGE_SEARCH_KEY, blocked(CommonsImageTools.SHOW, available.copy(imageSearchConfigured = false)))
         assertEquals(ToolBlockedReason.IMAGE_MODEL, blocked(ImageGenTool.NAME, ToolFeatureState()))
+        assertEquals(ToolBlockedReason.VIDEO_MODEL, blocked(VideoGenTool.NAME, ToolFeatureState()))
+        assertEquals(ToolBlockedReason.VIDEO_MODEL, blocked(VideoGenTool.NAME, available.copy(videoConfigured = false)))
         assertEquals(ToolBlockedReason.MEMORY, blocked(MemoryTool.UPDATE, ToolFeatureState()))
         for (name in SubagentTools.NAMES) assertEquals(ToolBlockedReason.SUBAGENTS, blocked(name, ToolFeatureState()))
         assertEquals(ToolBlockedReason.LINUX, blocked(LinuxBackgroundTool.NAME, ToolFeatureState()))

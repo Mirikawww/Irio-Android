@@ -261,17 +261,23 @@ internal fun ProcessEventRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Text(
-                    label,
-                    color =
-                        toolStatusTextColor(
-                            event.toolOutcome,
-                            LocalResolvedTheme.current.isDark,
-                            muted,
-                            irioErrorTextColor(),
-                        ),
-                    fontSize = 13.sp,
-                )
+                if (videoGenerationPending(event)) {
+                    // Task creation has ended, but the video is still being generated.
+                    // Keep the native tool-call highlight until the background query settles.
+                    StatusSweepText(event.displayText.ifEmpty { MemoryTool.liveLabel(event.toolName) })
+                } else {
+                    Text(
+                        label,
+                        color =
+                            toolStatusTextColor(
+                                event.toolOutcome,
+                                LocalResolvedTheme.current.isDark,
+                                muted,
+                                irioErrorTextColor(),
+                            ),
+                        fontSize = 13.sp,
+                    )
+                }
                 if (openable) {
                     Icon(
                         imageVector = IrioIcons.ChevronRight,

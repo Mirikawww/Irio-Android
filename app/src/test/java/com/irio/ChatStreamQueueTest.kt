@@ -43,7 +43,7 @@ class ChatStreamQueueTest {
 
     @Test(timeout = 30_000)
     fun slowUpdatesDoNotBlockNetworkReadsAndTheResultWaitsForDelivery() = runBlocking {
-        for (protocol in ProviderProtocol.entries) verifySlowConsumer(protocol)
+        for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) verifySlowConsumer(protocol)
     }
 
     @Test(timeout = 15_000)
@@ -134,6 +134,7 @@ class ChatStreamQueueTest {
     private fun textFrame(text: String, protocol: ProviderProtocol = ProviderProtocol.CHAT_COMPLETIONS): String {
         val quoted = JSONObject.quote(text)
         val payload = when (protocol) {
+            ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
             ProviderProtocol.CHAT_COMPLETIONS -> "{\"choices\":[{\"delta\":{\"content\":$quoted}}]}"
             ProviderProtocol.RESPONSES -> "{\"type\":\"response.output_text.delta\",\"delta\":$quoted}"
             ProviderProtocol.ANTHROPIC -> "{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":$quoted}}"
@@ -144,6 +145,7 @@ class ChatStreamQueueTest {
     }
 
     private fun endFrames(protocol: ProviderProtocol) = when (protocol) {
+        ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
         ProviderProtocol.CHAT_COMPLETIONS ->
             "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n" +
                 "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":20,\"total_tokens\":30}}\n\n" +

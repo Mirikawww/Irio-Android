@@ -35,6 +35,8 @@ internal fun ChatScreenState.startGeneration(
     requestSource: List<ChatMessage>,
     reply: ChatMessage,
     requestPreparation: GenerationRequestPreparation = GenerationRequestPreparation(requestSource),
+    modelOverride: String? = null,
+    providerOverride: ProviderConfig? = null,
 ) {
     ReplyNotifications.requestPermissionIfNeeded(
         granted =
@@ -44,8 +46,9 @@ internal fun ChatScreenState.startGeneration(
         requestReplyNotification()
     }
     SpeechPlayer.stop()
-    val requestModel = selectedModel
+    val requestModel = modelOverride ?: selectedModel
     val requestImageOptions = ImageGenerationStore.load(context, activeProviderId, requestModel)
+    val requestVideoOptions = VideoGenerationStore.load(context, providerOverride?.id ?: activeProviderId, requestModel)
     val requestImageStreaming = ThemeStore.imageGenerationStreaming
     val effectiveReasoningInfo =
         if (ProviderStore.loadModelsDevReasoning(context)) {
@@ -82,7 +85,7 @@ internal fun ChatScreenState.startGeneration(
     // 优先用当前内存态的 provider（省一次全量 Keystore 解密解析）；
     // 被选中 provider 被删掉时回落磁盘。
     val requestProvider =
-        providers.firstOrNull { it.id == activeProviderId && it.models.isNotEmpty() }
+        providerOverride ?: providers.firstOrNull { it.id == activeProviderId && it.models.isNotEmpty() }
             ?: providers.firstOrNull { it.models.isNotEmpty() }
             ?: ProviderStore.loadProvider(context)
     val uploadMessageId =
@@ -156,6 +159,38 @@ internal fun ChatScreenState.startGeneration(
                 val result =
                     if (provider == null) {
                         ChatCompletionResult(error = tr("请先在设置中添加提供商"))
+                    } else if (ModelCatalog.isVideoModel(context, requestModel)) {
+                        process.onToolStarted(VideoGenTool.NAME)
+                        pushNotice(tr("视频生成中"), finished = false)
+                        replaceInConversation(requestConversationId, reply.id,
+                            reply.copy(process = process.snapshot(), isPending = false, isStreaming = true))
+                        val user = requestSource.lastOrNull { it.fromUser && !it.hidden }
+                        val generated = withContext(Dispatchers.IO) {
+                            try {
+                                val uploads = user?.attachments.orEmpty()
+                                val mode = when {
+                                    uploads.isEmpty() -> "text"
+                                    uploads.size == 1 && uploads.all { it.isImage } -> "first_frame"
+                                    uploads.size == 2 && uploads.all { it.isImage } -> "first_last_frame"
+                                    else -> "reference"
+                                }
+                                VideoGenerationApi.generate(provider, requestModel, user?.requestText().orEmpty(),
+                                    options = requestVideoOptions, media = videoGenerationMedia(uploads, mode), cancellation = requestCancellation)
+                            } catch (failure: Exception) {
+                                VideoGenerationResult(error = failure.message ?: tr("视频生成失败"))
+                            }
+                        }
+                        when {
+                            requestCancellation.isCancelled() -> ChatCompletionResult(stopped = true)
+                            generated.attachment != null -> {
+                                process.dropLiveTool()
+                                ChatCompletionResult(attachments = listOf(generated.attachment), model = requestModel, usage = generated.usage)
+                            }
+                            else -> {
+                                process.onToolFinished(generated.error.orEmpty(), ToolOutcome.FAILED)
+                                ChatCompletionResult(error = generated.error ?: tr("视频生成失败"))
+                            }
+                        }
                     } else if (ModelCatalog.isImageModel(context, requestModel)) {
                         val lastUserIndex = requestSource.indexOfLast { it.fromUser && !it.hidden }
                         val prompt =
@@ -708,7 +743,8 @@ internal fun ChatScreenState.startGeneration(
                                 if (completed) {
                                     val preview =
                                         replyNotificationPreview(finalMessage.text).ifEmpty {
-                                            if (finalMessage.attachments.any { it.isImage })
+                                            if (finalMessage.attachments.any { it.isVideo }) tr("已生成视频")
+                                            else if (finalMessage.attachments.any { it.isImage })
                                                 tr("已生成图片")
                                             else ""
                                         }

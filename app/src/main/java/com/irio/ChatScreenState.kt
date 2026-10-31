@@ -105,6 +105,7 @@ internal class ChatScreenState(
     var preparing by mutableStateOf(emptyMap<Long, String>())
     val pendingBackgroundNotices = mutableMapOf<String, MutableList<LinuxBackgroundCommand>>()
     val subagentFinishes = SubagentFinishQueue()
+    val pendingVideoResults = linkedMapOf<String, VideoGenerationJob>()
 
     // Transcript scrolling and screen geometry.
     val messageRecyclerController = MessageRecyclerController()

@@ -490,7 +490,7 @@ internal class TodoistMcpToolProvider(
         val name = PREFIX + tool.name
         val schema = JSONObject(tool.inputSchema.toString())
         when (protocol) {
-            ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().put("type", "function").put("function",
+            ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> JSONObject().put("type", "function").put("function",
                 JSONObject().put("name", name).put("description", tool.description).put("parameters", schema))
             ProviderProtocol.RESPONSES -> JSONObject().put("type", "function").put("name", name)
                 .put("description", tool.description).put("parameters", schema).put("strict", false)

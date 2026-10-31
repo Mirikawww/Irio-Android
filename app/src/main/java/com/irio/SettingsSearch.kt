@@ -280,6 +280,7 @@ private val settingsSearchEntries = listOf(
     item("model.subagents", "子智能体", "模型", ModelSettingsActivity::class.java),
     item("model.subagentModel", "子智能体默认模型", "模型", ModelSettingsActivity::class.java),
     item("model.image", "图片生成模型", "模型", ModelSettingsActivity::class.java),
+    item("model.video", "视频生成模型", "模型", ModelSettingsActivity::class.java),
     item("model.title", "标题生成模型", "模型", ModelSettingsActivity::class.java),
     item("model.prompt", "编辑系统提示词", "模型", ModelSettingsActivity::class.java),
     item("model.timestamps", "消息时间戳", "模型", ModelSettingsActivity::class.java),

@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -504,7 +505,8 @@ internal fun StatusSweepText(label: String) {
         fontSize = 13.sp,
         color = base,
         modifier =
-            Modifier.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            Modifier.testTag("status-sweep")
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
                     drawContent()
                     val width = size.width
@@ -539,7 +541,7 @@ internal fun AssistantAttachmentList(
         verticalAlignment = Alignment.Bottom,
     ) {
         attachments.forEach { attachment ->
-            key(attachment.filePath) {
+            key(attachment.remoteUrl.ifEmpty { attachment.filePath }) {
                 if (attachment.isImage) {
                     ImageGenerationCard(
                         progress = ImageGenerationProgress(
@@ -549,6 +551,8 @@ internal fun AssistantAttachmentList(
                         ),
                         onOpen = onOpen,
                     )
+                } else if (attachment.isGeneratedVideo) {
+                    GeneratedVideoAttachmentCard(attachment, onOpen = onOpen)
                 } else {
                     AttachmentCard(attachment, onOpen = { onOpen(attachment) })
                 }

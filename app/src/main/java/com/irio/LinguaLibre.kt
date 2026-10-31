@@ -169,7 +169,7 @@ internal object LinguaLibreTool {
             .put("language", JSONObject().put("type", "string").put("description", "Three-letter ISO 639-3 language code, such as eng or fra")))
             .put("required", JSONArray(listOf("word", "language"))).put("additionalProperties", false)
         return when (protocol) {
-            ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().put("type", "function").put("function", JSONObject()
+            ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> JSONObject().put("type", "function").put("function", JSONObject()
                 .put("name", NAME).put("description", description).put("parameters", parameters))
             ProviderProtocol.RESPONSES -> JSONObject().put("type", "function").put("name", NAME)
                 .put("description", description).put("parameters", parameters).put("strict", true)

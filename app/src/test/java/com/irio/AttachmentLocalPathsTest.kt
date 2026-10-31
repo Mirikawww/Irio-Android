@@ -103,7 +103,7 @@ class AttachmentLocalPathsTest {
             ChatAttachment("report.pdf", "application/pdf", attachment.absolutePath)))
         val before = attachment.readBytes()
         try {
-            for (protocol in ProviderProtocol.entries) {
+            for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) {
                 for ((sandbox, paths, permission) in listOf(
                     Triple(true, true, true), Triple(true, false, true),
                     Triple(false, true, true), Triple(true, true, false),
@@ -126,6 +126,7 @@ class AttachmentLocalPathsTest {
                         val request = server.takeRequest(2, TimeUnit.SECONDS) ?: error("No request for $protocol")
                         val json = JSONObject(request.body.readUtf8())
                         val text = when (protocol) {
+                            ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
                             ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.ANTHROPIC ->
                                 json.getJSONArray("messages").getJSONObject(0).getJSONArray("content").getJSONObject(0).getString("text")
                             ProviderProtocol.RESPONSES, ProviderProtocol.GEMINI_INTERACTIONS ->

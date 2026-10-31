@@ -22,9 +22,13 @@ data class ChatAttachment(
     val name: String,
     val mimeType: String,
     val filePath: String,
+    /** Generated videos remain remote until the user explicitly downloads them. */
+    val remoteUrl: String = "",
 ) {
     val isImage: Boolean get() = mimeType.startsWith("image/") || mimeType in IMAGE_MIME_TYPES
     val isVideo: Boolean get() = mimeType.startsWith("video/")
+    val isGeneratedVideo: Boolean get() = isVideo && remoteUrl.isNotBlank()
+    val downloaded: Boolean get() = filePath.isNotBlank() && File(filePath).isFile && size > 0L
     val slotCost: Float get() = if (isImage || isVideo) 0.5f else 1f
     val size: Long get() = File(filePath).takeIf { it.exists() }?.length() ?: 0L
     fun bytes(): ByteArray = File(filePath).readBytes()
@@ -360,6 +364,7 @@ object ChatApi {
                 append(firstAssistantMessage.take(500))
             }
             val body = when (provider.protocol) {
+                ProviderProtocol.MINIMAX_VIDEO -> return@withContext null
                 ProviderProtocol.GEMINI -> GeminiProtocol.requestBody(listOf(ChatRequestMessage("user", prompt)), null)
                 ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.requestBody(model, listOf(ChatRequestMessage("user", prompt)), null)
                 ProviderProtocol.RESPONSES -> JSONObject().apply {
@@ -467,6 +472,7 @@ object ChatApi {
     ): String {
         val uploadEncoding = ImageUploadEncoding()
         return when (protocol) {
+            ProviderProtocol.MINIMAX_VIDEO -> throw IllegalArgumentException("MiniMax video does not support chat summaries")
             ProviderProtocol.GEMINI -> GeminiProtocol.requestBody(messages, systemPrompt, uploadEncoding = uploadEncoding).toString()
             ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.requestBody(model, messages, systemPrompt, uploadEncoding = uploadEncoding).toString()
             ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().apply {
@@ -506,6 +512,7 @@ object ChatApi {
         return runCatching {
             val root = JSONObject(body)
             when (protocol) {
+                ProviderProtocol.MINIMAX_VIDEO -> null
                 ProviderProtocol.GEMINI -> GeminiProtocol.parse(body)?.delta?.takeIf { it.isNotBlank() }
                 ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.parseResponse(body).let { if (it.error == null) it.delta.takeIf(String::isNotBlank) else null }
                 ProviderProtocol.CHAT_COMPLETIONS -> {
@@ -814,6 +821,7 @@ object ChatApi {
         if (data.isEmpty() || data.startsWith(":")) return null
         if (data == "[DONE]") return ChatStreamUpdate(done = true)
         return when (protocol) {
+            ProviderProtocol.MINIMAX_VIDEO -> throw IllegalArgumentException("MiniMax video does not support chat streaming")
             ProviderProtocol.GEMINI -> GeminiProtocol.parse(data)
             ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.StreamParser().parse(data, eventName)
             ProviderProtocol.CHAT_COMPLETIONS -> ChatProtocol.parseChatCompletions(data)
@@ -992,6 +1000,7 @@ object ChatApi {
             return if (tools.length() > 0) tools else null
         }
         return when (protocol) {
+        ProviderProtocol.MINIMAX_VIDEO -> throw IllegalArgumentException("MiniMax video does not support chat requests")
         ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.requestBody(model, messages, systemPrompt, toolRegistry.schemas(protocol), streaming = true, uploadEncoding = uploadEncoding).apply {
             ChatProtocol.putReasoning(this, protocol, reasoningEffort, model)
         }.toString()
@@ -1411,6 +1420,7 @@ internal object WebSearchTool {
             .put("input_schema", parameters())
         ProviderProtocol.GEMINI -> GeminiProtocol.declaration(NAME, DESCRIPTION, parameters())
         ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.declaration(NAME, DESCRIPTION, parameters())
+        ProviderProtocol.MINIMAX_VIDEO -> schemaFor(ProviderProtocol.CHAT_COMPLETIONS)
     }
 }
 
@@ -1436,6 +1446,7 @@ internal object WebFetchTool {
             .put("input_schema", parameters())
         ProviderProtocol.GEMINI -> GeminiProtocol.declaration(NAME, DESCRIPTION, parameters())
         ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.declaration(NAME, DESCRIPTION, parameters())
+        ProviderProtocol.MINIMAX_VIDEO -> schemaFor(ProviderProtocol.CHAT_COMPLETIONS)
     }
 }
 
@@ -1490,6 +1501,7 @@ internal object ImageGenTool {
             .put("input_schema", parameters())
         ProviderProtocol.GEMINI -> GeminiProtocol.declaration(NAME, DESCRIPTION, parameters())
         ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.declaration(NAME, DESCRIPTION, parameters())
+        ProviderProtocol.MINIMAX_VIDEO -> schemaFor(ProviderProtocol.CHAT_COMPLETIONS)
     }
 }
 
@@ -1528,6 +1540,7 @@ internal object TimeTool {
             .put("input_schema", parameters())
         ProviderProtocol.GEMINI -> GeminiProtocol.declaration(NAME, DESCRIPTION, parameters())
         ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.declaration(NAME, DESCRIPTION, parameters())
+        ProviderProtocol.MINIMAX_VIDEO -> schemaFor(ProviderProtocol.CHAT_COMPLETIONS)
     }
 
     /** 设备本地当前时间；一次调用返回完整描述，模型无需再追问。 */
@@ -1566,6 +1579,7 @@ internal object MemoryTool {
             "Call with {\"content\":\"one concise fact in the user's language\"}."
 
     fun liveLabel(name: String, webDomain: String = ""): String = when (name) {
+        VideoGenTool.NAME -> tr("视频生成中")
         ImageGenTool.NAME -> tr("图片生成中")
         CommonsImageTools.SEARCH -> tr("图片搜索中")
         CommonsImageTools.SHOW -> tr("展示图片")
@@ -1600,6 +1614,7 @@ internal object MemoryTool {
         if (outcome == ToolOutcome.FAILED) return toolFailureLabel(name)
         if (outcome == ToolOutcome.STOPPED) return toolStoppedLabel(name, webDomain)
         return when (name) {
+            VideoGenTool.NAME -> if (content.contains("\"status\":\"succeeded\"")) tr("已生成视频") else tr("视频生成中")
             ImageGenTool.NAME -> when (content) {
                 ImageGenTool.STATUS_FAILED -> tr("生成图片失败")
                 else -> tr("图片生成已停止")
@@ -1698,6 +1713,7 @@ internal object MemoryTool {
             .put("input_schema", parameters)
         ProviderProtocol.GEMINI -> GeminiProtocol.declaration(name, description, parameters)
         ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.declaration(name, description, parameters)
+        ProviderProtocol.MINIMAX_VIDEO -> functionSchema(ProviderProtocol.CHAT_COMPLETIONS, name, description, parameters)
     }
 }
 

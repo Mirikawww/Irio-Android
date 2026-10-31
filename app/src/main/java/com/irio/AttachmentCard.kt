@@ -28,6 +28,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.composables.ui.components.ButtonSize
@@ -67,6 +68,10 @@ internal fun AttachmentCard(
     uploadProgress: AttachmentUploadProgress? = null,
     onOpen: (() -> Unit)? = null,
     onRemove: (() -> Unit)? = null,
+    onDownload: (() -> Unit)? = null,
+    downloadState: String? = null,
+    statusText: String? = null,
+    fileCardWidth: Dp = 192.dp,
 ) {
     val context = LocalContext.current
     // Share the entire card height, not only the inner extension tile.
@@ -117,7 +122,7 @@ internal fun AttachmentCard(
                 }
             } else {
                 Row(
-                    modifier = surface.width(192.dp).height(cardHeight).padding(8.dp),
+                    modifier = surface.width(fileCardWidth).height(cardHeight).padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -149,12 +154,24 @@ internal fun AttachmentCard(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            size?.let { Formatter.formatShortFileSize(context, it) } ?: "…",
+                            statusText ?: size?.let { Formatter.formatShortFileSize(context, it) } ?: "…",
                             color = muted,
                             fontSize = 12.sp,
                             lineHeight = 16.sp,
                             maxLines = 1,
                         )
+                    }
+                    if (downloadState != null) {
+                        IconButton(
+                            onClick = { onDownload?.invoke() },
+                            enabled = onDownload != null,
+                            style = ButtonStyle.Ghost,
+                            buttonSize = ButtonSize.Small,
+                            modifier = Modifier.size(32.dp).semantics { contentDescription = downloadState },
+                        ) {
+                            Icon(if (attachment.downloaded) IrioIcons.Check else IrioIcons.Download,
+                                contentDescription = null, modifier = Modifier.size(18.dp), tint = content)
+                        }
                     }
                 }
             }

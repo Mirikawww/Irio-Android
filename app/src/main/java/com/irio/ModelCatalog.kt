@@ -114,12 +114,21 @@ object ModelCatalog {
     }
 
     fun isImageModel(context: Context, modelId: String): Boolean {
-        if (modelId.isBlank()) return false
+        if (modelId.isBlank() || isVideoModel(context, modelId)) return false
         val catalog = loadImageModels(context)
         return modelId in catalog ||
             modelId.lowercase() in catalog ||
             modelId.substringAfterLast('/').let { tail -> tail != modelId && (tail in catalog || tail.lowercase() in catalog) }
     }
+
+    /** MiniMax Video Generation V2 ids; match exact variants, like the catalog's provider/tail lookup. */
+    @Suppress("UNUSED_PARAMETER")
+    fun isVideoModel(context: Context, modelId: String): Boolean =
+        modelId.substringAfterLast('/').lowercase() in miniMaxVideoModels
+
+    private val miniMaxVideoModels = setOf(
+        "minimax-h3", "minimax-h3-highspeed", "minimax-h3-lite", "minimax-h3-max",
+    )
 
     /** 从 json 文本解析；assets 不可用或出错时返回空表。 */
     fun parseReasoning(text: String): Map<String, ReasoningInfo> {

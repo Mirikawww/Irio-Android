@@ -28,7 +28,7 @@ internal object MermaidTool {
                 .put("description", "Complete Mermaid source, for example flowchart LR\\n  A[Start] --> B[Finish]. No Markdown fences.")))
             .put("required", JSONArray(listOf("source"))).put("additionalProperties", false)
         return when (protocol) {
-            ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().put("type", "function").put("function",
+            ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> JSONObject().put("type", "function").put("function",
                 JSONObject().put("name", NAME).put("description", DESCRIPTION).put("parameters", parameters))
             ProviderProtocol.RESPONSES -> JSONObject().put("type", "function").put("name", NAME)
                 .put("description", DESCRIPTION).put("parameters", parameters).put("strict", true)

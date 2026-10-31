@@ -138,6 +138,7 @@ internal object ChatProtocol {
         model: String = "",
     ) {
         when (protocol) {
+            ProviderProtocol.MINIMAX_VIDEO -> Unit // Video requests do not expose chat reasoning controls.
             ProviderProtocol.GEMINI -> GeminiProtocol.putThinking(target, effort, model)
             ProviderProtocol.GEMINI_INTERACTIONS -> GeminiInteractionsProtocol.putThinking(target, effort, model)
             ProviderProtocol.CHAT_COMPLETIONS -> {

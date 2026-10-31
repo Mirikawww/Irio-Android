@@ -76,7 +76,7 @@ class ToolProviderTest {
     fun defaultRegistryExposesStableBuiltInsAndRuntimeGatesExecution() = runBlocking {
         val registry = ToolRegistry.default()
         val names = registry.definitions(ProviderProtocol.RESPONSES).map { it.optString("name") }
-        assertEquals(listOf("web_search", "web_fetch", "image_search", "show_images", "view_images", "generate_image", "get_time", "search_pronunciations", "react_to_message", "send_colored_bubbles", "render_mermaid", "query_history"), names)
+        assertEquals(listOf("web_search", "web_fetch", "image_search", "show_images", "view_images", "generate_image", "generate_video", "get_time", "search_pronunciations", "react_to_message", "send_colored_bubbles", "render_mermaid", "query_history"), names)
 
         val disabledSearch = registry.execute(
             ChatToolCall("search", WebSearchTool.NAME, "{\"query\":\"kotlin\"}"),

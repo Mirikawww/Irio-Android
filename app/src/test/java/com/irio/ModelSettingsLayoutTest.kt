@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -61,6 +62,11 @@ class ModelSettingsLayoutTest {
                 it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == tr(text) }
             }
             assertEquals("Tools must align with adjacent settings titles", title("单轮工具调用").boundsInRoot.left, title("工具").boundsInRoot.left, 0.5f)
+            assertEquals("Video must use the image model row's start edge", title("图片生成模型").boundsInRoot.left,
+                title("视频生成模型").boundsInRoot.left, 0.5f)
+            assertTrue("Video belongs between image and title models in the same settings hierarchy",
+                title("图片生成模型").boundsInRoot.bottom <= title("视频生成模型").boundsInRoot.top &&
+                    title("视频生成模型").boundsInRoot.bottom <= title("标题生成模型").boundsInRoot.top)
             val layouts = mutableListOf<TextLayoutResult>()
             title("工具").config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
             assertEquals("The Tools entry must use normal weight, not inherit the Button's medium weight",

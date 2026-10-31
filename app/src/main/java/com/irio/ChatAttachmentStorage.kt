@@ -1,10 +1,19 @@
 package com.irio
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import java.io.File
 import java.util.UUID
+
+internal fun attachmentViewChooser(uri: Uri, attachment: ChatAttachment): Intent {
+    val view = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, attachment.mimeType.ifBlank { "*/*" })
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    return Intent.createChooser(view, attachment.name)
+}
 
 internal fun Context.copyAttachment(uri: Uri): ChatAttachment? {
     val name =

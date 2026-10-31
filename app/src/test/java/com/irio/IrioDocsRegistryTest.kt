@@ -31,7 +31,7 @@ class IrioDocsRegistryTest {
         IrioHttp.resetForTests(IrioHttp.defaultClient())
         try {
             okhttp3.mockwebserver.MockWebServer().use { model ->
-                for (protocol in ProviderProtocol.entries) {
+                for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) {
                     model.enqueue(okhttp3.mockwebserver.MockResponse().setHeader("Content-Type", "text/event-stream").setBody(""))
                     ChatApi.streamChat(ProviderConfig("fixture", "Fixture", model.url("/v1beta").toString(), "fixture", protocol),
                         "model", listOf(ChatRequestMessage("user", "Irio documentation?")), ReasoningEffort.OFF, false,

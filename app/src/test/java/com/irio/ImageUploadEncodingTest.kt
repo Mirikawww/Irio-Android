@@ -184,7 +184,7 @@ class ImageUploadEncodingTest {
         val previous = ThemeStore.imageUploadOptions()
         try {
             ThemeStore.saveImageUploadQuality(context, 90)
-            for (format in ImageUploadFormat.entries) for (enabled in listOf(true, false)) for (protocol in ProviderProtocol.entries) MockWebServer().use { server ->
+            for (format in ImageUploadFormat.entries) for (enabled in listOf(true, false)) for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) MockWebServer().use { server ->
                 ThemeStore.saveImageUploadFormat(context, format)
                 ThemeStore.saveImageUploadCompression(context, enabled)
                 IrioHttp.resetForTests()
@@ -224,6 +224,7 @@ class ImageUploadEncodingTest {
 
     private fun imageData(protocol: ProviderProtocol, json: JSONObject): Pair<String, ByteArray> {
         return when (protocol) {
+            ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
             ProviderProtocol.CHAT_COMPLETIONS -> decodeUrl(json.getJSONArray("messages").getJSONObject(0)
                 .getJSONArray("content").getJSONObject(1).getJSONObject("image_url").getString("url"))
             ProviderProtocol.RESPONSES -> decodeUrl(json.getJSONArray("input").getJSONObject(0)

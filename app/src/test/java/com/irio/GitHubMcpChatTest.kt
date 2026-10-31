@@ -13,7 +13,7 @@ class GitHubMcpChatTest {
         IrioHttp.resetForTests(IrioHttp.defaultClient())
         try {
             MockWebServer().use { model ->
-                for (protocol in ProviderProtocol.entries) {
+                for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) {
                     for (connected in listOf(false, true)) {
                         for (hints in listOf(false, true)) {
                             model.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(""))
@@ -44,6 +44,7 @@ class GitHubMcpChatTest {
     }
 
     private fun systemPrompt(request: JSONObject, protocol: ProviderProtocol): String = when (protocol) {
+        ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
         ProviderProtocol.CHAT_COMPLETIONS -> request.getJSONArray("messages").getJSONObject(0).getString("content")
         ProviderProtocol.RESPONSES -> request.getString("instructions")
         ProviderProtocol.ANTHROPIC -> request.getString("system")

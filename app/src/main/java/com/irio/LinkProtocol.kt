@@ -240,6 +240,10 @@ object LinkConversationJson {
                                 put("retryGroup", message.groupId)
                                 put("selected", message.selected)
                                 if (message.hidden) put("hidden", true)
+                                val videos = message.attachments.filter { it.isGeneratedVideo }
+                                if (videos.isNotEmpty()) put("attachments", JSONArray(videos.map { video ->
+                                    JSONObject().put("name", video.name).put("mimeType", video.mimeType).put("remoteUrl", video.remoteUrl)
+                                }))
                                 if (message.toolRecords.isNotEmpty()) put("toolRecords", toolRecordsJson(message.toolRecords))
                                 if (message.finishedAt > 0L) put("finishedAt", message.finishedAt)
                                 if (message.summaryState != SummaryState.NONE) {
@@ -301,6 +305,14 @@ object LinkConversationJson {
                         modelReaction = modelReactionFrom(item),
                         userReaction = userReactionFrom(item),
                         fromUser = item.optBoolean("fromUser"),
+                        attachments = item.optJSONArray("attachments")?.let { array ->
+                            (0 until array.length()).mapNotNull { index ->
+                                val video = array.optJSONObject(index) ?: return@mapNotNull null
+                                val url = video.optString("remoteUrl")
+                                if (!video.optString("mimeType").startsWith("video/") || url.isBlank()) null
+                                else ChatAttachment(video.optString("name"), video.optString("mimeType"), "", remoteUrl = url)
+                            }
+                        }.orEmpty(),
                         process = processEventsFrom(item),
                         toolRecords = toolRecordsFrom(item),
                         isError = item.optBoolean("isError") || item.has("retryStatus"),

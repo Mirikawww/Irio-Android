@@ -27,7 +27,7 @@ internal object ColoredBubbleTool {
             .put("bubbles", JSONObject().put("type", "array").put("minItems", 1).put("maxItems", 12).put("items", bubble)))
             .put("required", JSONArray(listOf("bubbles"))).put("additionalProperties", false)
         return when (protocol) {
-            ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().put("type", "function").put("function",
+            ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> JSONObject().put("type", "function").put("function",
                 JSONObject().put("name", NAME).put("description", DESCRIPTION).put("parameters", parameters))
             ProviderProtocol.RESPONSES -> JSONObject().put("type", "function").put("name", NAME)
                 .put("description", DESCRIPTION).put("parameters", parameters).put("strict", true)

@@ -53,7 +53,7 @@ class ProviderHeadersTest {
             server.start()
             IrioHttp.resetForTests(IrioHttp.defaultClient())
             try {
-                for (protocol in ProviderProtocol.entries) {
+                for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) {
                     server.enqueue(okhttp3.mockwebserver.MockResponse().setBody(""))
                     val provider = ProviderConfig("p", "Fixture", server.url("/v1").toString(), "default-key",
                         protocol = protocol, customHeaders = listOf(

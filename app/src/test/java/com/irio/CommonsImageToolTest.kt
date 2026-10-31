@@ -114,7 +114,7 @@ class CommonsImageToolTest {
 
     @Test fun realChatAcrossEveryProtocolSendsPixelsOnlyAfterExplicitView() = runBlocking {
         org.robolectric.shadows.ShadowEnvironment.addExternalDir(app.cacheDir.resolve("external").absolutePath)
-        for (protocol in ProviderProtocol.entries) {
+        for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) {
             MockWebServer().use { media -> MockWebServer().use { model ->
                 media.enqueue(MockResponse().setBody(response))
                 media.enqueue(MockResponse().setHeader("Content-Type", "image/png").setBody(okio.Buffer().write(png)))
@@ -129,6 +129,7 @@ class CommonsImageToolTest {
                     model.enqueue(toolFrame(protocol, "show", "show_images", """{"image_ids":["img:1"]}"""))
                     model.enqueue(toolFrame(protocol, "view", "view_images", """{"image_ids":["img:1"]}"""))
                     model.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(when (protocol) {
+                        ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
                         ProviderProtocol.CHAT_COMPLETIONS -> "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
                         ProviderProtocol.RESPONSES -> "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[]}}\n\n"
                         ProviderProtocol.ANTHROPIC -> "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}\n\n"
@@ -161,6 +162,7 @@ class CommonsImageToolTest {
 
     private fun toolFrame(protocol: ProviderProtocol, id: String, name: String, args: String): MockResponse {
         val body = when (protocol) {
+            ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
             ProviderProtocol.CHAT_COMPLETIONS -> {
                 val call = JSONObject().put("index", 0).put("id", id).put("function", JSONObject().put("name", name).put("arguments", args))
                 val frame = JSONObject().put("choices", org.json.JSONArray().put(JSONObject().put("delta", JSONObject()

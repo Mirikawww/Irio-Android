@@ -2,6 +2,12 @@ package com.irio
 
 import androidx.compose.ui.graphics.Color
 
+/** Creation completed, but the real video task remains queued or running. */
+internal fun videoGenerationPending(event: ProcessEvent): Boolean =
+    event.toolName == VideoGenTool.NAME && event.toolOutcome == ToolOutcome.SUCCESS &&
+        runCatching { org.json.JSONObject(event.content).optString("status") }
+            .getOrNull() in setOf("queued", "running")
+
 internal fun toolStatusTextColor(outcome: ToolOutcome?, dark: Boolean, muted: Color, error: Color): Color = when (outcome) {
     ToolOutcome.FAILED -> error
     // Darker yellow remains readable on the light background.
@@ -13,6 +19,7 @@ internal fun toolFailureLabel(name: String): String = when (name) {
     WebSearchTool.NAME -> tr("搜索失败")
     WebFetchTool.NAME -> tr("浏览网页失败")
     ImageGenTool.NAME -> tr("生成图片失败")
+    VideoGenTool.NAME -> tr("生成视频失败")
     CommonsImageTools.SEARCH -> tr("图片搜索失败")
     CommonsImageTools.VIEW -> tr("图片查看失败")
     CommonsImageTools.SHOW -> tr("图片展示失败")
@@ -39,6 +46,7 @@ internal fun toolStoppedLabel(name: String, webDomain: String = ""): String = wh
     WebFetchTool.NAME -> tr("网页读取已停止")
     LinguaLibreTool.NAME -> tr("发音检索已停止")
     ImageGenTool.NAME -> tr("图片生成已停止")
+    VideoGenTool.NAME -> tr("视频生成已停止")
     CommonsImageTools.SEARCH -> tr("图片搜索已停止")
     CommonsImageTools.VIEW -> tr("图片查看已停止")
     HistoryTool.NAME -> tr("历史会话查询已停止")

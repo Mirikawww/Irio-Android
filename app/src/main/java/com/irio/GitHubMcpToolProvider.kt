@@ -12,7 +12,7 @@ internal class GitHubMcpToolProvider(
         val name = PREFIX + tool.name
         val parameters = JSONObject(tool.inputSchema.toString())
         when (protocol) {
-            ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().put("type", "function").put("function",
+            ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> JSONObject().put("type", "function").put("function",
                 JSONObject().put("name", name).put("description", tool.description).put("parameters", parameters))
             // Remote schemas may have optional fields; do not opt into Responses' strict defaults.
             ProviderProtocol.RESPONSES -> JSONObject().put("type", "function").put("name", name)

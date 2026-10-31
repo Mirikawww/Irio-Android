@@ -8,7 +8,7 @@ internal fun ChatScreenState.compressionModelId(): String {
     val configured = ToolStore.loadCompressionModel(context)
     return when {
         configured.isNotBlank() -> configured
-        !ModelCatalog.isImageModel(context, selectedModel) -> selectedModel
+        !ModelCatalog.isImageModel(context, selectedModel) && !ModelCatalog.isVideoModel(context, selectedModel) -> selectedModel
         else -> ProviderStore.loadLastChatModel(context)
     }
 }
@@ -79,11 +79,13 @@ internal fun ChatScreenState.sendOrCompress(
     conversationId: String,
     source: List<ChatMessage>,
     reply: ChatMessage,
+    modelOverride: String? = null,
+    providerOverride: ProviderConfig? = null,
 ) {
     // 同一回复只预检一次；占位同步写入，调用方 guards 据此拦截重复提交。
     if (reply.id in preparing) return
     preparing = preparing + (reply.id to conversationId)
-    val requestModel = selectedModel
+    val requestModel = modelOverride ?: selectedModel
     val compressionEnabled = ToolStore.loadContextCompression(context)
     val compressionTrigger = ToolStore.loadCompressionTrigger(context)
     val requestPreparation = GenerationRequestPreparation(source)
@@ -96,12 +98,12 @@ internal fun ChatScreenState.sendOrCompress(
                     requestPreparation.compressionPlan(
                         enabled = compressionEnabled,
                         triggerPercent = compressionTrigger,
-                        isImageModel = { ModelCatalog.isImageModel(context, requestModel) },
+                        isImageModel = { ModelCatalog.isImageModel(context, requestModel) || ModelCatalog.isVideoModel(context, requestModel) },
                         contextWindow = { ModelCatalog.contextWindow(context, requestModel) },
                     )
                 }
             if (plan == null) {
-                startGeneration(conversationId, source, reply, requestPreparation)
+                startGeneration(conversationId, source, reply, requestPreparation, modelOverride, providerOverride)
                 return@launch
             }
             val card =
@@ -143,7 +145,7 @@ internal fun ChatScreenState.sendOrCompress(
                             contextMessages(messagesOf(conversationId)).filterNot {
                                 it.id == reply.id || it.isError || it.isPending
                             }
-                        startGeneration(conversationId, nextSource, reply)
+                        startGeneration(conversationId, nextSource, reply, modelOverride = modelOverride, providerOverride = providerOverride)
                     }
                 }
             generations =
@@ -156,6 +158,7 @@ internal fun ChatScreenState.sendOrCompress(
                         ))
         } finally {
             preparing = preparing - reply.id
+            flushVideoResults(conversationId)
         }
     }
 }

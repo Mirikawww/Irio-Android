@@ -19,7 +19,7 @@ class ImageGenToolTest {
             val parameters = when (protocol) {
                 ProviderProtocol.GEMINI -> schema.getJSONObject("parametersJsonSchema")
                 ProviderProtocol.GEMINI_INTERACTIONS, ProviderProtocol.RESPONSES -> schema.getJSONObject("parameters")
-                ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
+                ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> schema.getJSONObject("function").getJSONObject("parameters")
                 ProviderProtocol.ANTHROPIC -> schema.getJSONObject("input_schema")
             }
             val properties = parameters.getJSONObject("properties")
@@ -89,7 +89,7 @@ class ImageGenToolTest {
             val parameters = when (protocol) {
                 ProviderProtocol.GEMINI -> schema.optJSONObject("parametersJsonSchema")
                 ProviderProtocol.GEMINI_INTERACTIONS -> schema.optJSONObject("parameters")
-                ProviderProtocol.CHAT_COMPLETIONS -> schema.optJSONObject("function")?.optJSONObject("parameters")
+                ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> schema.optJSONObject("function")?.optJSONObject("parameters")
                 ProviderProtocol.RESPONSES -> schema.optJSONObject("parameters")
                 ProviderProtocol.ANTHROPIC -> schema.optJSONObject("input_schema")
             }

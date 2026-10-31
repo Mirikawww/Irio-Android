@@ -16,6 +16,7 @@ internal fun ChatScreenState.flushBackgroundNotices(conversationId: String) {
     if (preparing.values.any { it == conversationId }) return
     val queued = pendingBackgroundNotices.remove(conversationId)?.toList().orEmpty()
     if (queued.isNotEmpty()) deliverBackgroundNotices(conversationId, queued)
+    flushVideoResults(conversationId)
     flushSubagentResults(conversationId)
 }
 

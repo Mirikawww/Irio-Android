@@ -5,13 +5,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal enum class ToolBlockedReason {
-    WEB_SEARCH, SEARCH_KEY, IMAGE_SEARCH_KEY, IMAGE_MODEL, MEMORY, SUBAGENTS, LINUX, STORAGE, LINUX_BACKGROUND, GITHUB, TODOIST, IRIO_DOCS;
+    WEB_SEARCH, SEARCH_KEY, IMAGE_SEARCH_KEY, IMAGE_MODEL, VIDEO_MODEL, MEMORY, SUBAGENTS, LINUX, STORAGE, LINUX_BACKGROUND, GITHUB, TODOIST, IRIO_DOCS;
 
     fun message(): String = tr(when (this) {
         WEB_SEARCH -> "请先在对话中开启「网络搜索」"
         SEARCH_KEY -> "请先在「搜索」中配置搜索提供商的 API 密钥"
         IMAGE_SEARCH_KEY -> "请先在「搜索」中配置 SerpAPI 的 API 密钥"
         IMAGE_MODEL -> "请先在「模型」中配置图片生成模型"
+        VIDEO_MODEL -> "请先在「模型」中配置视频生成模型"
         MEMORY -> "请先在「记忆」中开启记忆"
         SUBAGENTS -> "请先在「模型」中开启「子智能体」"
         LINUX -> "请先在「Linux 沙盒」中开启「启用 Linux 沙盒」"
@@ -28,6 +29,7 @@ internal data class ToolFeatureState(
     val searchConfigured: Boolean = false,
     val imageSearchConfigured: Boolean = false,
     val imageConfigured: Boolean = false,
+    val videoConfigured: Boolean = false,
     val memoryEnabled: Boolean = false,
     val subagentsEnabled: Boolean = false,
     val linuxEnabled: Boolean = false,
@@ -57,6 +59,7 @@ internal object ToolCatalog {
             searchConfigured = SearchStore.hasApiKey(context),
             imageSearchConfigured = SearchStore.hasImageApiKey(context),
             imageConfigured = ToolStore.loadImageGenModel(context).let { it.isNotBlank() && ModelCatalog.isImageModel(context, it) },
+            videoConfigured = configuredVideoGenModel(context).isNotBlank(),
             memoryEnabled = MemoryStore.loadEnabled(context),
             subagentsEnabled = ToolStore.loadSubagents(context),
             linuxEnabled = LinuxSandboxStore.loadEnabled(sandbox),
@@ -121,6 +124,7 @@ internal object ToolCatalog {
         CommonsImageTools.SHOW -> "展示图片"
         CommonsImageTools.VIEW -> "查看图片"
         ImageGenTool.NAME -> "生成图片"
+        VideoGenTool.NAME -> "生成视频"
         TimeTool.NAME -> "获取时间"
         LinguaLibreTool.NAME -> "检索发音"
         HistoryTool.NAME -> "查询历史会话"
@@ -151,6 +155,7 @@ internal object ToolCatalog {
             else -> null
         }
         ImageGenTool.NAME -> if (features.imageConfigured) null else ToolBlockedReason.IMAGE_MODEL
+        VideoGenTool.NAME -> if (features.videoConfigured) null else ToolBlockedReason.VIDEO_MODEL
         MemoryTool.GET, MemoryTool.UPDATE -> if (features.memoryEnabled) null else ToolBlockedReason.MEMORY
         in SubagentTools.NAMES -> if (features.subagentsEnabled) null else ToolBlockedReason.SUBAGENTS
         LinuxShellTool.NAME, LinuxBackgroundTool.NAME -> when {

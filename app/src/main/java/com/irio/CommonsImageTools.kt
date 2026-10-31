@@ -86,7 +86,7 @@ internal object CommonsImageTools {
                 .put("required", JSONArray().put("image_ids")).put("additionalProperties", false)
         }
         return when (protocol) {
-            ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().put("type", "function").put("function",
+            ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> JSONObject().put("type", "function").put("function",
                 JSONObject().put("name", name).put("description", description).put("parameters", parameters))
             ProviderProtocol.RESPONSES -> JSONObject().put("type", "function").put("name", name)
                 .put("description", description).put("parameters", parameters).put("strict", false)

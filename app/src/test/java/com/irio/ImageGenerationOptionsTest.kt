@@ -10,7 +10,7 @@ import java.nio.file.Files
 class ImageGenerationOptionsTest {
     @Test fun imagesRequestsDefaultToNonStreamingWithOrWithoutOptions() {
         val config = ProviderConfig("fixture", "Fixture", "https://example.invalid/v1", "fixture")
-        ProviderProtocol.entries.filterNot { it.isGoogleGemini }.forEach { protocol ->
+        ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }.filterNot { it.isGoogleGemini }.forEach { protocol ->
             listOf(null, ImageGenerationOptions()).forEach { options ->
                 val body = ProviderApi.imageRequestBody(config.copy(protocol = protocol), "gpt-image-2", "fixture", options = options)
                 assertFalse(body.getBoolean("stream"))
@@ -21,7 +21,7 @@ class ImageGenerationOptionsTest {
 
     @Test fun streamingRequestsUseThreePartialImagesWithOrWithoutOptions() {
         val config = ProviderConfig("fixture", "Fixture", "https://example.invalid/v1", "fixture")
-        ProviderProtocol.entries.filterNot { it.isGoogleGemini }.forEach { protocol ->
+        ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }.filterNot { it.isGoogleGemini }.forEach { protocol ->
             listOf(null, ImageGenerationOptions()).forEach { options ->
                 val body = ProviderApi.imageRequestBody(config.copy(protocol = protocol), "gpt-image-2", "fixture", options = options, streaming = true)
                 assertTrue(body.getBoolean("stream"))

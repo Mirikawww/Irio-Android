@@ -26,6 +26,7 @@ internal object ProviderEndpoints {
     fun chatUrl(provider: ProviderConfig, model: String = "", streaming: Boolean = true): String {
         val base = if (provider.protocol.isGoogleGemini) geminiBase(provider.endpointUrl) else apiBase(provider.endpointUrl)
         return when (provider.protocol) {
+            ProviderProtocol.MINIMAX_VIDEO -> throw IllegalArgumentException("MiniMax Video Generation V2 does not support chat requests")
             ProviderProtocol.GEMINI_INTERACTIONS -> "$base/interactions" + if (streaming) "?alt=sse" else ""
             ProviderProtocol.GEMINI -> {
                 val id = model.removePrefix("models/")

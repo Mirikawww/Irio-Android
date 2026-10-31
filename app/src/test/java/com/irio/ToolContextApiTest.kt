@@ -74,7 +74,7 @@ class ToolContextApiTest {
                 assertEquals(records.map { it.result }, messages.filter { it.role == "tool" }.map { it.text })
                 val summary = summaryTurns(planCompression(reopened.messages)!!)[1].text
                 records.forEach { assertTrue(summary.contains(it.call.arguments)); assertTrue(summary.contains(it.result)) }
-                ProviderProtocol.entries.forEach { protocol ->
+                ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }.forEach { protocol ->
                     server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(""))
                     ChatApi.streamChat(
                         provider.copy(protocol = protocol), "model", messages, ReasoningEffort.OFF, false,
@@ -82,6 +82,7 @@ class ToolContextApiTest {
                     )
                     val body = JSONObject(server.takeRequest(2, TimeUnit.SECONDS)!!.body.readUtf8())
                     val payload = when (protocol) {
+                        ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
                         ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.ANTHROPIC -> body.getJSONArray("messages")
                         ProviderProtocol.RESPONSES, ProviderProtocol.GEMINI_INTERACTIONS -> body.getJSONArray("input")
                         ProviderProtocol.GEMINI -> body.getJSONArray("contents")

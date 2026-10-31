@@ -142,7 +142,7 @@ class LinguaLibreTest {
         MockWebServer().use { model ->
             for (enabled in listOf(true, false)) {
                 ToolPreferencesStore.saveEnabled(context, LinguaLibreTool.NAME, enabled)
-                for (protocol in ProviderProtocol.entries) {
+                for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) {
                     model.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(""))
                     val registry = chatToolRegistry(context, false, "")
                     ChatApi.streamChat(ProviderConfig("test", "Test", model.url("/v1beta").toString(), "fixture", protocol),

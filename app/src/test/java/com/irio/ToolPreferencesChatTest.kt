@@ -21,7 +21,7 @@ class ToolPreferencesChatTest {
         org.robolectric.shadows.ShadowEnvironment.addExternalDir(context.cacheDir.resolve("external").absolutePath)
         ToolPreferencesStore.saveEnabled(context, TimeTool.NAME, false)
         ToolPreferencesStore.saveDescription(context, ReactionTool.NAME, "A custom description repeated for token accounting. ".repeat(20))
-        for (protocol in ProviderProtocol.entries) {
+        for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) {
             val registry = chatToolRegistry(context, webSearch = false, imageGenModel = "")
             assertFalse(registry.definitions(protocol).any { (it.optJSONObject("function") ?: it).getString("name") == TimeTool.NAME })
             val expected = estimateSystemPromptTokens(registry.systemPrompt(chatSystemPrompt(context)),
@@ -41,7 +41,7 @@ class ToolPreferencesChatTest {
         IrioHttp.resetForTests(IrioHttp.defaultClient())
         try {
             MockWebServer().use { model ->
-                for (protocol in ProviderProtocol.entries) {
+                for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) {
                     val registry = chatToolRegistry(context, webSearch = false, imageGenModel = "")
                     registry.register(GitHubMcpToolProvider(listOf(
                         McpTool("hidden", "Hidden", JSONObject("""{"type":"object","properties":{}}""")),
@@ -85,7 +85,7 @@ class ToolPreferencesChatTest {
                     ToolPreferencesStore.saveEnabled(context, HistoryTool.NAME, enabled)
                     for (hints in listOf(false, true)) {
                         ToolStore.saveSmartToolHints(context, hints)
-                        for (protocol in ProviderProtocol.entries) {
+                        for (protocol in ProviderProtocol.entries.filter { it != ProviderProtocol.MINIMAX_VIDEO }) {
                             val registry = chatToolRegistry(context, webSearch = false, imageGenModel = "")
                             model.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(""))
                             ChatApi.streamChat(
@@ -115,6 +115,7 @@ class ToolPreferencesChatTest {
     }
 
     private fun prompt(request: JSONObject, protocol: ProviderProtocol): String = when (protocol) {
+        ProviderProtocol.MINIMAX_VIDEO -> error("Video protocol is not chat")
         ProviderProtocol.CHAT_COMPLETIONS -> request.getJSONArray("messages").getJSONObject(0).getString("content")
         ProviderProtocol.RESPONSES -> request.getString("instructions")
         ProviderProtocol.ANTHROPIC -> request.getString("system")

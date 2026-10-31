@@ -25,7 +25,7 @@ internal object ReactionTool {
             .put("required", JSONArray().put("message_id").put("emoji"))
             .put("additionalProperties", false)
         return when (protocol) {
-            ProviderProtocol.CHAT_COMPLETIONS -> JSONObject().put("type", "function").put(
+            ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> JSONObject().put("type", "function").put(
                 "function", JSONObject().put("name", NAME).put("description", DESCRIPTION).put("parameters", parameters),
             )
             ProviderProtocol.RESPONSES -> JSONObject().put("type", "function").put("name", NAME)

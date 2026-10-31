@@ -45,7 +45,9 @@ internal fun ChatAttachmentList(
         verticalAlignment = Alignment.Bottom,
     ) {
         attachments.forEachIndexed { index, attachment ->
-            AttachmentCard(
+            if (attachment.isGeneratedVideo && onRemove == null) {
+                GeneratedVideoAttachmentCard(attachment, onOpen = onOpen)
+            } else AttachmentCard(
                 attachment = attachment,
                 loading = attachment.filePath in loadingFiles,
                 uploadProgress =

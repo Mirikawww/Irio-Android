@@ -276,7 +276,7 @@ class LinuxSandboxTest {
         ProviderProtocol.entries.forEach { protocol ->
             val schema = LinuxShellTool.schemaFor(protocol)
             val name = when (protocol) {
-                ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getString("name")
+                ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> schema.getJSONObject("function").getString("name")
                 else -> schema.getString("name")
             }
             assertEquals(LinuxShellTool.NAME, name)
@@ -382,7 +382,7 @@ class LinuxSandboxTest {
             assertTrue((0 until required.length()).any { required.getString(it) == "background" })
             val backgroundTool = LinuxBackgroundTool.schemaFor(protocol)
             val name = when (protocol) {
-                ProviderProtocol.CHAT_COMPLETIONS -> backgroundTool.getJSONObject("function").getString("name")
+                ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> backgroundTool.getJSONObject("function").getString("name")
                 else -> backgroundTool.getString("name")
             }
             assertEquals(LinuxBackgroundTool.NAME, name)
@@ -497,7 +497,7 @@ class LinuxSandboxTest {
     private fun parametersOf(schema: org.json.JSONObject, protocol: ProviderProtocol): org.json.JSONObject =
         when (protocol) {
             ProviderProtocol.GEMINI -> schema.getJSONObject("parametersJsonSchema")
-            ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
+            ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> schema.getJSONObject("function").getJSONObject("parameters")
             ProviderProtocol.ANTHROPIC -> schema.getJSONObject("input_schema")
             else -> schema.getJSONObject("parameters")
         }
@@ -517,7 +517,7 @@ class LinuxSandboxTest {
         val schema = LinuxShellTool.schemaFor(protocol, limit)
         val parameters = when (protocol) {
             ProviderProtocol.GEMINI -> schema.getJSONObject("parametersJsonSchema")
-            ProviderProtocol.CHAT_COMPLETIONS -> schema.getJSONObject("function").getJSONObject("parameters")
+            ProviderProtocol.CHAT_COMPLETIONS, ProviderProtocol.MINIMAX_VIDEO -> schema.getJSONObject("function").getJSONObject("parameters")
             ProviderProtocol.ANTHROPIC -> schema.getJSONObject("input_schema")
             else -> schema.getJSONObject("parameters")
         }

@@ -257,6 +257,8 @@ internal fun ChatScreenState.newConversation(closeDrawer: Boolean = true) {
 
 internal fun ChatScreenState.clearAllHistory() {
     clearingHistory = true
+    VideoGenerationJobs.forgetAll()
+    pendingVideoResults.clear()
     titleGeneration.clear()
     generations.values.forEach { it.cancellation.cancel() }
     IrioHttp.evictAllScopes()
@@ -298,6 +300,8 @@ internal fun ChatScreenState.togglePinned(conversation: ConversationSummary) {
 }
 
 internal fun ChatScreenState.deleteConversation(conversation: ConversationSummary) {
+    VideoGenerationJobs.forgetConversation(conversation.id)
+    pendingVideoResults.entries.removeAll { it.value.conversationId == conversation.id }
     titleGeneration.cancel(conversation.id)
     if (conversation.id in generatingIds) stopGeneration(conversation.id)
     IrioHttp.evictConversation(conversation.id)
@@ -324,7 +328,7 @@ internal fun ChatScreenState.maybeGenerateTitle(
     val titleModel =
         when {
             configured.isNotBlank() -> configured
-            !ModelCatalog.isImageModel(context, selectedModel) -> selectedModel
+            !ModelCatalog.isImageModel(context, selectedModel) && !ModelCatalog.isVideoModel(context, selectedModel) -> selectedModel
             else -> ProviderStore.loadLastChatModel(context)
         }
     if (titleModel.isBlank()) {

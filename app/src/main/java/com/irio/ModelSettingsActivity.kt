@@ -87,7 +87,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
     var maxRounds by remember { mutableIntStateOf(ToolStore.loadMaxRounds(context)) }
     var modelsDevReasoning by remember { mutableStateOf(ProviderStore.loadModelsDevReasoning(context)) }
     var imageGenModel by remember { mutableStateOf(ToolStore.loadImageGenModel(context)) }
-    var imageGenMenuOpen by remember { mutableStateOf(false) }
+    var videoGenModel by remember { mutableStateOf(ToolStore.loadVideoGenModel(context)) }
     var titleModel by remember { mutableStateOf(ToolStore.loadTitleModel(context)) }
     var messageTimestamps by remember { mutableStateOf(ToolStore.loadMessageTimestamps(context)) }
     var smartToolHints by remember { mutableStateOf(ToolStore.loadSmartToolHints(context)) }
@@ -216,11 +216,19 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                 )
             }
             SettingsSectionCard {
-                ImageGenModelPicker(
+                GenerationModelPicker(
                     selected = imageGenModel,
                     onSelect = { model ->
                         imageGenModel = model
                         ToolStore.saveImageGenModel(context, model)
+                    },
+                )
+                GenerationModelPicker(
+                    selected = videoGenModel,
+                    video = true,
+                    onSelect = { model ->
+                        videoGenModel = model
+                        ToolStore.saveVideoGenModel(context, model)
                     },
                 )
                 TitleModelPicker(
@@ -380,19 +388,22 @@ private fun SystemPromptRow(onClick: () -> Unit) {
     }
 }
 
-/** 图片生成工具的默认模型选择：聚合所有提供商的模型，按提供商分组展示。 */
+/** Generation tools share the same grouped model picker and settings-row hierarchy. */
 @Composable
-private fun ImageGenModelPicker(
+private fun GenerationModelPicker(
     selected: String,
     onSelect: (String) -> Unit,
+    video: Boolean = false,
 ) {
     val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
-    // 只列生图模型（models.dev modalities.output 含 image）；普通聊天模型不该被选为图片生成目标。
+    // Each tool lists only its own modality, never ordinary chat models.
     val providers = remember { ProviderStore.loadProviders(context) }
         .filter { it.enabled }
         .map { provider ->
-            provider.copy(models = provider.enabledModels().filter { model -> ModelCatalog.isImageModel(context, model) })
+            provider.copy(models = provider.enabledModels().filter { model ->
+                if (video) ModelCatalog.isVideoModel(context, model) else ModelCatalog.isImageModel(context, model)
+            })
         }
         .filter { it.models.isNotEmpty() }
     val options = remember(providers) {
@@ -474,7 +485,8 @@ private fun ImageGenModelPicker(
         val interactionSource = remember { MutableInteractionSource() }
         Row(
             modifier = Modifier
-                .settingsSearchAnchor("model.image", edge = SettingsSearchEdge.Top)
+                .settingsSearchAnchor(if (video) "model.video" else "model.image",
+                    edge = if (video) SettingsSearchEdge.Flat else SettingsSearchEdge.Top)
                 .fillMaxWidth()
                 .clickable(
                     interactionSource = interactionSource,
@@ -485,7 +497,7 @@ private fun ImageGenModelPicker(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(tr("图片生成模型"), color = Theme[colors][onPanelColor])
+                Text(tr(if (video) "视频生成模型" else "图片生成模型"), color = Theme[colors][onPanelColor])
                 Text(
                     selectedLabel,
                     color = Theme[colors][mutedColor],
@@ -504,7 +516,7 @@ private fun ImageGenModelPicker(
             ) {
                 Icon(
                     imageVector = IrioIcons.ChevronDown,
-                    contentDescription = tr("选择图片生成模型"),
+                    contentDescription = tr(if (video) "选择视频生成模型" else "选择图片生成模型"),
                     tint = Theme[colors][onPanelColor],
                     modifier = Modifier.size(20.dp),
                 )
@@ -513,7 +525,7 @@ private fun ImageGenModelPicker(
     }
 }
 
-/** 标题生成模型选择：列非图片模型；空选 = 跟随当前对话模型（当前是图片模型时用上次对话模型）。 */
+/** Chat-only targets for title, subagent and compression generation; blank follows the conversation. */
 @Composable
 private fun TitleModelPicker(
     selected: String,
@@ -527,7 +539,9 @@ private fun TitleModelPicker(
     val providers = remember { ProviderStore.loadProviders(context) }
         .filter { it.enabled }
         .map { provider ->
-            provider.copy(models = provider.enabledModels().filterNot { model -> ModelCatalog.isImageModel(context, model) })
+            provider.copy(models = provider.enabledModels().filterNot { model ->
+                ModelCatalog.isImageModel(context, model) || ModelCatalog.isVideoModel(context, model)
+            })
         }
         .filter { it.models.isNotEmpty() }
     val options = remember(providers) {
