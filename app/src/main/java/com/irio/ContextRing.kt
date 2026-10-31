@@ -107,6 +107,7 @@ internal fun ContextUsageRing(
             size = size,
             strokeWidth = strokeWidth,
             modifier = Modifier
+                .clip(ToolbarCapsuleShape)
                 .clickable(role = Role.Button) { onExpandedChange(!expanded) }
                 .padding(horizontal = 10.dp, vertical = 10.dp),
         )
