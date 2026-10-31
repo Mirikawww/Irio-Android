@@ -623,10 +623,11 @@ private fun UserEditVersionSwitcher(
 @Composable
 internal fun MessageRetryButton(enabled: Boolean, onClick: () -> Unit) {
     val muted = Theme[colors][mutedColor]
-    Icon(
+    MessageActionIconButton(
         imageVector = IrioIcons.RefreshCw,
         contentDescription = tr("重试"),
-        modifier = Modifier.size(18.dp).clickable(enabled = enabled, onClick = onClick),
+        enabled = enabled,
+        onClick = onClick,
         tint = muted.copy(alpha = if (enabled) 1f else 0.35f),
     )
 }
@@ -658,20 +659,20 @@ private fun AssistantActions(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
+        MessageActionIconButton(
             imageVector = if (copyConfirmation.confirmed) IrioIcons.Check else IrioIcons.Copy,
             contentDescription = tr(if (copyConfirmation.confirmed) "已复制" else "复制"),
-            modifier = Modifier.size(18.dp).clickable(onClick = { copyConfirmation.copy(onCopy) }),
+            onClick = { copyConfirmation.copy(onCopy) },
             tint = muted,
         )
         if (canRetry) {
             MessageRetryButton(enabled = retryEnabled, onClick = onRetry)
         }
         if (onSpeak != null) {
-            Icon(
+            MessageActionIconButton(
                 imageVector = IrioIcons.Volume2,
                 contentDescription = tr("朗读"),
-                modifier = Modifier.size(18.dp).clickable(onClick = onSpeak),
+                onClick = onSpeak,
                 tint = if (speaking) Theme[colors][onBackgroundColor] else muted,
             )
         }
@@ -684,27 +685,21 @@ private fun AssistantActions(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Icon(
+                MessageActionIconButton(
                     imageVector = IrioIcons.ChevronLeft,
                     contentDescription = tr("上一个回复"),
-                    modifier =
-                        Modifier.size(16.dp)
-                            .clickable(
-                                enabled = onPrevVersion != null,
-                                onClick = { onPrevVersion?.invoke() },
-                            ),
+                    iconSize = 16.dp,
+                    enabled = onPrevVersion != null,
+                    onClick = { onPrevVersion?.invoke() },
                     tint = muted.copy(alpha = if (onPrevVersion != null) 1f else 0.35f),
                 )
                 Text("$versionIndex / $versionCount", color = muted, fontSize = 13.sp)
-                Icon(
+                MessageActionIconButton(
                     imageVector = IrioIcons.ChevronRight,
                     contentDescription = tr("下一个回复"),
-                    modifier =
-                        Modifier.size(16.dp)
-                            .clickable(
-                                enabled = onNextVersion != null,
-                                onClick = { onNextVersion?.invoke() },
-                            ),
+                    iconSize = 16.dp,
+                    enabled = onNextVersion != null,
+                    onClick = { onNextVersion?.invoke() },
                     tint = muted.copy(alpha = if (onNextVersion != null) 1f else 0.35f),
                 )
             }

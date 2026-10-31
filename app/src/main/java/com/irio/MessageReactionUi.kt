@@ -2,7 +2,6 @@ package com.irio
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -96,18 +95,15 @@ internal fun AssistantReactionButton(
     onRemove: () -> Unit,
 ) {
     // Retain the original icon's 18dp footprint; the emoji draws beyond it without resizing the row.
-    Box(
-        modifier = Modifier.size(18.dp)
+    MessageActionButton(
+        contentDescription = if (emoji.isEmpty()) "Add Reaction" else tr("撤销回应") + " " + emoji,
+        onClick = if (emoji.isEmpty()) onAdd else onRemove,
+        modifier = Modifier
             .graphicsLayer {
                 scaleX = bounce.value
                 scaleY = bounce.value
                 clip = false
-            }
-            .semantics {
-                contentDescription = if (emoji.isEmpty()) "Add Reaction" else tr("撤销回应") + " " + emoji
-            }
-            .clickable(onClick = if (emoji.isEmpty()) onAdd else onRemove),
-        contentAlignment = Alignment.Center,
+            },
     ) {
         if (emoji.isEmpty()) {
             Icon(
