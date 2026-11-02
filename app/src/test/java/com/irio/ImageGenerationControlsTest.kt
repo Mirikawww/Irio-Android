@@ -86,7 +86,10 @@ class ImageGenerationControlsTest {
             assertTrue("Image parameters must not replace the thinking slider", nodes.any {
                 it.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }.contains(tr("思考强度"))
             })
-            fun text(label: String) = nodes.single {
+            fun text(label: String) = nodes.singleOrNull {
+                it.config.contains(SemanticsActions.OnClick) &&
+                    tr(label) in it.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }
+            } ?: nodes.single {
                 it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == tr(label) }
             }
             fun toggle(label: String) {
@@ -94,8 +97,9 @@ class ImageGenerationControlsTest {
                 while (!node.config.contains(SemanticsActions.OnClick)) node = node.parent!!
                 assertTrue(node.config[SemanticsActions.OnClick].action!!.invoke())
             }
-            assertTrue(text("网络搜索").boundsInRoot.top < text("自动朗读").boundsInRoot.top)
-            val orderedLabels = listOf("分辨率", "宽高比", "背景", "质量", "网络搜索", "自动朗读")
+            assertEquals(text("网络搜索").boundsInRoot.top, text("自动朗读").boundsInRoot.top, 0.1f)
+            assertTrue(text("网络搜索").boundsInRoot.right < text("自动朗读").boundsInRoot.left)
+            val orderedLabels = listOf("分辨率", "宽高比", "背景", "质量", "网络搜索")
             orderedLabels.zipWithNext().forEach { (before, after) ->
                 assertTrue("$before must appear above $after", text(before).boundsInRoot.bottom <= text(after).boundsInRoot.top)
             }
@@ -103,13 +107,19 @@ class ImageGenerationControlsTest {
                 it.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }.contains(tr("思考强度"))
             }
             assertTrue(thinking.boundsInRoot.bottom <= text("分辨率").boundsInRoot.top)
+            assertEquals("Generation parameters move closer to the thinking handle", 10f,
+                text("分辨率").boundsInRoot.top - thinking.boundsInRoot.bottom, 0.1f)
+            assertEquals("Move existing space below the parameters without moving the action row", 232f,
+                text("网络搜索").boundsInRoot.top, 0.1f)
+            assertTrue("Keep the 12dp spacer in addition to the last row's text inset",
+                text("网络搜索").boundsInRoot.top - text("质量").boundsInRoot.bottom >= 20f)
             assertTrue(text("自动朗读").boundsInRoot.bottom <= 349f)
             toggle("网络搜索")
             toggle("自动朗读")
             assertTrue(searchChanged)
             assertTrue(autoReadChanged)
             assertEquals(396f, modelSwitcherCompactHeight(true).value, 0.01f)
-            assertEquals(220f, modelSwitcherCompactHeight(false).value, 0.01f)
+            assertEquals(208f, modelSwitcherCompactHeight(false).value, 0.01f)
         } finally {
             view.disposeComposition(); recomposer.close(); runner.cancel()
             controller.pause().stop().destroy()

@@ -5,9 +5,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.sin
-import kotlin.math.min
-import kotlin.math.max
-import kotlin.math.sqrt
 import kotlin.random.Random
 
 internal data class ThinkingSliderGeometry(val thumbX: Float, val fillStart: Float, val fillWidth: Float)
@@ -26,29 +23,6 @@ internal fun thinkingSliderGeometry(width: Float, radius: Float, fraction: Float
         else ThinkingSliderGeometry(center, 0f, fill)
 }
 
-internal data class ThinkingIndicatorGeometry(
-    val bodyTop: Float, val radius: Float, val tipX: Float, val rootStart: Float, val rootEnd: Float, val rootBottom: Float,
-)
-
-/** Keep the original straight, symmetric pointer; extend its hidden root into the capsule. */
-internal fun thinkingIndicatorGeometry(width: Float, height: Float, tipX: Float, bodyTop: Float, shoulder: Float): ThinkingIndicatorGeometry {
-    val top = bodyTop.coerceIn(0f, height)
-    val radius = min((height - top) / 2f, width / 2f)
-    val center = tipX.coerceIn(0f, width)
-    val halfRoot = min(shoulder, min(center, width - center))
-    val start = center - halfRoot
-    val end = center + halfRoot
-    fun capsuleTop(x: Float): Float {
-        val dx = when {
-            x < radius -> radius - x
-            x > width - radius -> x - (width - radius)
-            else -> 0f
-        }
-        return top + radius - sqrt((radius * radius - dx * dx).coerceAtLeast(0f))
-    }
-    val depth = max(capsuleTop(start), capsuleTop(end)) + shoulder * 0.2f
-    return ThinkingIndicatorGeometry(top, radius, center, start, end, depth)
-}
 
 internal data class ThinkingRollState(val index: Int, val direction: Int = 1) {
     fun moveTo(next: Int): ThinkingRollState = if (next == index) this else ThinkingRollState(next, if (next > index) 1 else -1)

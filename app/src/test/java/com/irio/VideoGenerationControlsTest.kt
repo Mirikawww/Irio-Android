@@ -96,7 +96,10 @@ class VideoGenerationControlsTest {
             repeat(12) { frame() }
             fun descend(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descend)
             fun nodes() = descend((view.getChildAt(0) as ViewRootForTest).semanticsOwner.unmergedRootSemanticsNode)
-            fun text(label: String) = nodes().single {
+            fun text(label: String) = nodes().singleOrNull {
+                it.config.contains(SemanticsActions.OnClick) &&
+                    label in it.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }
+            } ?: nodes().single {
                 it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == label }
             }
             fun click(label: String) {
@@ -105,10 +108,20 @@ class VideoGenerationControlsTest {
                 assertTrue(node.config[SemanticsActions.OnClick].action!!.invoke())
                 repeat(20) { frame() }
             }
-            listOf("分辨率", "视频时长", "宽高比", "网络搜索", "自动朗读").zipWithNext().forEach { (before, after) ->
+            listOf("分辨率", "视频时长", "宽高比", "网络搜索").zipWithNext().forEach { (before, after) ->
                 assertTrue("$before must appear before $after", text(tr(before)).boundsInRoot.bottom <= text(tr(after)).boundsInRoot.top)
             }
             assertTrue(text(tr("自动朗读")).boundsInRoot.bottom <= 305f)
+            assertEquals(text(tr("网络搜索")).boundsInRoot.top, text(tr("自动朗读")).boundsInRoot.top, 0.1f)
+            val thinkingHandle = nodes().single {
+                tr("思考强度") in it.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }
+            }
+            assertEquals("Generation parameters move closer to the thinking handle", 10f,
+                text(tr("分辨率")).boundsInRoot.top - thinkingHandle.boundsInRoot.bottom, 0.1f)
+            assertEquals("The quick-action row must keep its existing position", 188f,
+                text(tr("网络搜索")).boundsInRoot.top, 0.1f)
+            assertEquals("Separate video parameters from quick actions", 12f,
+                text(tr("网络搜索")).boundsInRoot.top - text(tr("宽高比")).boundsInRoot.bottom, 0.1f)
             assertFalse(nodes().any { it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == tr("背景") } })
             click("2K")
             assertEquals(VideoGenerationOptions(resolution = "2K"), options.value)

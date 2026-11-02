@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -173,6 +174,7 @@ internal fun ModelPicker(
                 selectedDisplay.ifBlank { tr("选择模型") },
                 modifier = Modifier.widthIn(max = 180.dp),
                 fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
                 color = content,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

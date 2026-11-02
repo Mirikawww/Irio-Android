@@ -10,7 +10,7 @@ class IrioIconsTest {
         // Construct all lazy vectors: malformed SVG path syntax must not crash when a screen opens.
         val icons = listOf(
             IrioIcons.ArrowLeft, IrioIcons.ChevronLeft, IrioIcons.ChevronRight,
-            IrioIcons.ChevronDown, IrioIcons.Volume2, IrioIcons.Plus,
+            IrioIcons.ChevronDown, IrioIcons.Volume2, IrioIcons.VolumeOff, IrioIcons.Globe, IrioIcons.GlobeOff, IrioIcons.Plus,
             IrioIcons.FaceSlightlySmilingPlus, IrioIcons.ArrowUp, IrioIcons.Paperclip,
             IrioIcons.Sparkles, IrioIcons.Zap, IrioIcons.ZapOff, IrioIcons.Check, IrioIcons.X,
             IrioIcons.Minimize2, IrioIcons.Monitor, IrioIcons.Copy, IrioIcons.Braces,
@@ -22,7 +22,7 @@ class IrioIconsTest {
             IrioIcons.Rewind, IrioIcons.Search, IrioIcons.Settings, IrioIcons.Bot,
             IrioIcons.Square, IrioIcons.SquareCheck, IrioIcons.SquarePen, IrioIcons.Terminal, IrioIcons.Upload,
         )
-        assertEquals(46, icons.size)
+        assertEquals(49, icons.size)
         assertEquals(icons.size, icons.map { it.name }.toSet().size)
         assertTrue(icons.all { it.name.startsWith("lucide:") })
         assertTrue(IrioIcons.ArrowLeft.autoMirror)

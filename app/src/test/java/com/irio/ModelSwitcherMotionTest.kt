@@ -173,18 +173,6 @@ class ModelSwitcherMotionTest {
         }
     }
 
-    @Test
-    fun originalPointerStaysSymmetricAndOverlapsCapsuleAtBothEnds() {
-        listOf(35f, 69f, 120f).forEach { width ->
-            listOf(12f, width / 2f, width - 12f).forEach { tip ->
-                val shape = thinkingIndicatorGeometry(width, 34f, tip, 5f, 5f)
-                assertEquals(tip, (shape.rootStart + shape.rootEnd) / 2f, 0.001f)
-                assertEquals(tip, shape.tipX, 0.001f)
-                assertTrue(shape.rootBottom > shape.bodyTop)
-                if (tip == 12f || tip == width - 12f) assertTrue(shape.rootBottom > shape.bodyTop + 1f)
-            }
-        }
-    }
 
     @Test
     fun rapidReversalsUseTheImmediatelyPrecedingSelection() {

@@ -4,8 +4,8 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.animateColorAsState
+
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.selection.toggleable
 import com.kyant.shapes.RoundedRectangle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -61,13 +60,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
+
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -79,6 +77,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -92,6 +91,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontSynthesis
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -99,6 +100,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
@@ -107,13 +109,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.composables.ui.components.ButtonSize
-import com.composables.ui.components.ButtonStyle
+
 import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
 import com.composables.ui.components.DropdownMenuScope
 import com.composables.ui.components.Icon
-import com.composables.ui.components.IconButton
-import com.composables.ui.components.Switch
+
 import com.composables.ui.components.Text
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
@@ -121,6 +121,7 @@ import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.secondaryColor
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.LocalTextStyle
 import kotlin.math.roundToInt
 
 import androidx.compose.ui.text.AnnotatedString
@@ -141,7 +142,8 @@ private fun Modifier.modelSwitcherClickable(onClick: () -> Unit): Modifier = cli
     onClick = onClick,
 )
 
-private val MaxThinkingGold = Color(0xFFFFB400)
+
+
 private val UltraThinkingPurple = Color(0xFF9254E8)
 
 /**
@@ -161,7 +163,7 @@ internal fun modelSwitcherListComposed(listPrepared: Boolean, modelsExpanded: Bo
 internal fun modelSwitcherCompactHeight(imageModel: Boolean, videoModel: Boolean = false): Dp = when {
     imageModel -> 396.dp
     videoModel -> 352.dp
-    else -> 220.dp
+    else -> 208.dp
 }
 
 /** The entire surface changes to the list during the initial fast extension. */
@@ -223,7 +225,8 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
         motion.animateTo(modelsExpanded)
     }
     androidx.activity.compose.BackHandler(enabled = modelsExpanded) { modelsExpanded = false }
-    val compactHeight = modelSwitcherCompactHeight(imageModel, videoModel)
+    val compactHeight = modelSwitcherCompactHeight(imageModel, videoModel) +
+        (modelSwitcherQuickActionsLayout(width - 16.dp).height - 88.dp) - 26.dp
     val videoChoice = videoChoicePage
     val naturalHeight = if (aspectRatioPage && imageModel) ((imageAspectRatioPresets.size + 1) * 36 + 152).dp
     else if (videoChoice != null && videoModel) (videoGenerationChoiceValues(videoChoice, selectedModel).size * 36 + 8).dp
@@ -235,7 +238,11 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
         }
     }.dp + 8.dp
     val listHeight = modelSwitcherListHeight(naturalHeight, configuration.screenHeightDp)
-    val fastBackground by animateColorAsState(if (fastMode) accent.copy(alpha = 0.16f) else content.copy(alpha = 0.08f), irioSpring(), label = "fast background")
+    val thinkingLevels = reasoningLevels.ifEmpty { listOf(ReasoningEffort.OFF) }
+    var thinkingPreview by remember(selectedModel, thinkingLevels) {
+        mutableStateOf(ThinkingRollState(thinkingLevels.indexOf(reasoningEffort).coerceAtLeast(0)))
+    }
+    val displayEffort = thinkingLevels[thinkingPreview.index.coerceIn(thinkingLevels.indices)]
     val listOpacity = { motion.listOpacity }
     val listOpacityState = remember { androidx.compose.runtime.derivedStateOf { motion.listOpacity } }
     DropdownMenuPanel(modifier = Modifier.width(width)) {
@@ -266,20 +273,12 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                         }.padding(start = 8.dp, end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(selectedDisplay.ifBlank { tr("选择模型") }, modifier = Modifier.weight(1f, fill = false),
-                        color = content, fontSize = 17.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    ModelSwitcherModelName(selectedDisplay.ifBlank { tr("选择模型") },
+                        modifier = Modifier.weight(1f, fill = false))
                     Icon(IrioIcons.ChevronDown, contentDescription = null, tint = muted,
                         modifier = Modifier.padding(start = 4.dp).size(18.dp).graphicsLayer { rotationZ = phase.value * 180f })
                 }
-                Spacer(Modifier.width(6.dp))
-                IconButton(
-                    onClick = { if (compactInteractive) onFastModeChange(!fastMode) }, style = ButtonStyle.Ghost,
-                    buttonSize = ButtonSize.Small, shape = ContinuousCapsule,
-                    modifier = Modifier.size(36.dp).background(fastBackground, ContinuousCapsule)
-                        .semantics { selected = fastMode; stateDescription = tr(if (fastMode) "开启" else "关闭") },
-                ) {
-                    Icon(if (fastMode) IrioIcons.Zap else IrioIcons.ZapOff, contentDescription = tr("快速"), tint = if (fastMode) accent else content, modifier = Modifier.size(21.dp))
-                }
+                ModelSwitcherThinkingReadout(displayEffort, supportsThinking && !videoModel)
             }
                 Spacer(Modifier.height(3.dp))
                 ModelSwitcherParameterControls(
@@ -294,6 +293,9 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                     webSearchEnabled = webSearchEnabled,
                     autoRead = autoRead,
                     onReasoningChange = onReasoningChange,
+                    onThinkingPreviewChange = { thinkingPreview = it },
+                    fastMode = fastMode,
+                    onFastModeChange = onFastModeChange,
                     onWebSearchChange = onWebSearchChange,
                     onAutoReadChange = onAutoReadChange,
                     onImageOptionsChange = ::saveImageOptions,
@@ -404,36 +406,81 @@ internal fun ModelSwitcherParameterControls(
     selectedModel: String = "MiniMax-H3",
     onVideoOptionsChange: (VideoGenerationOptions) -> Unit = {},
     onVideoChoice: (VideoGenerationChoice) -> Unit = {},
+    fastMode: Boolean = false,
+    onFastModeChange: (Boolean) -> Unit = {},
+    onThinkingPreviewChange: (ThinkingRollState) -> Unit = {},
 ) {
-    ThinkingDepthSlider(reasoningEffort, supportsThinking && !videoModel, reasoningLevels, onReasoningChange, active = compactInteractive)
-    Spacer(Modifier.height(2.dp))
+    ThinkingDepthSlider(reasoningEffort, supportsThinking && !videoModel, reasoningLevels, onReasoningChange,
+        active = compactInteractive, onPreviewChange = onThinkingPreviewChange)
     if (imageModel) {
         ImageGenerationControls(imageOptions, compactInteractive, supportsOpenAiOptions, onImageOptionsChange, onAspectRatio)
     } else if (videoModel) {
         VideoGenerationControls(videoOptions, compactInteractive, selectedModel, onVideoOptionsChange, onVideoChoice)
     }
-    ModelSwitcherToggle(tr("网络搜索"), webSearchAvailable && webSearchEnabled, webSearchAvailable) {
-        if (compactInteractive) onWebSearchChange(it)
+    // Only generation parameters need separation from the action row below them.
+    if (imageModel || videoModel) Spacer(Modifier.height(12.dp))
+    ModelSwitcherQuickActions(
+        fastMode = fastMode,
+        webSearchAvailable = webSearchAvailable,
+        webSearchEnabled = webSearchEnabled,
+        autoRead = autoRead,
+        active = compactInteractive,
+        onFastModeChange = onFastModeChange,
+        onWebSearchChange = onWebSearchChange,
+        onAutoReadChange = onAutoReadChange,
+    )
+}
+
+/** Match actual glyph ink rather than centering incompatible font line boxes. */
+@Composable
+private fun rememberHeaderInkShift(text: String, style: TextStyle, layout: androidx.compose.ui.text.TextLayoutResult): Float {
+    val density = LocalDensity.current
+    val typeface = LocalFontFamilyResolver.current.resolve(style.fontFamily,
+        style.fontWeight ?: FontWeight.Normal, style.fontStyle ?: FontStyle.Normal,
+        style.fontSynthesis ?: FontSynthesis.All).value as android.graphics.Typeface
+    val fontPx = with(density) { style.fontSize.toPx() }
+    return remember(text, style, layout, typeface, fontPx) {
+        val ink = android.graphics.Rect()
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            this.typeface = typeface
+            textSize = fontPx
+        }
+        paint.getTextBounds(text, 0, text.length, ink)
+        if (ink.isEmpty) 0f else layout.size.height / 2f - layout.firstBaseline - ink.exactCenterY()
     }
-    ModelSwitcherToggle(tr("自动朗读"), autoRead) { if (compactInteractive) onAutoReadChange(it) }
 }
 
 @Composable
-private fun ModelSwitcherToggle(label: String, checked: Boolean, enabled: Boolean = true, onCheckedChange: (Boolean) -> Unit) {
-    val content = Theme[colors][onBackgroundColor]
-    val muted = Theme[colors][mutedColor]
-    Row(
-        Modifier.fillMaxWidth().height(44.dp).clip(RoundedRectangle(10.dp))
-            .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, color = if (enabled) content else muted, fontSize = 17.5.sp, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled, modifier = Modifier.clearAndSetSemantics { })
+internal fun ModelSwitcherModelName(text: String, modifier: Modifier = Modifier) {
+    val style = LocalTextStyle.current.merge(TextStyle(fontSize = 17.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold))
+    val layout = rememberTextMeasurer().measure(AnnotatedString(text), style, maxLines = 1, softWrap = false)
+    val shift = rememberHeaderInkShift(text, style, layout)
+    Text(text, modifier = modifier.graphicsLayer { translationY = shift }, color = Theme[colors][onBackgroundColor],
+        fontSize = 17.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+}
+
+/** Show the current thinking depth in the header without a text transition. */
+@Composable
+internal fun ModelSwitcherThinkingReadout(effort: ReasoningEffort, enabled: Boolean) {
+    val color = when {
+        !enabled || effort == ReasoningEffort.OFF -> Theme[colors][mutedColor]
+        effort == ReasoningEffort.ULTRA -> UltraThinkingPurple
+        else -> Theme[colors][primaryColor]
+    }
+    val text = tr(if (enabled) effort.label else "不支持思考")
+    val style = LocalTextStyle.current.merge(TextStyle(fontSize = 17.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal))
+    val layout = rememberTextMeasurer().measure(AnnotatedString(text), style, maxLines = 1, softWrap = false)
+    val shift = rememberHeaderInkShift(text, style, layout)
+    Row(Modifier.height(44.dp).semantics {
+        contentDescription = tr("思考强度")
+        stateDescription = tr(if (enabled) effort.label else "不支持思考")
+    }.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(text, modifier = Modifier.graphicsLayer { translationY = shift }
+            .semantics { contentDescription = text }, color = color,
+            fontSize = 17.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal, maxLines = 1)
     }
 }
 
-/** Every language rolls glyph by glyph, each starting a beat after the previous one. */
 private const val RollStagger = 0.5f
 /** Stiffness matched to the previous 180ms fast-out roll. */
 private const val RollSpringStiffness = 760f
@@ -441,18 +488,6 @@ private const val RollBlurMaxDp = 5f
 private const val RollBleedXDp = 12
 private const val RollBleedYDp = 6
 private const val AscenderEm = 0.76f
-/** One draw clock rolls natural-width glyphs together, preserving visible positions on reversal. */
-@Composable
-private fun RollingThinkingLabel(effort: ReasoningEffort, enabled: Boolean, color: Color, direction: Int, animate: Boolean) {
-    RollingGlyphLabel(
-        text = tr(if (enabled) effort.label else "不支持思考"),
-        color = color,
-        direction = direction,
-        animate = animate,
-        style = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp, lineHeight = 20.sp),
-    )
-}
-
 @Composable
 internal fun RollingGlyphLabel(
     text: String,
@@ -462,18 +497,23 @@ internal fun RollingGlyphLabel(
     style: TextStyle,
     enterFromEmpty: Boolean = false,
     wrapContent: Boolean = false,
+    centerHeaderInk: Boolean = false,
+    hazeEnabled: Boolean = true,
+    rightAligned: Boolean = false,
 ) {
     val measurer = rememberTextMeasurer(cacheSize = 64)
     val density = LocalDensity.current
-    val layout = measurer.measure(AnnotatedString(text), style, maxLines = 1, softWrap = false)
-    val targets = remember(text, layout) {
-        text.indices.map { index -> ThinkingGlyphFrame(index, text[index].toString(), layout.getBoundingBox(index).left) }
+    val resolvedStyle = if (centerHeaderInk) LocalTextStyle.current.merge(style) else style
+    val layout = measurer.measure(AnnotatedString(text), resolvedStyle, maxLines = 1, softWrap = false)
+    val targets = remember(text, layout, rightAligned) {
+        text.indices.map { index -> ThinkingGlyphFrame(index, text[index].toString(),
+            layout.getBoundingBox(index).left - if (rightAligned) layout.size.width else 0) }
     }
     val isLatin = ThemeStore.language == AppLanguage.EN
     val fontPx = with(density) { style.fontSize.toPx() }
     // The line box reserves descender room, so Latin ink (ascender..baseline) sits above its centre and
     // reads as misaligned with the icon. Nudge it down to centre that band; CJK fills the box evenly.
-    val opticalShift = remember(layout, isLatin, density, fontPx) {
+    val opticalShift = if (centerHeaderInk) rememberHeaderInkShift(text, resolvedStyle, layout) else remember(layout, isLatin, density, fontPx) {
         if (!isLatin) 0f
         else layout.size.height / 2f - (layout.firstBaseline - AscenderEm / 2f * fontPx)
     }
@@ -498,9 +538,11 @@ internal fun RollingGlyphLabel(
         runs = targets.map { ThinkingGlyphRun(it, it) }
         progress.floatValue = 1f
     }
-    val glyphLayouts = remember(runs, measurer, density.fontScale, density.density) {
-        runs.map { it.start.character }.distinct().associateWith {
-            measurer.measure(AnnotatedString(it), style, maxLines = 1, softWrap = false)
+    // Drawing and glyph caches must use the same applied frame, even if an effect updates runs.
+    val renderedRuns = runs
+    val glyphLayouts = remember(renderedRuns, resolvedStyle, measurer, density.fontScale, density.density) {
+        renderedRuns.map { it.start.character }.distinct().associateWith {
+            measurer.measure(AnnotatedString(it), resolvedStyle, maxLines = 1, softWrap = false)
         }
     }
     val glyphBaselineOffsets = remember(layout, glyphLayouts) {
@@ -508,28 +550,33 @@ internal fun RollingGlyphLabel(
             layout.firstBaseline - glyphLayout.firstBaseline
         }
     }
-    // Haze styles are immutable, so the radius is quantized to half-dp steps to keep restyling cheap.
-    val blurRadius by remember {
-        derivedStateOf { (thinkingBlurFraction(runs, progress.floatValue) * RollBlurMaxDp * 2f).roundToInt() / 2f }
-    }
-    val blurStyle = remember(blurRadius) {
-        HazeBlurStyle {
-            blurEnabled(blurRadius > 0f)
-            blurRadius(blurRadius.dp)
-            noiseFactor(0f)
-            colorEffects(emptyList())
-            fallbackColorEffect(HazeColorEffect.tint(Color.Transparent))
+    val hazeModifier = if (hazeEnabled) {
+        // Haze styles are immutable; quantize the radius to keep restyling cheap.
+        val blurRadius by remember {
+            derivedStateOf { (thinkingBlurFraction(runs, progress.floatValue) * RollBlurMaxDp * 2f).roundToInt() / 2f }
         }
-    }
-    // The blur only renders inside its node, so the canvas is laid out larger than the label and the
-    // surplus fades out through a mask. No hard clip edge is left for the blurred glyphs to run into.
-    val bleedX = with(density) { RollBleedXDp.dp.roundToPx() }
+        val blurStyle = remember(blurRadius) {
+            HazeBlurStyle {
+                blurEnabled(blurRadius > 0f)
+                blurRadius(blurRadius.dp)
+                noiseFactor(0f)
+                colorEffects(emptyList())
+                fallbackColorEffect(HazeColorEffect.tint(Color.Transparent))
+            }
+        }
+        Modifier.hazeBlur(input = HazeInput.Content, style = blurStyle)
+    } else Modifier
+    // Keep the original vertical roll travel and soft edge even when Haze is disabled.
+    // Right-aligned headers retain outgoing width instead of painting horizontal blur bleed.
+    val bleedX = if (rightAligned) 0 else with(density) { RollBleedXDp.dp.roundToPx() }
     val bleedY = with(density) { RollBleedYDp.dp.roundToPx() }
     val textHeight = layout.size.height
-    val textWidth = layout.size.width
+    val outgoingWidth = if (rightAligned)
+        kotlin.math.ceil(-(renderedRuns.minOfOrNull { minOf(it.start.x, it.end.x) } ?: 0f)).toInt() else 0
+    val textWidth = maxOf(layout.size.width, outgoingWidth)
     Canvas(Modifier
         .layout { measurable, constraints ->
-            val width = if (wrapContent) textWidth else constraints.maxWidth
+            val width = if (wrapContent) constraints.constrainWidth(textWidth) else constraints.maxWidth
             val placeable = measurable.measure(Constraints.fixed(width + 2 * bleedX, textHeight + 2 * bleedY))
             layout(width, textHeight) { placeable.place(-bleedX, -bleedY) }
         }
@@ -538,16 +585,18 @@ internal fun RollingGlyphLabel(
             drawContent()
             val fadeX = bleedX / size.width
             val fadeY = bleedY / size.height
-            drawRect(Brush.horizontalGradient(0f to Color.Transparent, fadeX to Color.Black, 1f - fadeX to Color.Black, 1f to Color.Transparent),
-                blendMode = BlendMode.DstIn)
+            if (bleedX > 0) {
+                drawRect(Brush.horizontalGradient(0f to Color.Transparent, fadeX to Color.Black, 1f - fadeX to Color.Black, 1f to Color.Transparent),
+                    blendMode = BlendMode.DstIn)
+            }
             drawRect(Brush.verticalGradient(0f to Color.Transparent, fadeY to Color.Black, 1f - fadeY to Color.Black, 1f to Color.Transparent),
                 blendMode = BlendMode.DstIn)
         }
-        .hazeBlur(input = HazeInput.Content, style = blurStyle)
+        .then(hazeModifier)
         .clearAndSetSemantics { contentDescription = text }) {
-        translate(bleedX.toFloat(), bleedY.toFloat()) {
+        translate(bleedX.toFloat() + if (rightAligned) size.width - 2 * bleedX else 0f, bleedY.toFloat()) {
             val phase = progress.floatValue
-            runs.forEach { run ->
+            renderedRuns.forEach { run ->
                 val glyph = run.frame(phase)
                 if (glyph.alpha > 0.01f) {
                     drawText(
@@ -566,8 +615,8 @@ internal fun RollingGlyphLabel(
 }
 
 @Composable
-private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, supportedLevels: List<ReasoningEffort>, onEffortChange: (ReasoningEffort) -> Unit, active: Boolean = true) {
-    val darkTheme = LocalResolvedTheme.current.isDark
+private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, supportedLevels: List<ReasoningEffort>,
+    onEffortChange: (ReasoningEffort) -> Unit, active: Boolean = true, onPreviewChange: (ThinkingRollState) -> Unit = {}) {
     val levels = supportedLevels.ifEmpty { listOf(ReasoningEffort.OFF) }
     val adjustable = active && enabled && levels.size > 1
     val selectedIndex = levels.indexOf(effort).coerceAtLeast(0)
@@ -578,7 +627,6 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
     val haptics = LocalHapticFeedback.current
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     var sliderWidth by remember { mutableIntStateOf(0) }
-    var indicatorWidth by remember { mutableIntStateOf(0) }
     var value by remember(levels) { mutableFloatStateOf(selectedIndex.toFloat()) }
     var dragging by remember(levels) { mutableStateOf(false) }
     var preview by remember(levels) { mutableStateOf(ThinkingRollState(selectedIndex)) }
@@ -586,44 +634,28 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
         if (!dragging) {
             value = selectedIndex.toFloat()
             preview = preview.moveTo(selectedIndex)
+            onPreviewChange(preview)
         }
     }
     val displayEffort = levels[preview.index]
-    val showIntelligence = enabled && displayEffort != ReasoningEffort.OFF
-    val iconReveal by animateFloatAsState(if (showIntelligence) 1f else 0f, irioSpring<Float>(), label = "thinking icon reveal")
     val motionAllowed = rememberSwitcherMotionAllowed()
     val ultra = enabled && displayEffort == ReasoningEffort.ULTRA
     val clock = rememberParticleClock(ultra && motionAllowed && active)
     val trackParticles = remember { ThinkingParticleField(System.nanoTime().toInt(), 36) }
-    val badgeParticles = remember { ThinkingParticleField(System.nanoTime().toInt(), 10) }
     val fill by animateColorAsState(
         when {
             !enabled || displayEffort == ReasoningEffort.OFF -> muted
-            displayEffort == ReasoningEffort.MAX -> MaxThinkingGold
             ultra -> UltraThinkingPurple
             else -> accent
         }, irioSpring(), label = "thinking color",
     )
-    val measurer = rememberTextMeasurer(cacheSize = 16)
-    val labels = if (enabled) levels.map { tr(it.label) } else listOf(tr("不支持思考"))
-    val labelWidths = remember(labels, measurer, density.fontScale, density.density) {
-        labels.associateWith {
-            measurer.measure(AnnotatedString(it), TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp), maxLines = 1, softWrap = false).size.width
-        }
-    }
-    val currentLabel = tr(if (enabled) displayEffort.label else "不支持思考")
-    val labelWidth by animateDpAsState(
-        with(density) { labelWidths.getValue(currentLabel).toDp() },
-        irioSpring(), label = "thinking label width",
-    )
-    // Icon stays anchored to the leading inset; the same animated width moves the bubble.
-    val badgeWidth = labelWidth + 16.dp + 19.dp * iconReveal
     val position by animateFloatAsState(value, if (dragging) snap() else irioSpring(dampingRatio = 0.9f, stiffness = 700f), label = "thinking position")
     val radius = with(density) { 12.dp.toPx() }
     val applySelection by rememberUpdatedState<(Int) -> Unit> { requested ->
         val next = preview.moveTo(requested.coerceIn(0, levels.lastIndex))
         if (next != preview) {
             preview = next
+            onPreviewChange(next)
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         }
     }
@@ -632,7 +664,7 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
     }
     val fraction = { if (levels.size == 1) 0.5f else (position / levels.lastIndex).coerceIn(0f, 1f) }
     val geometry = { thinkingSliderGeometry(sliderWidth.toFloat(), radius, fraction(), rtl) }
-    Box(Modifier.fillMaxWidth().height(80.dp).padding(horizontal = 6.dp).onSizeChanged { sliderWidth = it.width }) {
+    Box(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 6.dp).onSizeChanged { sliderWidth = it.width }) {
         Canvas(
             Modifier.fillMaxWidth().height(44.dp)
                 .focusable(adjustable)
@@ -733,51 +765,7 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
             Modifier.offset { IntOffset((geometry().thumbX - radius).roundToInt(), with(density) { 10.dp.roundToPx() }) }
                 .size(24.dp).shadow(2.dp, ContinuousCapsule).background(Color.White, ContinuousCapsule),
         )
-        val indicatorInk = if (fill.luminance() > 0.45f) {
-            if (darkTheme || displayEffort == ReasoningEffort.OFF) Color.Black else Color(0xFF392500)
-        } else Color.White
-        Box(
-            Modifier.offset {
-                val left = (geometry().thumbX - indicatorWidth / 2f).coerceIn(0f, (sliderWidth - indicatorWidth).coerceAtLeast(0).toFloat())
-                IntOffset(left.roundToInt(), with(density) { 44.dp.roundToPx() })
-            }.width(badgeWidth).onSizeChanged { indicatorWidth = it.width },
-        ) {
-            Canvas(Modifier.matchParentSize()) {
-                val left = (geometry().thumbX - indicatorWidth / 2f).coerceIn(0f, (sliderWidth - indicatorWidth).coerceAtLeast(0).toFloat())
-                val tipHeight = 6.dp.toPx()
-                val bubble = thinkingIndicatorPath(size, geometry().thumbX - left, 5.dp.toPx(), tipHeight, 5.dp.toPx())
-                drawPath(bubble, fill)
-                if (ultra && motionAllowed) clipPath(bubble) {
-                    drawThinkingParticles(clock.value, badgeParticles, Offset(0f, 5.dp.toPx()), Size(size.width, size.height - 5.dp.toPx()), indicatorInk)
-                }
-            }
-            Row(Modifier.fillMaxWidth().padding(top = 5.dp).padding(horizontal = 8.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) {
-                Box(Modifier.width(19.dp * iconReveal).height(15.dp).clipToBounds()) {
-                    Icon(IrioIcons.Sparkles, contentDescription = null, tint = indicatorInk,
-                        modifier = Modifier.size(15.dp).graphicsLayer { alpha = iconReveal })
-                }
-                Box(Modifier.width(labelWidth), contentAlignment = Alignment.CenterStart) {
-                    RollingThinkingLabel(displayEffort, enabled, indicatorInk, preview.direction, motionAllowed && active)
-                }
-            }
-        }
     }
-}
-
-private fun DrawScope.thinkingIndicatorPath(size: Size, tipX: Float, bodyTop: Float, tipHeight: Float, shoulder: Float): Path {
-    val g = thinkingIndicatorGeometry(size.width, size.height, tipX, bodyTop, shoulder)
-    val bodyHeight = (size.height - g.bodyTop).coerceAtLeast(0f)
-    val capsule = ContinuousCapsule.continuousPath(Size(size.width, bodyHeight), layoutDirection, this).apply {
-        translate(Offset(0f, g.bodyTop))
-    }
-    val pointer = Path().apply {
-        moveTo(g.tipX, 0f)
-        lineTo(g.rootEnd, g.rootBottom)
-        lineTo(g.rootStart, g.rootBottom)
-        close()
-    }
-    return Path.combine(PathOperation.Union, capsule, pointer)
 }
 
 /** An unbounded clock drives draw only; independent particle births never replay a shared loop. */
