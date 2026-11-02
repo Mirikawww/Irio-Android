@@ -175,6 +175,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
     rows: List<ModelPickerRow>,
     reasoningEffort: ReasoningEffort,
     supportsThinking: Boolean,
+    keepIme: Boolean = false,
     reasoningLevels: List<ReasoningEffort>,
     fastMode: Boolean,
     webSearchAvailable: Boolean,
@@ -245,7 +246,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
     val displayEffort = thinkingLevels[thinkingPreview.index.coerceIn(thinkingLevels.indices)]
     val listOpacity = { motion.listOpacity }
     val listOpacityState = remember { androidx.compose.runtime.derivedStateOf { motion.listOpacity } }
-    DropdownMenuPanel(modifier = Modifier.width(width)) {
+    DropdownMenuPanel(modifier = Modifier.width(width), keepIme = keepIme && !(imageModel && aspectRatioPage)) {
         Box(Modifier.width(width).padding(horizontal = 8.dp, vertical = 6.dp)
             .layout { measurable, constraints ->
                 // 测量上限必须同时容下收起态主面板和展开列表，否则列表矮时会把主面板一起压扁。

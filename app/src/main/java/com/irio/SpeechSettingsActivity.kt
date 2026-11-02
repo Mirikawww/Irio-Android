@@ -40,7 +40,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
-import com.composables.ui.components.DropdownMenu
+import com.irio.ImePreservingDropdownMenu as DropdownMenu
 import com.composables.ui.components.DropdownMenuAlignment
 import com.composables.ui.components.DropdownMenuItem
 import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
@@ -253,7 +253,7 @@ private fun SttSettingsSectionCard(
 }
 
 @Composable
-private fun SttProviderMenu(
+internal fun SttProviderMenu(
     provider: SttProviderKind,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
@@ -311,7 +311,7 @@ private fun SttProviderMenu(
 }
 
 @Composable
-private fun SttModelMenu(
+internal fun SttModelMenu(
     provider: SttProviderKind,
     model: String,
     expanded: Boolean,
@@ -384,7 +384,7 @@ private val GladiaLanguages = listOf(
 )
 
 @Composable
-private fun SttLanguageMenu(
+internal fun SttLanguageMenu(
     language: String,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
@@ -446,7 +446,7 @@ private fun SttLanguageMenu(
 }
 
 @Composable
-private fun VoiceMenu(
+internal fun VoiceMenu(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     selected: String,

@@ -50,7 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.composables.ui.components.Button
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
-import com.composables.ui.components.DropdownMenu
+import com.irio.ImePreservingDropdownMenu as DropdownMenu
 import com.composables.ui.components.DropdownMenuAlignment
 import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
 import com.composables.ui.components.Text
@@ -77,13 +77,14 @@ internal fun ContextUsageRing(
     size: Dp = 18.dp,
     strokeWidth: Dp = 2.dp,
 ) {
+    val keepIme = rememberKeepImeOnMenuOpen(expanded)
     DropdownMenu(
         expanded = expanded,
         onExpandedChange = onExpandedChange,
         modifier = modifier.wrapContentWidth(Alignment.End),
         alignment = DropdownMenuAlignment.End,
         panel = {
-            DropdownMenuPanel(minWidth = 0.dp) {
+            DropdownMenuPanel(minWidth = 0.dp, keepIme = keepIme) {
                 ContextRingMenu(
                     breakdown = breakdown,
                     compressions = if (showCompression) formatContextCount(compressionCount) else null,

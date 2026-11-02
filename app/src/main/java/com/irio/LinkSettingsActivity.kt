@@ -57,7 +57,7 @@ import androidx.compose.ui.unit.IntOffset
 import com.composables.ui.components.Button
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
-import com.composables.ui.components.DropdownMenu
+import com.irio.ImePreservingDropdownMenu as DropdownMenu
 import com.composables.ui.components.DropdownMenuAlignment
 import com.composables.ui.components.DropdownMenuItem
 import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
@@ -92,7 +92,7 @@ class LinkSettingsActivity : ComponentActivity() {
 }
 
 @Composable
-private fun LinkSettingsScreen(onBack: () -> Unit) {
+internal fun LinkSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]

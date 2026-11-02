@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.sp
 import com.composables.ui.components.Button
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
-import com.composables.ui.components.DropdownMenu
+import com.irio.ImePreservingDropdownMenu as DropdownMenu
 import com.composables.ui.components.DropdownMenuAlignment
 import com.composables.ui.components.Icon
 import com.composables.ui.components.Text
@@ -134,6 +134,7 @@ internal fun ModelPicker(
         }
     val reasoningLevels = remember(reasoningInfo) { ModelCatalog.reasoningLevels(reasoningInfo) }
     val effectiveEffort = ModelCatalog.resolveReasoningEffort(reasoningEffort, reasoningLevels)
+    val keepIme = rememberKeepImeOnMenuOpen(expanded)
     DropdownMenu(
         expanded = expanded,
         onExpandedChange = onExpandedChange,
@@ -147,6 +148,7 @@ internal fun ModelPicker(
                 rows = rows,
                 reasoningEffort = effectiveEffort,
                 supportsThinking = reasoningInfo?.supports ?: true,
+                keepIme = keepIme,
                 reasoningLevels = reasoningLevels,
                 fastMode = fastMode,
                 webSearchAvailable = webSearchAvailable,

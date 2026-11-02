@@ -53,7 +53,7 @@ import androidx.compose.ui.unit.sp
 import com.composables.ui.components.BottomSheetDetent
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
-import com.composables.ui.components.DropdownMenu
+import com.irio.ImePreservingDropdownMenu as DropdownMenu
 import com.composables.ui.components.DropdownMenuAlignment
 import com.composables.ui.components.DropdownMenuItem
 import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
@@ -89,6 +89,7 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
 
         @Composable
         fun AttachmentButton() {
+            val keepIme = rememberKeepImeOnMenuOpen(attachMenuOpen)
             DropdownMenu(
                 expanded = attachMenuOpen,
                 onExpandedChange = { attachMenuOpen = it },
@@ -96,7 +97,7 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
                 alignment = DropdownMenuAlignment.Start,
                 side = DropdownMenuSide.Top,
                 panel = {
-                    DropdownMenuPanel {
+                    DropdownMenuPanel(keepIme = keepIme) {
                         DropdownMenuItem(
                             onClick = {
                                 attachMenuOpen = false

@@ -327,13 +327,14 @@ internal fun ProtocolPicker(
     onSelect: (ProviderProtocol) -> Unit,
     enabled: Boolean = true,
 ) {
-    DropdownMenu(
+    val keepIme = rememberKeepImeOnMenuOpen(expanded && enabled)
+    ImePreservingDropdownMenu(
         expanded = expanded && enabled,
         onExpandedChange = { if (enabled) onExpandedChange(it) },
         modifier = Modifier.fillMaxWidth(),
         alignment = DropdownMenuAlignment.End,
         panel = {
-            DropdownMenuPanel {
+            DropdownMenuPanel(keepIme = keepIme) {
                 ProviderProtocol.entries.forEach { option ->
                     DropdownMenuItem(
                         onClick = {
