@@ -48,6 +48,49 @@ class CodeBlockWrapTest {
     }
 
     @Test
+    fun glassMasterSwitchPreservesSelectedSurfacesAndPersists() {
+        val context = RuntimeEnvironment.getApplication()
+        ThemeStore.ensureLoaded(context)
+        val previousSurfaces = ThemeStore.glassSurfaces
+        val previousEnabled = ThemeStore.glassEnabled
+        val prefs = context.getSharedPreferences("appearance_settings", Context.MODE_PRIVATE)
+        try {
+            GlassSurface.entries.forEach { ThemeStore.saveGlassSurface(context, it, it == GlassSurface.COMPOSER) }
+            ThemeStore.saveGlassEnabled(context, true)
+            assertTrue(ThemeStore.isGlassEnabled(GlassSurface.COMPOSER))
+            assertFalse(ThemeStore.isGlassEnabled(GlassSurface.USER_BUBBLE))
+            ThemeStore.saveGlassEnabled(context, false)
+            assertFalse(ThemeStore.isGlassEnabled(GlassSurface.COMPOSER))
+            assertTrue(GlassSurface.COMPOSER in ThemeStore.glassSurfaces)
+            assertFalse(prefs.getBoolean("glass_enabled", true))
+            ThemeStore.saveGlassEnabled(context, true)
+            assertTrue(ThemeStore.isGlassEnabled(GlassSurface.COMPOSER))
+            assertTrue(prefs.getBoolean("glass_enabled", false))
+        } finally {
+            GlassSurface.entries.forEach { ThemeStore.saveGlassSurface(context, it, it in previousSurfaces) }
+            ThemeStore.saveGlassEnabled(context, previousEnabled)
+        }
+    }
+
+    @Test
+    fun enablingGlassWithoutAnySelectedSurfaceEnablesAllSurfaces() {
+        val context = RuntimeEnvironment.getApplication()
+        ThemeStore.ensureLoaded(context)
+        val previousSurfaces = ThemeStore.glassSurfaces
+        val previousEnabled = ThemeStore.glassEnabled
+        try {
+            ThemeStore.saveGlassEnabled(context, false)
+            GlassSurface.entries.forEach { ThemeStore.saveGlassSurface(context, it, false) }
+            ThemeStore.saveGlassEnabled(context, true)
+            assertEquals(GlassSurface.entries.toSet(), ThemeStore.glassSurfaces)
+            GlassSurface.entries.forEach { assertTrue(ThemeStore.isGlassEnabled(it)) }
+        } finally {
+            GlassSurface.entries.forEach { ThemeStore.saveGlassSurface(context, it, it in previousSurfaces) }
+            ThemeStore.saveGlassEnabled(context, previousEnabled)
+        }
+    }
+
+    @Test
     fun codeBlockLineNumbersPersistAndCanStayOff() {
         val context = RuntimeEnvironment.getApplication()
         val previous = ThemeStore.codeBlockLineNumbers

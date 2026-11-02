@@ -32,7 +32,7 @@ internal fun BoxScope.ChatToolbar(state: ChatScreenState) {
 
         @Composable
         fun ToolbarModelPicker() {
-            ToolbarCapsule(glass = GlassSurface.MODEL_SWITCHER in ThemeStore.glassSurfaces) {
+            ToolbarCapsule(glass = ThemeStore.isGlassEnabled(GlassSurface.MODEL_SWITCHER)) {
                 ModelPicker(
                     alignLeft = modelPickerOnLeft,
                     selectedModel = selectedModel,
@@ -104,7 +104,7 @@ internal fun BoxScope.ChatToolbar(state: ChatScreenState) {
                 compact = true,
                 leading = {
                     ToolbarCapsule(
-                        glass = GlassSurface.SIDEBAR_BUTTON in ThemeStore.glassSurfaces
+                        glass = ThemeStore.isGlassEnabled(GlassSurface.SIDEBAR_BUTTON)
                     ) {
                         IconButton(
                             onClick = { drawerProgress = if (drawerOpen) 0f else 1f },
@@ -188,7 +188,7 @@ internal fun BoxScope.ChatToolbar(state: ChatScreenState) {
                                     }
                                 ) != null
                         ToolbarCapsule(
-                            glass = GlassSurface.CONTEXT_RING in ThemeStore.glassSurfaces
+                            glass = ThemeStore.isGlassEnabled(GlassSurface.CONTEXT_RING)
                         ) {
                             ContextUsageRing(
                                 breakdown = breakdown,

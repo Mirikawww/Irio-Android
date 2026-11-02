@@ -445,6 +445,13 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         modifier = Modifier.weight(1f),
                         color = Theme[colors][onPanelColor],
                     )
+                    Switch(
+                        checked = ThemeStore.glassEnabled,
+                        onCheckedChange = { ThemeStore.saveGlassEnabled(context, it) },
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp)
+                            .semantics { contentDescription = tr("毛玻璃") },
+                    )
                     IconButton(
                         onClick = { glassExpanded = !glassExpanded },
                         style = ButtonStyle.Ghost,

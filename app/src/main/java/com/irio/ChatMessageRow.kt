@@ -270,8 +270,7 @@ internal fun MessageRow(
                                         chatMessage.text,
                                         modifier =
                                             Modifier.irioSolidOrGlass(
-                                                    GlassSurface.USER_BUBBLE in
-                                                        ThemeStore.glassSurfaces,
+                                                    ThemeStore.isGlassEnabled(GlassSurface.USER_BUBBLE),
                                                     bubble.background,
                                                     RoundedRectangle(16.dp),
                                                     haze = null,

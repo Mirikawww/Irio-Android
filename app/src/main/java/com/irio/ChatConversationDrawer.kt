@@ -225,7 +225,7 @@ internal fun ChatConversationDrawer(state: ChatScreenState, drawerOpenProgress: 
                         ) {
                             ToolbarCapsule(
                                 modifier = Modifier.size(48.dp),
-                                glass = GlassSurface.SIDEBAR_BUTTON in ThemeStore.glassSurfaces,
+                                glass = ThemeStore.isGlassEnabled(GlassSurface.SIDEBAR_BUTTON),
                             ) {
                                 IconButton(
                                     onClick = {

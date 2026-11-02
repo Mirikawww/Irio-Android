@@ -161,6 +161,7 @@ object ThemeStore {
     private const val ENTER_TO_SEND_KEY = "enter_to_send"
     private const val LONG_TEXT_PASTE_KEY = "long_text_paste"
     private const val LONG_TEXT_PASTE_THRESHOLD_KEY = "long_text_paste_threshold"
+    private const val GLASS_ENABLED_KEY = "glass_enabled"
     private const val GLASS_SURFACES_KEY = "glass_surfaces"
     private const val BUBBLE_OPACITY_KEY = "bubble_opacity"
     private const val CODE_BLOCK_WRAP_KEY = "code_block_wrap"
@@ -230,9 +231,15 @@ object ThemeStore {
     var longTextPasteThreshold by mutableStateOf(LongTextPaste.DEFAULT_THRESHOLD)
         private set
 
+    /** 总开关与已勾选的表面分别保存；旧版本已启用的表面继续生效。 */
+    var glassEnabled by mutableStateOf(false)
+        private set
+
     /** 勾选后对应表面从纯色改为毛玻璃。默认全关。 */
     var glassSurfaces by mutableStateOf(emptySet<GlassSurface>())
         private set
+
+    fun isGlassEnabled(surface: GlassSurface): Boolean = glassEnabled && surface in glassSurfaces
 
     /** 用户气泡背景的不透明度，0–100%，默认 25%。文字保持不透明。 */
     var bubbleOpacity by mutableStateOf(25)
@@ -319,6 +326,7 @@ object ThemeStore {
                 .orEmpty()
                 .mapNotNull(GlassSurface::fromStored)
                 .toSet()
+            glassEnabled = appearance.getBoolean(GLASS_ENABLED_KEY, glassSurfaces.isNotEmpty())
             bubbleOpacity = appearance.getInt(BUBBLE_OPACITY_KEY, 25).coerceIn(0, 100)
             codeBlockWrap = appearance.getBoolean(CODE_BLOCK_WRAP_KEY, false)
             codeBlockLineNumbers = appearance.getBoolean(CODE_BLOCK_LINE_NUMBERS_KEY, false)
@@ -417,6 +425,20 @@ object ThemeStore {
             .edit()
             .putBoolean(NEW_MESSAGE_SCROLL_KEY, enabled)
             .apply()
+    }
+
+    fun saveGlassEnabled(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (glassEnabled == enabled && (!enabled || glassSurfaces.isNotEmpty())) return
+        val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val editor = preferences.edit().putBoolean(GLASS_ENABLED_KEY, enabled)
+        if (enabled && glassSurfaces.isEmpty()) {
+            val selected = GlassSurface.entries.toSet()
+            glassSurfaces = selected
+            editor.putStringSet(GLASS_SURFACES_KEY, selected.map { it.stored }.toSet())
+        }
+        glassEnabled = enabled
+        editor.apply()
     }
 
     fun saveGlassSurface(context: Context, surface: GlassSurface, enabled: Boolean) {

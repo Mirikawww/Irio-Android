@@ -207,7 +207,7 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
             val waveColor = Theme[colors][primaryColor]
             val fillColor = Theme[colors][fieldColor]
             val outlineColor = Theme[colors][borderColor]
-            val glass = GlassSurface.COMPOSER in ThemeStore.glassSurfaces
+            val glass = ThemeStore.isGlassEnabled(GlassSurface.COMPOSER)
             val totalSeconds = (sttRecordingElapsedMillis / 1_000L).toInt()
             val timer = "%02d:%02d".format(totalSeconds / 60, totalSeconds % 60)
             Box(

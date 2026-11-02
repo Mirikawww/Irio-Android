@@ -164,7 +164,7 @@ internal fun ComposerField(
     val showGhosts by remember(progress) { derivedStateOf { progress.value < 0.6f } }
     val ringColor = if (focused) Theme[colors][primaryColor] else Theme[colors][borderColor]
     val fillColor = Theme[colors][fieldColor]
-    val glass = !fullyExpanded && GlassSurface.COMPOSER in ThemeStore.glassSurfaces
+    val glass = !fullyExpanded && ThemeStore.isGlassEnabled(GlassSurface.COMPOSER)
     val footerBackground = Theme[colors][backgroundColorToken]
     val buttonGap = 8.dp
     val compactStart = contentPadding.calculateLeftPadding(layoutDirection) +
