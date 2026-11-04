@@ -4,6 +4,7 @@ package com.irio
 import androidx.compose.animation.core.Easing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -323,7 +325,10 @@ internal fun SettingsTitleCapsule(
             )
             .padding(start = 12.dp, end = 12.dp, top = 6.dp),
     ) {
-        ToolbarCapsule {
+        ToolbarCapsule(
+            // Only the painted capsule blocks page taps; child actions keep their own gestures.
+            modifier = Modifier.pointerInput(Unit) { detectTapGestures(onTap = {}) },
+        ) {
             Row(
                 modifier = Modifier.padding(end = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
