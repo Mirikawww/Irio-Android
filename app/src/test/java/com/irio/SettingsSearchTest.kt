@@ -6,6 +6,26 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsSearchTest {
+    @Test fun messageOnlyCornerScopeHasItsOwnSearchAnchor() {
+        val hit = searchSettings("仅对消息框生效", label = { it })
+            .single { it.id == "appearance.inputCorners.messageOnly" }
+        assertEquals("appearance.inputCorners.messageOnly", hit.anchor)
+        assertEquals("com.irio.AppearanceSettingsActivity", hit.destination.name)
+        assertEquals("Apply to message box only", translate(AppLanguage.EN, hit.title))
+    }
+
+    @Test fun inputCornersCanBeFoundInAppearanceSettingsInBothLanguages() {
+        val chinese = searchSettings("输入框圆角", label = { it })
+            .single { it.id == "appearance.inputCorners" }
+        assertEquals("appearance.inputCorners", chinese.anchor)
+        assertEquals("com.irio.AppearanceSettingsActivity", chinese.destination.name)
+        assertEquals("输入框圆角", chinese.title)
+        val english = searchSettings("Input corner radius",
+            label = { translate(AppLanguage.EN, it) })
+            .single { it.id == "appearance.inputCorners" }
+        assertEquals("Input corner radius", english.title)
+    }
+
     @Test fun newMessageScrollUsesTheExplicitSendLabelAndKeepsItsDestination() {
         val title = "发送新消息时滚动到新消息"
         val hit = searchSettings(title, label = { it }).single { it.id == "appearance.scroll" }

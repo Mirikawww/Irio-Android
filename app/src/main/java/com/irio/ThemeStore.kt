@@ -145,6 +145,9 @@ internal fun wcagContrastRatio(first: Color, second: Color): Float {
         (minOf(firstLuminance, secondLuminance) + 0.05f)
 }
 
+internal const val DefaultInputCornerRadiusDp = 16
+internal val InputCornerRadiusRange = 0..32
+
 object ThemeStore {
     private const val PREFS = "appearance_settings"
     private const val KEY = "theme_preference"
@@ -163,6 +166,8 @@ object ThemeStore {
     private const val LONG_TEXT_PASTE_THRESHOLD_KEY = "long_text_paste_threshold"
     private const val GLASS_ENABLED_KEY = "glass_enabled"
     private const val GLASS_SURFACES_KEY = "glass_surfaces"
+    private const val INPUT_CORNER_RADIUS_KEY = "input_corner_radius"
+    private const val INPUT_CORNERS_MESSAGE_ONLY_KEY = "input_corners_message_only"
     private const val BUBBLE_OPACITY_KEY = "bubble_opacity"
     private const val CODE_BLOCK_WRAP_KEY = "code_block_wrap"
     private const val CODE_BLOCK_LINE_NUMBERS_KEY = "code_block_line_numbers"
@@ -240,6 +245,13 @@ object ThemeStore {
         private set
 
     fun isGlassEnabled(surface: GlassSurface): Boolean = glassEnabled && surface in glassSurfaces
+
+    /** 输入框的连续圆角，默认保持原有 16dp。 */
+    var inputCornerRadius by mutableStateOf(DefaultInputCornerRadiusDp)
+        private set
+
+    var inputCornersMessageOnly by mutableStateOf(false)
+        private set
 
     /** 用户气泡背景的不透明度，0–100%，默认 25%。文字保持不透明。 */
     var bubbleOpacity by mutableStateOf(25)
@@ -327,6 +339,9 @@ object ThemeStore {
                 .mapNotNull(GlassSurface::fromStored)
                 .toSet()
             glassEnabled = appearance.getBoolean(GLASS_ENABLED_KEY, glassSurfaces.isNotEmpty())
+            inputCornerRadius = appearance.getInt(INPUT_CORNER_RADIUS_KEY, DefaultInputCornerRadiusDp)
+                .coerceIn(InputCornerRadiusRange)
+            inputCornersMessageOnly = appearance.getBoolean(INPUT_CORNERS_MESSAGE_ONLY_KEY, false)
             bubbleOpacity = appearance.getInt(BUBBLE_OPACITY_KEY, 25).coerceIn(0, 100)
             codeBlockWrap = appearance.getBoolean(CODE_BLOCK_WRAP_KEY, false)
             codeBlockLineNumbers = appearance.getBoolean(CODE_BLOCK_LINE_NUMBERS_KEY, false)
@@ -439,6 +454,23 @@ object ThemeStore {
         }
         glassEnabled = enabled
         editor.apply()
+    }
+
+    fun saveInputCornerRadius(context: Context, value: Int) {
+        ensureLoaded(context)
+        val next = value.coerceIn(InputCornerRadiusRange)
+        if (inputCornerRadius == next) return
+        inputCornerRadius = next
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putInt(INPUT_CORNER_RADIUS_KEY, next).apply()
+    }
+
+    fun saveInputCornersMessageOnly(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (inputCornersMessageOnly == enabled) return
+        inputCornersMessageOnly = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(INPUT_CORNERS_MESSAGE_ONLY_KEY, enabled).apply()
     }
 
     fun saveGlassSurface(context: Context, surface: GlassSurface, enabled: Boolean) {

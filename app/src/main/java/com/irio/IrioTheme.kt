@@ -276,7 +276,9 @@ private val SurfaceOverride: ThemeComposable = buildTheme {
         dialogShape to RoundedRectangle(16.dp),
         sheetShape to UnevenRoundedRectangle(topStart = 24.dp, topEnd = 24.dp),
         menuShape to RoundedRectangle(16.dp),
-        fieldShape to RoundedRectangle(16.dp),
+        fieldShape to RoundedRectangle(
+            (if (ThemeStore.inputCornersMessageOnly) DefaultInputCornerRadiusDp else ThemeStore.inputCornerRadius).dp,
+        ),
     )
     properties[shadows] = mapOf(
         raisedShadow to Theme[shadows][raisedShadow],

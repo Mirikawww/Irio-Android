@@ -51,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
@@ -65,14 +66,20 @@ import com.composables.ui.theme.backgroundColor as backgroundColorToken
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.defaultTextSelectionColors
 import com.composables.ui.theme.borderColor
-import com.composables.ui.theme.fieldShape
 import com.composables.ui.theme.fieldColor
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onFieldColor
 import com.composables.ui.theme.primaryColor
-import com.composables.ui.theme.shapes
 import com.composables.ui.theme.textSelectionColors
 import com.composeunstyled.theme.Theme
+import com.kyant.shapes.RoundedRectangle
+
+/** The chat composer keeps its chosen corners even when ordinary input fields use the default. */
+@Composable
+internal fun rememberComposerFieldShape(): Shape {
+    val radius = ThemeStore.inputCornerRadius
+    return remember(radius) { RoundedRectangle(radius.dp) }
+}
 
 /**
  * 输入文本样式：显式关掉 lineHeight 裁剪并把多余行距均分到上下，
@@ -122,7 +129,7 @@ internal fun ComposerField(
     onEnterSend: (() -> Unit)? = null,
     onPasteAsAttachment: ((String) -> Boolean)? = null,
 ) {
-    val shape = Theme[shapes][fieldShape]
+    val shape = rememberComposerFieldShape()
     val contentColor = Theme[colors][onFieldColor]
     val textStyle = ComposerTextStyle.copy(
         color = contentColor,

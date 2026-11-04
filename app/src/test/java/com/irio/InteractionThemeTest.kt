@@ -24,11 +24,97 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
 class InteractionThemeTest {
+    @Test
+    fun messageOnlyCornerScopePreservesTheCustomRadiusAndNormalFieldDefaults() = runTest {
+        val context = RuntimeEnvironment.getApplication()
+        ThemeStore.ensureLoaded(context)
+        val previousRadius = ThemeStore.inputCornerRadius
+        val previousScope = ThemeStore.inputCornersMessageOnly
+        val preferences = context.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
+        try {
+            ThemeStore.saveInputCornerRadius(context, 24)
+            for (messageOnly in listOf(true, false)) {
+                ThemeStore.saveInputCornersMessageOnly(context, messageOnly)
+                assertEquals(messageOnly, preferences.getBoolean("input_corners_message_only", !messageOnly))
+                assertEquals("Changing scope must retain the chosen radius", 24, ThemeStore.inputCornerRadius)
+                val recomposer = Recomposer(coroutineContext)
+                val composition = Composition(NoNodesApplier(), recomposer)
+                var observed = false
+                try {
+                    composition.setContent {
+                        CompositionLocalProvider(LocalDensity provides Density(2f)) {
+                            IrioComponentTheme {
+                                val size = Size(400f, 160f)
+                                val normal = Theme[shapes][fieldShape] as RoundedRectangularShape
+                                val composer = rememberComposerFieldShape() as RoundedRectangularShape
+                                assertEquals("Message box keeps its custom corners in both scopes", 48f,
+                                    composer.corners(size, LayoutDirection.Ltr, Density(2f)).topLeft, 0.01f)
+                                assertEquals("Only ordinary inputs revert to their original corners", if (messageOnly) 32f else 48f,
+                                    normal.corners(size, LayoutDirection.Ltr, Density(2f)).topLeft, 0.01f)
+                                observed = true
+                            }
+                        }
+                    }
+                    assertTrue(observed)
+                } finally {
+                    composition.dispose()
+                    recomposer.close()
+                }
+            }
+        } finally {
+            ThemeStore.saveInputCornerRadius(context, previousRadius)
+            ThemeStore.saveInputCornersMessageOnly(context, previousScope)
+        }
+    }
+
+    @Test
+    fun inputFieldCornerRadiusIsEditableAndPersistedWithoutChangingButtons() = runTest {
+        val context = RuntimeEnvironment.getApplication()
+        ThemeStore.ensureLoaded(context)
+        val original = ThemeStore.inputCornerRadius
+        val preferences = context.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
+        try {
+            for (radius in listOf(0, 8, 16, 32)) {
+                ThemeStore.saveInputCornerRadius(context, radius)
+                assertEquals(radius, preferences.getInt("input_corner_radius", -1))
+                val recomposer = Recomposer(coroutineContext)
+                val composition = Composition(NoNodesApplier(), recomposer)
+                var observed = false
+                try {
+                    composition.setContent {
+                        CompositionLocalProvider(LocalDensity provides Density(2f)) {
+                            IrioComponentTheme {
+                                // Taller than the largest radius, so corner capping cannot hide the chosen value.
+                                val size = Size(400f, 160f)
+                                val field = Theme[shapes][fieldShape] as RoundedRectangularShape
+                                val button = Theme[shapes][buttonShape] as RoundedRectangularShape
+                                assertEquals(radius * 2f, field.corners(size, LayoutDirection.Ltr, Density(2f)).topLeft, 0.01f)
+                                assertEquals(80f, button.corners(size, LayoutDirection.Ltr, Density(2f)).topLeft, 0.01f)
+                                observed = true
+                            }
+                        }
+                    }
+                    assertTrue("Theme was composed at radius $radius", observed)
+                } finally {
+                    composition.dispose()
+                    recomposer.close()
+                }
+            }
+            ThemeStore.saveInputCornerRadius(context, 100)
+            assertEquals(32, ThemeStore.inputCornerRadius)
+            ThemeStore.saveInputCornerRadius(context, -5)
+            assertEquals(0, ThemeStore.inputCornerRadius)
+        } finally {
+            ThemeStore.saveInputCornerRadius(context, original)
+        }
+    }
+
     @Test
     fun androidGeometryStaysTouchSizedWhenAPointerIsReported() = runTest {
         for (inputMode in listOf(InteractionMode.Pointer, InteractionMode.Touch, null)) {

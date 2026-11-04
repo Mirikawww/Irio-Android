@@ -119,6 +119,9 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
     var accentMenuOpen by remember { mutableStateOf(false) }
     var languageMenuOpen by remember { mutableStateOf(false) }
     val searchTarget = context.settingsSearchTarget()
+    var pendingInputCornerRadius by remember(ThemeStore.inputCornerRadius) {
+        mutableIntStateOf(ThemeStore.inputCornerRadius)
+    }
     var glassExpanded by remember { mutableStateOf(searchTarget.startsWith("appearance.glass.")) }
     var longTextPasteExpanded by remember { mutableStateOf(searchTarget == "appearance.paste.threshold") }
 
@@ -422,6 +425,28 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     valueLabel = { "$it%" },
                     onValueChange = { ThemeStore.saveBubbleOpacity(context, it) },
                 )
+                SettingsSlider(
+                    modifier = Modifier.settingsSearchAnchor("appearance.inputCorners"),
+                    label = tr("输入框圆角"),
+                    value = pendingInputCornerRadius,
+                    valueRange = InputCornerRadiusRange,
+                    valueLabel = { "$it dp" },
+                    onValueChange = { pendingInputCornerRadius = it },
+                    onValueChangeFinished = {
+                        ThemeStore.saveInputCornerRadius(context, pendingInputCornerRadius)
+                    },
+                )
+                Checkbox(
+                    checked = ThemeStore.inputCornersMessageOnly,
+                    onCheckedChange = { ThemeStore.saveInputCornersMessageOnly(context, it) },
+                    modifier = Modifier
+                        .settingsSearchAnchor("appearance.inputCorners.messageOnly")
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    accessibilityLabel = tr("仅对消息框生效"),
+                ) {
+                    Text(tr("仅对消息框生效"), color = Theme[colors][onPanelColor])
+                }
                 val glassArrow by animateFloatAsState(
                     targetValue = if (glassExpanded) 180f else 0f,
                     animationSpec = irioSpring(),

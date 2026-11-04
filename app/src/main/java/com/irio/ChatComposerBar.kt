@@ -64,11 +64,9 @@ import com.composables.ui.components.Text
 import com.composables.ui.theme.borderColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.fieldColor
-import com.composables.ui.theme.fieldShape
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPrimaryColor
 import com.composables.ui.theme.primaryColor
-import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 import com.composeunstyled.LocalContentColor
 import com.kyant.shapes.RoundedRectangle
@@ -203,7 +201,7 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
             expansionProgress: androidx.compose.runtime.State<Float>,
             modifier: Modifier = Modifier,
         ) {
-            val shape = Theme[shapes][fieldShape]
+            val shape = rememberComposerFieldShape()
             val waveColor = Theme[colors][primaryColor]
             val fillColor = Theme[colors][fieldColor]
             val outlineColor = Theme[colors][borderColor]
