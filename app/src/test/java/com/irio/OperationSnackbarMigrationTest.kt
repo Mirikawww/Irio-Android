@@ -187,10 +187,20 @@ class OperationSnackbarMigrationTest {
             assertEquals("List scrolling must not move the page's bottom action", before.top, entry.boundsInRoot.top, 1f)
             val addStart = entry.positionInRoot.x
             val refreshStart = ui.text(tr("刷新模型")).positionInRoot.x
+            val addTop = entry.positionInRoot.y
+            val refreshTop = ui.text(tr("刷新模型")).positionInRoot.y
             ui.click(tr("配置"))
             val frames = (0 until 40).map {
                 ui.frames(1)
                 val nodes = ui.all()
+                for ((label, top) in listOf(tr("添加模型") to addTop, tr("刷新模型") to refreshTop)) {
+                    val action = nodes.firstOrNull { node ->
+                        node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == label }
+                    }
+                    if (action != null && action.boundsInRoot.width > 1f && action.boundsInRoot.height > 1f) {
+                        assertEquals("$label must slide horizontally without drifting vertically", top, action.positionInRoot.y, 1f)
+                    }
+                }
                 fun x(label: String) = nodes.firstOrNull { node ->
                     node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == label }
                 }?.positionInRoot?.x

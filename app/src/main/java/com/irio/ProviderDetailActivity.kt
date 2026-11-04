@@ -293,7 +293,8 @@ internal fun ProviderDetailScreen(
                     // Same transition as the refresh overlay, on the shared tabs backdrop.
                     pageTransition.AnimatedContent(
                         modifier = Modifier.fillMaxWidth().clipToBounds(),
-                        transitionSpec = { providerPageTransition() },
+                        // Retain the outgoing action's height until its horizontal slide finishes.
+                        transitionSpec = { providerPageTransition().using(null) },
                     ) { current ->
                         if (current == ProviderDetailPage.Models) {
                             Box(Modifier.fillMaxWidth().onSizeChanged { modelActionHeightPx = it.height }) {
