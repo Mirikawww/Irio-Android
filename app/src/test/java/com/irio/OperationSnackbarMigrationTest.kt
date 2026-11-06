@@ -113,8 +113,9 @@ class OperationSnackbarMigrationTest {
             assertFalse(IrioDocsMcpStore.loadInstalled(app))
             assertFalse(IrioDocsMcpStore.loadEnabled(app))
             assertFalse(chatToolRegistry(app, false, "").handles("irio_docs_mcp_search_irio_docs"))
-            open("安装")
-            assertTrue(ui.hasText(tr("开发者")))
+            assertTrue("Removing Docs must keep the installation details open", ui.hasText(tr("开发者")))
+            assertTrue("The installation page must remain visible after removing Docs",
+                ui.text(tr("开发者")).boundsInWindow.height > 0f)
             assertFalse(ui.hasText(tr("移除集成")))
             assertFalse(ui.hasText(tr("使用 OAuth 登录")))
             assertFalse(ui.hasText("Personal Access Token"))
@@ -127,6 +128,47 @@ class OperationSnackbarMigrationTest {
             assertTrue(ui.hasText(tr("工具数量")))
             assertTrue(ui.hasText(tr("移除集成")))
         }
+    }
+
+    @Test fun githubRemovalReturnsToInstallationWithoutClosingDetails() = verifyMcpRemoval(todoist = false)
+
+    @Test fun todoistRemovalReturnsToInstallationWithoutClosingDetails() = verifyMcpRemoval(todoist = true)
+
+    private fun verifyMcpRemoval(todoist: Boolean) = runTest {
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        IrioDocsMcpStore.remove(app)
+        val directory = java.io.File(app.cacheDir, "mcp-removal-${System.nanoTime()}").apply { mkdirs() }
+        val key = javax.crypto.KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        val github = GitHubMcpStore(java.io.File(directory, "github.json"), secretKey = { key })
+        val tasks = TodoistMcpStore(java.io.File(directory, "todoist.json"), secretKey = { key })
+        val tools = listOf(McpTool("fixture", "Fixture", org.json.JSONObject("{\"type\":\"object\"}")))
+        if (todoist) {
+            tasks.save(TodoistMcpInstallation("fixture-client", TodoistCredential("fixture-token"), tools,
+                account = TodoistMcpAccount("Fixture", "", "fixture@example.test")))
+        } else {
+            github.save(GitHubMcpInstallation(GitHubCredential("fixture-token"), "PAT", tools,
+                account = GitHubMcpAccount("fixture", "", "fixture@example.test")))
+        }
+        try {
+            withUi { McpSettingsScreen(githubStore = github, todoistStoreOverride = tasks, onBack = {}) }.use { ui ->
+                ui.until { ui.hasText(tr("管理")) }
+                ui.click(tr("管理")); ui.frames(40)
+                assertTrue(ui.hasText(tr("移除集成")))
+                ui.click(tr("移除集成"))
+                ui.until { if (todoist) tasks.load() == null else github.load() == null }
+                ui.frames(40)
+                assertFalse("Removal must clear the installed controls", ui.hasText(tr("移除集成")))
+                assertTrue("Removal must leave the integration's installation page open", ui.hasText(tr("开发者")))
+                assertTrue("The installation page must remain visible after removal",
+                    ui.text(tr("开发者")).boundsInWindow.height > 0f)
+                if (todoist) {
+                    assertTrue(ui.hasText(tr("安装") + " OAuth"))
+                } else {
+                    assertTrue(ui.hasText(tr("安装") + " PAT"))
+                    assertTrue(ui.hasText(tr("安装") + " OAuth"))
+                }
+            }
+        } finally { directory.deleteRecursively() }
     }
 
     @Test fun manualModelDeleteActionDoesNotIncreaseTheModelRowHeight() = runTest {

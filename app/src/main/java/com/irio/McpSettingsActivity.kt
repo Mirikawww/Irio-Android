@@ -69,11 +69,15 @@ class McpSettingsActivity : ComponentActivity() {
 private enum class McpIntegration { GITHUB, TODOIST, IRIO_DOCS }
 
 @Composable
-internal fun McpSettingsScreen(onBack: () -> Unit) {
+internal fun McpSettingsScreen(
+    githubStore: GitHubMcpStore? = null,
+    todoistStoreOverride: TodoistMcpStore? = null,
+    onBack: () -> Unit,
+) {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
-    val store = remember { GitHubMcpStore.of(context.applicationContext) }
-    val todoistStore = remember { TodoistMcpStore.of(context.applicationContext) }
+    val store = remember(githubStore) { githubStore ?: GitHubMcpStore.of(context.applicationContext) }
+    val todoistStore = remember(todoistStoreOverride) { todoistStoreOverride ?: TodoistMcpStore.of(context.applicationContext) }
     val scope = rememberCoroutineScope()
     val details = rememberBottomSheetState()
     val loginSheet = rememberBottomSheetState()
@@ -338,7 +342,6 @@ internal fun McpSettingsScreen(onBack: () -> Unit) {
                         IrioDocsMcpStore.remove(context)
                         docsInstalled = IrioDocsMcpStore.loadInstalled(context)
                         docsEnabled = IrioDocsMcpStore.loadEnabled(context)
-                        details.targetDetent = BottomSheetDetent.Hidden
                     },
                 )
             } else if (selectedIntegration == McpIntegration.TODOIST) {
@@ -437,7 +440,6 @@ internal fun McpSettingsScreen(onBack: () -> Unit) {
                 Button(onClick = { scope.launch {
                     try {
                         withContext(Dispatchers.IO) { store.remove(); check(store.load() == null) }
-                        details.hide()
                         installation = null
                     } catch (_: Exception) { showDetailsError(tr("无法移除 GitHub 集成，请重试")) }
                 } }, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
