@@ -215,6 +215,65 @@ class OperationSnackbarMigrationTest {
 
     @Test fun githubRemovalReturnsToInstallationWithoutClosingDetails() = verifyMcpRemoval(todoist = false)
 
+    @Test fun githubAccountLoadingWaitsForEntranceAndUsesTheCachedAccountOnReopen() = verifyMcpEntrance(todoist = false)
+
+    @Test fun todoistAccountLoadingWaitsForEntranceAndUsesTheCachedAccountOnReopen() = verifyMcpEntrance(todoist = true)
+
+    private fun verifyMcpEntrance(todoist: Boolean) = runTest {
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        IrioDocsMcpStore.remove(app)
+        val directory = java.io.File(app.cacheDir, "mcp-entrance-${System.nanoTime()}").apply { mkdirs() }
+        val key = javax.crypto.KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        val github = GitHubMcpStore(java.io.File(directory, "github.json"), secretKey = { key })
+        val tasks = TodoistMcpStore(java.io.File(directory, "todoist.json"), secretKey = { key })
+        val tools = listOf(McpTool("fixture", "Fixture", org.json.JSONObject("{\"type\":\"object\"}")))
+        if (todoist) tasks.save(TodoistMcpInstallation("fixture-client", TodoistCredential("fixture-token"), tools))
+        else github.save(GitHubMcpInstallation(GitHubCredential("fixture-token"), "PAT", tools))
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        var release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var opens = 0
+        try {
+            withUi { McpSettingsScreen(githubStore = github, todoistStoreOverride = tasks,
+                awaitDetailsEntrance = { sheet ->
+                    sheet.targetDetent = BottomSheetDetent.FullyExpanded
+                    opens++
+                    release.await()
+                },
+                loadGitHubAccount = { _, _ ->
+                    calls.incrementAndGet()
+                    GitHubMcpAccount("fixture", "", "fixture@example.test")
+                },
+                loadTodoistAccount = { _, _ ->
+                    calls.incrementAndGet()
+                    TodoistMcpAccount("Fixture", "", "fixture@example.test")
+                }, onBack = {}) }.use { ui ->
+                ui.until { ui.hasText(tr("管理")) }
+                ui.click(tr("管理")); ui.frames(40)
+                assertEquals("Opening must start the real entrance path", 1, opens)
+                assertEquals("Account I/O must not run during entrance, even if it lasts beyond a fixed delay", 0, calls.get())
+                (ui.view.context as ComponentActivity).onBackPressedDispatcher.onBackPressed()
+                ui.frames(40)
+                release.complete(Unit)
+                ui.frames(10)
+                assertEquals("Dismissing during entrance must cancel pending account work", 0, calls.get())
+                release = kotlinx.coroutines.CompletableDeferred()
+                ui.click(tr("管理")); ui.frames(40)
+                assertEquals(2, opens)
+                assertEquals(0, calls.get())
+                release.complete(Unit)
+                ui.until { (if (todoist) tasks.load()?.account else github.load()?.account) != null }
+                ui.until { ui.hasText("fixture@example.test") }
+                assertEquals("Account is loaded once after the sheet settles", 1, calls.get())
+                (ui.view.context as ComponentActivity).onBackPressedDispatcher.onBackPressed()
+                ui.frames(40)
+                ui.click(tr("管理")); ui.frames(40)
+                assertEquals("Cached account avoids another request on reopening", 1, calls.get())
+                assertTrue(ui.hasText("fixture@example.test"))
+                println("MCP entrance ($todoist): account requests before settlement=0; after settlement=1; after cached reopen=1")
+            }
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun todoistRemovalReturnsToInstallationWithoutClosingDetails() = verifyMcpRemoval(todoist = true)
 
     private fun verifyMcpRemoval(todoist: Boolean) = runTest {

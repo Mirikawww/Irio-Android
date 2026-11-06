@@ -83,6 +83,13 @@ internal fun McpSettingsScreen(
     },
     createGitHubAuth: () -> GitHubDeviceAuth = { GitHubDeviceAuth() },
     openWebPage: (android.content.Context, String) -> Boolean = ::openGitHubPage,
+    awaitDetailsEntrance: suspend (BottomSheetState) -> Unit = { it.show() },
+    loadGitHubAccount: (String, ChatRequestCancellation) -> GitHubMcpAccount = { token, cancel ->
+        GitHubAccountClient(token, cancellation = cancel).load()
+    },
+    loadTodoistAccount: (String, ChatRequestCancellation) -> TodoistMcpAccount = { token, cancel ->
+        TodoistAccountClient(token, cancellation = cancel).load()
+    },
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -96,6 +103,8 @@ internal fun McpSettingsScreen(
     var installation by remember { mutableStateOf<GitHubMcpInstallation?>(null) }
     var todoistInstallation by remember { mutableStateOf<TodoistMcpInstallation?>(null) }
     var selectedIntegration by remember { mutableStateOf(McpIntegration.GITHUB) }
+    var detailsReady by remember { mutableStateOf(false) }
+    var entranceJob by remember { mutableStateOf<Job?>(null) }
     var removeDialogOpen by remember(selectedIntegration, details.targetDetent) { mutableStateOf(false) }
     var removingIntegration by remember { mutableStateOf(false) }
     var docsInstalled by remember { mutableStateOf(IrioDocsMcpStore.loadInstalled(context)) }
@@ -120,6 +129,22 @@ internal fun McpSettingsScreen(
     fun showDetailsError(message: String) {
         sheets.detailsError = message
         detailsErrorNonce++
+    }
+
+    fun openDetails() {
+        entranceJob?.cancel()
+        detailsReady = false
+        entranceJob = scope.launch {
+            // show() suspends until the actual sheet animation settles, not a fixed timeout.
+            awaitDetailsEntrance(details)
+            coroutineContext.ensureActive()
+            detailsReady = true
+        }
+    }
+    fun closeDetails() {
+        entranceJob?.cancel()
+        detailsReady = false
+        details.targetDetent = BottomSheetDetent.Hidden
     }
 
     val refreshCancellation = remember(selectedIntegration, details.targetDetent) { ChatRequestCancellation() }
@@ -157,15 +182,15 @@ internal fun McpSettingsScreen(
         todoistInstallation = withContext(Dispatchers.IO) { todoistStore.load() }
         loaded = true
     }
-    val accountCancellation = remember(selectedIntegration, details.targetDetent, installation?.credential?.accessToken) { ChatRequestCancellation() }
+    val accountCancellation = remember(selectedIntegration, details.targetDetent, detailsReady, installation?.credential?.accessToken) { ChatRequestCancellation() }
     DisposableEffect(accountCancellation) { onDispose { accountCancellation.cancel() } }
     LaunchedEffect(accountCancellation) {
         val current = installation ?: return@LaunchedEffect
-        if (selectedIntegration != McpIntegration.GITHUB || details.targetDetent == BottomSheetDetent.Hidden || current.account != null) return@LaunchedEffect
+        if (selectedIntegration != McpIntegration.GITHUB || !detailsReady || details.targetDetent == BottomSheetDetent.Hidden || current.account != null) return@LaunchedEffect
         accountLoading = true
         try {
             val account = withContext(Dispatchers.IO) {
-                GitHubAccountClient(current.credential.accessToken, cancellation = accountCancellation).load()
+                loadGitHubAccount(current.credential.accessToken, accountCancellation)
             }
             val updated = withContext(Dispatchers.IO) { store.updateAccount(current.credential.accessToken, account) }
             val latest = installation
@@ -181,18 +206,18 @@ internal fun McpSettingsScreen(
             accountLoading = false
         }
     }
-    val todoistAccountCancellation = remember(selectedIntegration, details.targetDetent, todoistInstallation?.clientId) {
+    val todoistAccountCancellation = remember(selectedIntegration, details.targetDetent, detailsReady, todoistInstallation?.clientId) {
         ChatRequestCancellation()
     }
     DisposableEffect(todoistAccountCancellation) { onDispose { todoistAccountCancellation.cancel() } }
     LaunchedEffect(todoistAccountCancellation) {
         val current = todoistInstallation ?: return@LaunchedEffect
-        if (selectedIntegration != McpIntegration.TODOIST || details.targetDetent == BottomSheetDetent.Hidden || current.account != null) return@LaunchedEffect
+        if (selectedIntegration != McpIntegration.TODOIST || !detailsReady || details.targetDetent == BottomSheetDetent.Hidden || current.account != null) return@LaunchedEffect
         todoistAccountLoading = true
         try {
             val updated = withContext(Dispatchers.IO) {
                 val latest = todoistStore.refreshIfNeeded() ?: error(tr("无法读取 Todoist 登录账号"))
-                val account = TodoistAccountClient(latest.credential.accessToken, cancellation = todoistAccountCancellation).load()
+                val account = loadTodoistAccount(latest.credential.accessToken, todoistAccountCancellation)
                 coroutineContext.ensureActive()
                 check(!todoistAccountCancellation.isCancelled())
                 todoistStore.updateAccount(latest.credential.accessToken, account)
@@ -244,7 +269,7 @@ internal fun McpSettingsScreen(
     fun openTodoist() {
         selectedIntegration = McpIntegration.TODOIST
         sheets.detailsError = null
-        details.targetDetent = BottomSheetDetent.FullyExpanded
+        openDetails()
     }
     suspend fun install(credential: GitHubCredential, kind: GitHubLogin, cancel: ChatRequestCancellation) {
         val saved = withContext(Dispatchers.IO) {
@@ -320,7 +345,7 @@ internal fun McpSettingsScreen(
     }
     BackHandler(loginSheet.targetDetent != BottomSheetDetent.Hidden || details.targetDetent != BottomSheetDetent.Hidden) {
         if (loginSheet.targetDetent != BottomSheetDetent.Hidden) clearLogin()
-        else details.targetDetent = BottomSheetDetent.Hidden
+        else closeDetails()
     }
     SettingsHazeScaffold(title = "MCP", onBack = onBack) { top, bottom ->
         Column(Modifier.fillMaxSize().padding(bottom = bottom).verticalScroll(rememberScrollState())
@@ -336,7 +361,7 @@ internal fun McpSettingsScreen(
                      onClick = {
                          selectedIntegration = McpIntegration.GITHUB
                          sheets.detailsError = null
-                         details.targetDetent = BottomSheetDetent.FullyExpanded
+                         openDetails()
                      })
             }
             IrioDocsMcpSettingsCard(installed = docsInstalled, loaded = loaded, onManage = {
@@ -344,7 +369,7 @@ internal fun McpSettingsScreen(
                 docsInstalled = IrioDocsMcpStore.loadInstalled(context)
                 docsEnabled = IrioDocsMcpStore.loadEnabled(context)
                 sheets.detailsError = null
-                details.targetDetent = BottomSheetDetent.FullyExpanded
+                openDetails()
             })
             Row(Modifier.fillMaxWidth().background(Theme[colors][secondaryColor], Theme[shapes][largeShape]).settingsSearchAnchor("mcp.todoist", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
                 .padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -358,7 +383,7 @@ internal fun McpSettingsScreen(
             }
         }
     }
-    BottomSheet(state = details, onDismissRequest = { details.targetDetent = BottomSheetDetent.Hidden },
+    BottomSheet(state = details, onDismissRequest = { closeDetails() },
         contentPadding = PaddingValues(top = 32.dp, bottom = 16.dp), scrollableBody = true) {
         Box(Modifier.fillMaxWidth()) {
         SheetBody {
@@ -405,7 +430,7 @@ internal fun McpSettingsScreen(
                         GitHubInfoDivider()
                         GitHubInfoRow(tr("授权方式"), "OAuth")
                         GitHubInfoDivider()
-                        TodoistAccountRow(current.account, todoistAccountLoading)
+                        TodoistAccountRow(current.account, todoistAccountLoading, loadAvatar = detailsReady)
                         GitHubInfoDivider()
                         GitHubInfoRow(tr("工具数量"), current.tools.size.toString())
                     }
@@ -450,7 +475,7 @@ internal fun McpSettingsScreen(
                     GitHubInfoDivider()
                     GitHubInfoRow(tr("授权方式"), current.auth)
                     GitHubInfoDivider()
-                    GitHubAccountRow(current.account, accountLoading)
+                    GitHubAccountRow(current.account, accountLoading, loadAvatar = detailsReady)
                     GitHubInfoDivider()
                     GitHubInfoRow(tr("工具数量"), current.tools.size.toString())
                 }
@@ -703,7 +728,7 @@ private fun TodoistButton(
 }
 
 @Composable
-private fun TodoistAccountRow(account: TodoistMcpAccount?, loading: Boolean) {
+private fun TodoistAccountRow(account: TodoistMcpAccount?, loading: Boolean, loadAvatar: Boolean) {
     val content = Theme[colors][onPanelColor]
     val muted = Theme[colors][mutedColor]
     Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -712,7 +737,7 @@ private fun TodoistAccountRow(account: TodoistMcpAccount?, loading: Boolean) {
             if (account != null) {
                 Box(Modifier.size(24.dp).clip(ContinuousCapsule).background(Theme[colors][secondaryColor]), contentAlignment = Alignment.Center) {
                     Text(account.name.ifBlank { account.email }.take(1).uppercase(), color = muted, fontSize = 14.sp)
-                    if (account.avatarUrl.isNotBlank()) {
+                    if (loadAvatar && account.avatarUrl.isNotBlank()) {
                         AsyncImage(model = account.avatarUrl, contentDescription = tr("Todoist 头像"),
                             contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
                     }
@@ -731,7 +756,7 @@ private fun TodoistAccountRow(account: TodoistMcpAccount?, loading: Boolean) {
 }
 
 @Composable
-private fun GitHubAccountRow(account: GitHubMcpAccount?, loading: Boolean) {
+private fun GitHubAccountRow(account: GitHubMcpAccount?, loading: Boolean, loadAvatar: Boolean) {
     val content = Theme[colors][onPanelColor]
     val muted = Theme[colors][mutedColor]
     Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -740,7 +765,7 @@ private fun GitHubAccountRow(account: GitHubMcpAccount?, loading: Boolean) {
             if (account != null) {
                 Box(Modifier.size(24.dp).clip(ContinuousCapsule).background(Theme[colors][secondaryColor]), contentAlignment = Alignment.Center) {
                     Text(account.login.take(1).uppercase(), color = muted, fontSize = 14.sp)
-                    if (account.avatarUrl.isNotBlank()) {
+                    if (loadAvatar && account.avatarUrl.isNotBlank()) {
                         AsyncImage(model = account.avatarUrl, contentDescription = tr("GitHub 头像"),
                             contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
                     }
