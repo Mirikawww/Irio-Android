@@ -237,7 +237,6 @@ private val settingsSearchEntries = listOf(
     item("appearance.theme", "主题", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.accent", "强调色", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.amoled", "自动 AMOLED", "外观与偏好", AppearanceSettingsActivity::class.java),
-    item("appearance.background", "聊天背景", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.bubbleOpacity", "气泡透明度", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.inputCorners", "输入框圆角", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.inputCorners.messageOnly", "仅对消息框生效", "外观与偏好", AppearanceSettingsActivity::class.java),

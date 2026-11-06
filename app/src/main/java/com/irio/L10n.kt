@@ -478,7 +478,6 @@ private val English = mapOf(
     "其他" to "Other",
     "名称" to "Name",
     "外观与偏好" to "Appearance and preferences",
-    "聊天背景" to "Chat background",
     "密钥" to "API key",
     "自定义请求头" to "Custom request headers",
     "请求头名称" to "Header name",

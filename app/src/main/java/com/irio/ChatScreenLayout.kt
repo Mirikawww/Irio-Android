@@ -110,106 +110,99 @@ internal fun ChatScreenLayout(state: ChatScreenState) =
                         containerColor = background,
                         contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     ) { paddingValues ->
-                        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-                            // 背景图固定铺满聊天页，不跟键盘一起重新缩放，避免出现黑边。
-                            Box(modifier = Modifier.fillMaxSize().background(background)) {
-                                ChatBackgroundImage()
-                            }
-                            BoxWithConstraints(modifier = Modifier.fillMaxSize().imePadding()) {
-                                AndroidMessageList(
-                                    messages = shownTranscript,
-                                    controller = messageRecyclerController,
-                                    modifier =
-                                        Modifier.fillMaxSize()
-                                            .hazeSource(chatHazeState)
-                                            .then(
-                                                if (ChatBackgroundEnabled) Modifier
-                                                else Modifier.background(background)
-                                            ),
-                                    contentPaddingTop = toolbarContentPaddingPx,
-                                    contentPaddingBottom = composerContentPaddingPx,
-                                    callbacks = messageCallbacks,
-                                    onVisibleRangeChanged = { first, last ->
-                                        val snapshot = shownTranscript
-                                        val conversationId = currentConversation.id
-                                        val candidates =
-                                            listOf(first - 1, last + 1)
-                                                .filter { it in snapshot.indices }
-                                                .distinct()
-                                        transcriptPrewarmJob.value?.cancel()
-                                        transcriptPrewarmJob.value =
-                                            if (candidates.isEmpty()) {
-                                                null
-                                            } else {
-                                                scope.launch {
-                                                    // 先让当前可见行完成首帧和自身渲染，再预热邻居。
-                                                    withFrameNanos {}
-                                                    delay(180)
-                                                    if (currentConversation.id != conversationId)
-                                                        return@launch
-                                                    candidates.forEach { index ->
-                                                        prepareFinishedMessage(
-                                                            snapshot[index],
-                                                            renderContentArgb,
-                                                            renderPxPerPt,
-                                                            renderTexScale,
-                                                            scope,
-                                                        )
-                                                    }
+                        BoxWithConstraints(
+                            modifier = Modifier.fillMaxSize().padding(paddingValues).imePadding()
+                        ) {
+                            AndroidMessageList(
+                                messages = shownTranscript,
+                                controller = messageRecyclerController,
+                                modifier =
+                                    Modifier.fillMaxSize()
+                                        .hazeSource(chatHazeState)
+                                        .background(background),
+                                contentPaddingTop = toolbarContentPaddingPx,
+                                contentPaddingBottom = composerContentPaddingPx,
+                                callbacks = messageCallbacks,
+                                onVisibleRangeChanged = { first, last ->
+                                    val snapshot = shownTranscript
+                                    val conversationId = currentConversation.id
+                                    val candidates =
+                                        listOf(first - 1, last + 1)
+                                            .filter { it in snapshot.indices }
+                                            .distinct()
+                                    transcriptPrewarmJob.value?.cancel()
+                                    transcriptPrewarmJob.value =
+                                        if (candidates.isEmpty()) {
+                                            null
+                                        } else {
+                                            scope.launch {
+                                                // 先让当前可见行完成首帧和自身渲染，再预热邻居。
+                                                withFrameNanos {}
+                                                delay(180)
+                                                if (currentConversation.id != conversationId)
+                                                    return@launch
+                                                candidates.forEach { index ->
+                                                    prepareFinishedMessage(
+                                                        snapshot[index],
+                                                        renderContentArgb,
+                                                        renderPxPerPt,
+                                                        renderTexScale,
+                                                        scope,
+                                                    )
                                                 }
                                             }
-                                    },
-                                    onScrollStateChanged = { state ->
-                                        val scrolling = state != RecyclerView.SCROLL_STATE_IDLE
-                                        recyclerScrolling = scrolling
-                                        if (scrolling && generatingIds.isNotEmpty()) {
-                                            streamingDeferActive.set(true)
                                         }
-                                    },
-                                    onUserScrollSample = { scrollDeltaY ->
-                                        if (!messageRecyclerController.isProgrammaticScroll()) {
-                                            val pinned =
-                                                if (scrollDeltaY > 0) {
-                                                    messageRecyclerController.isPinnedToBottom(
-                                                        transcriptBottomSlackPx
-                                                    )
-                                                } else {
-                                                    null
-                                                }
-                                            stickToBottom =
-                                                transcriptBottomLockAfterUserScroll(
-                                                    stickToBottom,
-                                                    scrollDeltaY,
-                                                    pinned,
+                                },
+                                onScrollStateChanged = { state ->
+                                    val scrolling = state != RecyclerView.SCROLL_STATE_IDLE
+                                    recyclerScrolling = scrolling
+                                    if (scrolling && generatingIds.isNotEmpty()) {
+                                        streamingDeferActive.set(true)
+                                    }
+                                },
+                                onUserScrollSample = { scrollDeltaY ->
+                                    if (!messageRecyclerController.isProgrammaticScroll()) {
+                                        val pinned =
+                                            if (scrollDeltaY > 0) {
+                                                messageRecyclerController.isPinnedToBottom(
+                                                    transcriptBottomSlackPx
                                                 )
-                                        }
-                                    },
-                                )
+                                            } else {
+                                                null
+                                            }
+                                        stickToBottom =
+                                            transcriptBottomLockAfterUserScroll(
+                                                stickToBottom,
+                                                scrollDeltaY,
+                                                pinned,
+                                            )
+                                    }
+                                },
+                            )
 
-                                ChatComposerBar(state, maxHeight)
+                            ChatComposerBar(state, maxHeight)
 
-                                ScrollToBottomButton(
-                                    visible = !messageRecyclerController.scrollButtonHidden &&
-                                        shownTranscript.isNotEmpty() && !composerFullscreen &&
-                                        pendingConversationScroll != currentConversation.id,
-                                    followingBottom = stickToBottom,
-                                    responding = busyThisChat,
-                                    bottomInset = composerBarHeight,
-                                    onClick = {
-                                        stickToBottom = true
-                                        messageRecyclerController.revealTail()
-                                    },
-                                )
+                            ScrollToBottomButton(
+                                visible = !messageRecyclerController.scrollButtonHidden &&
+                                    shownTranscript.isNotEmpty() && !composerFullscreen &&
+                                    pendingConversationScroll != currentConversation.id,
+                                followingBottom = stickToBottom,
+                                responding = busyThisChat,
+                                bottomInset = composerBarHeight,
+                                onClick = {
+                                    stickToBottom = true
+                                    messageRecyclerController.revealTail()
+                                },
+                            )
 
-                                ChatToolbar(state)
-                                IrioSnackbar(
-                                    visible = composerStatus != null,
-                                    message = composerStatus.orEmpty(),
-                                    bottomInset = composerBarHeight + 16.dp,
-                                    onDismiss = { composerStatus = null },
-                                    restartKey = composerStatusNonce,
-                                )
-                            }
+                            ChatToolbar(state)
+                            IrioSnackbar(
+                                visible = composerStatus != null,
+                                message = composerStatus.orEmpty(),
+                                bottomInset = composerBarHeight + 16.dp,
+                                onDismiss = { composerStatus = null },
+                                restartKey = composerStatusNonce,
+                            )
                         }
                     }
 
