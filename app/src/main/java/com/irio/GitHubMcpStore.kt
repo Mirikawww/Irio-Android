@@ -100,10 +100,12 @@ internal class GitHubMcpStore(
         updated
     }
 
-    suspend fun refreshIfNeeded(): GitHubMcpInstallation? {
-        val current = load()?.takeIf { it.enabled && it.tools.isNotEmpty() && it.credential.accessToken.isNotBlank() }
+    suspend fun refreshIfNeeded(allowDisabled: Boolean = false): GitHubMcpInstallation? {
+        val current = load()?.takeIf { (allowDisabled || it.enabled) && it.tools.isNotEmpty() && it.credential.accessToken.isNotBlank() }
             ?: return null
-        if (!current.credential.shouldRefresh()) return current.takeIf { it.usable() }
+        if (!current.credential.shouldRefresh()) return current.takeIf {
+            it.credential.expiresAt == 0L || it.credential.expiresAt > System.currentTimeMillis()
+        }
         if (current.credential.refreshTokenExpiresAt > 0 && current.credential.refreshTokenExpiresAt <= System.currentTimeMillis()) return null
         val refreshed = runCatching { refreshAuth().refresh(current.credential) }.getOrNull() ?: return null
         return synchronized(lock) {
@@ -116,6 +118,13 @@ internal class GitHubMcpStore(
 
     fun remove(): Unit = synchronized(lock) {
         check(!file.exists() || file.delete()) { tr("无法移除 GitHub 集成，请重试") }
+    }
+
+    fun updateTools(expectedToken: String, tools: List<McpTool>): GitHubMcpInstallation? = synchronized(lock) {
+        require(tools.isNotEmpty())
+        val current = load()?.takeIf { it.credential.accessToken == expectedToken } ?: return@synchronized null
+        save(GitHubMcpInstallation(current.credential, current.auth, tools, current.enabled, current.account))
+        load()
     }
 
     suspend fun toolProvider(cancellation: ChatRequestCancellation): ToolProvider? = withContext(Dispatchers.IO) {

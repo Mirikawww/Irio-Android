@@ -294,6 +294,13 @@ internal class TodoistMcpStore(
 
     fun setEnabled(enabled: Boolean) = synchronized(lock) { load()?.let { save(it.copy(enabled = enabled)) } }
 
+    fun updateTools(expectedToken: String, tools: List<McpTool>): TodoistMcpInstallation? = synchronized(lock) {
+        require(tools.isNotEmpty())
+        val current = load()?.takeIf { it.credential.accessToken == expectedToken } ?: return@synchronized null
+        save(current.copy(tools = tools))
+        load()
+    }
+
     fun remove() = synchronized(lock) { check(!file.exists() || file.delete()) { tr("无法移除 Todoist 集成，请重试") } }
 
     fun updateAccount(expectedToken: String, account: TodoistMcpAccount): TodoistMcpInstallation? = synchronized(lock) {

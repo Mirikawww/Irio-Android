@@ -78,6 +78,8 @@ class OperationSnackbarMigrationTest {
             assertTrue(ui.hasText(tr("工具数量")))
             assertTrue(ui.hasText("3"))
             assertTrue(ui.hasText(tr("移除集成")))
+            assertTrue("Docs management must expose tool refresh", ui.hasText(tr("刷新工具")))
+            assertTrue(ui.text(tr("刷新工具")).positionInRoot.y < ui.text(tr("移除集成")).positionInRoot.y)
             val toggle = ui.all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-docs-mcp-enabled" }
             assertTrue(toggle.config[SemanticsActions.OnClick].action!!.invoke()); ui.frames(10)
             assertFalse(IrioDocsMcpStore.loadEnabled(app))
@@ -130,6 +132,38 @@ class OperationSnackbarMigrationTest {
         }
     }
 
+    @Test fun docsRefreshShowsProgressPreventsDuplicateRequestsAndSavesRemoteTools() = runTest {
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        IrioDocsMcpStore.install(app)
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        val release = java.util.concurrent.CountDownLatch(1)
+        val tools = IrioDocsMcpStore.tools(app).map { it.copy(description = "Updated fixture " + it.name) }
+        try {
+            withUi { McpSettingsScreen(discoverDocsTools = {
+                calls.incrementAndGet()
+                check(release.await(10, java.util.concurrent.TimeUnit.SECONDS))
+                tools
+            }, onBack = {}) }.use { ui ->
+                ui.frames(40)
+                val card = ui.all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-docs-mcp" }
+                val manage = ui.descend(card).single { node -> node.config.contains(SemanticsActions.OnClick) && ui.descend(node).any {
+                    it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == tr("管理") }
+                } }
+                manage.config[SemanticsActions.OnClick].action!!.invoke(); ui.frames(40)
+                ui.click(tr("刷新工具"))
+                ui.until { calls.get() == 1 }
+                assertTrue(ui.hasText(tr("刷新工具中")))
+                val refresh = ui.all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "mcp-refresh-tools" }
+                assertTrue("The in-flight refresh button must be disabled", refresh.config.contains(SemanticsProperties.Disabled))
+                release.countDown()
+                ui.until { ui.hasText(tr("刷新工具")) }
+                assertEquals(1, calls.get())
+                assertTrue(IrioDocsMcpStore.tools(app).all { it.description.startsWith("Updated fixture ") })
+                assertTrue("Refreshing must retain the management page", ui.hasText(tr("移除集成")))
+            }
+        } finally { release.countDown() }
+    }
+
     @Test fun githubRemovalReturnsToInstallationWithoutClosingDetails() = verifyMcpRemoval(todoist = false)
 
     @Test fun todoistRemovalReturnsToInstallationWithoutClosingDetails() = verifyMcpRemoval(todoist = true)
@@ -150,10 +184,31 @@ class OperationSnackbarMigrationTest {
                 account = GitHubMcpAccount("fixture", "", "fixture@example.test")))
         }
         try {
-            withUi { McpSettingsScreen(githubStore = github, todoistStoreOverride = tasks, onBack = {}) }.use { ui ->
+            val failRefresh = java.util.concurrent.atomic.AtomicBoolean(false)
+            val refreshed = tools + McpTool("second", "Second", org.json.JSONObject("{\"type\":\"object\"}"))
+            val discover: (String, ChatRequestCancellation) -> List<McpTool> = { _, _ ->
+                if (failRefresh.get()) throw java.io.IOException("fixture-secret-must-not-leak")
+                refreshed
+            }
+            withUi { McpSettingsScreen(githubStore = github, todoistStoreOverride = tasks,
+                discoverGitHubTools = discover, discoverTodoistTools = discover, onBack = {}) }.use { ui ->
                 ui.until { ui.hasText(tr("管理")) }
                 ui.click(tr("管理")); ui.frames(40)
                 assertTrue(ui.hasText(tr("移除集成")))
+                assertTrue("Every installed integration must expose tool refresh", ui.hasText(tr("刷新工具")))
+                assertTrue("Refresh belongs above removal",
+                    ui.text(tr("刷新工具")).positionInRoot.y < ui.text(tr("移除集成")).positionInRoot.y)
+                ui.click(tr("刷新工具"))
+                ui.until { (if (todoist) tasks.load()?.tools?.size else github.load()?.tools?.size) == 2 }
+                ui.until { ui.hasText(tr("刷新工具")) }
+                assertTrue("The displayed tool count must refresh", ui.hasText("2"))
+                failRefresh.set(true)
+                ui.click(tr("刷新工具"))
+                ui.until { ui.hasText(tr("刷新工具失败，请检查登录和网络后重试")) }
+                assertFalse(ui.hasText("fixture-secret-must-not-leak"))
+                assertEquals("Failure must retain the saved tools", 2,
+                    if (todoist) tasks.load()!!.tools.size else github.load()!!.tools.size)
+                assertTrue("The refresh control must recover after failure", ui.hasText(tr("刷新工具")))
                 ui.click(tr("移除集成"))
                 ui.until { if (todoist) tasks.load() == null else github.load() == null }
                 ui.frames(40)

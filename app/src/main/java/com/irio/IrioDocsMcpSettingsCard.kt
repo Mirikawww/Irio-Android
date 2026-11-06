@@ -49,6 +49,8 @@ internal fun IrioDocsMcpManagement(
     installed: Boolean,
     enabled: Boolean,
     toolCount: Int,
+    refreshingTools: Boolean,
+    onRefreshTools: () -> Unit,
     onWebsite: () -> Unit,
     onEnabledChange: (Boolean) -> Unit,
     onInstall: () -> Unit,
@@ -76,9 +78,11 @@ internal fun IrioDocsMcpManagement(
             verticalAlignment = Alignment.CenterVertically) {
             Text(tr("在对话中启用"), color = content, modifier = Modifier.weight(1f))
             Switch(checked = enabled, onCheckedChange = onEnabledChange,
+                enabled = !refreshingTools,
                 modifier = Modifier.testTag("irio-docs-mcp-enabled"))
         }
-        Button(onClick = onRemove, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
+        McpRefreshToolsButton(refreshingTools, onRefreshTools)
+        Button(onClick = onRemove, enabled = !refreshingTools, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
             modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
             Text(tr("移除集成"), color = LocalContentColor.current)
         }

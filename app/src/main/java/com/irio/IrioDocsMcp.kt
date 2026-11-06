@@ -13,9 +13,22 @@ internal object IrioDocsMcpStore {
     fun loadInstalled(context: Context): Boolean = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("installed", true)
     fun loadEnabled(context: Context): Boolean = loadInstalled(context) && context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("enabled", true)
     fun install(context: Context) { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("installed", true).putBoolean("enabled", true).apply() }
-    fun remove(context: Context) { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("installed", false).putBoolean("enabled", false).apply() }
+    fun remove(context: Context) { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("installed", false).putBoolean("enabled", false).remove("tools").apply() }
     fun saveEnabled(context: Context, enabled: Boolean) { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("enabled", enabled).apply() }
-    fun tools(context: Context): List<McpTool> = parseTools(context.assets.open("irio-docs-tools.json").bufferedReader().use { it.readText() })
+    fun tools(context: Context): List<McpTool> {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("tools", null)?.let { cached ->
+            runCatching { parseTools(cached) }.getOrNull()?.let { return it }
+        }
+        return parseTools(context.assets.open("irio-docs-tools.json").bufferedReader().use { it.readText() })
+    }
+
+    fun saveTools(context: Context, tools: List<McpTool>) {
+        val json = JSONArray(tools.map { tool -> JSONObject().put("name", tool.name)
+            .put("description", tool.description).put("inputSchema", tool.inputSchema) }).toString()
+        parseTools(json)
+        check(loadInstalled(context))
+        check(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("tools", json).commit())
+    }
     fun parseTools(json: String): List<McpTool> {
         val array = JSONArray(json)
         return (0 until array.length()).map { index ->

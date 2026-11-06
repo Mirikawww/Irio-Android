@@ -72,6 +72,15 @@ private enum class McpIntegration { GITHUB, TODOIST, IRIO_DOCS }
 internal fun McpSettingsScreen(
     githubStore: GitHubMcpStore? = null,
     todoistStoreOverride: TodoistMcpStore? = null,
+    discoverGitHubTools: (String, ChatRequestCancellation) -> List<McpTool> = { token, cancel ->
+        GitHubMcpClient(token, cancellation = cancel).listTools()
+    },
+    discoverTodoistTools: (String, ChatRequestCancellation) -> List<McpTool> = { token, cancel ->
+        TodoistMcpClient(token, cancellation = cancel).listTools()
+    },
+    discoverDocsTools: (ChatRequestCancellation) -> List<McpTool> = { cancel ->
+        IrioDocsMcpClient(cancellation = cancel).listTools()
+    },
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -87,7 +96,7 @@ internal fun McpSettingsScreen(
     var selectedIntegration by remember { mutableStateOf(McpIntegration.GITHUB) }
     var docsInstalled by remember { mutableStateOf(IrioDocsMcpStore.loadInstalled(context)) }
     var docsEnabled by remember { mutableStateOf(IrioDocsMcpStore.loadEnabled(context)) }
-    val docsToolCount = remember(context) { IrioDocsMcpStore.tools(context).size }
+    var docsToolCount by remember(context) { mutableIntStateOf(IrioDocsMcpStore.tools(context).size) }
     var loaded by remember { mutableStateOf(false) }
     val login = sheets.login
     // Tokens must not enter savedInstanceState, clipboard, logs or backup files.
@@ -106,6 +115,36 @@ internal fun McpSettingsScreen(
     fun showDetailsError(message: String) {
         sheets.detailsError = message
         detailsErrorNonce++
+    }
+
+    val refreshCancellation = remember(selectedIntegration, details.targetDetent) { ChatRequestCancellation() }
+    var refreshingTools by remember(refreshCancellation) { mutableStateOf(false) }
+    DisposableEffect(refreshCancellation) { onDispose { refreshCancellation.cancel() } }
+    fun refreshTools() {
+        if (refreshingTools) return
+        refreshingTools = true
+        sheets.detailsError = null
+        scope.launch {
+            try {
+                when (selectedIntegration) {
+                    McpIntegration.GITHUB -> installation = withContext(Dispatchers.IO) {
+                        refreshGitHubMcpTools(store, refreshCancellation, discoverGitHubTools)
+                    }
+                    McpIntegration.TODOIST -> todoistInstallation = withContext(Dispatchers.IO) {
+                        refreshTodoistMcpTools(todoistStore, refreshCancellation, discoverTodoistTools)
+                    }
+                    McpIntegration.IRIO_DOCS -> docsToolCount = withContext(Dispatchers.IO) {
+                        refreshIrioDocsMcpTools(context, refreshCancellation, discoverDocsTools)
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (!refreshCancellation.isCancelled()) showDetailsError(tr("刷新工具失败，请检查登录和网络后重试"))
+            } finally {
+                refreshingTools = false
+            }
+        }
     }
 
     LaunchedEffect(store) {
@@ -326,6 +365,7 @@ internal fun McpSettingsScreen(
             if (selectedIntegration == McpIntegration.IRIO_DOCS) {
                 IrioDocsMcpManagement(
                     installed = docsInstalled, enabled = docsEnabled, toolCount = docsToolCount,
+                    refreshingTools = refreshingTools, onRefreshTools = ::refreshTools,
                     onWebsite = {
                         if (!openGitHubPage(context, "https://irio.mirikawww.workers.dev")) showDetailsError(tr("未找到可打开网页的浏览器"))
                     },
@@ -380,14 +420,15 @@ internal fun McpSettingsScreen(
                                     todoistInstallation = withContext(Dispatchers.IO) { todoistStore.load() }
                                 } catch (_: Exception) { showDetailsError(tr("Todoist 集成设置保存失败，请重试")) }
                             }
-                        })
+                        }, enabled = !refreshingTools)
                     }
+                    McpRefreshToolsButton(refreshingTools, ::refreshTools)
                     Button(onClick = { scope.launch {
                         try {
                             withContext(Dispatchers.IO) { todoistStore.remove() }
                             todoistInstallation = null
                         } catch (_: Exception) { showDetailsError(tr("无法移除 Todoist 集成，请重试")) }
-                    } }, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
+                    } }, enabled = !refreshingTools, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
                         modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(tr("移除集成"), color = LocalContentColor.current)
                     }
@@ -427,7 +468,7 @@ internal fun McpSettingsScreen(
                                 installation = withContext(Dispatchers.IO) { store.setEnabled(enabled); store.load() }
                             } catch (_: Exception) { showDetailsError(tr("GitHub 安装保存失败，请重试")) }
                         }
-                    })
+                    }, enabled = !refreshingTools)
                 }
             }
             if (installation == null) {
@@ -437,12 +478,13 @@ internal fun McpSettingsScreen(
                 }
             }
             if (installation != null) {
+                McpRefreshToolsButton(refreshingTools, ::refreshTools)
                 Button(onClick = { scope.launch {
                     try {
                         withContext(Dispatchers.IO) { store.remove(); check(store.load() == null) }
                         installation = null
                     } catch (_: Exception) { showDetailsError(tr("无法移除 GitHub 集成，请重试")) }
-                } }, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
+                } }, enabled = !refreshingTools, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
                     modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(tr("移除集成"), color = LocalContentColor.current)
                 }
