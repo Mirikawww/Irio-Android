@@ -240,13 +240,8 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                 )
             }
             SettingsSectionCard {
-                SystemPromptRow(
-                    onClick = {
-                        context.startActivity(Intent(context, SystemPromptSettingsActivity::class.java))
-                    },
-                )
                 SettingsSwitchRow(
-                    modifier = Modifier.settingsSearchAnchor("model.timestamps", edge = SettingsSearchEdge.Bottom),
+                    modifier = Modifier.settingsSearchAnchor("model.timestamps", edge = SettingsSearchEdge.All),
                     label = tr("消息时间戳"),
                     checked = messageTimestamps,
                     onCheckedChange = {
@@ -347,44 +342,6 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
         }
     }
 
-}
-
-@Composable
-private fun SystemPromptRow(onClick: () -> Unit) {
-    val interactionSource = remember { MutableInteractionSource() }
-    Row(
-        modifier = Modifier
-            .settingsSearchAnchor("model.prompt", edge = SettingsSearchEdge.Top)
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-            )
-            .settingsPromptInset(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            tr("编辑系统提示词"),
-            modifier = Modifier.weight(1f),
-            color = Theme[colors][onPanelColor],
-        )
-        IconButton(
-            onClick = onClick,
-            style = ButtonStyle.Ghost,
-            buttonSize = ButtonSize.Small,
-            shape = ContinuousCapsule,
-            modifier = Modifier.size(24.dp),
-            interactionSource = interactionSource,
-        ) {
-            Icon(
-                imageVector = IrioIcons.ChevronRight,
-                contentDescription = tr("编辑系统提示词"),
-                tint = Theme[colors][onPanelColor],
-                modifier = Modifier.size(20.dp),
-            )
-        }
-    }
 }
 
 /** Generation tools share the same grouped model picker and settings-row hierarchy. */

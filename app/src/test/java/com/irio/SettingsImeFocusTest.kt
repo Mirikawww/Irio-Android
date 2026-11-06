@@ -44,7 +44,9 @@ class SettingsImeFocusTest {
 
     @Test fun recycledToolDescriptionClearsItsOwnFocusWhenImeHides() = verifyDismissal(tools = true)
 
-    private fun verifyDismissal(tools: Boolean) = runTest {
+    @Test fun personalizationPromptClearsFocusWhenImeHides() = verifyDismissal(tools = false, personalization = true)
+
+    private fun verifyDismissal(tools: Boolean, personalization: Boolean = false) = runTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup().visible()
         val clock = BroadcastFrameClock()
         val recomposer = Recomposer(coroutineContext + clock)
@@ -60,7 +62,8 @@ class SettingsImeFocusTest {
                 CompositionLocalProvider(LocalDensity provides Density(1f)) {
                     observedIme = WindowInsets.ime.getBottom(LocalDensity.current) > 0
                     AppTheme {
-                        if (tools) ToolSettingsScreen(onBack = {}, loadTools = {
+                        if (personalization) PersonalizationSettingsScreen(onBack = {})
+                        else if (tools) ToolSettingsScreen(onBack = {}, loadTools = {
                             listOf(ToolSettingsEntry("fixture", "Fixture", "Tool description"))
                         }) else SpeechSettingsScreen(onBack = {})
                     }

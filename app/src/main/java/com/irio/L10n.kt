@@ -844,7 +844,7 @@ private val English = mapOf(
     "端点返回了空回复" to "The endpoint returned an empty reply",
     "粉色" to "Pink",
     "系统提示词" to "System prompt",
-    "编辑系统提示词" to "Edit system prompt",
+    "个性化" to "Personalization",
     "缺少 query" to "Missing query",
     "网络搜索" to "Web search",
     "自动朗读" to "Auto-read",

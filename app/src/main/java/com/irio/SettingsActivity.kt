@@ -128,6 +128,9 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                     SettingsHomeRow(tr("提供商"), IrioIcons.Braces) {
                         context.startActivity(Intent(context, ProviderSettingsActivity::class.java))
                     }
+                    SettingsHomeRow(tr("个性化"), IrioIcons.Sparkles) {
+                        context.startActivity(Intent(context, PersonalizationSettingsActivity::class.java))
+                    }
                     SettingsHomeRow(tr("模型"), IrioIcons.Bot) {
                         context.startActivity(Intent(context, ModelSettingsActivity::class.java))
                     }

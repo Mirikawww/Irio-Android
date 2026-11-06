@@ -34,8 +34,5 @@ internal fun Modifier.settingsSwitchRow(): Modifier = fillMaxWidth().padding(ver
 /** 两行文字（标题加当前值）的下拉/选择行。放在 clickable 之后，点击区域包含留白。 */
 internal fun Modifier.settingsDropdownInset(): Modifier = padding(top = 3.5.dp, bottom = 6.dp)
 
-/** 只有一行文字加右侧 24dp 图标的可点击行（编辑系统提示词）。 */
-internal fun Modifier.settingsPromptInset(): Modifier = padding(vertical = 4.dp)
-
 /** 滑条：标签上方自带约 3.4dp，底部是滑轨本身，没有内部留白。 */
 internal fun Modifier.settingsSliderInset(): Modifier = padding(top = 4.5.dp, bottom = 8.dp)

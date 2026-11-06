@@ -6,6 +6,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsSearchTest {
+    @Test fun systemPromptSearchOpensPersonalizationDirectly() {
+        val prompt = searchSettings("系统提示词", label = { it }).single()
+        assertEquals("个性化", prompt.page)
+        assertEquals("com.irio.PersonalizationSettingsActivity", prompt.destination.name)
+        assertEquals("personalization.prompt", prompt.anchor)
+        val page = searchSettings("个性化", label = { it }).single()
+        assertEquals(prompt.destination, page.destination)
+        assertEquals("Personalization", translate(AppLanguage.EN, page.title))
+        val english = searchSettings("System prompt", label = { translate(AppLanguage.EN, it) }).single()
+        assertEquals("Personalization", english.page)
+        assertEquals(prompt.destination, english.destination)
+    }
+
     @Test fun messageOnlyCornerScopeHasItsOwnSearchAnchor() {
         val hit = searchSettings("仅对消息框生效", label = { it })
             .single { it.id == "appearance.inputCorners.messageOnly" }

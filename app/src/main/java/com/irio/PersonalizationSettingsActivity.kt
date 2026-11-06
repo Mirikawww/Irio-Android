@@ -14,46 +14,56 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.maxLength
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.composables.ui.components.ButtonStyle
-import com.composables.ui.components.Icon
-import com.composables.ui.components.IconButton
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.composables.ui.components.Text
 import com.composables.ui.components.TextField
-import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.fieldShape
-import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.mutedColor
+import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 
-class SystemPromptSettingsActivity : ComponentActivity() {
+class PersonalizationSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setIrioContent { SystemPromptSettingsScreen(onBack = { finish() }) }
+        setIrioContent { PersonalizationSettingsScreen(onBack = { finish() }) }
     }
 }
 
 @Composable
-private fun SystemPromptSettingsScreen(onBack: () -> Unit) {
+internal fun PersonalizationSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    val state = rememberTextFieldState(SystemPromptStore.load(context))
-    val background = Theme[colors][backgroundColor]
-    val content = Theme[colors][onBackgroundColor]
+    val prompt = rememberTextFieldState(SystemPromptStore.load(context))
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, prompt) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                SystemPromptStore.save(context, prompt.text.toString())
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            SystemPromptStore.save(context, prompt.text.toString())
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     DismissComposerFocusWhenImeHides()
     SettingsHazeScaffold(
-        title = tr("系统提示词"),
+        title = tr("个性化"),
         onBack = onBack,
     ) { topInset, bottomInset ->
         Column(
-            Modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = bottomInset)
                 .verticalScroll(rememberScrollState())
@@ -61,9 +71,13 @@ private fun SystemPromptSettingsScreen(onBack: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Text(tr("系统提示词"), color = Theme[colors][onBackgroundColor])
             TextField(
-                state = state,
-                modifier = Modifier.fillMaxWidth().then(rememberInputFieldBorder()),
+                state = prompt,
+                modifier = Modifier.fillMaxWidth()
+                    .settingsSearchAnchor("personalization.prompt", horizontalOutset = 0.dp,
+                        edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
+                    .then(rememberInputFieldBorder()),
                 accessibilityLabel = tr("系统提示词"),
                 placeholder = { Text(tr("以系统身份注入每次对话的指令"), color = Theme[colors][mutedColor]) },
                 textStyle = FieldTextStyle,
@@ -75,8 +89,5 @@ private fun SystemPromptSettingsScreen(onBack: () -> Unit) {
                 inputTransformation = InputTransformation.maxLength(SystemPromptStore.MAX_CHARS),
             )
         }
-    }
-    DisposableEffect(Unit) {
-        onDispose { SystemPromptStore.save(context, state.text.toString()) }
     }
 }
