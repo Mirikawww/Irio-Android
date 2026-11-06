@@ -96,6 +96,8 @@ internal fun McpSettingsScreen(
     var installation by remember { mutableStateOf<GitHubMcpInstallation?>(null) }
     var todoistInstallation by remember { mutableStateOf<TodoistMcpInstallation?>(null) }
     var selectedIntegration by remember { mutableStateOf(McpIntegration.GITHUB) }
+    var removeDialogOpen by remember(selectedIntegration, details.targetDetent) { mutableStateOf(false) }
+    var removingIntegration by remember { mutableStateOf(false) }
     var docsInstalled by remember { mutableStateOf(IrioDocsMcpStore.loadInstalled(context)) }
     var docsEnabled by remember { mutableStateOf(IrioDocsMcpStore.loadEnabled(context)) }
     var docsToolCount by remember(context) { mutableIntStateOf(IrioDocsMcpStore.tools(context).size) }
@@ -382,9 +384,7 @@ internal fun McpSettingsScreen(
                         docsEnabled = IrioDocsMcpStore.loadEnabled(context)
                     },
                     onRemove = {
-                        IrioDocsMcpStore.remove(context)
-                        docsInstalled = IrioDocsMcpStore.loadInstalled(context)
-                        docsEnabled = IrioDocsMcpStore.loadEnabled(context)
+                        removeDialogOpen = true
                     },
                 )
             } else if (selectedIntegration == McpIntegration.TODOIST) {
@@ -426,12 +426,7 @@ internal fun McpSettingsScreen(
                         }, enabled = !refreshingTools)
                     }
                     McpRefreshToolsButton(refreshingTools, ::refreshTools)
-                    Button(onClick = { scope.launch {
-                        try {
-                            withContext(Dispatchers.IO) { todoistStore.remove() }
-                            todoistInstallation = null
-                        } catch (_: Exception) { showDetailsError(tr("无法移除 Todoist 集成，请重试")) }
-                    } }, enabled = !refreshingTools, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
+                    Button(onClick = { removeDialogOpen = true }, enabled = !refreshingTools, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
                         modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(tr("移除集成"), color = LocalContentColor.current)
                     }
@@ -482,12 +477,7 @@ internal fun McpSettingsScreen(
             }
             if (installation != null) {
                 McpRefreshToolsButton(refreshingTools, ::refreshTools)
-                Button(onClick = { scope.launch {
-                    try {
-                        withContext(Dispatchers.IO) { store.remove(); check(store.load() == null) }
-                        installation = null
-                    } catch (_: Exception) { showDetailsError(tr("无法移除 GitHub 集成，请重试")) }
-                } }, enabled = !refreshingTools, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
+                Button(onClick = { removeDialogOpen = true }, enabled = !refreshingTools, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
                     modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(tr("移除集成"), color = LocalContentColor.current)
                 }
@@ -503,6 +493,48 @@ internal fun McpSettingsScreen(
         )
         }
     }
+    McpRemovalConfirmationDialog(
+        visible = removeDialogOpen,
+        integrationName = when (selectedIntegration) {
+            McpIntegration.GITHUB -> "GitHub"
+            McpIntegration.TODOIST -> "Todoist"
+            McpIntegration.IRIO_DOCS -> "Irio Docs"
+        },
+        removing = removingIntegration,
+        onDismiss = { if (!removingIntegration) removeDialogOpen = false },
+        onConfirm = {
+            if (!removingIntegration && !refreshingTools) {
+                val target = selectedIntegration
+                removingIntegration = true
+                scope.launch {
+                    try {
+                        when (target) {
+                            McpIntegration.GITHUB -> {
+                                withContext(Dispatchers.IO) { store.remove(); check(store.load() == null) }
+                                installation = null
+                            }
+                            McpIntegration.TODOIST -> {
+                                withContext(Dispatchers.IO) { todoistStore.remove(); check(todoistStore.load() == null) }
+                                todoistInstallation = null
+                            }
+                            McpIntegration.IRIO_DOCS -> {
+                                withContext(Dispatchers.IO) { IrioDocsMcpStore.remove(context) }
+                                docsInstalled = IrioDocsMcpStore.loadInstalled(context)
+                                docsEnabled = IrioDocsMcpStore.loadEnabled(context)
+                            }
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        showDetailsError(tr("无法移除集成，请重试"))
+                    } finally {
+                        removingIntegration = false
+                        removeDialogOpen = false
+                    }
+                }
+            }
+        },
+    )
     if (login != null) BottomSheet(state = loginSheet, onDismissRequest = { clearLogin() },
         contentPadding = PaddingValues(start = 24.dp, top = 32.dp, end = 24.dp, bottom = 16.dp), scrollableBody = true) {
         Box(Modifier.fillMaxWidth()) {

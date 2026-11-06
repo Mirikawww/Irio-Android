@@ -112,6 +112,13 @@ class OperationSnackbarMigrationTest {
             }
             open("管理")
             ui.click(tr("移除集成")); ui.frames(40)
+            assertTrue("Opening confirmation must not remove Docs", IrioDocsMcpStore.loadInstalled(app))
+            assertTrue(IrioDocsMcpStore.loadEnabled(app))
+            assertTrue(ui.hasText(tr("确定要移除“%s”集成吗？").format("Irio Docs")))
+            ui.click(tr("取消")); ui.frames(40)
+            assertTrue("Cancel must preserve Docs", IrioDocsMcpStore.loadInstalled(app))
+            ui.click(tr("移除集成")); ui.frames(40)
+            ui.click(tr("确认移除")); ui.frames(40)
             assertFalse(IrioDocsMcpStore.loadInstalled(app))
             assertFalse(IrioDocsMcpStore.loadEnabled(app))
             assertFalse(chatToolRegistry(app, false, "").handles("irio_docs_mcp_search_irio_docs"))
@@ -252,6 +259,16 @@ class OperationSnackbarMigrationTest {
                     if (todoist) tasks.load()!!.tools.size else github.load()!!.tools.size)
                 assertTrue("The refresh control must recover after failure", ui.hasText(tr("刷新工具")))
                 ui.click(tr("移除集成"))
+                ui.frames(40)
+                assertNotNull("Opening confirmation must preserve the saved integration",
+                    if (todoist) tasks.load() else github.load())
+                assertTrue(ui.hasText(tr("确定要移除“%s”集成吗？").format(if (todoist) "Todoist" else "GitHub")))
+                assertEquals("Confirmation buttons must share one row", ui.text(tr("取消")).positionInRoot.y,
+                    ui.text(tr("确认移除")).positionInRoot.y, 0.5f)
+                ui.click(tr("取消")); ui.frames(40)
+                assertNotNull("Cancel must leave the integration intact", if (todoist) tasks.load() else github.load())
+                ui.click(tr("移除集成")); ui.frames(40)
+                ui.click(tr("确认移除"))
                 ui.until { if (todoist) tasks.load() == null else github.load() == null }
                 ui.frames(40)
                 assertFalse("Removal must clear the installed controls", ui.hasText(tr("移除集成")))
