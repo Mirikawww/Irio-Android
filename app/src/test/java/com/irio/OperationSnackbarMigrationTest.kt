@@ -164,6 +164,48 @@ class OperationSnackbarMigrationTest {
         } finally { release.countDown() }
     }
 
+    @Test fun githubBrowserAuthorizationShowsConnectingUntilItFinishes() = runTest {
+        IrioDocsMcpStore.remove(org.robolectric.RuntimeEnvironment.getApplication())
+        okhttp3.mockwebserver.MockWebServer().use { server ->
+            server.enqueue(okhttp3.mockwebserver.MockResponse().setBody(
+                """{"device_code":"fixture-device","user_code":"FIXT-TEST","verification_uri":"https://github.com/login/device","expires_in":1800,"interval":60}"""))
+            val browserWorks = java.util.concurrent.atomic.AtomicBoolean(false)
+            val opens = java.util.concurrent.atomic.AtomicInteger()
+            withUi { McpSettingsScreen(createGitHubAuth = { GitHubDeviceAuth(server.url("/")) },
+                openWebPage = { _, url ->
+                    assertEquals("https://github.com/login/device", url)
+                    opens.incrementAndGet()
+                    browserWorks.get()
+                }, onBack = {}) }.use { ui ->
+                ui.frames(40)
+                var githubRow = ui.text("GitHub")
+                while (ui.descend(githubRow).none { it.config.contains(SemanticsActions.OnClick) }) githubRow = githubRow.parent!!
+                val install = ui.descend(githubRow).single { it.config.contains(SemanticsActions.OnClick) }
+                install.config[SemanticsActions.OnClick].action!!.invoke(); ui.frames(40)
+                ui.click(tr("安装") + " OAuth"); ui.frames(40)
+                ui.click(tr("获取授权码"))
+                ui.until { ui.hasText("FIXT-TEST") }
+                assertTrue("The authorization webpage must remain available before opening it", ui.hasText(tr("打开 GitHub 授权")))
+                ui.click(tr("打开 GitHub 授权")); ui.frames(10)
+                assertTrue("A failed browser launch must remain retryable", ui.hasText(tr("打开 GitHub 授权")))
+                assertFalse(ui.hasText(tr("正在连接")))
+                browserWorks.set(true)
+                ui.click(tr("打开 GitHub 授权")); ui.frames(10)
+                assertTrue("GitHub must show the same connecting feedback as Todoist", ui.hasText(tr("正在连接")))
+                var connecting = ui.text(tr("正在连接"))
+                while (!connecting.config.contains(SemanticsActions.OnClick)) connecting = connecting.parent!!
+                assertTrue("Connecting must prevent duplicate webpage launches", connecting.config.contains(SemanticsProperties.Disabled))
+                assertTrue("Keep the device code visible during connection", ui.hasText("FIXT-TEST"))
+                assertTrue("Connection must remain cancelable", ui.hasText(tr("取消")))
+                assertEquals(2, opens.get())
+                ui.click(tr("取消")); ui.frames(40)
+                ui.click(tr("安装") + " OAuth"); ui.frames(40)
+                assertFalse("Reopening must not retain the previous connecting state", ui.hasText(tr("正在连接")))
+                assertTrue(ui.hasText(tr("获取授权码")))
+            }
+        }
+    }
+
     @Test fun githubRemovalReturnsToInstallationWithoutClosingDetails() = verifyMcpRemoval(todoist = false)
 
     @Test fun todoistRemovalReturnsToInstallationWithoutClosingDetails() = verifyMcpRemoval(todoist = true)

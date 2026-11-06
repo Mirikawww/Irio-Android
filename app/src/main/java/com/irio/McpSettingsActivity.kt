@@ -81,6 +81,8 @@ internal fun McpSettingsScreen(
     discoverDocsTools: (ChatRequestCancellation) -> List<McpTool> = { cancel ->
         IrioDocsMcpClient(cancellation = cancel).listTools()
     },
+    createGitHubAuth: () -> GitHubDeviceAuth = { GitHubDeviceAuth() },
+    openWebPage: (android.content.Context, String) -> Boolean = ::openGitHubPage,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -102,6 +104,7 @@ internal fun McpSettingsScreen(
     // Tokens must not enter savedInstanceState, clipboard, logs or backup files.
     val pat = remember { TextFieldState() }
     var deviceCode by remember { mutableStateOf<GitHubDeviceCode?>(null) }
+    var githubAuthorizationOpened by remember(deviceCode) { mutableStateOf(false) }
     val detailsError = sheets.detailsError
     var detailsErrorNonce by remember { mutableIntStateOf(0) }
     var busy by remember { mutableStateOf(false) }
@@ -286,7 +289,7 @@ internal fun McpSettingsScreen(
             }
             return
         }
-        val auth = GitHubDeviceAuth()
+        val auth = createGitHubAuth()
         val cancel = auth.cancellation
         cancellation = cancel
         job = scope.launch {
@@ -541,8 +544,17 @@ internal fun McpSettingsScreen(
                         scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("GitHub", code.userCode))) }
                     },
                         color = content, fontWeight = FontWeight.Bold, fontSize = 28.sp, textAlign = TextAlign.Center)
-                    GitHubButton(tr("打开 GitHub 授权"), modifier = Modifier.fillMaxWidth(),
-                        onClick = { if (!openGitHubPage(context, code.verificationUri)) sheets.loginError = tr("未找到可打开网页的浏览器") })
+                    val connecting = busy && githubAuthorizationOpened
+                    GitHubButton(tr(if (connecting) "正在连接" else "打开 GitHub 授权"),
+                        modifier = Modifier.fillMaxWidth(), enabled = !connecting,
+                        onClick = {
+                            if (openWebPage(context, code.verificationUri)) {
+                                githubAuthorizationOpened = true
+                                sheets.loginError = null
+                            } else {
+                                sheets.loginError = tr("未找到可打开网页的浏览器")
+                            }
+                        })
                 }
             }
             if (deviceCode == null || !busy) {
