@@ -13,6 +13,7 @@ import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -40,6 +41,9 @@ internal fun UserBubbleReaction(
 ) {
     val emojiSize = with(LocalDensity.current) { 16.dp.toSp() }
     val emojiLineHeight = with(LocalDensity.current) { 20.dp.toSp() }
+    LocalResolvedTheme.current
+    // Resolve the translucent fill once, rather than tinting the message again at overlaps.
+    val reactionFill = bubbleColor.compositeOver(Theme[colors][backgroundColor])
     // Only the original content determines size; the reaction is an overlaid decoration.
     Box {
         content()
@@ -61,7 +65,7 @@ internal fun UserBubbleReaction(
                 ) {
                     Box(
                         modifier = Modifier.offset(x = 6.dp).size(30.dp)
-                            .background(bubbleColor, ContinuousCapsule)
+                            .background(reactionFill, ContinuousCapsule)
                             .border(2.dp, Theme[colors][backgroundColor], ContinuousCapsule),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -78,8 +82,8 @@ internal fun UserBubbleReaction(
                             maxLines = 1,
                         )
                     }
-                    Box(Modifier.offset(y = 26.dp).size(9.dp).background(bubbleColor, ContinuousCapsule))
-                    Box(Modifier.offset(x = (-4).dp, y = 37.dp).size(4.dp).background(bubbleColor, ContinuousCapsule))
+                    Box(Modifier.offset(y = 26.dp).size(9.dp).background(reactionFill, ContinuousCapsule))
+                    Box(Modifier.offset(x = (-4).dp, y = 37.dp).size(4.dp).background(reactionFill, ContinuousCapsule))
                 }
             }
         }
