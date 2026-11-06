@@ -141,25 +141,24 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                 .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            ListRowButton(
+                searchId = "model.tools",
+                label = tr("工具"),
+                labelFontWeight = FontWeight.Normal,
+                onClick = { context.startActivity(Intent(context, ToolSettingsActivity::class.java)) },
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                trailing = {
+                    Icon(
+                        imageVector = IrioIcons.ChevronRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = Theme[colors][onPanelColor],
+                    )
+                },
+            )
             SettingsSectionCard {
-                ListRowButton(
-                    searchId = "model.tools",
-                    label = tr("工具"),
-                    labelFontWeight = FontWeight.Normal,
-                    onClick = { context.startActivity(Intent(context, ToolSettingsActivity::class.java)) },
-                    style = ButtonStyle.Ghost,
-                    contentPadding = PaddingValues(horizontal = 0.dp),
-                    trailing = {
-                        Icon(
-                            imageVector = IrioIcons.ChevronRight,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = Theme[colors][onPanelColor],
-                        )
-                    },
-                )
                 SettingsSlider(
-                    modifier = Modifier.settingsSearchAnchor("model.rounds"),
+                    modifier = Modifier.settingsSearchAnchor("model.rounds", edge = SettingsSearchEdge.Top),
                     label = tr("单轮工具调用"),
                     value = maxRounds,
                     valueRange = ToolStore.MAX_ROUNDS_MIN..ToolStore.MAX_ROUNDS_MAX,

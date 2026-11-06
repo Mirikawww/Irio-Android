@@ -62,6 +62,17 @@ class ModelSettingsLayoutTest {
                 it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == tr(text) }
             }
             assertEquals("Tools must align with adjacent settings titles", title("单轮工具调用").boundsInRoot.left, title("工具").boundsInRoot.left, 0.5f)
+            val toolsTitle = title("工具")
+            val toolsButton = nodes.single { node ->
+                node.config.contains(SemanticsActions.OnClick) &&
+                    descend(node).any { it.id == toolsTitle.id }
+            }
+            assertEquals("Tools must be a standalone button outside the settings card",
+                16f, toolsButton.boundsInRoot.left, 0.5f)
+            assertEquals("Tools must span the page content width",
+                344f, toolsButton.boundsInRoot.right, 0.5f)
+            assertTrue("Tool-call settings must remain below the independent Tools button",
+                toolsButton.boundsInRoot.bottom < title("单轮工具调用").boundsInRoot.top)
             assertEquals("Video must use the image model row's start edge", title("图片生成模型").boundsInRoot.left,
                 title("视频生成模型").boundsInRoot.left, 0.5f)
             assertTrue("Video belongs between image and title models in the same settings hierarchy",
