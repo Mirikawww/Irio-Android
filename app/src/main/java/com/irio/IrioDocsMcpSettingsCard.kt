@@ -35,7 +35,7 @@ internal fun IrioDocsMcpSettingsCard(installed: Boolean, loaded: Boolean, onMana
         .settingsSearchAnchor("mcp.irio_docs", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
         .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        IrioDocsMcpLogo(48.dp)
+        IrioDocsMcpLogo(42.dp, Modifier.testTag("mcp-logo:irio-docs"))
         Column(Modifier.weight(1f)) {
             Text("Irio Docs", color = Theme[colors][onPanelColor], fontWeight = FontWeight.SemiBold)
             Text(tr("查询官方文档与更新日志"), fontSize = 13.sp, lineHeight = 18.sp, color = Theme[colors][mutedColor])

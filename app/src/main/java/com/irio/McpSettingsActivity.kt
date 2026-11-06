@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -278,7 +279,7 @@ internal fun McpSettingsScreen(onBack: () -> Unit) {
             .padding(top = top).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(Modifier.fillMaxWidth().background(Theme[colors][secondaryColor], Theme[shapes][largeShape]).settingsSearchAnchor("mcp.github", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
                 .padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                GitHubLogo(48.dp)
+                GitHubLogo(42.dp, Modifier.testTag("mcp-logo:github"))
                 Column(Modifier.weight(1f)) {
                     Text("GitHub", color = content, fontWeight = FontWeight.SemiBold)
                     Text(tr("在对话中管理代码与协作"), fontSize = 13.sp, lineHeight = 18.sp, color = muted)
@@ -299,7 +300,7 @@ internal fun McpSettingsScreen(onBack: () -> Unit) {
             })
             Row(Modifier.fillMaxWidth().background(Theme[colors][secondaryColor], Theme[shapes][largeShape]).settingsSearchAnchor("mcp.todoist", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
                 .padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TodoistLogo(48.dp)
+                TodoistLogo(42.dp, Modifier.testTag("mcp-logo:todoist"))
                 Column(Modifier.weight(1f)) {
                     Text("Todoist", color = content, fontWeight = FontWeight.SemiBold)
                     Text(tr("在对话中管理任务和项目"), fontSize = 13.sp, lineHeight = 18.sp, color = muted)
