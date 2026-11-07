@@ -1,12 +1,8 @@
 package com.irio
 
 import android.content.Context
-import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
-import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 
 data class BackupImportResult(
     val success: Boolean,
@@ -24,108 +20,8 @@ object BackupFileValidation {
 
 /** Exports application data, but deliberately never includes attachment bytes. */
 object BackupStore {
-    private const val FORMAT = "irio-backup-v1"
+    fun export(context: Context, output: OutputStream) = BackupArchive.export(context, output)
 
-    fun export(context: Context, output: OutputStream) {
-        ZipOutputStream(output).use { zip ->
-            zip.putNextEntry(ZipEntry("format"))
-            zip.write(FORMAT.toByteArray())
-            zip.closeEntry()
-            addDirectory(zip, context.dataDir, "")
-            zip.putNextEntry(ZipEntry("provider_snapshot.json"))
-            zip.write(ProviderStore.snapshot(context).toString().toByteArray())
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry("stt_snapshot.json"))
-            zip.write(SttStore.snapshot(context).toString().toByteArray())
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry("search_snapshot.json"))
-            zip.write(SearchStore.snapshot(context).toString().toByteArray())
-            zip.closeEntry()
-        }
-    }
-
-    fun import(context: Context, input: InputStream, overwrite: Boolean = true): BackupImportResult {
-        val stage = File(context.cacheDir, "irio-import-${System.nanoTime()}").apply { mkdirs() }
-        try {
-            var valid = false
-            var providerSnapshot: String? = null
-            var sttSnapshot: String? = null
-            var searchSnapshot: String? = null
-            ZipInputStream(input).use { zip ->
-                while (true) {
-                    val entry = zip.nextEntry ?: break
-                    val relative = entry.name.replace('\\', '/')
-                    require(relative.isNotBlank() && !relative.startsWith('/') &&
-                        relative.split('/').none { it == ".." }) { tr("无效的 Irio 文件") }
-                    if (relative == "format") {
-                        valid = zip.readBytes().toString(Charsets.UTF_8) == FORMAT
-                    } else if (relative == "provider_snapshot.json") {
-                        providerSnapshot = zip.readBytes().toString(Charsets.UTF_8)
-                    } else if (relative == "stt_snapshot.json") {
-                        sttSnapshot = zip.readBytes().toString(Charsets.UTF_8)
-                    } else if (relative == "search_snapshot.json") {
-                        searchSnapshot = zip.readBytes().toString(Charsets.UTF_8)
-                    } else if (!entry.isDirectory && !isAttachment(relative) && !isSandboxRootfs(relative)) {
-                        val target = File(stage, relative)
-                        target.parentFile?.mkdirs()
-                        target.outputStream().use { zip.copyTo(it) }
-                    }
-                    zip.closeEntry()
-                }
-            }
-            if (!valid) return BackupImportResult(false, tr("不是有效的 Irio 导出文件"))
-            var conversationCount = 0
-            stage.walkTopDown().filter { it.isFile }.forEach { staged ->
-                val relativePath = staged.relativeTo(stage).path.replace('\\', '/')
-                if (isAttachment(relativePath) || isSandboxRootfs(relativePath) || relativePath == "provider_snapshot.json" || relativePath == "stt_snapshot.json" || relativePath == "search_snapshot.json") return@forEach
-                val target = File(context.dataDir, relativePath)
-                if (overwrite || !target.exists()) {
-                    target.parentFile?.mkdirs()
-                    staged.copyTo(target, overwrite = true)
-                }
-                if (relativePath.startsWith("files/conversations/") && relativePath.endsWith(".json")) conversationCount++
-            }
-            val providerRestored = providerSnapshot != null
-            val sttRestored = sttSnapshot != null
-            val searchRestored = searchSnapshot != null
-            providerSnapshot?.let { ProviderStore.applySnapshot(context, org.json.JSONObject(it), overwrite) }
-            sttSnapshot?.let { SttStore.applySnapshot(context, org.json.JSONObject(it), overwrite) }
-            searchSnapshot?.let { SearchStore.applySnapshot(context, org.json.JSONObject(it), overwrite) }
-            return BackupImportResult(
-                success = true,
-                message = tr("恢复完成"),
-                conversationCount = conversationCount,
-                providerRestored = providerRestored,
-                sttRestored = sttRestored,
-                searchRestored = searchRestored,
-                missing = buildList {
-                    if (!providerRestored) add(tr("提供商数据"))
-                    if (!sttRestored) add(tr("STT 提供商数据"))
-                    if (!searchRestored) add(tr("搜索提供商数据"))
-                },
-            )
-        } finally {
-            stage.deleteRecursively()
-        }
-    }
-
-    private fun addDirectory(zip: ZipOutputStream, root: File, relativeRoot: String) {
-        root.listFiles()?.forEach { file ->
-            val relative = if (relativeRoot.isEmpty()) file.name else "$relativeRoot/${file.name}"
-            if (relative == "cache" || relative == "code_cache" || isAttachment(relative) || isSandboxRootfs(relative)) return@forEach
-            if (file.isDirectory) addDirectory(zip, file, relative)
-            else {
-                zip.putNextEntry(ZipEntry(relative))
-                file.inputStream().use { it.copyTo(zip) }
-                zip.closeEntry()
-            }
-        }
-    }
-
-    private fun isAttachment(path: String): Boolean = path == "files/attachments" || path.startsWith("files/attachments/")
-
-    private fun isSandboxRootfs(path: String): Boolean =
-        path == "files/linux-sandbox/rootfs" || path.startsWith("files/linux-sandbox/rootfs/") ||
-            path == "files/linux-sandbox/rootfs.partial" || path.startsWith("files/linux-sandbox/rootfs.partial/") ||
-            path == "files/linux-sandbox/rootfs.previous" || path.startsWith("files/linux-sandbox/rootfs.previous/")
+    fun import(context: Context, input: InputStream, overwrite: Boolean = true): BackupImportResult =
+        BackupArchive.import(context, input, overwrite)
 }

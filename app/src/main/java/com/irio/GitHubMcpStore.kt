@@ -17,6 +17,46 @@ import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** Shared strict parsing for the two portable, plaintext MCP snapshot formats. */
+internal object McpSnapshotJson {
+    fun boolean(json: JSONObject, name: String): Boolean {
+        val value = json.get(name)
+        require(value is Boolean) { "Invalid MCP snapshot field: $name" }
+        return value
+    }
+
+    fun string(json: JSONObject, name: String, allowBlank: Boolean = false): String {
+        val value = json.get(name)
+        require(value is String && (allowBlank || value.isNotBlank())) { "Invalid MCP snapshot field: $name" }
+        return value
+    }
+
+    fun expiry(json: JSONObject, name: String): Long {
+        val value = json.get(name)
+        require(value is Int || value is Long) { "Invalid MCP snapshot field: $name" }
+        return (value as Number).toLong().also { require(it >= 0) { "Invalid MCP snapshot field: $name" } }
+    }
+
+    fun refreshToken(credential: JSONObject): String? =
+        if (!credential.has("refresh_token") || credential.isNull("refresh_token")) null
+        else string(credential, "refresh_token")
+
+    fun account(json: JSONObject): JSONObject? =
+        if (!json.has("account") || json.isNull("account")) null else json.getJSONObject("account")
+
+    fun tools(json: JSONObject, maxNameLength: Int): List<McpTool> {
+        val array = json.getJSONArray("tools")
+        require(array.length() > 0) { "Empty MCP snapshot tools" }
+        val names = mutableSetOf<String>()
+        return (0 until array.length()).map { index ->
+            val tool = array.getJSONObject(index)
+            val name = string(tool, "name")
+            require(name.matches(Regex("[A-Za-z0-9_-]{1,$maxNameLength}")) && names.add(name)) { "Invalid MCP snapshot tool name" }
+            McpTool(name, string(tool, "description", allowBlank = true), JSONObject(tool.getJSONObject("inputSchema").toString()))
+        }
+    }
+}
+
 internal class GitHubMcpInstallation(val credential: GitHubCredential, val auth: String, val tools: List<McpTool>,
     val enabled: Boolean = true, val account: GitHubMcpAccount? = null) {
     fun usable(): Boolean = enabled && credential.accessToken.isNotBlank() && tools.isNotEmpty() &&
@@ -89,6 +129,33 @@ internal class GitHubMcpStore(
         }.getOrNull()
     }
 
+    /** Explicit plaintext export; never refreshes or contacts GitHub. */
+    internal fun snapshot(): JSONObject = synchronized(lock) {
+        val installation = load() ?: run {
+            check(!file.exists()) { "Unable to decrypt GitHub integration for backup" }
+            return@synchronized JSONObject().put("installed", false)
+        }
+        JSONObject().put("installed", true).put("auth", installation.auth).put("enabled", installation.enabled)
+            .put("credential", JSONObject().put("access_token", installation.credential.accessToken)
+                .put("expires_at", installation.credential.expiresAt)
+                .put("refresh_token", installation.credential.refreshToken ?: JSONObject.NULL)
+                .put("refresh_token_expires_at", installation.credential.refreshTokenExpiresAt))
+            .put("tools", JSONArray(installation.tools.map { tool -> JSONObject().put("name", tool.name)
+                .put("description", tool.description).put("inputSchema", JSONObject(tool.inputSchema.toString())) }))
+            .put("account", installation.account?.let { JSONObject().put("login", it.login)
+                .put("avatar_url", it.avatarUrl).put("email", it.email) } ?: JSONObject.NULL)
+    }
+
+    internal fun applySnapshot(snapshot: JSONObject, overwrite: Boolean): Unit = synchronized(lock) {
+        val installation = parseSnapshot(snapshot)
+        if (installation == null) {
+            if (overwrite) remove()
+            return@synchronized
+        }
+        // Validate the entire incoming installation even when merge will preserve the current one.
+        if (overwrite || load() == null) save(installation)
+    }
+
     fun setEnabled(enabled: Boolean) = synchronized(lock) {
         load()?.let { save(GitHubMcpInstallation(it.credential, it.auth, it.tools, enabled, it.account)) }
     }
@@ -141,6 +208,24 @@ internal class GitHubMcpStore(
     companion object {
         private val lock = Any()
         private const val KEY_ALIAS = "irio_mcp_github"
+
+        /** Backup preflight: no store access, key access, or network. */
+        internal fun validateSnapshot(snapshot: JSONObject): Unit { parseSnapshot(snapshot) }
+
+        private fun parseSnapshot(snapshot: JSONObject): GitHubMcpInstallation? {
+            if (!McpSnapshotJson.boolean(snapshot, "installed")) return null
+            val credential = snapshot.getJSONObject("credential")
+            val tools = McpSnapshotJson.tools(snapshot, maxNameLength = 50)
+            val account = McpSnapshotJson.account(snapshot)?.let {
+                GitHubMcpAccount(McpSnapshotJson.string(it, "login", allowBlank = true),
+                    McpSnapshotJson.string(it, "avatar_url", allowBlank = true), McpSnapshotJson.string(it, "email", allowBlank = true))
+            }
+            return GitHubMcpInstallation(GitHubCredential(McpSnapshotJson.string(credential, "access_token"),
+                McpSnapshotJson.expiry(credential, "expires_at"), McpSnapshotJson.refreshToken(credential),
+                McpSnapshotJson.expiry(credential, "refresh_token_expires_at")), McpSnapshotJson.string(snapshot, "auth"), tools,
+                McpSnapshotJson.boolean(snapshot, "enabled"), account)
+        }
+
         fun of(context: Context): GitHubMcpStore = GitHubMcpStore(File(context.noBackupFilesDir, "mcp/github.json"), secretKey = {
             val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
             (keyStore.getKey(KEY_ALIAS, null) as? SecretKey) ?: KeyGenerator.getInstance("AES", "AndroidKeyStore").apply {

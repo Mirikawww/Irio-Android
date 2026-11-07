@@ -363,6 +363,11 @@ object ThemeStore {
         }
     }
 
+    internal fun reload(context: Context) = synchronized(this) {
+        loaded = false
+        ensureLoaded(context)
+    }
+
     fun save(context: Context, value: ThemePreference) {
         ensureLoaded(context)
         if (preference == value) return

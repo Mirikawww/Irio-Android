@@ -292,6 +292,32 @@ internal class TodoistMcpStore(
         }.getOrNull()
     }
 
+    /** Explicit plaintext export; never refreshes or contacts Todoist. */
+    internal fun snapshot(): JSONObject = synchronized(lock) {
+        val installation = load() ?: run {
+            check(!file.exists()) { "Unable to decrypt Todoist integration for backup" }
+            return@synchronized JSONObject().put("installed", false)
+        }
+        JSONObject().put("installed", true).put("client_id", installation.clientId).put("enabled", installation.enabled)
+            .put("credential", JSONObject().put("access_token", installation.credential.accessToken)
+                .put("expires_at", installation.credential.expiresAt)
+                .put("refresh_token", installation.credential.refreshToken ?: JSONObject.NULL))
+            .put("tools", JSONArray(installation.tools.map { tool -> JSONObject().put("name", tool.name)
+                .put("description", tool.description).put("inputSchema", JSONObject(tool.inputSchema.toString())) }))
+            .put("account", installation.account?.let { JSONObject().put("name", it.name)
+                .put("avatar_url", it.avatarUrl).put("email", it.email) } ?: JSONObject.NULL)
+    }
+
+    internal fun applySnapshot(snapshot: JSONObject, overwrite: Boolean): Unit = synchronized(lock) {
+        val installation = parseSnapshot(snapshot)
+        if (installation == null) {
+            if (overwrite) remove()
+            return@synchronized
+        }
+        // Validate the entire incoming installation even when merge will preserve the current one.
+        if (overwrite || load() == null) save(installation)
+    }
+
     fun setEnabled(enabled: Boolean) = synchronized(lock) { load()?.let { save(it.copy(enabled = enabled)) } }
 
     fun updateTools(expectedToken: String, tools: List<McpTool>): TodoistMcpInstallation? = synchronized(lock) {
@@ -351,6 +377,23 @@ internal class TodoistMcpStore(
         private const val KEY_ALIAS = "irio_mcp_todoist"
         private val lock = Any()
         private val refreshMutex = Mutex()
+
+        /** Backup preflight: no store access, key access, or network. */
+        internal fun validateSnapshot(snapshot: JSONObject): Unit { parseSnapshot(snapshot) }
+
+        private fun parseSnapshot(snapshot: JSONObject): TodoistMcpInstallation? {
+            if (!McpSnapshotJson.boolean(snapshot, "installed")) return null
+            val credential = snapshot.getJSONObject("credential")
+            val tools = McpSnapshotJson.tools(snapshot, maxNameLength = 64)
+            val account = McpSnapshotJson.account(snapshot)?.let {
+                TodoistMcpAccount(McpSnapshotJson.string(it, "name", allowBlank = true),
+                    McpSnapshotJson.string(it, "avatar_url", allowBlank = true), McpSnapshotJson.string(it, "email", allowBlank = true))
+            }
+            return TodoistMcpInstallation(McpSnapshotJson.string(snapshot, "client_id"),
+                TodoistCredential(McpSnapshotJson.string(credential, "access_token"), McpSnapshotJson.expiry(credential, "expires_at"),
+                    McpSnapshotJson.refreshToken(credential)), tools, McpSnapshotJson.boolean(snapshot, "enabled"), account)
+        }
+
         fun of(context: Context): TodoistMcpStore = TodoistMcpStore(
             File(context.noBackupFilesDir, "mcp/todoist.json"), secretKey = {
                 val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }

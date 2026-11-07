@@ -43,6 +43,15 @@ object LinkRuntime {
         startReconnectLoop()
     }
 
+    internal fun reloadAfterImport(context: Context) {
+        if (!started) return
+        appContext = context.applicationContext
+        stopServer()
+        val settings = LinkStore.load(context)
+        _state.value = LinkUiState(settings = settings)
+        if (settings.enabled) refreshPairing()
+    }
+
     fun refreshPairing() {
         val context = appContext ?: return
         pairingCode = LinkProtocol.newPairingCode()

@@ -237,6 +237,11 @@ object ProfileStore {
         }
     }
 
+    internal fun reload(context: Context) = synchronized(this) {
+        loaded = false
+        ensureLoaded(context)
+    }
+
     fun loadNameInput(context: Context): String {
         val prefs = preferences(context.applicationContext)
         val stored = prefs.getString(NAME, null).orEmpty()

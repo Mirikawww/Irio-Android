@@ -163,6 +163,24 @@ object ConversationStore {
         notifyChanged()
     }
 
+    /** Backup merge keeps local conflicts; overwrite replaces matching ids even with an older timestamp. */
+    internal fun importBackup(context: Context, incoming: List<Conversation>, overwrite: Boolean) {
+        val dir = directory(context)
+        ConversationSummaries.withLock {
+            incoming.forEach { conversation ->
+                require(conversation.id.matches(Regex("[A-Za-z0-9_-]+")))
+                val target = File(dir, "${conversation.id}.json")
+                require(target.canonicalFile.toPath().startsWith(context.filesDir.canonicalFile.toPath()))
+                if (overwrite || !target.exists()) target.writeText(conversation.toJson().toString())
+            }
+            val summaries = dir.listFiles().orEmpty()
+                .filter { it.extension == "json" && it.name != "index.json" }
+                .mapNotNull { load(context, it.nameWithoutExtension)?.summary() }
+            ConversationSummaries.replace(dir, summaries)
+        }
+        notifyChanged()
+    }
+
     fun parseConversation(json: JSONObject): Conversation = conversationFromJson(json)
 
     fun conversationJson(conversation: Conversation): JSONObject = conversation.toJson()
