@@ -31,10 +31,12 @@ import com.mikepenz.markdown.compose.LocalMarkdownTypography
 import com.mikepenz.markdown.compose.LocalReferenceLinkHandler
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
 import com.mikepenz.markdown.compose.elements.MarkdownText
+import com.mikepenz.markdown.model.markdownAnnotator
 import com.mikepenz.markdown.utils.codeSpanStyle
 import kotlinx.coroutines.delay
 import org.intellij.markdown.IElementType
 import org.intellij.markdown.MarkdownTokenTypes
+import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.findChildOfType
 import kotlin.math.min
@@ -285,7 +287,23 @@ internal fun FadingMarkdownAnnotated(
     val codeStyle = typography.codeSpanStyle
     val colors = LocalMarkdownColors.current
     val highlightStyle = SpanStyle(color = colors.highlightText, background = colors.highlightBackground)
-    val annotator = LocalMarkdownAnnotator.current
+    val inheritedAnnotator = LocalMarkdownAnnotator.current
+    val annotator = remember(inheritedAnnotator) {
+        markdownAnnotator(config = inheritedAnnotator.config) { source, child ->
+            // List continuation indentation is structural, not a displayed leading space.
+            if (child.type == MarkdownTokenTypes.WHITE_SPACE &&
+                child.parent?.type == MarkdownElementTypes.PARAGRAPH &&
+                child.parent?.children?.let { siblings ->
+                    siblings.getOrNull(siblings.indexOf(child) - 1)?.type == MarkdownTokenTypes.EOL
+                } == true &&
+                generateSequence(child.parent) { it.parent }.any { it.type == MarkdownElementTypes.LIST_ITEM }
+            ) {
+                true
+            } else {
+                inheritedAnnotator.annotate?.invoke(this, source, child) ?: false
+            }
+        }
+    }
     val references = LocalReferenceLinkHandler.current
     val uriHandler = LocalUriHandler.current
     val settings = remember(linkStyle, codeStyle, highlightStyle, annotator, references, uriHandler) {
