@@ -238,6 +238,22 @@ class ConditionalSettingsUiTest {
         }
     }
 
+    @Test fun linkConnectionHintIsOnlyVisibleWhileEnabled() = runTest {
+        val enabled = androidx.compose.runtime.mutableStateOf(false)
+        withScreen(prepare = { context ->
+            ThemeStore.saveLanguage(context, AppLanguage.ZH_CN)
+        }, content = { LinkConnectionHint(enabled.value) }) { _ ->
+            val hint = "两端必须在同一 Wi-Fi。已发送的文件不会同步。"
+            assertHidden(hint)
+            enabled.value = true
+            frames(1)
+            assertVisible(hint)
+            enabled.value = false
+            frames(1)
+            assertHidden(hint)
+        }
+    }
+
     private fun prepareSandbox(context: ComponentActivity, enabled: Boolean) {
         ThemeStore.saveLanguage(context, AppLanguage.ZH_CN)
         ShadowEnvironment.addExternalDir(context.cacheDir.resolve("external").absolutePath)

@@ -160,11 +160,7 @@ internal fun LinkSettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
-            Text(
-                tr("两端必须在同一 Wi-Fi。已发送的文件不会同步。"),
-                color = muted,
-                fontSize = 13.sp,
-            )
+            LinkConnectionHint(state.settings.enabled)
             if (state.settings.enabled) {
                 LinkCard(topPadding = 11.dp) {
                     Text(
@@ -337,6 +333,16 @@ internal fun LinkSettingsScreen(onBack: () -> Unit) {
         )
         }
     }
+}
+
+@Composable
+internal fun LinkConnectionHint(enabled: Boolean) {
+    if (!enabled) return
+    Text(
+        tr("两端必须在同一 Wi-Fi。已发送的文件不会同步。"),
+        color = Theme[colors][mutedColor],
+        fontSize = 13.sp,
+    )
 }
 
 /** One visible notice for pairing and runtime status; preserve its text throughout exit. */
