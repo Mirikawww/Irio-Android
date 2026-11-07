@@ -62,7 +62,7 @@ class LinuxSandboxSettingsActivity : ComponentActivity() {
 }
 
 @Composable
-private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
+internal fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val layout = remember { LinuxSandboxLayout.of(context.filesDir) }
     var enabled by remember { mutableStateOf(LinuxSandboxStore.loadEnabled(layout.stateFile)) }
@@ -231,70 +231,72 @@ private fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                     },
                 )
             }
-            if (enabled && !allFiles) {
-                ListRowButton(searchId = "linux.permission", label = tr("授予权限"), onClick = {
-                    awaitingPermission = true
-                    openPermissionSettings()
-                })
-            }
-            if (offerRebuild) {
-                ListRowButton(searchId = "linux.rebuild", label = tr("用安装包里的版本重新准备"), onClick = { confirmRebuild = true })
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-                    .padding(horizontal = 16.dp, vertical = SettingsCardInset),
-            ) {
-                SettingsSlider(
-                    modifier = Modifier.settingsSearchAnchor("linux.commands", edge = SettingsSearchEdge.All),
-                    label = tr("单次命令数"),
-                    value = commandsPerCall,
-                    valueRange = LinuxSandboxStore.COMMANDS_UNLIMITED..LinuxSandboxStore.COMMANDS_MAX,
-                    valueLabel = { count ->
-                        if (count == LinuxSandboxStore.COMMANDS_UNLIMITED) tr("无限") else "$count"
-                    },
-                    onValueChange = { next ->
-                        val clamped = linuxSandboxClampCommandsPerCall(next)
-                        commandsPerCall = clamped
-                        LinuxSandboxStore.saveCommandsPerCall(layout.stateFile, clamped)
-                    },
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .settingsRow()
-                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-                    .settingsSearchAnchor("linux.background", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(tr("后台命令"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
-                Switch(
-                    checked = backgroundCommands,
-                    onCheckedChange = { want ->
-                        LinuxSandboxStore.saveBackgroundEnabled(layout.stateFile, want)
-                        backgroundCommands = want
-                        if (!want) LinuxBackgroundJobs.stopAll()
-                    },
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .settingsRow()
-                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-                    .settingsSearchAnchor("linux.attachmentPaths", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(tr("附带上传文件路径"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
-                Switch(
-                    checked = attachmentPaths,
-                    onCheckedChange = { want ->
-                        LinuxSandboxStore.saveAttachmentPaths(layout.stateFile, want)
-                        attachmentPaths = want
-                    },
-                )
+            if (enabled) {
+                if (!allFiles) {
+                    ListRowButton(searchId = "linux.permission", label = tr("授予权限"), onClick = {
+                        awaitingPermission = true
+                        openPermissionSettings()
+                    })
+                }
+                if (offerRebuild) {
+                    ListRowButton(searchId = "linux.rebuild", label = tr("用安装包里的版本重新准备"), onClick = { confirmRebuild = true })
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                        .padding(horizontal = 16.dp, vertical = SettingsCardInset),
+                ) {
+                    SettingsSlider(
+                        modifier = Modifier.settingsSearchAnchor("linux.commands", edge = SettingsSearchEdge.All),
+                        label = tr("单次命令数"),
+                        value = commandsPerCall,
+                        valueRange = LinuxSandboxStore.COMMANDS_UNLIMITED..LinuxSandboxStore.COMMANDS_MAX,
+                        valueLabel = { count ->
+                            if (count == LinuxSandboxStore.COMMANDS_UNLIMITED) tr("无限") else "$count"
+                        },
+                        onValueChange = { next ->
+                            val clamped = linuxSandboxClampCommandsPerCall(next)
+                            commandsPerCall = clamped
+                            LinuxSandboxStore.saveCommandsPerCall(layout.stateFile, clamped)
+                        },
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .settingsRow()
+                        .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                        .settingsSearchAnchor("linux.background", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(tr("后台命令"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
+                    Switch(
+                        checked = backgroundCommands,
+                        onCheckedChange = { want ->
+                            LinuxSandboxStore.saveBackgroundEnabled(layout.stateFile, want)
+                            backgroundCommands = want
+                            if (!want) LinuxBackgroundJobs.stopAll()
+                        },
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .settingsRow()
+                        .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                        .settingsSearchAnchor("linux.attachmentPaths", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(tr("附带上传文件路径"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
+                    Switch(
+                        checked = attachmentPaths,
+                        onCheckedChange = { want ->
+                            LinuxSandboxStore.saveAttachmentPaths(layout.stateFile, want)
+                            attachmentPaths = want
+                        },
+                    )
+                }
             }
             Button(
                 onClick = { confirmDelete = true },

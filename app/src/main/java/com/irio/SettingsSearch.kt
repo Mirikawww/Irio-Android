@@ -30,7 +30,22 @@ internal data class SettingsSearchHit(
 
 internal fun Context.openSettingsSearch(hit: SettingsSearchHit) {
     val intent = Intent(this, hit.destination)
-    hit.anchor?.let { intent.putExtra(SETTINGS_SEARCH_TARGET, it) }
+    hit.anchor?.let { anchor ->
+        ThemeStore.ensureLoaded(this)
+        // Locate the controlling switch when its dependent option is not composed.
+        val visibleAnchor = when {
+            anchor.startsWith("appearance.retry.") && !ThemeStore.autoRetry -> "appearance.retry"
+            anchor.startsWith("appearance.paste.") && !ThemeStore.longTextPaste -> "appearance.paste"
+            anchor.startsWith("appearance.glass.") && !ThemeStore.glassEnabled -> "appearance.glass"
+            anchor == "model.subagentModel" && !ToolStore.loadSubagents(this) -> "model.subagents"
+            anchor.startsWith("linux.") && anchor != "linux.enabled" && anchor != "linux.delete" &&
+                !LinuxSandboxStore.loadEnabled(LinuxSandboxLayout.of(filesDir).stateFile) -> "linux.enabled"
+            anchor in setOf("model.compressionModel", "model.trigger", "model.target", "model.visualize") &&
+                !ToolStore.loadContextCompression(this) -> "model.compression"
+            else -> anchor
+        }
+        intent.putExtra(SETTINGS_SEARCH_TARGET, visibleAnchor)
+    }
     startActivity(intent)
 }
 

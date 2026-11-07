@@ -203,16 +203,18 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                         ToolStore.saveSubagents(context, enabled)
                     },
                 )
-                TitleModelPicker(
-                    selected = subagentModel,
-                    onSelect = { model ->
-                        subagentModel = model
-                        ToolStore.saveSubagentModel(context, model)
-                    },
-                    modifier = Modifier.settingsSearchAnchor("model.subagentModel", edge = SettingsSearchEdge.Bottom),
-                    label = tr("子智能体默认模型"),
-                    contentDescription = tr("选择子智能体默认模型"),
-                )
+                SettingsDependentContent(enabled = subagentsEnabled) {
+                    TitleModelPicker(
+                        selected = subagentModel,
+                        onSelect = { model ->
+                            subagentModel = model
+                            ToolStore.saveSubagentModel(context, model)
+                        },
+                        modifier = Modifier.settingsSearchAnchor("model.subagentModel", edge = SettingsSearchEdge.Bottom),
+                        label = tr("子智能体默认模型"),
+                        contentDescription = tr("选择子智能体默认模型"),
+                    )
+                }
             }
             SettingsSectionCard {
                 GenerationModelPicker(
@@ -268,49 +270,51 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                         },
                     )
                 }
-                TitleModelPicker(
-                    selected = compressionModel,
-                    onSelect = { model ->
-                        compressionModel = model
-                        ToolStore.saveCompressionModel(context, model)
-                    },
-                    modifier = Modifier.settingsSearchAnchor("model.compressionModel"),
-                    label = tr("压缩模型"),
-                    contentDescription = tr("选择压缩模型"),
-                )
-                SettingsSlider(
-                    modifier = Modifier.settingsSearchAnchor("model.trigger"),
-                    label = tr("触发时机"),
-                    value = compressionTrigger,
-                    valueRange = ToolStore.COMPRESSION_PERCENT_MIN..ToolStore.COMPRESSION_PERCENT_MAX,
-                    valueLabel = { "$it%" },
-                    onValueChange = {
-                        val next = ToolStore.clampCompressionPercent(it)
-                        compressionTrigger = next
-                        ToolStore.saveCompressionTrigger(context, next)
-                    },
-                )
-                SettingsSlider(
-                    modifier = Modifier.settingsSearchAnchor("model.target"),
-                    label = tr("压缩目标"),
-                    value = compressionTarget,
-                    valueRange = ToolStore.COMPRESSION_PERCENT_MIN..ToolStore.COMPRESSION_PERCENT_MAX,
-                    valueLabel = { "$it%" },
-                    onValueChange = {
-                        val next = ToolStore.clampCompressionPercent(it)
-                        compressionTarget = next
-                        ToolStore.saveCompressionTarget(context, next)
-                    },
-                )
-                SettingsSwitchRow(
-                    modifier = Modifier.settingsSearchAnchor("model.visualize", edge = SettingsSearchEdge.Bottom),
-                    label = tr("可视化上下文"),
-                    checked = visualizeContext,
-                    onCheckedChange = {
-                        visualizeContext = it
-                        ToolStore.saveVisualizeContext(context, it)
-                    },
-                )
+                SettingsDependentContent(enabled = contextCompression) {
+                    TitleModelPicker(
+                        selected = compressionModel,
+                        onSelect = { model ->
+                            compressionModel = model
+                            ToolStore.saveCompressionModel(context, model)
+                        },
+                        modifier = Modifier.settingsSearchAnchor("model.compressionModel"),
+                        label = tr("压缩模型"),
+                        contentDescription = tr("选择压缩模型"),
+                    )
+                    SettingsSlider(
+                        modifier = Modifier.settingsSearchAnchor("model.trigger"),
+                        label = tr("触发时机"),
+                        value = compressionTrigger,
+                        valueRange = ToolStore.COMPRESSION_PERCENT_MIN..ToolStore.COMPRESSION_PERCENT_MAX,
+                        valueLabel = { "$it%" },
+                        onValueChange = {
+                            val next = ToolStore.clampCompressionPercent(it)
+                            compressionTrigger = next
+                            ToolStore.saveCompressionTrigger(context, next)
+                        },
+                    )
+                    SettingsSlider(
+                        modifier = Modifier.settingsSearchAnchor("model.target"),
+                        label = tr("压缩目标"),
+                        value = compressionTarget,
+                        valueRange = ToolStore.COMPRESSION_PERCENT_MIN..ToolStore.COMPRESSION_PERCENT_MAX,
+                        valueLabel = { "$it%" },
+                        onValueChange = {
+                            val next = ToolStore.clampCompressionPercent(it)
+                            compressionTarget = next
+                            ToolStore.saveCompressionTarget(context, next)
+                        },
+                    )
+                    SettingsSwitchRow(
+                        modifier = Modifier.settingsSearchAnchor("model.visualize", edge = SettingsSearchEdge.Bottom),
+                        label = tr("可视化上下文"),
+                        checked = visualizeContext,
+                        onCheckedChange = {
+                            visualizeContext = it
+                            ToolStore.saveVisualizeContext(context, it)
+                        },
+                    )
+                }
             }
             SettingsSectionCard {
                 Row(

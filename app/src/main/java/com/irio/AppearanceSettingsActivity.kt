@@ -2,12 +2,6 @@ package com.irio
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -32,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -84,7 +77,7 @@ class AppearanceSettingsActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AppearanceSettingsScreen(onBack: () -> Unit) {
+internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
     val context = LocalContext.current
@@ -101,12 +94,9 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
     var themeMenuOpen by remember { mutableStateOf(false) }
     var accentMenuOpen by remember { mutableStateOf(false) }
     var languageMenuOpen by remember { mutableStateOf(false) }
-    val searchTarget = context.settingsSearchTarget()
     var pendingInputCornerRadius by remember(ThemeStore.inputCornerRadius) {
         mutableIntStateOf(ThemeStore.inputCornerRadius)
     }
-    var glassExpanded by remember { mutableStateOf(searchTarget.startsWith("appearance.glass.")) }
-    var longTextPasteExpanded by remember { mutableStateOf(searchTarget == "appearance.paste.threshold") }
 
     SettingsHazeScaffold(
         title = tr("外观与偏好"),
@@ -392,22 +382,10 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 ) {
                     Text(tr("仅对消息框生效"), color = Theme[colors][onPanelColor])
                 }
-                val glassArrow by animateFloatAsState(
-                    targetValue = if (glassExpanded) 180f else 0f,
-                    animationSpec = irioSpring(),
-                    label = "glass expansion arrow",
-                )
-                val glassInteraction = remember { MutableInteractionSource() }
                 Row(
                     modifier = Modifier
                         .settingsSearchAnchor("appearance.glass")
-                        .fillMaxWidth()
-                        .clickable(
-                            interactionSource = glassInteraction,
-                            indication = null,
-                            onClick = { glassExpanded = !glassExpanded },
-                        )
-                        .padding(top = 6.dp, bottom = 6.dp),
+                        .settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -419,31 +397,10 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         checked = ThemeStore.glassEnabled,
                         onCheckedChange = { ThemeStore.saveGlassEnabled(context, it) },
                         modifier = Modifier
-                            .padding(horizontal = 8.dp)
                             .semantics { contentDescription = tr("毛玻璃") },
                     )
-                    IconButton(
-                        onClick = { glassExpanded = !glassExpanded },
-                        style = ButtonStyle.Ghost,
-                        buttonSize = ButtonSize.Small,
-                        shape = ContinuousCapsule,
-                        modifier = Modifier.size(32.dp),
-                        interactionSource = glassInteraction,
-                    ) {
-                        Icon(
-                            imageVector = IrioIcons.ChevronDown,
-                            contentDescription = if (glassExpanded) tr("收起") else tr("展开"),
-                            tint = Theme[colors][onPanelColor],
-                            modifier = Modifier.size(20.dp).rotate(glassArrow),
-                        )
-                    }
                 }
-                AnimatedVisibility(
-                    visible = glassExpanded,
-                    enter = expandVertically(animationSpec = irioSpring(), expandFrom = Alignment.Top) + fadeIn(animationSpec = irioSpring()),
-                    exit = shrinkVertically(animationSpec = irioSpring(), shrinkTowards = Alignment.Top) + fadeOut(animationSpec = irioSpring()),
-                ) {
-                    Column {
+                SettingsDependentContent(enabled = ThemeStore.glassEnabled) {
                     GlassSurface.entries.forEach { surface ->
                         val label = when (surface) {
                             GlassSurface.SIDEBAR_BUTTON -> tr("侧边栏按钮")
@@ -472,7 +429,6 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                             Text(label, color = Theme[colors][onPanelColor])
                         }
                     }
-                    }
                 }
                 Row(
                     modifier = Modifier.settingsSearchAnchor("appearance.userAvatar", edge = SettingsSearchEdge.Bottom).settingsSwitchRow(),
@@ -495,22 +451,10 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 ImageUploadSettings()
             }
             SettingsSectionCard {
-                val pasteArrow by animateFloatAsState(
-                    targetValue = if (longTextPasteExpanded) 180f else 0f,
-                    animationSpec = irioSpring(),
-                    label = "long text paste expansion arrow",
-                )
-                val pasteInteraction = remember { MutableInteractionSource() }
                 Row(
                     modifier = Modifier
                         .settingsSearchAnchor("appearance.paste", edge = SettingsSearchEdge.Top)
-                        .fillMaxWidth()
-                        .clickable(
-                            interactionSource = pasteInteraction,
-                            indication = null,
-                            onClick = { longTextPasteExpanded = !longTextPasteExpanded },
-                        )
-                        .padding(vertical = 6.dp),
+                        .settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -522,30 +466,10 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         checked = ThemeStore.longTextPaste,
                         onCheckedChange = { ThemeStore.saveLongTextPaste(context, it) },
                         modifier = Modifier
-                            .padding(horizontal = 8.dp)
                             .semantics { contentDescription = tr("粘贴长文本为文件") },
                     )
-                    IconButton(
-                        onClick = { longTextPasteExpanded = !longTextPasteExpanded },
-                        style = ButtonStyle.Ghost,
-                        buttonSize = ButtonSize.Small,
-                        shape = ContinuousCapsule,
-                        modifier = Modifier.size(32.dp),
-                        interactionSource = pasteInteraction,
-                    ) {
-                        Icon(
-                            imageVector = IrioIcons.ChevronDown,
-                            contentDescription = if (longTextPasteExpanded) tr("收起") else tr("展开"),
-                            tint = Theme[colors][onPanelColor],
-                            modifier = Modifier.size(20.dp).rotate(pasteArrow),
-                        )
-                    }
                 }
-                AnimatedVisibility(
-                    visible = longTextPasteExpanded,
-                    enter = expandVertically(animationSpec = irioSpring(), expandFrom = Alignment.Top) + fadeIn(animationSpec = irioSpring()),
-                    exit = shrinkVertically(animationSpec = irioSpring(), shrinkTowards = Alignment.Top) + fadeOut(animationSpec = irioSpring()),
-                ) {
+                SettingsDependentContent(enabled = ThemeStore.longTextPaste) {
                     SettingsSlider(
                         modifier = Modifier.settingsSearchAnchor("appearance.paste.threshold"),
                         label = tr("字符阈值"),
@@ -581,21 +505,23 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     Text(tr("自动重试"), modifier = Modifier.weight(1f), color = Theme[colors][onPanelColor])
                     Switch(checked = ThemeStore.autoRetry, onCheckedChange = { ThemeStore.saveAutoRetry(context, it) })
                 }
-                SettingsSlider(
-                    modifier = Modifier.settingsSearchAnchor("appearance.retry.limit"),
-                    label = tr("重试次数上限"),
-                    value = ThemeStore.retryLimit,
-                    valueRange = 1..20,
-                    onValueChange = { ThemeStore.saveRetryLimit(context, it) },
-                )
-                SettingsSlider(
-                    modifier = Modifier.settingsSearchAnchor("appearance.retry.cooldown", edge = SettingsSearchEdge.Bottom),
-                    label = tr("重试冷却时长"),
-                    value = ThemeStore.retryCooldownSeconds,
-                    valueRange = 0..300,
-                    valueLabel = { "${it}s" },
-                    onValueChange = { ThemeStore.saveRetryCooldown(context, it) },
-                )
+                SettingsDependentContent(enabled = ThemeStore.autoRetry) {
+                    SettingsSlider(
+                        modifier = Modifier.settingsSearchAnchor("appearance.retry.limit"),
+                        label = tr("重试次数上限"),
+                        value = ThemeStore.retryLimit,
+                        valueRange = 1..20,
+                        onValueChange = { ThemeStore.saveRetryLimit(context, it) },
+                    )
+                    SettingsSlider(
+                        modifier = Modifier.settingsSearchAnchor("appearance.retry.cooldown", edge = SettingsSearchEdge.Bottom),
+                        label = tr("重试冷却时长"),
+                        value = ThemeStore.retryCooldownSeconds,
+                        valueRange = 0..300,
+                        valueLabel = { "${it}s" },
+                        onValueChange = { ThemeStore.saveRetryCooldown(context, it) },
+                    )
+                }
             }
             SettingsSectionCard {
                 Row(
