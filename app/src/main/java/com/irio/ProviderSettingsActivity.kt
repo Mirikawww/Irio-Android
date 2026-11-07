@@ -184,6 +184,7 @@ internal fun ProviderSettingsScreen(
                 searchId = "provider.add",
                 label = tr("添加提供商"),
                 icon = IrioIcons.Plus,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                 onClick = {
                     resetAddForm()
                     dialogOpen = true

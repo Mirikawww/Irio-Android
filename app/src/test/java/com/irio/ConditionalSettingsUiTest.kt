@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -319,6 +320,36 @@ class ConditionalSettingsUiTest {
             assertEquals("Action rows must fill the card rather than shrink inside its padding", 16f, exportRow.left, 0.5f)
             assertEquals(exportRow.bottom, importRow.top, 0.5f)
             assertVisible("历史记录")
+        }
+    }
+
+    @Test fun settingsHomeAndSubpagesMatchAboutIconTitleSpacing() = runTest {
+        val screens: List<Pair<List<String>, @Composable () -> Unit>> = listOf(
+            listOf("提供商", "个性化", "模型", "TTS/STT", "搜索", "记忆", "MCP", "Linux 沙盒", "外观与偏好", "我", "互连", "其他", "关于") to {
+                SettingsScreen(onBack = {})
+            },
+            listOf("添加提供商") to { ProviderSettingsScreen(onBack = {}) },
+            listOf("删除所有历史", "导出数据", "导入数据") to { OtherSettingsScreen(onBack = {}) },
+            listOf("鸣谢", "项目地址", "文档与更新日志") to { AboutScreen(onBack = {}, onAcknowledgements = {}) },
+            listOf("fixture link") to {
+                ListRowButton(label = "fixture link", supportingText = "https://example.invalid", icon = IrioIcons.Braces,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 32.dp), onClick = {})
+            },
+        )
+        for ((labels, screen) in screens) {
+            withScreen(prepare = { context -> ThemeStore.saveLanguage(context, AppLanguage.ZH_CN) }, content = screen) { _ ->
+                for (label in labels) {
+                    val title = nodes().single { node ->
+                        node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == label } &&
+                            generateSequence(node) { it.parent }.any {
+                                it.config.contains(SemanticsProperties.Role) &&
+                                    it.config[SemanticsProperties.Role] == androidx.compose.ui.semantics.Role.Button
+                            }
+                    }
+                    assertEquals("$label must use page 16 + row 16 + icon 20 + gap 12", 64f,
+                        title.boundsInRoot.left, 0.5f)
+                }
+            }
         }
     }
 

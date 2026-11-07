@@ -143,6 +143,7 @@ internal fun OtherSettingsScreen(onBack: () -> Unit) {
                     searchId = "other.history",
                     label = tr("删除所有历史"),
                     icon = IrioIcons.Trash,
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     onClick = { showClearHistoryDialog = true },
                 )
                 }

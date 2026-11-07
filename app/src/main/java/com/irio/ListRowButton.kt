@@ -172,7 +172,7 @@ fun ListRowButton(
             buttonSize = ButtonSize.Large,
             contentColor = contentColor,
             contentPadding = contentPadding,
-            content = if (searchId == null) content else buttonContent,
+            content = buttonContent,
         )
     } else {
         Button(
@@ -183,7 +183,7 @@ fun ListRowButton(
             shape = shape,
             buttonSize = ButtonSize.Large,
             contentColor = contentColor,
-            content = if (searchId == null) content else buttonContent,
+            content = buttonContent,
         )
     }
 }
