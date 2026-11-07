@@ -30,12 +30,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.ui.components.ButtonStyle
+import com.composables.ui.components.Button
 import com.composables.ui.components.Icon
 import com.composables.ui.components.IconButton
 import com.composables.ui.components.DropdownMenu
@@ -66,7 +68,10 @@ class OtherSettingsActivity : ComponentActivity() {
 }
 
 @Composable
-internal fun OtherSettingsScreen(onBack: () -> Unit) {
+internal fun OtherSettingsScreen(
+    onBack: () -> Unit,
+    exportBackup: (android.content.Context, java.io.OutputStream) -> Unit = BackupStore::export,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var showClearHistoryDialog by remember { mutableStateOf(false) }
@@ -78,13 +83,17 @@ internal fun OtherSettingsScreen(onBack: () -> Unit) {
     var operationErrorNonce by remember { mutableStateOf(0) }
     var importModeMenuOpen by remember { mutableStateOf(false) }
     var importCompleted by remember { mutableStateOf(false) }
+    var showExportNotice by rememberSaveable { mutableStateOf(false) }
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         runCatching {
             val output = context.contentResolver.openOutputStream(uri) ?: error("Output stream unavailable")
-            output.use { BackupStore.export(context, it) }
+            output.use { exportBackup(context, it) }
+        }.onSuccess {
+            operationError = null
+            showExportNotice = true
         }.onFailure {
             operationError = tr("导出失败")
             operationErrorNonce++
@@ -184,6 +193,28 @@ internal fun OtherSettingsScreen(onBack: () -> Unit) {
                 onDismiss = { operationError = null },
                 restartKey = operationErrorNonce,
             )
+        }
+    }
+
+    IrioAlertDialog(
+        visible = showExportNotice,
+        onDismissRequest = { showExportNotice = false },
+    ) {
+        Column {
+            DialogTitle(tr("注意"))
+            Spacer(Modifier.height(12.dp))
+            Text(
+                tr(".irio 备份包含 API 密钥及 MCP 登录凭据，请勿公开分享。"),
+                color = Theme[colors][onPanelColor],
+                fontSize = 16.sp,
+                lineHeight = 22.sp,
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { showExportNotice = false },
+                modifier = Modifier.fillMaxWidth(),
+                style = ButtonStyle.Primary,
+            ) { Text(tr("知道了"), color = LocalContentColor.current) }
         }
     }
 

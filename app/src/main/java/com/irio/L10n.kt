@@ -135,6 +135,8 @@ private val TodoistProgressEnglish = mapOf(
 ).flatMap { (action, forms) -> listOf(action to forms.first, "已$action" to forms.second) }.toMap()
 
 private val English = mapOf(
+    "注意" to "Notice",
+    ".irio 备份包含 API 密钥及 MCP 登录凭据，请勿公开分享。" to ".irio backups contain API keys and MCP login credentials. Do not share them publicly.",
     "数据" to "Data",
     "命令" to "Commands",
     "对话与模型" to "Chat and models",
