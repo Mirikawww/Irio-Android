@@ -68,6 +68,7 @@ import com.composables.ui.components.Text
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
+import com.composables.ui.theme.onPrimaryColor
 import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.secondaryColor
 import com.composeunstyled.theme.Theme
@@ -283,14 +284,16 @@ private fun SettingsSearchResult(
 }
 
 @Composable
-private fun SettingsSearchTitle(title: String, ranges: List<IntRange>, color: Color) {
+internal fun SettingsSearchTitle(title: String, ranges: List<IntRange>, color: Color) {
+    val matchBackground = Theme[colors][primaryColor]
+    val matchForeground = Theme[colors][onPrimaryColor]
     val highlighted = buildAnnotatedString {
         var cursor = 0
         ranges.forEach { range ->
             val start = range.first.coerceIn(0, title.length)
             val end = (range.last + 1).coerceIn(start, title.length)
             if (cursor < start) append(title.substring(cursor, start))
-            withStyle(SpanStyle(background = SettingsSearchHighlight, color = Color(0xFF1A1A1A))) {
+            withStyle(SpanStyle(background = matchBackground, color = matchForeground)) {
                 append(title.substring(start, end))
             }
             cursor = end
