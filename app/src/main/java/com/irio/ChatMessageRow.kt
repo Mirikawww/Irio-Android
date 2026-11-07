@@ -269,14 +269,7 @@ internal fun MessageRow(
                                     Text(
                                         chatMessage.text,
                                         modifier =
-                                            Modifier.irioSolidOrGlass(
-                                                    ThemeStore.isGlassEnabled(GlassSurface.USER_BUBBLE),
-                                                    bubble.background,
-                                                    RoundedRectangle(16.dp),
-                                                    haze = null,
-                                                    border = true,
-                                                    glassTintAlpha = bubble.background.alpha,
-                                                )
+                                            Modifier.background(bubble.background, RoundedRectangle(16.dp))
                                                 .clip(RoundedRectangle(16.dp))
                                                 .then(
                                                     if (onEdit != null) {

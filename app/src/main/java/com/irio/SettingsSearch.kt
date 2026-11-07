@@ -245,7 +245,6 @@ private val settingsSearchEntries = listOf(
     item("appearance.inputCorners", "输入框圆角", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.inputCorners.messageOnly", "仅对消息框生效", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.glass", "毛玻璃", "外观与偏好", AppearanceSettingsActivity::class.java),
-    item("appearance.glass.bubble", "用户气泡", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.glass.sidebar", "侧边栏按钮", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.glass.ring", "上下文圆环", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.glass.switcher", "模型切换器", "外观与偏好", AppearanceSettingsActivity::class.java),

@@ -54,8 +54,6 @@ class UserBubbleRippleTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val context = controller.get()
         ThemeStore.ensureLoaded(context)
-        val oldGlass = GlassSurface.USER_BUBBLE in ThemeStore.glassSurfaces
-        ThemeStore.saveGlassSurface(context, GlassSurface.USER_BUBBLE, false)
         val clock = BroadcastFrameClock()
         val recomposer = Recomposer(coroutineContext + clock)
         val runner = launch(clock) { recomposer.runRecomposeAndApplyChanges() }
@@ -133,7 +131,6 @@ class UserBubbleRippleTest {
             view.disposeComposition()
             recomposer.close()
             runner.cancel()
-            ThemeStore.saveGlassSurface(context, GlassSurface.USER_BUBBLE, oldGlass)
             controller.pause().stop().destroy()
         }
     }

@@ -446,7 +446,6 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     Column {
                     GlassSurface.entries.forEach { surface ->
                         val label = when (surface) {
-                            GlassSurface.USER_BUBBLE -> tr("用户气泡")
                             GlassSurface.SIDEBAR_BUTTON -> tr("侧边栏按钮")
                             GlassSurface.CONTEXT_RING -> tr("上下文圆环")
                             GlassSurface.MODEL_SWITCHER -> tr("模型切换器")
@@ -460,7 +459,6 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                             modifier = Modifier
                                 .settingsSearchAnchor(
                                     when (surface) {
-                                        GlassSurface.USER_BUBBLE -> "appearance.glass.bubble"
                                         GlassSurface.SIDEBAR_BUTTON -> "appearance.glass.sidebar"
                                         GlassSurface.CONTEXT_RING -> "appearance.glass.ring"
                                         GlassSurface.MODEL_SWITCHER -> "appearance.glass.switcher"

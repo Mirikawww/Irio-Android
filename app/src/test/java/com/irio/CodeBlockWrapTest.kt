@@ -3,6 +3,7 @@ package com.irio
 import android.content.Context
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -13,6 +14,14 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
 class CodeBlockWrapTest {
+    @Test fun userBubbleGlassIsRemovedWithoutChangingOtherSurfaces() {
+        assertNull("Legacy bubble selections must no longer enable glass", GlassSurface.fromStored("user_bubble"))
+        assertEquals(setOf("sidebar_button", "context_ring", "model_switcher", "composer"),
+            GlassSurface.entries.map { it.stored }.toSet())
+        assertTrue("The removed option must not be searchable",
+            searchSettings("用户气泡", label = { it }).none { it.id == "appearance.glass.bubble" })
+    }
+
     @Test
     fun codeBlockWrapPersistsAndCanStayOff() {
         val context = RuntimeEnvironment.getApplication()
@@ -58,7 +67,7 @@ class CodeBlockWrapTest {
             GlassSurface.entries.forEach { ThemeStore.saveGlassSurface(context, it, it == GlassSurface.COMPOSER) }
             ThemeStore.saveGlassEnabled(context, true)
             assertTrue(ThemeStore.isGlassEnabled(GlassSurface.COMPOSER))
-            assertFalse(ThemeStore.isGlassEnabled(GlassSurface.USER_BUBBLE))
+            assertFalse(ThemeStore.isGlassEnabled(GlassSurface.SIDEBAR_BUTTON))
             ThemeStore.saveGlassEnabled(context, false)
             assertFalse(ThemeStore.isGlassEnabled(GlassSurface.COMPOSER))
             assertTrue(GlassSurface.COMPOSER in ThemeStore.glassSurfaces)

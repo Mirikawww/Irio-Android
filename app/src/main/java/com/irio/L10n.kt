@@ -590,7 +590,6 @@ private val English = mapOf(
     "模型差异" to "Model diff",
     "模型切换器居左" to "Model selector on the left",
     "毛玻璃" to "Frosted glass",
-    "用户气泡" to "User bubbles",
     "气泡透明度" to "Bubble opacity",
     "输入框圆角" to "Input corner radius",
     "仅对消息框生效" to "Apply to message box only",

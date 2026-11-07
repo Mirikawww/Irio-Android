@@ -42,7 +42,6 @@ enum class ThemePreference(val label: String, val stored: String) {
 }
 
 enum class GlassSurface(val stored: String) {
-    USER_BUBBLE("user_bubble"),
     SIDEBAR_BUTTON("sidebar_button"),
     CONTEXT_RING("context_ring"),
     MODEL_SWITCHER("model_switcher"),
