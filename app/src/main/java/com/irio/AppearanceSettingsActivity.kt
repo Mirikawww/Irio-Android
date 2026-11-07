@@ -665,7 +665,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSearchAnchor("appearance.scroll").settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ExperimentalLabel(
+                    Text(
                         tr("发送新消息时滚动到新消息"),
                         color = Theme[colors][onPanelColor],
                         modifier = Modifier.weight(1f),
