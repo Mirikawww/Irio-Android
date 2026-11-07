@@ -75,8 +75,6 @@ import com.composeunstyled.theme.Theme
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
-internal val SettingsSearchHighlight = Color(0xFFFFE14A)
-
 internal enum class SettingsSearchEdge { Flat, Top, Bottom, All }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -91,6 +89,7 @@ internal fun Modifier.settingsSearchAnchor(
     val active = LocalContext.current.settingsSearchTarget() == id && id.isNotEmpty()
     val requester = remember(id) { BringIntoViewRequester() }
     val flash = remember(id) { Animatable(0f) }
+    val highlightColor = Theme[colors][primaryColor]
     LaunchedEffect(active) {
         if (!active) {
             flash.snapTo(0f)
@@ -134,7 +133,7 @@ internal fun Modifier.settingsSearchAnchor(
                     ),
                 )
             }
-            drawPath(path, SettingsSearchHighlight.copy(alpha = 0.42f * alpha))
+            drawPath(path, highlightColor.copy(alpha = 0.42f * alpha))
         }
 }
 

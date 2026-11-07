@@ -2,6 +2,12 @@ package com.irio
 
 import android.view.View
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.composables.ui.theme.backgroundColor
+import kotlinx.coroutines.test.advanceTimeBy
 import androidx.compose.runtime.BroadcastFrameClock
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Recomposer
@@ -36,6 +42,76 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
 class SettingsSearchHighlightTest {
+    @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun destinationFlashDrawsTheAccentInsteadOfYellowAndFadesAway() = runTest {
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        val context = controller.get()
+        context.intent.putExtra(SETTINGS_SEARCH_TARGET, "fixture")
+        ThemeStore.ensureLoaded(context)
+        val oldAccent = ThemeStore.accent
+        val oldTheme = ThemeStore.preference
+        ThemeStore.saveAccent(context, AccentColor.BLUE)
+        ThemeStore.save(context, ThemePreference.LIGHT)
+        val clock = BroadcastFrameClock()
+        val recomposer = Recomposer(coroutineContext + clock)
+        val runner = launch(clock) { recomposer.runRecomposeAndApplyChanges() }
+        val view = ComposeView(context)
+        var accent = Color.Unspecified
+        var background = Color.Unspecified
+        var time = 0L
+        try {
+            view.setParentCompositionContext(recomposer)
+            context.setContentView(view)
+            view.setContent {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    AppTheme {
+                        accent = Theme[colors][primaryColor]
+                        background = Theme[colors][backgroundColor]
+                        Box(
+                            Modifier.background(background)
+                                .settingsSearchAnchor("fixture", horizontalOutset = 0.dp,
+                                    edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
+                        )
+                    }
+                }
+            }
+            var strongest = Color.Unspecified
+            var strongestDistance = 0f
+            var last = Color.Unspecified
+            repeat(80) {
+                Snapshot.sendApplyNotifications(); runCurrent()
+                advanceTimeBy(16); runCurrent()
+                time += 16_000_000L; clock.sendFrame(time); runCurrent()
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+                view.requestLayout()
+                view.measure(View.MeasureSpec.makeMeasureSpec(80, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(80, View.MeasureSpec.EXACTLY))
+                view.layout(0, 0, 80, 80)
+                val bitmap = android.graphics.Bitmap.createBitmap(80, 80, android.graphics.Bitmap.Config.ARGB_8888)
+                try {
+                    view.draw(android.graphics.Canvas(bitmap))
+                    last = Color(bitmap.getPixel(40, 40))
+                    val distance = kotlin.math.abs(last.red - background.red) + kotlin.math.abs(last.green - background.green) +
+                        kotlin.math.abs(last.blue - background.blue)
+                    if (distance > strongestDistance) { strongest = last; strongestDistance = distance }
+                } finally { bitmap.recycle() }
+            }
+            val opacity = (strongest.red - background.red) / (accent.red - background.red)
+            org.junit.Assert.assertTrue("The locator flash must actually draw", opacity > 0.1f)
+            assertEquals("Locator green follows the accent", background.green + (accent.green - background.green) * opacity,
+                strongest.green, 0.015f)
+            assertEquals("Locator blue follows the accent", background.blue + (accent.blue - background.blue) * opacity,
+                strongest.blue, 0.015f)
+            assertEquals("Locator still fades back to the page", background, last)
+        } finally {
+            view.disposeComposition(); recomposer.close(); runner.cancel()
+            controller.pause().stop().destroy()
+            ThemeStore.saveAccent(context, oldAccent)
+            ThemeStore.save(context, oldTheme)
+        }
+    }
+
     @Test fun matchedRangesUseLiveAccentAndContrastingTextAcrossThemes() = runTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val context = controller.get()
