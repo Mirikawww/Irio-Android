@@ -118,7 +118,9 @@ private fun MemorySettingsScreen(onBack: () -> Unit) {
                     },
                 )
             }
-            MemoryField(memory)
+            SettingsGroup(tr("记忆内容")) {
+                MemoryField(memory)
+            }
         }
     }
 }

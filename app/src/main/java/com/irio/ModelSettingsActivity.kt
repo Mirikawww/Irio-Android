@@ -156,7 +156,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     )
                 },
             )
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("工具调用")) {
                 SettingsSlider(
                     modifier = Modifier.settingsSearchAnchor("model.rounds", edge = SettingsSearchEdge.Top),
                     label = tr("单轮工具调用"),
@@ -193,7 +193,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("代理设置")) {
                 SettingsSwitchRow(
                     modifier = Modifier.settingsSearchAnchor("model.subagents", edge = SettingsSearchEdge.Top),
                     label = tr("子智能体"),
@@ -216,7 +216,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("生成模型")) {
                 GenerationModelPicker(
                     selected = imageGenModel,
                     onSelect = { model ->
@@ -241,7 +241,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.settingsSearchAnchor("model.title", edge = SettingsSearchEdge.Bottom),
                 )
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("消息内容")) {
                 SettingsSwitchRow(
                     modifier = Modifier.settingsSearchAnchor("model.timestamps", edge = SettingsSearchEdge.All),
                     label = tr("消息时间戳"),
@@ -252,7 +252,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     },
                 )
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("上下文管理")) {
                 Row(
                     modifier = Modifier.settingsSearchAnchor("model.compression", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -316,7 +316,7 @@ internal fun ModelSettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("模型能力")) {
                 Row(
                     modifier = Modifier.settingsSearchAnchor("model.reasoning", edge = SettingsSearchEdge.All).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -666,8 +666,13 @@ private fun SettingsSwitchRow(
 
 @Composable
 internal fun SettingsSectionCard(
+    title: String? = null,
     content: @Composable () -> Unit,
 ) {
+    if (title != null) {
+        SettingsGroup(title) { SettingsSectionCard(content = content) }
+        return
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()

@@ -62,7 +62,7 @@ internal fun IrioDocsMcpManagement(
     Text(tr("连接 Irio Docs MCP，在对话中搜索官方文档、读取说明和查询版本更新。仅访问公开资料，无需登录。"),
         modifier = Modifier.padding(horizontal = 24.dp), color = content, fontSize = 16.sp, lineHeight = 24.sp)
     Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-        Text(tr("信息"), color = content, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        SettingsGroupTitle(tr("信息"))
         GitHubInfoRow(tr("开发者"), "Pirikawww")
         GitHubInfoDivider()
         GitHubInfoRow(tr("官网"), "irio.mirikawww.workers.dev", onClick = onWebsite)

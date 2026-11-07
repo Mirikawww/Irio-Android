@@ -19,9 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.composables.ui.components.Button
 import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.Text
-import com.composables.ui.theme.colors
-import com.composables.ui.theme.onBackgroundColor
-import com.composeunstyled.theme.Theme
+
 import com.composeunstyled.LocalContentColor
 
 internal class ProviderHeaderFields(header: ProviderHeader) {
@@ -77,7 +75,7 @@ internal fun ProviderHeadersEditor(state: ProviderHeadersState, enabled: Boolean
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(tr("自定义请求头"), color = Theme[colors][onBackgroundColor])
+        SettingsGroupTitle(tr("自定义请求头"))
         state.rows.forEach { row ->
             key(row) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -420,7 +420,7 @@ internal fun McpSettingsScreen(
                     modifier = Modifier.padding(horizontal = 24.dp), color = content, fontSize = 16.sp, lineHeight = 24.sp,
                 )
                 Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-                    Text(tr("信息"), color = content, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    SettingsGroupTitle(tr("信息"))
                     GitHubInfoRow(tr("开发者"), "Doist Inc.")
                     GitHubInfoDivider()
                     GitHubInfoRow(tr("官网"), "todoist.com", onClick = {
@@ -464,8 +464,7 @@ internal fun McpSettingsScreen(
             Text(tr("连接 GitHub 官方 MCP，在对话中查阅仓库和代码、管理 Issue 与 Pull Request、查看 Actions 与发布信息。可用工具和操作范围取决于你的账户权限。"),
                 modifier = Modifier.padding(horizontal = 24.dp), color = content, fontSize = 16.sp, lineHeight = 24.sp)
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-                Text(tr("信息"), color = content,
-                    fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                SettingsGroupTitle(tr("信息"))
                 GitHubInfoRow(tr("开发者"), "GitHub, Inc.")
                 GitHubInfoDivider()
                 GitHubInfoRow(tr("官网"), "github.com", onClick = {
@@ -577,7 +576,7 @@ internal fun McpSettingsScreen(
             if (login == GitHubLogin.PAT) {
                 DismissComposerFocusWhenImeHides()
                 Column(Modifier.fillMaxWidth()) {
-                    Text(tr("必要权限"), color = content, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    SettingsGroupTitle(tr("必要权限"))
                     GitHubInfoRow("Contents", tr("读写"))
                     GitHubInfoDivider()
                     GitHubInfoRow("Issues", tr("读写"))

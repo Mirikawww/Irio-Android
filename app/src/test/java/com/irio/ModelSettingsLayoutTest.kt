@@ -61,6 +61,23 @@ class ModelSettingsLayoutTest {
             fun title(text: String) = nodes.single {
                 it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == tr(text) }
             }
+            for ((heading, firstRow) in listOf(
+                "工具调用" to "单轮工具调用",
+                "代理设置" to "子智能体",
+                "生成模型" to "图片生成模型",
+                "消息内容" to "消息时间戳",
+                "上下文管理" to "上下文压缩",
+                "模型能力" to "使用 OpenRouter 思考数据",
+            )) {
+                val groupTitle = title(heading)
+                assertTrue("Group titles must be accessible headings", groupTitle.config.contains(SemanticsProperties.Heading))
+                assertEquals("Group title must align with its card's text", title(firstRow).boundsInRoot.left,
+                    groupTitle.boundsInRoot.left, 0.5f)
+                assertTrue("Group title must sit above its card", groupTitle.boundsInRoot.bottom < title(firstRow).boundsInRoot.top)
+                val headingLayouts = mutableListOf<TextLayoutResult>()
+                groupTitle.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(headingLayouts)
+                assertEquals(13f, headingLayouts.single().layoutInput.style.fontSize.value, 0f)
+            }
             assertEquals("Tools must align with adjacent settings titles", title("单轮工具调用").boundsInRoot.left, title("工具").boundsInRoot.left, 0.5f)
             val toolsTitle = title("工具")
             val toolsButton = nodes.single { node ->

@@ -103,7 +103,7 @@ internal fun SearchSettingsScreen(onBack: () -> Unit) {
                 .verticalScroll(rememberScrollState()).padding(top = topInset).padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("网页搜索")) {
                 DropdownMenu(
                     expanded = providerMenuOpen,
                     onExpandedChange = { providerMenuOpen = it },
@@ -170,7 +170,7 @@ internal fun SearchSettingsScreen(onBack: () -> Unit) {
                     },
                 )
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("图片搜索")) {
                 Column(Modifier.settingsSearchAnchor("search.image", edge = SettingsSearchEdge.Top).fillMaxWidth().settingsDropdownInset()) {
                     Text(tr("图片搜索提供商"), color = Theme[colors][onPanelColor])
                     Text("SerpAPI", color = Theme[colors][mutedColor], fontSize = 13.sp)

@@ -154,6 +154,7 @@ internal fun SpeechSettingsScreen(onBack: () -> Unit) {
                 .padding(top = topInset)
                 .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
+            SettingsGroup(tr("朗读设置")) {
             Box(Modifier.settingsSearchAnchor("speech.voice")) {
             VoiceMenu(
                 expanded = menuOpen && canPick,
@@ -170,7 +171,8 @@ internal fun SpeechSettingsScreen(onBack: () -> Unit) {
             )
             }
             Spacer(Modifier.height(12.dp))
-            SttSettingsSectionCard {
+            }
+            SttSettingsSectionCard(title = tr("朗读参数")) {
                 SettingsSlider(
                     modifier = Modifier.settingsSearchAnchor("speech.rate", edge = SettingsSearchEdge.All),
                     label = tr("朗读速度"),
@@ -184,7 +186,7 @@ internal fun SpeechSettingsScreen(onBack: () -> Unit) {
                 )
             }
             Spacer(Modifier.height(16.dp))
-            SttSettingsSectionCard {
+            SttSettingsSectionCard(title = tr("语音识别")) {
                 Box(Modifier.settingsSearchAnchor("speech.provider", edge = SettingsSearchEdge.Top)) {
                 SttProviderMenu(
                     provider = providerKind,
@@ -241,15 +243,10 @@ internal fun SpeechSettingsScreen(onBack: () -> Unit) {
 
 @Composable
 private fun SttSettingsSectionCard(
+    title: String,
     content: @Composable () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-            .padding(horizontal = 16.dp, vertical = SettingsCardInset),
-        verticalArrangement = Arrangement.spacedBy(0.dp),
-    ) { content() }
+    SettingsSectionCard(title = title, content = content)
 }
 
 @Composable

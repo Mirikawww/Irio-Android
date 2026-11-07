@@ -216,6 +216,7 @@ class ConditionalSettingsUiTest {
                 .forEach { assertHidden(it) }
             assertVisible("启用 Linux 沙盒")
             assertVisible("删除 Linux 沙盒")
+            assertHidden("运行环境")
             val child = searchSettings("单次命令数", label = { it }).single { it.id == "linux.commands" }
             context.openSettingsSearch(child)
             assertEquals("linux.enabled", shadowOf(context).nextStartedActivity.getStringExtra(SETTINGS_SEARCH_TARGET))
@@ -231,12 +232,16 @@ class ConditionalSettingsUiTest {
         }, content = { LinuxSandboxSettingsScreen(onBack = {}) }) { context ->
             listOf("单次命令数", "后台命令", "附带上传文件路径", "授予权限")
                 .forEach { assertVisible(it) }
+            assertVisible("命令")
+            assertHidden("命令执行")
+            assertHidden("后台运行")
             val expandedDeleteTop = top("删除 Linux 沙盒")
             toggle("启用 Linux 沙盒")
             frames(1)
             listOf("单次命令数", "后台命令", "附带上传文件路径", "授予权限", "用安装包里的版本重新准备")
                 .forEach { assertHidden(it) }
             assertVisible("删除 Linux 沙盒")
+            assertHidden("命令")
             val collapsedDeleteTop = top("删除 Linux 沙盒")
             assertTrue(collapsedDeleteTop < expandedDeleteTop)
             frames(45)
@@ -265,6 +270,55 @@ class ConditionalSettingsUiTest {
             enabled.value = false
             frames(1)
             assertHidden(hint)
+        }
+    }
+
+    @Test fun providerHeadersUseTheSharedSectionHeading() = runTest {
+        withScreen(prepare = { context ->
+            ThemeStore.saveLanguage(context, AppLanguage.ZH_CN)
+        }, content = { ProviderHeadersEditor(rememberProviderHeadersState()) }) { _ ->
+            val heading = nodes().single { node ->
+                node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == "自定义请求头" }
+            }
+            assertTrue("Custom headers must use an accessible section heading",
+                heading.config.contains(SemanticsProperties.Heading))
+            val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            heading.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
+            assertEquals(13f, layouts.single().layoutInput.style.fontSize.value, 0f)
+            assertEquals(18f, layouts.single().layoutInput.style.lineHeight.value, 0f)
+            assertVisible("添加请求头")
+        }
+    }
+
+    @Test fun importAndExportShareTheDataGroup() = runTest {
+        withScreen(prepare = { context ->
+            ThemeStore.saveLanguage(context, AppLanguage.ZH_CN)
+        }, content = { OtherSettingsScreen(onBack = {}) }) { _ ->
+            assertVisible("数据")
+            assertVisible("导出数据")
+            assertVisible("导入数据")
+            assertHidden("数据备份")
+            assertHidden("数据恢复")
+            val title = nodes().single { node ->
+                node.config.contains(SemanticsProperties.Heading) &&
+                    node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == "数据" }
+            }
+            assertTrue(title.boundsInRoot.bottom < top("导出数据"))
+            assertTrue(top("导出数据") < top("导入数据"))
+            fun action(label: String): SemanticsNode {
+                var node = nodes().single { candidate ->
+                    candidate.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == label }
+                }
+                while (!node.config.contains(SemanticsActions.OnClick)) node = requireNotNull(node.parent)
+                return node
+            }
+            val exportRow = action("导出数据").boundsInRoot
+            val importRow = action("导入数据").boundsInRoot
+            assertEquals("Export must keep the normal settings row height", 52f, exportRow.height, 0.5f)
+            assertEquals("Import must keep the normal settings row height", 52f, importRow.height, 0.5f)
+            assertEquals("Action rows must fill the card rather than shrink inside its padding", 16f, exportRow.left, 0.5f)
+            assertEquals(exportRow.bottom, importRow.top, 0.5f)
+            assertVisible("历史记录")
         }
     }
 

@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
@@ -48,6 +50,9 @@ import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.panelColor
 import com.composables.ui.theme.onPanelColor
+import com.composables.ui.theme.largeShape
+import com.composables.ui.theme.secondaryColor
+import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 import com.composeunstyled.LocalContentColor
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +66,7 @@ class OtherSettingsActivity : ComponentActivity() {
 }
 
 @Composable
-private fun OtherSettingsScreen(onBack: () -> Unit) {
+internal fun OtherSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var showClearHistoryDialog by remember { mutableStateOf(false) }
@@ -133,31 +138,45 @@ private fun OtherSettingsScreen(onBack: () -> Unit) {
                     .padding(top = topInset)
                     .padding(16.dp),
             ) {
+                SettingsGroup(tr("历史记录")) {
                 ListRowButton(
                     searchId = "other.history",
                     label = tr("删除所有历史"),
                     icon = IrioIcons.Trash,
                     onClick = { showClearHistoryDialog = true },
                 )
+                }
                 Spacer(Modifier.height(12.dp))
-                ListRowButton(
-                    searchId = "other.export",
-                    label = tr("导出数据"),
-                    icon = IrioIcons.Upload,
-                    experimental = true,
-                    onClick = { exportLauncher.launch("irio-${System.currentTimeMillis()}.irio") },
-                )
-                Spacer(Modifier.height(12.dp))
-                ListRowButton(
-                    searchId = "other.import",
-                    label = tr("导入数据"),
-                    icon = IrioIcons.Download,
-                    experimental = true,
-                    onClick = {
-                        operationError = null
-                        importLauncher.launch(arrayOf("application/octet-stream", "application/zip", "*/*"))
-                    },
-                )
+                SettingsGroup(tr("数据")) {
+                    Column(
+                        Modifier.fillMaxWidth()
+                            .background(Theme[colors][secondaryColor], Theme[shapes][largeShape]),
+                    ) {
+                        ListRowButton(
+                            searchId = "other.export",
+                            label = tr("导出数据"),
+                            icon = IrioIcons.Upload,
+                            experimental = true,
+                            modifier = Modifier.settingsRow(),
+                            style = ButtonStyle.Ghost,
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            onClick = { exportLauncher.launch("irio-${System.currentTimeMillis()}.irio") },
+                        )
+                        ListRowButton(
+                            searchId = "other.import",
+                            label = tr("导入数据"),
+                            icon = IrioIcons.Download,
+                            experimental = true,
+                            modifier = Modifier.settingsRow(),
+                            style = ButtonStyle.Ghost,
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            onClick = {
+                                operationError = null
+                                importLauncher.launch(arrayOf("application/octet-stream", "application/zip", "*/*"))
+                            },
+                        )
+                    }
+                }
             }
             IrioSnackbar(
                 visible = operationError != null,

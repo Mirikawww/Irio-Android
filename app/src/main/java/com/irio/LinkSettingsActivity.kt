@@ -162,7 +162,7 @@ internal fun LinkSettingsScreen(onBack: () -> Unit) {
             }
             LinkConnectionHint(state.settings.enabled)
             if (state.settings.enabled) {
-                LinkCard(topPadding = 11.dp) {
+                LinkCard(title = tr("设备配对"), topPadding = 11.dp) {
                     Text(
                         tr("本机配对码"),
                         modifier = Modifier.fillMaxWidth(),
@@ -231,7 +231,7 @@ internal fun LinkSettingsScreen(onBack: () -> Unit) {
                         contentColor = Theme[colors][onPanelColor],
                     ) { Text(tr("刷新端口"), color = LocalContentColor.current) }
                 }
-                LinkCard(verticalPadding = SettingsCardInset, spacing = 0.dp) {
+                LinkCard(title = tr("数据同步"), verticalPadding = SettingsCardInset, spacing = 0.dp) {
                 DropdownMenu(
                     expanded = modeMenuOpen,
                     onExpandedChange = { modeMenuOpen = it },
@@ -310,16 +310,19 @@ internal fun LinkSettingsScreen(onBack: () -> Unit) {
                 }
                 }
 
-                Text(tr("已配对设备"), color = muted, fontSize = 12.sp)
-                if (state.settings.peers.isEmpty()) {
-                    Text(tr("还没有设备"), color = muted)
-                } else {
-                    state.settings.peers.forEach { peer ->
-                        PeerRow(
-                            peer = peer,
-                            connection = state.connections[peer.id] ?: LinkConnectionState.DISCONNECTED,
-                            onForget = { LinkRuntime.forget(peer.id) },
-                        )
+                SettingsGroup(tr("已配对设备")) {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        if (state.settings.peers.isEmpty()) {
+                            Text(tr("还没有设备"), color = muted)
+                        } else {
+                            state.settings.peers.forEach { peer ->
+                                PeerRow(
+                                    peer = peer,
+                                    connection = state.connections[peer.id] ?: LinkConnectionState.DISCONNECTED,
+                                    onForget = { LinkRuntime.forget(peer.id) },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -378,19 +381,22 @@ internal class LinkSettingsNotice {
 
 @Composable
 private fun LinkCard(
+    title: String? = null,
     verticalPadding: Dp = 14.dp,
     spacing: Dp = 8.dp,
     topPadding: Dp = verticalPadding,
     content: @Composable () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-                    .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
-            .padding(start = 16.dp, end = 16.dp, top = topPadding, bottom = verticalPadding),
-        verticalArrangement = Arrangement.spacedBy(spacing),
-        content = { content() },
-    )
+    SettingsGroup(title) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Theme[colors][secondaryColor], Theme[shapes][largeShape])
+                .padding(start = 16.dp, end = 16.dp, top = topPadding, bottom = verticalPadding),
+            verticalArrangement = Arrangement.spacedBy(spacing),
+            content = { content() },
+        )
+    }
 }
 
 @Composable

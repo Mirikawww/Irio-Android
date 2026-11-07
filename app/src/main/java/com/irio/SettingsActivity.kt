@@ -95,7 +95,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                     onBounds = { searchAnchor = it },
                 )
                 Spacer(Modifier.height(20.dp))
-                SettingsHomeGroup {
+                SettingsHomeGroup(title = tr("对话与模型")) {
                     SettingsHomeRow(tr("提供商"), IrioIcons.Braces) {
                         context.startActivity(Intent(context, ProviderSettingsActivity::class.java))
                     }
@@ -110,7 +110,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(20.dp))
-                SettingsHomeGroup {
+                SettingsHomeGroup(title = tr("扩展能力")) {
                     SettingsHomeRow(tr("搜索"), IrioIcons.Search) {
                         context.startActivity(Intent(context, SearchSettingsActivity::class.java))
                     }
@@ -125,7 +125,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(20.dp))
-                SettingsHomeGroup {
+                SettingsHomeGroup(title = tr("应用偏好")) {
                     SettingsHomeRow(tr("外观与偏好"), IrioIcons.Palette) {
                         context.startActivity(Intent(context, AppearanceSettingsActivity::class.java))
                     }
@@ -140,7 +140,7 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(20.dp))
-                SettingsHomeGroup {
+                SettingsHomeGroup(title = tr("应用信息")) {
                     SettingsHomeRow(tr("关于"), IrioIcons.Info) {
                         context.startActivity(Intent(context, AboutActivity::class.java))
                     }
@@ -169,12 +169,14 @@ internal fun SettingsScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun SettingsHomeGroup(content: @Composable () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Theme[colors][secondaryColor], Theme[shapes][largeShape]),
-    ) { content() }
+private fun SettingsHomeGroup(title: String, content: @Composable () -> Unit) {
+    SettingsGroup(title) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Theme[colors][secondaryColor], Theme[shapes][largeShape]),
+        ) { content() }
+    }
 }
 
 @Composable

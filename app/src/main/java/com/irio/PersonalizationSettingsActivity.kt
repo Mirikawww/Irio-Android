@@ -28,7 +28,6 @@ import com.composables.ui.components.TextField
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.fieldShape
 import com.composables.ui.theme.mutedColor
-import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 
@@ -71,23 +70,24 @@ internal fun PersonalizationSettingsScreen(onBack: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(tr("系统提示词"), color = Theme[colors][onBackgroundColor])
-            TextField(
-                state = prompt,
-                modifier = Modifier.fillMaxWidth()
-                    .settingsSearchAnchor("personalization.prompt", horizontalOutset = 0.dp,
-                        edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
-                    .then(rememberInputFieldBorder()),
-                accessibilityLabel = tr("系统提示词"),
-                placeholder = { Text(tr("以系统身份注入每次对话的指令"), color = Theme[colors][mutedColor]) },
-                textStyle = FieldTextStyle,
-                lineHeight = 20.sp,
-                fontSize = 16.sp,
-                shape = Theme[shapes][fieldShape],
-                contentPadding = PaddingValues(12.dp),
-                lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 5, maxHeightInLines = 12),
-                inputTransformation = InputTransformation.maxLength(SystemPromptStore.MAX_CHARS),
-            )
+            SettingsGroup(tr("系统提示词")) {
+                TextField(
+                    state = prompt,
+                    modifier = Modifier.fillMaxWidth()
+                        .settingsSearchAnchor("personalization.prompt", horizontalOutset = 0.dp,
+                            edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
+                        .then(rememberInputFieldBorder()),
+                    accessibilityLabel = tr("系统提示词"),
+                    placeholder = { Text(tr("以系统身份注入每次对话的指令"), color = Theme[colors][mutedColor]) },
+                    textStyle = FieldTextStyle,
+                    lineHeight = 20.sp,
+                    fontSize = 16.sp,
+                    shape = Theme[shapes][fieldShape],
+                    contentPadding = PaddingValues(12.dp),
+                    lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 5, maxHeightInLines = 12),
+                    inputTransformation = InputTransformation.maxLength(SystemPromptStore.MAX_CHARS),
+                )
+            }
         }
     }
 }

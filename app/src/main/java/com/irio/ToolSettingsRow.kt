@@ -172,7 +172,7 @@ internal fun ToolSettingsRow(
                 Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(tr("工具描述"), color = content, fontSize = 14.sp, lineHeight = 20.sp)
+                SettingsGroupTitle(tr("工具描述"))
                 TextField(
                     state = description,
                     scrollState = descriptionScrollState,

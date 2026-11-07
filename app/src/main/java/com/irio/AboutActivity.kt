@@ -115,9 +115,12 @@ internal fun AboutScreen(onBack: () -> Unit, onAcknowledgements: () -> Unit) {
                     Spacer(Modifier.height(16.dp))
                     SettingsUpdateSection(onNotice = ::showNotice)
                 }
+                SettingsGroup(tr("开源信息")) {
                 ListRowButton(label = tr("鸣谢"), icon = IrioIcons.Sparkles,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     searchId = "about.acknowledgements", onClick = onAcknowledgements)
+                }
+                SettingsGroup(tr("相关链接")) {
                 Column(
                     Modifier.testTag("about-resources").fillMaxWidth()
                         .clip(Theme[shapes][largeShape]).background(Theme[colors][secondaryColor]),
@@ -130,6 +133,7 @@ internal fun AboutScreen(onBack: () -> Unit, onAcknowledgements: () -> Unit) {
                         supportingText = IRIO_DOCS_URL, style = ButtonStyle.Ghost,
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                         searchId = "about.docs", onClick = { openLink(IRIO_DOCS_URL) })
+                }
                 }
             }
             IrioSnackbar(visible = noticeVisible, message = notice, bottomInset = bottomInset,

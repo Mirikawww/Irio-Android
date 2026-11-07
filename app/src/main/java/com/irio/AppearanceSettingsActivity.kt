@@ -112,7 +112,7 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("字体与语言")) {
                 AppearanceChoiceSetting(
                     title = tr("字体"),
                     options = AppFont.entries,
@@ -190,7 +190,7 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     }
                 }
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("主题与样式")) {
                 DropdownMenu(
                     expanded = themeMenuOpen,
                     onExpandedChange = { themeMenuOpen = it },
@@ -447,10 +447,10 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("图片处理")) {
                 ImageUploadSettings()
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("输入与发送")) {
                 Row(
                     modifier = Modifier
                         .settingsSearchAnchor("appearance.paste", edge = SettingsSearchEdge.Top)
@@ -497,7 +497,7 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("错误恢复")) {
                 Row(
                     modifier = Modifier.settingsSearchAnchor("appearance.retry", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -523,7 +523,7 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("界面交互")) {
                 Row(
                     modifier = Modifier.settingsSearchAnchor("appearance.glyph", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -637,7 +637,7 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("内容显示")) {
                 Row(
                     modifier = Modifier.settingsSearchAnchor("appearance.wrap", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -722,7 +722,7 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     valueLabel = { "$it%" },
                 )
             }
-            SettingsSectionCard {
+            SettingsSectionCard(title = tr("模型列表")) {
                 Row(
                     modifier = Modifier.settingsSearchAnchor("appearance.mergeModels", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,

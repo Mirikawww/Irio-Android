@@ -16,6 +16,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -76,6 +78,16 @@ class PersonalizationSettingsTest {
             frames()
             assertEquals("The existing prompt must be directly editable on opening the page",
                 "Existing global system prompt", field().config[SemanticsProperties.EditableText].text)
+            val promptHeading = nodes().single { node ->
+                node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == tr("系统提示词") }
+            }
+            assertTrue("The prompt section must use the shared accessible heading", promptHeading.config.contains(SemanticsProperties.Heading))
+            val headingLayouts = mutableListOf<TextLayoutResult>()
+            promptHeading.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(headingLayouts)
+            assertEquals(13f, headingLayouts.single().layoutInput.style.fontSize.value, 0f)
+            assertEquals(18f, headingLayouts.single().layoutInput.style.lineHeight.value, 0f)
+            assertEquals(FontWeight.Medium, headingLayouts.single().layoutInput.style.fontWeight)
+            assertEquals(field().boundsInRoot.left + 16f, promptHeading.boundsInRoot.left, 0.5f)
             assertTrue("The new page heading must be visible", nodes().any { node ->
                 node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == tr("个性化") }
             })
