@@ -38,6 +38,9 @@ internal fun Context.openSettingsSearch(hit: SettingsSearchHit) {
             anchor.startsWith("appearance.paste.") && !ThemeStore.longTextPaste -> "appearance.paste"
             anchor.startsWith("appearance.glass.") && !ThemeStore.glassEnabled -> "appearance.glass"
             anchor == "model.subagentModel" && !ToolStore.loadSubagents(this) -> "model.subagents"
+            anchor == "linux.delete" && LinuxSandboxLayout.of(filesDir).let {
+                !it.rootfs.isDirectory || it.installedVersion() == null
+            } -> "linux.enabled"
             anchor.startsWith("linux.") && anchor != "linux.enabled" && anchor != "linux.delete" &&
                 !LinuxSandboxStore.loadEnabled(LinuxSandboxLayout.of(filesDir).stateFile) -> "linux.enabled"
             anchor in setOf("model.compressionModel", "model.trigger", "model.target", "model.visualize") &&

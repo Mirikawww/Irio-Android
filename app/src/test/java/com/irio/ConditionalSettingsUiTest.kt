@@ -194,6 +194,20 @@ class ConditionalSettingsUiTest {
         }
     }
 
+    @Test fun uninitializedSandboxHidesDeletion() = runTest {
+        withScreen(prepare = { context ->
+            prepareSandbox(context, enabled = false)
+            val layout = LinuxSandboxLayout.of(context.filesDir)
+            assertTrue(layout.versionFile.delete())
+        }, content = { LinuxSandboxSettingsScreen(onBack = {}) }) { context ->
+            assertVisible("启用 Linux 沙盒")
+            assertHidden("删除 Linux 沙盒")
+            val delete = searchSettings("删除 Linux 沙盒", label = { it }).single { it.id == "linux.delete" }
+            context.openSettingsSearch(delete)
+            assertEquals("linux.enabled", shadowOf(context).nextStartedActivity.getStringExtra(SETTINGS_SEARCH_TARGET))
+        }
+    }
+
     @Test fun disabledSandboxHidesOptionsButKeepsDeletionAvailable() = runTest {
         withScreen(prepare = { context ->
             prepareSandbox(context, enabled = false)

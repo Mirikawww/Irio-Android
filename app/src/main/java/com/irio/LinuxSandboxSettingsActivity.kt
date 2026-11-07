@@ -298,12 +298,14 @@ internal fun LinuxSandboxSettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
-            Button(
-                onClick = { confirmDelete = true },
-                enabled = LinuxSandboxPolicy.canDelete(installed, preparing = showPrepare, deleting = deleting),
-                modifier = Modifier.settingsSearchAnchor("linux.delete", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp).fillMaxWidth(),
-                style = ButtonStyle.Destructive,
-            ) { Text(tr("删除 Linux 沙盒"), color = LocalContentColor.current) }
+            if (installed) {
+                Button(
+                    onClick = { confirmDelete = true },
+                    enabled = LinuxSandboxPolicy.canDelete(installed, preparing = showPrepare, deleting = deleting),
+                    modifier = Modifier.settingsSearchAnchor("linux.delete", horizontalOutset = 0.dp, edge = SettingsSearchEdge.All, verticalOutset = 0.dp).fillMaxWidth(),
+                    style = ButtonStyle.Destructive,
+                ) { Text(tr("删除 Linux 沙盒"), color = LocalContentColor.current) }
+            }
         }
         IrioSnackbar(
             visible = operationError != null,
