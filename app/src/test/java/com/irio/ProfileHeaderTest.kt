@@ -53,11 +53,27 @@ class ProfileHeaderTest {
         assertEquals("Mira Lin", ProfileStore.name)
         ProfileStore.saveName(context, "   ")
         assertEquals(PROFILE_DEFAULT_NAME, ProfileStore.name)
+        assertEquals("", ProfileStore.loadNameInput(context))
         assertEquals(
-            PROFILE_DEFAULT_NAME,
+            "",
             context.getSharedPreferences("profile_settings", android.content.Context.MODE_PRIVATE)
                 .getString("display_name", null),
         )
+    }
+
+    @Test fun editableNameKeepsUnsetAndLegacyFallbackEmptyButPreservesExplicitNames() {
+        val context = RuntimeEnvironment.getApplication()
+        ProfileStore.resetForTest(context)
+        assertEquals("", ProfileStore.loadNameInput(context))
+        context.getSharedPreferences("profile_settings", 0).edit().putString("display_name", PROFILE_DEFAULT_NAME).apply()
+        assertEquals("Legacy automatic fallback must not fill the editor", "", ProfileStore.loadNameInput(context))
+        ProfileStore.saveName(context, PROFILE_DEFAULT_NAME)
+        assertEquals("An explicitly typed name matching the fallback is still a real name", PROFILE_DEFAULT_NAME,
+            ProfileStore.loadNameInput(context))
+        ProfileStore.saveName(context, "")
+        ProfileStore.forgetForTest(); ProfileStore.ensureLoaded(context)
+        assertEquals("", ProfileStore.loadNameInput(context))
+        assertEquals("Other display surfaces retain their fallback", PROFILE_DEFAULT_NAME, ProfileStore.name)
     }
 
     @Test fun avatarFileRoundTripsAndCropKeepsTheChosenCorner() = runTest {

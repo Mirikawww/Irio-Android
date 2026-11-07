@@ -1,16 +1,12 @@
 package com.irio
 
 import android.content.Intent
-import android.graphics.Bitmap
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -32,13 +28,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.composables.ui.components.ButtonStyle
@@ -64,9 +56,6 @@ class SettingsActivity : ComponentActivity() {
 @Composable
 internal fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var editingName by remember { mutableStateOf(false) }
-    var cropSource by remember { mutableStateOf<Bitmap?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     var searchAnchor by remember { mutableStateOf(Rect.Zero) }
@@ -78,14 +67,6 @@ internal fun SettingsScreen(onBack: () -> Unit) {
         animationSpec = tween(280),
         label = "settingsSearchFade",
     )
-    val pickAvatar = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val decoded = withContext(Dispatchers.IO) { decodeProfilePhoto(context, uri) }
-            if (decoded != null) cropSource = decoded
-        }
-    }
-
     BackHandler(enabled = searchExpanded) {
         focusManager.clearFocus()
         searchQuery = ""
@@ -105,23 +86,13 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                 .padding(top = topInset)
                 .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
-                SettingsProfileHeader(
-                    onPickAvatar = {
-                        pickAvatar.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                        )
-                    },
-                    onEditName = { editingName = true },
-                    searchField = {
-                        SettingsSearchSlot(
-                            showField = !searchExpanded && searchProgress <= 0f,
-                            query = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            onExpanded = { searchExpanded = true },
-                            focusRequester = searchFocus,
-                            onBounds = { searchAnchor = it },
-                        )
-                    },
+                SettingsSearchSlot(
+                    showField = !searchExpanded && searchProgress <= 0f,
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    onExpanded = { searchExpanded = true },
+                    focusRequester = searchFocus,
+                    onBounds = { searchAnchor = it },
                 )
                 Spacer(Modifier.height(20.dp))
                 SettingsHomeGroup {
@@ -158,6 +129,9 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                     SettingsHomeRow(tr("外观与偏好"), IrioIcons.Palette) {
                         context.startActivity(Intent(context, AppearanceSettingsActivity::class.java))
                     }
+                    SettingsHomeRow(tr("我"), IrioIcons.UserRound) {
+                        context.startActivity(Intent(context, MeSettingsActivity::class.java))
+                    }
                     SettingsHomeRow(tr("互连"), IrioIcons.MonitorSmartphone) {
                         context.startActivity(Intent(context, LinkSettingsActivity::class.java))
                     }
@@ -191,10 +165,6 @@ internal fun SettingsScreen(onBack: () -> Unit) {
         },
         focusRequester = searchFocus,
     )
-    ProfileNameDialog(visible = editingName, onDismiss = { editingName = false })
-    cropSource?.let { source ->
-        AvatarCropScreen(source = source, onDismiss = { cropSource = null })
-    }
     }
 }
 

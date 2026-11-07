@@ -53,6 +53,13 @@
             android:screenOrientation="portrait"
             android:theme="@style/AppTheme" />
         <activity
+            android:name=".MeSettingsActivity"
+            android:exported="false"
+            android:label="我"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name=".AboutActivity"
             android:exported="false"
             android:label="@string/about_title"

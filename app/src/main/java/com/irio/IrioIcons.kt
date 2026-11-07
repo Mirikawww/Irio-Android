@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
  * License (including Feather attribution): assets/licenses/lucide.txt.
  */
 internal object IrioIcons {
+    val UserRound by lazy { icon("user-round", circle(12f, 8f, 5f), "M20 21a8 8 0 0 0-16 0") }
     val ArrowLeft by lazy { icon("arrow-left", "m12 19-7-7 7-7", "M19 12H5", autoMirror = true) }
     val ChevronLeft by lazy { icon("chevron-left", "m15 18-6-6 6-6", autoMirror = true) }
     val ChevronRight by lazy { icon("chevron-right", "m9 18 6-6-6-6", autoMirror = true) }

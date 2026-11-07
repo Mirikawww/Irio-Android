@@ -6,6 +6,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsSearchTest {
+    @Test fun profileControlsBelongToMeSettings() {
+        val me = searchSettings("我", label = { it }).single { it.id == "page.me" }
+        assertEquals("com.irio.MeSettingsActivity", me.destination.name)
+        assertEquals("Me", translate(AppLanguage.EN, me.title))
+        for ((query, id) in listOf("头像" to "me.avatar", "用户名称" to "me.name")) {
+            val hit = searchSettings(query, label = { it }).single { it.id == id }
+            assertEquals("我", hit.page)
+            assertEquals(me.destination, hit.destination)
+            assertEquals(id, hit.anchor)
+        }
+    }
+
     @Test fun systemPromptSearchOpensPersonalizationDirectly() {
         val prompt = searchSettings("系统提示词", label = { it }).single()
         assertEquals("个性化", prompt.page)

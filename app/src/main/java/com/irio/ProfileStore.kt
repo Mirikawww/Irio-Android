@@ -213,6 +213,7 @@ internal fun decodeProfilePhoto(context: Context, uri: Uri, maxSide: Int = 2048)
 object ProfileStore {
     private const val PREFS = "profile_settings"
     private const val NAME = "display_name"
+    private const val NAME_EXPLICIT = "display_name_explicit"
 
     var name by mutableStateOf(PROFILE_DEFAULT_NAME)
         private set
@@ -236,10 +237,18 @@ object ProfileStore {
         }
     }
 
+    fun loadNameInput(context: Context): String {
+        val prefs = preferences(context.applicationContext)
+        val stored = prefs.getString(NAME, null).orEmpty()
+        // Old versions persisted the fallback even when the user had never entered a name.
+        if (stored == PROFILE_DEFAULT_NAME && !prefs.getBoolean(NAME_EXPLICIT, false)) return ""
+        return stored.trim().replace(Regex("\\s+"), " ").take(PROFILE_NAME_LIMIT)
+    }
+
     fun saveName(context: Context, value: String) {
-        val next = normalizeProfileName(value)
-        name = next
-        preferences(context.applicationContext).edit().putString(NAME, next).apply()
+        val stored = value.trim().replace(Regex("\\s+"), " ").take(PROFILE_NAME_LIMIT)
+        name = normalizeProfileName(stored)
+        preferences(context.applicationContext).edit().putString(NAME, stored).putBoolean(NAME_EXPLICIT, true).apply()
     }
 
     suspend fun saveAvatar(context: Context, bitmap: Bitmap) {
