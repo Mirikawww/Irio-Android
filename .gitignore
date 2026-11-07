@@ -40,3 +40,6 @@ Thumbs.db
 # Local work files
 work/
 __pycache__/
+
+# Local tools
+/tools/
