@@ -66,7 +66,6 @@ private fun MemorySettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
-    val muted = Theme[colors][mutedColor]
     var enabled by remember { mutableStateOf(MemoryStore.loadEnabled(context)) }
     val memory = rememberTextFieldState(MemoryStore.loadContent(context))
     val currentText by rememberUpdatedState(memory.text.toString())
@@ -119,11 +118,6 @@ private fun MemorySettingsScreen(onBack: () -> Unit) {
                     },
                 )
             }
-            Text(
-                tr("会作为长期用户信息注入之后的对话，不会自动从聊天里提取。"),
-                color = muted,
-                fontSize = 13.sp,
-            )
             MemoryField(memory)
         }
     }
