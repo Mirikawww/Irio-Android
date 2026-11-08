@@ -55,6 +55,7 @@ internal fun IrioDocsMcpManagement(
     onEnabledChange: (Boolean) -> Unit,
     onInstall: () -> Unit,
     onRemove: () -> Unit,
+    actionsModifier: Modifier = Modifier,
 ) {
     val content = Theme[colors][onPanelColor]
     Text("Irio Docs", Modifier.fillMaxWidth(), color = content, fontSize = 24.sp,
@@ -81,12 +82,12 @@ internal fun IrioDocsMcpManagement(
                 enabled = !refreshingTools,
                 modifier = Modifier.testTag("irio-docs-mcp-enabled"))
         }
-        McpRefreshToolsButton(refreshingTools, onRefreshTools)
+        McpRefreshToolsButton(refreshingTools, onRefreshTools, actionsModifier)
         Button(onClick = onRemove, enabled = !refreshingTools, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
             modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
             Text(tr("移除集成"), color = LocalContentColor.current)
         }
     } else {
-        GitHubButton(tr("安装"), modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().testTag("irio-docs-mcp-install"), onClick = onInstall)
+        GitHubButton(tr("安装"), modifier = actionsModifier.padding(horizontal = 24.dp).fillMaxWidth().testTag("irio-docs-mcp-install"), onClick = onInstall)
     }
 }

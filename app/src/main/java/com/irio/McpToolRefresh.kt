@@ -54,10 +54,10 @@ internal suspend fun refreshIrioDocsMcpTools(
 }
 
 @Composable
-internal fun McpRefreshToolsButton(refreshing: Boolean, onClick: () -> Unit) {
+internal fun McpRefreshToolsButton(refreshing: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     GitHubButton(
         label = tr(if (refreshing) "刷新工具中" else "刷新工具"),
-        modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().testTag("mcp-refresh-tools"),
+        modifier = modifier.padding(horizontal = 24.dp).fillMaxWidth().testTag("mcp-refresh-tools"),
         enabled = !refreshing,
         secondary = true,
         onClick = onClick,

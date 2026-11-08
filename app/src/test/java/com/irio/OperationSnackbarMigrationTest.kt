@@ -56,6 +56,90 @@ import org.robolectric.shadows.ShadowWindowManagerImpl
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class OperationSnackbarMigrationTest {
+    @Test fun docsManagementNoticeClearsRefreshAndRemovalControls() = runTest {
+        IrioDocsMcpStore.install(org.robolectric.RuntimeEnvironment.getApplication())
+        withUi { McpSettingsScreen(discoverDocsTools = { throw java.io.IOException("fixture") }, onBack = {}) }.use { ui ->
+            ui.flushLayout = true
+            ui.frames(40)
+            val card = ui.all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-docs-mcp" }
+            ui.descend(card).single { it.config.contains(SemanticsActions.OnClick) }
+                .config[SemanticsActions.OnClick].action!!.invoke()
+            ui.frames(40); ui.scrollToBottom(tr("刷新工具")); ui.click(tr("刷新工具"))
+            ui.until { ui.hasText(tr("刷新工具失败，请检查登录和网络后重试")) }
+            ui.frames(40)
+            ui.assertSnackbarAboveAction(tr("刷新工具"))
+        }
+    }
+
+    @Test fun actualMcpLoginNoticeClearsCancelWithoutDoubleCountingWindowInsets() = runTest {
+        okhttp3.mockwebserver.MockWebServer().use { server ->
+            server.enqueue(okhttp3.mockwebserver.MockResponse().setBody(
+                """{"device_code":"fixture-device","user_code":"FIXT-TEST","verification_uri":"https://github.com/login/device","expires_in":1800,"interval":60}"""))
+            withUi { McpSettingsScreen(createGitHubAuth = { GitHubDeviceAuth(server.url("/")) },
+                openWebPage = { _, _ -> false }, onBack = {}) }.use { ui ->
+                ui.flushLayout = true
+                ui.frames(40)
+                var row = ui.text("GitHub")
+                while (ui.descend(row).none { it.config.contains(SemanticsActions.OnClick) }) row = row.parent!!
+                ui.descend(row).single { it.config.contains(SemanticsActions.OnClick) }
+                    .config[SemanticsActions.OnClick].action!!.invoke()
+                ui.frames(40); ui.click(tr("安装") + " OAuth"); ui.frames(40)
+                ui.click(tr("获取授权码")); ui.until { ui.hasText("FIXT-TEST") }
+                ui.click(tr("打开 GitHub 授权")); ui.frames(60)
+                fun verifyGap() {
+                    var cancel = ui.text(tr("取消"))
+                    while (!cancel.config.contains(SemanticsActions.OnClick)) cancel = cancel.parent!!
+                    val surface = ui.all().single {
+                        it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-snackbar-surface"
+                    }
+                    assertEquals("MCP authentication notice must clear Cancel by one gap inside its own sheet",
+                        16f, cancel.boundsInWindow.top - surface.boundsInWindow.bottom, 1f)
+                }
+                verifyGap()
+                val owner = ui.ownerOfText(tr("取消"))
+                androidx.core.view.ViewCompat.dispatchApplyWindowInsets(owner, androidx.core.view.WindowInsetsCompat.Builder()
+                    .setInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars(), androidx.core.graphics.Insets.of(0, 0, 0, 24))
+                    .setInsets(androidx.core.view.WindowInsetsCompat.Type.ime(), androidx.core.graphics.Insets.of(0, 0, 0, 220))
+                    .setVisible(androidx.core.view.WindowInsetsCompat.Type.ime(), true).build())
+                ui.frames(40); verifyGap()
+            }
+        }
+    }
+
+    @Test fun providerNoticesClearTheBottomControlsWithoutAvoidingHazeBleed() = runTest {
+        withUi {
+            ProviderDetailScreen("fixture", {}, {},
+                loadProvider = { _, _ -> ProviderConfig("fixture", "Fixture", "https://example.test", "") },
+                fetchModels = { ModelFetchResult(error = "Placement fixture") })
+        }.use { ui ->
+            ui.flushLayout = true
+            ui.frames(40)
+            fun surface() = ui.all().single {
+                it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-snackbar-surface"
+            }.boundsInRoot
+            fun button(label: String): SemanticsNode {
+                var node = ui.text(tr(label))
+                while (!node.config.contains(SemanticsActions.OnClick)) node = requireNotNull(node.parent)
+                return node
+            }
+            ui.click(tr("保存")); ui.until { ui.hasText("Placement fixture") }; ui.frames(40)
+            assertEquals("Config notice avoids the tabs' normal padding, not the 28dp haze bleed",
+                24f, button("配置").boundsInRoot.top - surface().bottom, 1f)
+            ui.click(tr("模型")); ui.frames(40)
+            ui.click(tr("刷新模型")); ui.until { ui.hasText("Placement fixture") }; ui.frames(40)
+            assertEquals("Model notice sits one snackbar gap above Add model, not above its haze",
+                16f, button("添加模型").boundsInRoot.top - surface().bottom, 1f)
+            androidx.core.view.ViewCompat.dispatchApplyWindowInsets(ui.view,
+                androidx.core.view.WindowInsetsCompat.Builder()
+                    .setInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars(), androidx.core.graphics.Insets.of(0, 0, 0, 24))
+                    .setInsets(androidx.core.view.WindowInsetsCompat.Type.ime(), androidx.core.graphics.Insets.of(0, 0, 0, 300))
+                    .setVisible(androidx.core.view.WindowInsetsCompat.Type.ime(), true).build())
+            ui.frames(20)
+            assertEquals("Keyboard avoidance replaces rather than adds to bottom-control clearance",
+                1200f - 300f - 16f, surface().bottom, 1f)
+        }
+    }
+
     @Test fun docsMcpManagementMatchesPeerSheetsAndPreservesEnablementOnOpen() = runTest {
         val app = org.robolectric.RuntimeEnvironment.getApplication()
         org.robolectric.shadows.ShadowEnvironment.addExternalDir(app.cacheDir.resolve("external").absolutePath)
@@ -300,12 +384,14 @@ class OperationSnackbarMigrationTest {
             }
             withUi { McpSettingsScreen(githubStore = github, todoistStoreOverride = tasks,
                 discoverGitHubTools = discover, discoverTodoistTools = discover, onBack = {}) }.use { ui ->
+                ui.flushLayout = true
                 ui.until { ui.hasText(tr("管理")) }
                 ui.click(tr("管理")); ui.frames(40)
                 assertTrue(ui.hasText(tr("移除集成")))
                 assertTrue("Every installed integration must expose tool refresh", ui.hasText(tr("刷新工具")))
                 assertTrue("Refresh belongs above removal",
                     ui.text(tr("刷新工具")).positionInRoot.y < ui.text(tr("移除集成")).positionInRoot.y)
+                ui.scrollToBottom(tr("刷新工具"))
                 ui.click(tr("刷新工具"))
                 ui.until { (if (todoist) tasks.load()?.tools?.size else github.load()?.tools?.size) == 2 }
                 ui.until { ui.hasText(tr("刷新工具")) }
@@ -317,6 +403,8 @@ class OperationSnackbarMigrationTest {
                 assertEquals("Failure must retain the saved tools", 2,
                     if (todoist) tasks.load()!!.tools.size else github.load()!!.tools.size)
                 assertTrue("The refresh control must recover after failure", ui.hasText(tr("刷新工具")))
+                ui.frames(40)
+                ui.assertSnackbarAboveAction(tr("刷新工具"))
                 ui.click(tr("移除集成"))
                 ui.frames(40)
                 assertNotNull("Opening confirmation must preserve the saved integration",
@@ -815,6 +903,7 @@ class OperationSnackbarMigrationTest {
 
     private class Ui(val scope: TestScope, val view: ComposeView, val clock: BroadcastFrameClock, val dispose: () -> Unit) : AutoCloseable {
         var time = 0L
+        var flushLayout = false
         fun roots(): List<View> {
             val windows = shadowOf(view.context.getSystemService(WindowManager::class.java)) as ShadowWindowManagerImpl
             return (listOf(view) + windows.views).distinct()
@@ -828,6 +917,13 @@ class OperationSnackbarMigrationTest {
                 root.measure(View.MeasureSpec.makeMeasureSpec(420, if (root === view) View.MeasureSpec.EXACTLY else View.MeasureSpec.AT_MOST),
                     View.MeasureSpec.makeMeasureSpec(1200, if (root === view) View.MeasureSpec.EXACTLY else View.MeasureSpec.AT_MOST))
                 root.layout(0, 0, root.measuredWidth, root.measuredHeight)
+                if (flushLayout) {
+                    fun flush(view: View) {
+                        if (view is ViewRootForTest) view.measureAndLayoutForTest()
+                        if (view is ViewGroup) repeat(view.childCount) { flush(view.getChildAt(it)) }
+                    }
+                    flush(root)
+                }
             }
         } }
         fun descend(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descend)
@@ -839,6 +935,19 @@ class OperationSnackbarMigrationTest {
         fun hasText(value: String) = all().any { it.hasText(value) }
         fun SemanticsNode.hasText(value: String) = config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == value }
         fun text(value: String) = all().single { it.hasText(value) }
+        fun scrollToBottom(label: String) {
+            var node: SemanticsNode? = text(label)
+            while (node != null && !node.config.contains(SemanticsActions.ScrollBy)) node = node.parent
+            requireNotNull(node).config[SemanticsActions.ScrollBy].action!!.invoke(0f, 10000f)
+            frames(40)
+        }
+        fun assertSnackbarAboveAction(label: String) {
+            var action = text(label)
+            while (!action.config.contains(SemanticsActions.OnClick)) action = action.parent!!
+            val surface = all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-snackbar-surface" }
+            assertEquals("Notice must clear $label in the same modal window: action=${action.boundsInWindow}/${action.positionInRoot}/${action.size}, surface=${surface.boundsInWindow}/${surface.positionInRoot}/${surface.size}", 16f,
+                action.boundsInWindow.top - surface.boundsInWindow.bottom, 1f)
+        }
         // A visible Activity's decor can also contain view; prefer the direct host listed first.
         fun ownerOfText(value: String) = roots().first { root -> nodes(root).any { it.hasText(value) } }
         fun isSnackbarText(value: String) = all().any { node ->

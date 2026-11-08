@@ -8,10 +8,11 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -45,9 +46,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun ChatScreenLayout(state: ChatScreenState) =
+internal fun ChatScreenLayout(
+    state: ChatScreenState,
+    startupCheck: StartupUpdateCheck = StartupUpdates.check,
+) =
     with(state) {
         val composerBarHeight = with(LocalDensity.current) { composerBarHeightPx.toDp() }
+        // The measured composer body excludes both navigation padding and Haze.
+        // IME clearance belongs to the host; IrioSnackbar adds its own 16dp gap.
+        val composerNoticeBottomInset = composerBarHeight + with(LocalDensity.current) {
+            WindowInsets.navigationBars.exclude(WindowInsets.ime).getBottom(this).toDp()
+        }
         val toolbarHeight = with(LocalDensity.current) { toolbarHeightPx.toDp() }
         val toolbarContentPaddingPx =
             with(LocalDensity.current) { (toolbarHeight + 16.dp).toPx().roundToInt() }
@@ -199,7 +208,7 @@ internal fun ChatScreenLayout(state: ChatScreenState) =
                             IrioSnackbar(
                                 visible = composerStatus != null,
                                 message = composerStatus.orEmpty(),
-                                bottomInset = composerBarHeight + 16.dp,
+                                bottomInset = composerNoticeBottomInset,
                                 onDismiss = { composerStatus = null },
                                 restartKey = composerStatusNonce,
                             )
@@ -226,13 +235,14 @@ internal fun ChatScreenLayout(state: ChatScreenState) =
                         )
                     }
                 }
-                Box(Modifier.fillMaxSize().zIndex(2f)) {
+                Box(Modifier.fillMaxSize().imePadding().zIndex(2f)) {
                     ChatNoticeSnackbar(
                         titleNotice = titleGeneration.notice,
                         titleNoticeNonce = titleGeneration.noticeNonce,
-                        bottomInset =
-                            WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+                        bottomInset = composerNoticeBottomInset,
                         onDismissTitle = { titleGeneration.notice = null },
+                        startupCheck = startupCheck,
+                        enabled = composerStatus == null && !composerFullscreen,
                     )
                 }
                 ClearHistoryDialog(

@@ -342,7 +342,7 @@ internal fun ProviderDetailScreen(
         OperationErrorSnackbar(
             visible = operationNotice != null,
             message = operationNotice.orEmpty(),
-            bottomInset = maxOf(tabContentPadding + ChatComposerHazeBleed + if (page == ProviderDetailPage.Models) {
+            bottomInset = maxOf(tabContentPadding + if (page == ProviderDetailPage.Models) {
                 with(LocalDensity.current) { modelActionHeightPx.toDp() }
             } else 0.dp, with(LocalDensity.current) { WindowInsets.ime.getBottom(this).toDp() }),
             onDismiss = { operationNotice = null },

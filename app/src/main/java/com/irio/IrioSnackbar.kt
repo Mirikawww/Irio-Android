@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
@@ -233,3 +234,12 @@ private class SnackbarSwipeMotion(initialVisible: Boolean) {
 }
 
 private const val EXIT_DURATION_MS = 180
+
+/** A modal's local bottom may already include IME padding; measure controls in its own window. */
+internal class SnackbarControlClearance {
+    private var hostBottom by mutableFloatStateOf(0f)
+    private var controlsTop by mutableFloatStateOf(Float.NaN)
+    val bottomPx: Float get() = if (controlsTop.isNaN()) 0f else (hostBottom - controlsTop).coerceAtLeast(0f)
+    val hostModifier: Modifier get() = Modifier.onGloballyPositioned { hostBottom = it.positionInWindow().y + it.size.height }
+    val controlsModifier: Modifier get() = Modifier.onGloballyPositioned { controlsTop = it.positionInWindow().y }
+}

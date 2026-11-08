@@ -85,6 +85,7 @@ internal fun BoxScope.ChatNoticeSnackbar(
     onDismissTitle: () -> Unit,
     bottomInset: Dp,
     startupCheck: StartupUpdateCheck = StartupUpdates.check,
+    enabled: Boolean = true,
 ) {
     val startupNotice by startupCheck.notice.collectAsState()
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
@@ -94,7 +95,7 @@ internal fun BoxScope.ChatNoticeSnackbar(
     val update = (startupNotice as? StartupUpdateNotice.Checked)?.result?.release
     val canViewUpdate = titleNotice == null && !linkError && update != null
     IrioSnackbar(
-        visible = viewingUpdate == null && (titleNotice != null || showStartup ||
+        visible = enabled && viewingUpdate == null && (titleNotice != null || showStartup ||
             (linkError && lifecycleState.isAtLeast(Lifecycle.State.RESUMED))),
         message = titleNotice ?: if (linkError) tr("无法打开链接") else
             startupNotice?.let { startupUpdateMessage(it) }.orEmpty(),
