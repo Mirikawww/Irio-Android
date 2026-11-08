@@ -38,6 +38,50 @@ import kotlin.math.abs
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ConditionalSettingsUiTest {
+    @Test fun messageOnlyCornerScopeIsHiddenOnlyAtTheDefaultRadiusWithoutResettingSelection() = runTest {
+        withScreen(prepare = { context ->
+            ThemeStore.saveLanguage(context, AppLanguage.ZH_CN)
+            ThemeStore.saveInputCornerRadius(context, 16)
+            ThemeStore.saveInputCornersMessageOnly(context, true)
+        }, content = { AppearanceSettingsScreen(onBack = {}) }) { context ->
+            assertHidden("仅对消息框生效")
+            for (radius in listOf(0, 15, 16, 17, 32, 16, 24)) {
+                ThemeStore.saveInputCornerRadius(context, radius)
+                frames(45)
+                if (radius == 16) assertHidden("仅对消息框生效") else assertVisible("仅对消息框生效")
+                assertTrue("Hiding the scope must not clear its saved selection", ThemeStore.inputCornersMessageOnly)
+            }
+        }
+    }
+
+    @Test fun messageOnlyCornerScopeExpandsAndCollapsesWithIntermediateLayoutFrames() = runTest {
+        withScreen(prepare = { context ->
+            ThemeStore.saveLanguage(context, AppLanguage.ZH_CN)
+            ThemeStore.saveInputCornerRadius(context, 16)
+            ThemeStore.saveInputCornersMessageOnly(context, true)
+        }, content = { AppearanceSettingsScreen(onBack = {}) }) { context ->
+            fun sampleTop(): Float {
+                frames(1)
+                return top("毛玻璃")
+            }
+            val collapsed = sampleTop()
+            ThemeStore.saveInputCornerRadius(context, 24)
+            val expanding = List(45) { sampleTop() }
+            val expanded = expanding.last()
+            assertTrue("Showing the scope must make room below it", expanded > collapsed)
+            assertTrue("Expansion must contain intermediate layout frames, not appear instantly",
+                expanding.any { it > collapsed + 0.5f && it < expanded - 0.5f })
+            assertVisible("仅对消息框生效")
+            ThemeStore.saveInputCornerRadius(context, 16)
+            val collapsing = List(45) { sampleTop() }
+            assertEquals(collapsed, collapsing.last(), 0.5f)
+            assertTrue("Collapse must contain intermediate layout frames, not disappear instantly",
+                collapsing.any { it > collapsed + 0.5f && it < expanded - 0.5f })
+            assertHidden("仅对消息框生效")
+            assertTrue(ThemeStore.inputCornersMessageOnly)
+        }
+    }
+
     @Test fun appearanceParametersFollowTheirOwnSwitchAndRetainValues() = runTest {
         withScreen(prepare = { context ->
             ThemeStore.ensureLoaded(context)
@@ -133,6 +177,25 @@ class ConditionalSettingsUiTest {
             val hit = searchSettings("重试次数上限", label = { it }).single { it.id == "appearance.retry.limit" }
             context.openSettingsSearch(hit)
             assertEquals(hit.anchor, shadowOf(context).nextStartedActivity.getStringExtra(SETTINGS_SEARCH_TARGET))
+        } finally {
+            restore()
+            controller.pause().stop().destroy()
+        }
+    }
+
+    @Test fun searchForHiddenCornerScopeLocatesTheRadiusWithoutChangingIt() {
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        val context = controller.get()
+        val restore = preserveSettings(context)
+        try {
+            val hit = searchSettings("仅对消息框生效", label = { it }).single()
+            for (radius in listOf(16, 24)) {
+                ThemeStore.saveInputCornerRadius(context, radius)
+                context.openSettingsSearch(hit)
+                assertEquals(if (radius == 16) "appearance.inputCorners" else hit.anchor,
+                    shadowOf(context).nextStartedActivity.getStringExtra(SETTINGS_SEARCH_TARGET))
+                assertEquals("Search must not change the radius to reveal the checkbox", radius, ThemeStore.inputCornerRadius)
+            }
         } finally {
             restore()
             controller.pause().stop().destroy()
@@ -411,6 +474,8 @@ class ConditionalSettingsUiTest {
         val glass = ThemeStore.glassEnabled
         val surfaces = ThemeStore.glassSurfaces.toSet()
         val image = ThemeStore.imageUploadOptions()
+        val inputRadius = ThemeStore.inputCornerRadius
+        val inputMessageOnly = ThemeStore.inputCornersMessageOnly
         val compression = ToolStore.loadContextCompression(context)
         val trigger = ToolStore.loadCompressionTrigger(context)
         val target = ToolStore.loadCompressionTarget(context)
@@ -430,6 +495,8 @@ class ConditionalSettingsUiTest {
             ThemeStore.saveImageUploadCompression(context, image.enabled)
             ThemeStore.saveImageUploadQuality(context, image.quality)
             ThemeStore.saveImageUploadFormat(context, image.format)
+            ThemeStore.saveInputCornerRadius(context, inputRadius)
+            ThemeStore.saveInputCornersMessageOnly(context, inputMessageOnly)
             ToolStore.saveContextCompression(context, compression)
             ToolStore.saveCompressionTrigger(context, trigger)
             ToolStore.saveCompressionTarget(context, target)

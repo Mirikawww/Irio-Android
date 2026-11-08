@@ -34,6 +34,8 @@ internal fun Context.openSettingsSearch(hit: SettingsSearchHit) {
         ThemeStore.ensureLoaded(this)
         // Locate the controlling switch when its dependent option is not composed.
         val visibleAnchor = when {
+            anchor == "appearance.inputCorners.messageOnly" &&
+                ThemeStore.inputCornerRadius == DefaultInputCornerRadiusDp -> "appearance.inputCorners"
             anchor.startsWith("appearance.retry.") && !ThemeStore.autoRetry -> "appearance.retry"
             anchor.startsWith("appearance.paste.") && !ThemeStore.longTextPaste -> "appearance.paste"
             anchor.startsWith("appearance.glass.") && !ThemeStore.glassEnabled -> "appearance.glass"

@@ -371,16 +371,18 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         ThemeStore.saveInputCornerRadius(context, pendingInputCornerRadius)
                     },
                 )
-                Checkbox(
-                    checked = ThemeStore.inputCornersMessageOnly,
-                    onCheckedChange = { ThemeStore.saveInputCornersMessageOnly(context, it) },
-                    modifier = Modifier
-                        .settingsSearchAnchor("appearance.inputCorners.messageOnly")
-                        .fillMaxWidth()
-                        .padding(vertical = 2.dp),
-                    accessibilityLabel = tr("仅对消息框生效"),
-                ) {
-                    Text(tr("仅对消息框生效"), color = Theme[colors][onPanelColor])
+                SettingsDependentContent(enabled = pendingInputCornerRadius != DefaultInputCornerRadiusDp) {
+                    Checkbox(
+                        checked = ThemeStore.inputCornersMessageOnly,
+                        onCheckedChange = { ThemeStore.saveInputCornersMessageOnly(context, it) },
+                        modifier = Modifier
+                            .settingsSearchAnchor("appearance.inputCorners.messageOnly")
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        accessibilityLabel = tr("仅对消息框生效"),
+                    ) {
+                        Text(tr("仅对消息框生效"), color = Theme[colors][onPanelColor])
+                    }
                 }
                 Row(
                     modifier = Modifier
