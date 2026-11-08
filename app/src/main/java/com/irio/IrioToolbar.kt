@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +23,8 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
@@ -81,6 +84,7 @@ import dev.chrisbanes.haze.rememberHazeState
  * Scaffold 按顶栏实测高度叠内容，焦点描边（2dp 宽 + 2dp 外偏）会画到布局外。
  * 底部 [IrioToolbarOverflow] 只把这块溢出让给内容，不把按钮再垫高。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun IrioToolbar(
     title: @Composable RowScope.() -> Unit,
@@ -101,7 +105,9 @@ fun IrioToolbar(
                         else Modifier.background(backgroundColor)
                     )
                     .windowInsetsPadding(
-                        WindowInsets.systemBars.only(
+                        // An open menu can leave the host reporting hidden bars
+                        // after resume. Preserve the status bar's actual geometry.
+                        WindowInsets.systemBars.union(WindowInsets.statusBarsIgnoringVisibility).only(
                             WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
                         )
                     )
@@ -304,6 +310,7 @@ private val IrioToolbarTitleStyle = TextStyle(
     fontWeight = FontWeight.Medium,
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SettingsTitleCapsule(
     title: String,
@@ -319,7 +326,7 @@ internal fun SettingsTitleCapsule(
             .fillMaxWidth()
             .onSizeChanged { onHeightChanged(it.height) }
             .windowInsetsPadding(
-                WindowInsets.systemBars.only(
+                WindowInsets.systemBars.union(WindowInsets.statusBarsIgnoringVisibility).only(
                     WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
                 ),
             )

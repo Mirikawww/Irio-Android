@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.BroadcastFrameClock
 import androidx.compose.runtime.CompositionLocalProvider
@@ -45,6 +46,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
 import org.robolectric.annotation.RealObject
@@ -98,7 +100,19 @@ class ChatMenuImeTest {
     @Test fun openingLinkSyncModePreservesFieldIme() = verify(Menu.LINK, true)
     @Test fun openingLinkSyncModeWithoutImeKeepsNormalFocus() = verify(Menu.LINK, false)
 
-    private fun verify(menu: Menu, showIme: Boolean, transientImeInset: Boolean = false) = runTest {
+    @Test fun contextToolbarKeepsStatusBarClearanceAcrossBackgroundReturn() =
+        verify(Menu.CONTEXT, false, backgroundRoundTrip = true)
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Test fun modelToolbarKeepsStatusBarClearanceAcrossBackgroundReturn() =
+        verify(Menu.MODEL, false, backgroundRoundTrip = true)
+    @Test fun contextToolbarKeepsStatusBarClearanceWithImeAcrossBackgroundReturn() =
+        verify(Menu.CONTEXT, true, backgroundRoundTrip = true)
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Test fun modelToolbarKeepsStatusBarClearanceWithImeAcrossBackgroundReturn() =
+        verify(Menu.MODEL, true, backgroundRoundTrip = true)
+
+    private fun verify(menu: Menu, showIme: Boolean, transientImeInset: Boolean = false,
+        backgroundRoundTrip: Boolean = false) = runTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup().visible()
         val host = ComposeView(controller.get())
         val clock = BroadcastFrameClock()
@@ -108,7 +122,10 @@ class ChatMenuImeTest {
         val draft = mutableStateOf("Draft")
         var attachmentState: ChatScreenState? = null
         var imeVisible = false
+        var visibleStatusTop = 0
         var frameTime = 0L
+        val canvas = android.graphics.Canvas(android.graphics.Bitmap.createBitmap(360, 640,
+            android.graphics.Bitmap.Config.ARGB_8888))
         try {
             host.setParentCompositionContext(recomposer)
             controller.get().setContentView(host, ViewGroup.LayoutParams(360, 640))
@@ -116,48 +133,54 @@ class ChatMenuImeTest {
             host.setContent {
                 CompositionLocalProvider(LocalDensity provides Density(1f)) {
                     imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                    visibleStatusTop = WindowInsets.statusBars.getTop(LocalDensity.current)
                     AppTheme {
                         Column {
                             BasicTextField(draft.value, onValueChange = { draft.value = it },
                                 modifier = Modifier.testTag("fixture-composer"))
-                            when (menu) {
-                                Menu.SEARCH -> SearchSettingsScreen(onBack = {})
-                                Menu.LINK -> LinkSettingsScreen(onBack = {})
-                                Menu.STT_PROVIDER -> SttProviderMenu(SttProviderKind.GROQ, expanded.value,
-                                    { expanded.value = it }, {})
-                                Menu.STT_MODEL -> SttModelMenu(SttProviderKind.GROQ, SttStore.defaultModel(SttProviderKind.GROQ),
-                                    expanded.value, { expanded.value = it }, {})
-                                Menu.STT_LANGUAGE -> SttLanguageMenu("en", expanded.value, { expanded.value = it }, {})
-                                Menu.VOICE -> VoiceMenu(expanded.value, { expanded.value = it }, tr("系统默认"), "", emptyList(), true, {})
-                                Menu.PROTOCOL -> ProtocolPicker(
-                                    protocol = ProviderProtocol.CHAT_COMPLETIONS,
-                                    expanded = expanded.value,
-                                    onExpandedChange = { expanded.value = it },
-                                    onSelect = {},
-                                )
-                                Menu.CONTEXT -> ContextUsageRing(
-                                    breakdown = ContextUsageBreakdown(0, 0, 0, 100, 0, 0, 100),
-                                    compressionCount = 0, showCompression = false, compressEnabled = false,
-                                    onCompress = {}, expanded = expanded.value, onExpandedChange = { expanded.value = it },
-                                )
-                                Menu.MODEL, Menu.IMAGE_MODEL -> ModelPicker(
-                                    alignLeft = true, selectedModel = if (menu == Menu.IMAGE_MODEL) "gpt-image-1" else "fixture-model",
-                                    providers = listOf(ProviderConfig("fixture", "Fixture", "https://example.test", "",
-                                        models = listOf(if (menu == Menu.IMAGE_MODEL) "gpt-image-1" else "fixture-model"))),
-                                    activeProviderId = "fixture", mergeModels = false, useModelsDev = false,
-                                    useModelsDevReasoning = false, reasoningEffort = ReasoningEffort.OFF,
-                                    fastMode = false, webSearchAvailable = false, webSearchEnabled = false,
-                                    autoRead = false, expanded = expanded.value,
-                                    onExpandedChange = { expanded.value = it }, onSelectedModelChange = { _, _ -> },
-                                    onReasoningChange = {}, onFastModeChange = {}, onWebSearchChange = {},
-                                    onAutoReadChange = {},
-                                )
-                                Menu.ATTACH -> Box(Modifier.fillMaxSize()) {
-                                    val state = rememberChatScreenState()
-                                    attachmentState = state
-                                    ChatComposerBar(state, 600.dp)
+                            @androidx.compose.runtime.Composable
+                            fun MenuContent() {
+                                when (menu) {
+                                    Menu.SEARCH -> SearchSettingsScreen(onBack = {})
+                                    Menu.LINK -> LinkSettingsScreen(onBack = {})
+                                    Menu.STT_PROVIDER -> SttProviderMenu(SttProviderKind.GROQ, expanded.value,
+                                        { expanded.value = it }, {})
+                                    Menu.STT_MODEL -> SttModelMenu(SttProviderKind.GROQ, SttStore.defaultModel(SttProviderKind.GROQ),
+                                        expanded.value, { expanded.value = it }, {})
+                                    Menu.STT_LANGUAGE -> SttLanguageMenu("en", expanded.value, { expanded.value = it }, {})
+                                    Menu.VOICE -> VoiceMenu(expanded.value, { expanded.value = it }, tr("系统默认"), "", emptyList(), true, {})
+                                    Menu.PROTOCOL -> ProtocolPicker(
+                                        protocol = ProviderProtocol.CHAT_COMPLETIONS,
+                                        expanded = expanded.value,
+                                        onExpandedChange = { expanded.value = it },
+                                        onSelect = {},
+                                    )
+                                    Menu.CONTEXT -> ContextUsageRing(
+                                        breakdown = ContextUsageBreakdown(0, 0, 0, 100, 0, 0, 100),
+                                        compressionCount = 0, showCompression = false, compressEnabled = false,
+                                        onCompress = {}, expanded = expanded.value, onExpandedChange = { expanded.value = it },
+                                    )
+                                    Menu.MODEL, Menu.IMAGE_MODEL -> ModelPicker(
+                                        alignLeft = true, selectedModel = if (menu == Menu.IMAGE_MODEL) "gpt-image-1" else "fixture-model",
+                                        providers = listOf(ProviderConfig("fixture", "Fixture", "https://example.test", "",
+                                            models = listOf(if (menu == Menu.IMAGE_MODEL) "gpt-image-1" else "fixture-model"))),
+                                        activeProviderId = "fixture", mergeModels = false, useModelsDev = false,
+                                        useModelsDevReasoning = false, reasoningEffort = ReasoningEffort.OFF,
+                                        fastMode = false, webSearchAvailable = false, webSearchEnabled = false,
+                                        autoRead = false, expanded = expanded.value,
+                                        onExpandedChange = { expanded.value = it }, onSelectedModelChange = { _, _ -> },
+                                        onReasoningChange = {}, onFastModeChange = {}, onWebSearchChange = {},
+                                        onAutoReadChange = {},
+                                    )
+                                    Menu.ATTACH -> Box(Modifier.fillMaxSize()) {
+                                        val state = rememberChatScreenState()
+                                        attachmentState = state
+                                        ChatComposerBar(state, 600.dp)
+                                    }
                                 }
                             }
+                            if (backgroundRoundTrip) IrioToolbar(title = { MenuContent() }, compact = true)
+                            else MenuContent()
                         }
                     }
                 }
@@ -171,12 +194,22 @@ class ChatMenuImeTest {
                 host.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
                     View.MeasureSpec.makeMeasureSpec(640, View.MeasureSpec.EXACTLY))
                 host.layout(0, 0, 360, 640)
+                if (backgroundRoundTrip) host.draw(canvas)
             }
             fun descendants(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descendants)
             fun nodes(view: View): List<SemanticsNode> =
                 (if (view is ViewRootForTest) descendants(view.semanticsOwner.unmergedRootSemanticsNode) else emptyList()) +
                     (if (view is ViewGroup) (0 until view.childCount).flatMap { nodes(view.getChildAt(it)) } else emptyList())
             fun field() = nodes(host).single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "fixture-composer" }
+            fun statusBars(visible: Boolean, top: Int = 24) {
+                ViewCompat.dispatchApplyWindowInsets(host, WindowInsetsCompat.Builder()
+                    .setInsets(WindowInsetsCompat.Type.statusBars(), if (visible) Insets.of(0, top, 0, 0) else Insets.NONE)
+                    .setInsetsIgnoringVisibility(WindowInsetsCompat.Type.statusBars(), Insets.of(0, top, 0, 0))
+                    .setVisible(WindowInsetsCompat.Type.statusBars(), visible)
+                    .setInsets(WindowInsetsCompat.Type.ime(), if (showIme) Insets.of(0, 0, 0, 300) else Insets.NONE)
+                    .setVisible(WindowInsetsCompat.Type.ime(), showIme).build())
+                repeat(3) { frame() }
+            }
             repeat(8) { frame() }
             assertTrue(field().config[SemanticsActions.RequestFocus].action!!.invoke())
             frame()
@@ -186,6 +219,7 @@ class ChatMenuImeTest {
                 .setVisible(WindowInsetsCompat.Type.ime(), true).build())
             repeat(3) { frame() }
             assertEquals("Fixture IME precondition", showIme, imeVisible)
+            if (backgroundRoundTrip) statusBars(true)
             val label = when (menu) {
                 Menu.CONTEXT -> null
                 Menu.MODEL, Menu.IMAGE_MODEL, Menu.STT_MODEL -> tr("选择模型")
@@ -197,7 +231,7 @@ class ChatMenuImeTest {
                 Menu.VOICE -> tr("选择音色")
                 Menu.LINK -> tr("选择同步方式")
             }
-            val trigger = nodes(host).first { node ->
+            fun triggerNode() = nodes(host).first { node ->
                 node.config.contains(SemanticsActions.OnClick) && if (label == null)
                     node.config.contains(SemanticsProperties.Role) &&
                         node.config[SemanticsProperties.Role] == androidx.compose.ui.semantics.Role.Button
@@ -206,6 +240,7 @@ class ChatMenuImeTest {
                 }
                 else label in node.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }
             }
+            val trigger = triggerNode()
             assertTrue(trigger.config[SemanticsActions.OnClick].action!!.invoke())
             repeat(8) { frame() }
             if (menu != Menu.SEARCH && menu != Menu.LINK)
@@ -219,6 +254,25 @@ class ChatMenuImeTest {
             assertEquals("$menu dialog window focus must match IME state",
                 if (showIme) WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE else 0,
                 dialog.window!!.attributes.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+            if (backgroundRoundTrip) {
+                val originalTop = trigger.boundsInRoot.top
+                assertTrue("The toolbar must initially clear the 24px status bar", originalTop >= 24f)
+                controller.windowFocusChanged(false)
+                controller.pause().stop()
+                statusBars(false)
+                assertEquals("Fixture must deliver the hidden status bar inset", 0, visibleStatusTop)
+                controller.start().resume()
+                controller.windowFocusChanged(showIme)
+                repeat(8) { frame() }
+                assertTrue("Returning must retain the open menu", dialog.isShowing && expanded.value)
+                assertEquals("An open $menu must not move the toolbar into the status bar after returning",
+                    originalTop, triggerNode().boundsInRoot.top, 0.5f)
+                statusBars(true, 32)
+                assertEquals("Fixture must deliver the new inset", 32, visibleStatusTop)
+                assertEquals("Real status bar geometry changes must still update toolbar clearance",
+                    originalTop + 8f, triggerNode().boundsInRoot.top, 0.5f)
+                statusBars(true)
+            }
             if (showIme) {
                 assertTrue("Composer keeps focus for continued typing", field().config[SemanticsProperties.Focused])
                 assertTrue("The IME inset stays visible", imeVisible)
