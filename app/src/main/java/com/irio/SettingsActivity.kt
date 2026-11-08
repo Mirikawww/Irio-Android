@@ -135,6 +135,9 @@ internal fun SettingsScreen(onBack: () -> Unit) {
                     SettingsHomeRow(tr("互连"), IrioIcons.MonitorSmartphone) {
                         context.startActivity(Intent(context, LinkSettingsActivity::class.java))
                     }
+                    SettingsHomeRow(tr("实验室"), IrioIcons.FlaskConical) {
+                        context.startActivity(Intent(context, LaboratorySettingsActivity::class.java))
+                    }
                     SettingsHomeRow(tr("其他"), IrioIcons.Ellipsis) {
                         context.startActivity(Intent(context, OtherSettingsActivity::class.java))
                     }

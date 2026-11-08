@@ -68,6 +68,11 @@ internal object IrioIcons {
     val Monitor by lazy { icon("monitor", rect(2, 3, 20, 14, 2), "M8 21H16", "M12 17V21") }
     val Copy by lazy { icon("copy", rect(8, 8, 14, 14, 2), "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2") }
     val Info by lazy { icon("info", circle(12f, 12f, 10f), "M12 16v-4", "M12 8h.01") }
+    val FlaskConical by lazy {
+        icon("flask-conical",
+            "M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2",
+            "M6.453 15h11.094", "M8.5 2h7")
+    }
     val Braces by lazy {
         icon("braces", "M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1",
             "M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1")
