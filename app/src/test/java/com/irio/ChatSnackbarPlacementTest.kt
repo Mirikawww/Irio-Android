@@ -42,8 +42,10 @@ class ChatSnackbarPlacementTest {
     @Test fun startupUpdateClearsTheComposerAndKeyboard() = verify(composerError = false, startup = true)
     @Test fun startupUpdateWaitsForComposerErrorsInsteadOfOverlappingThem() = verify(composerError = true, startup = true)
     @Test fun startupUpdateWaitsUntilFullscreenInputCloses() = verify(composerError = false, startup = true, fullscreen = true)
+    @Test fun startupUpdateStaysBehindTheDrawerWhenItOpens() = verify(composerError = false, startup = true, drawer = true)
 
-    private fun verify(composerError: Boolean, startup: Boolean = false, fullscreen: Boolean = false) = runTest {
+    private fun verify(composerError: Boolean, startup: Boolean = false, fullscreen: Boolean = false,
+        drawer: Boolean = false) = runTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup().visible()
         val context = controller.get()
         val clock = BroadcastFrameClock()
@@ -128,6 +130,21 @@ class ChatSnackbarPlacementTest {
                     if (startup && !composerError) assertTrue("The real update notice must retain its View action", nodes().any {
                         it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == tr("查看") }
                     })
+                    if (drawer) {
+                        state.drawerProgress = 1f
+                        frames(45)
+                        val surface = nodes().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-snackbar-surface" }
+                        val settings = nodes().first { tr("设置") in it.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() } }
+                        val noticePath = generateSequence(surface) { it.parent }.toList().reversed()
+                        val drawerPath = generateSequence(settings) { it.parent }.toList().reversed()
+                        val shared = noticePath.zip(drawerPath).takeWhile { it.first.id == it.second.id }.size
+                        val siblings = noticePath[shared - 1].children.map { it.id }
+                        assertTrue("The notice must paint below the drawer, not on an app-wide foreground layer",
+                            siblings.indexOf(noticePath[shared].id) < siblings.indexOf(drawerPath[shared].id))
+                        assertNotNull("Opening the drawer must not consume the pending update", startupCheck.notice.value)
+                        state.drawerProgress = 0f
+                        frames(45)
+                    }
                 }
             }
             if (startup && composerError) {

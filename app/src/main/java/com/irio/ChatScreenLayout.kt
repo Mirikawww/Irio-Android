@@ -205,6 +205,15 @@ internal fun ChatScreenLayout(
                             )
 
                             ChatToolbar(state)
+                            // Page-owned feedback stays beneath the drawer and its scrim.
+                            ChatNoticeSnackbar(
+                                titleNotice = titleGeneration.notice,
+                                titleNoticeNonce = titleGeneration.noticeNonce,
+                                bottomInset = composerNoticeBottomInset,
+                                onDismissTitle = { titleGeneration.notice = null },
+                                startupCheck = startupCheck,
+                                enabled = composerStatus == null && !composerFullscreen,
+                            )
                             IrioSnackbar(
                                 visible = composerStatus != null,
                                 message = composerStatus.orEmpty(),
@@ -234,16 +243,6 @@ internal fun ChatScreenLayout(
                                     )
                         )
                     }
-                }
-                Box(Modifier.fillMaxSize().imePadding().zIndex(2f)) {
-                    ChatNoticeSnackbar(
-                        titleNotice = titleGeneration.notice,
-                        titleNoticeNonce = titleGeneration.noticeNonce,
-                        bottomInset = composerNoticeBottomInset,
-                        onDismissTitle = { titleGeneration.notice = null },
-                        startupCheck = startupCheck,
-                        enabled = composerStatus == null && !composerFullscreen,
-                    )
                 }
                 ClearHistoryDialog(
                     visible = clearHistoryDialogOpen,
