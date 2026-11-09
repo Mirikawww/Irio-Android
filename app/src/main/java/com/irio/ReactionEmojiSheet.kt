@@ -130,8 +130,8 @@ internal fun ReactionEmojiCategoryTabs(
                 color = if (index == selected) Theme[colors][onPanelColor] else Theme[colors][mutedColor],
                 fontSize = 13.sp,
                 modifier = Modifier.testTag("reaction-emoji-tab-$index")
-                    .clip(com.kyant.shapes.RoundedRectangle(8.dp))
-                    .background(if (index == selected) Theme[colors][secondaryColor] else androidx.compose.ui.graphics.Color.Transparent, com.kyant.shapes.RoundedRectangle(8.dp))
+                    .clip(ToolbarCapsuleShape)
+                    .background(if (index == selected) Theme[colors][secondaryColor] else androidx.compose.ui.graphics.Color.Transparent, ToolbarCapsuleShape)
                     .selectable(selected = index == selected, role = Role.Tab,
                         interactionSource = remember { MutableInteractionSource() }, indication = indication,
                         onClick = { onSelect(index) })
