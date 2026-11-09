@@ -43,6 +43,32 @@ internal class ReactionEmojiPagerState(private val scope: CoroutineScope) {
         settle(if (target == anchor) 0f else direction)
     }
 
+    fun beginDrag() {
+        motion?.cancel()
+        rebaseToDominantPage()
+        selected = anchor
+        dragging = true
+    }
+
+    fun dragBy(pixels: Float, width: Float, rtl: Boolean) {
+        if (!dragging || width <= 0 || count == 0) return
+        val next = position - pixels / width * if (rtl) -1f else 1f
+        val step = if (next > 0f) 1 else -1
+        if (destination == null || direction != step.toFloat()) {
+            destination = (anchor + step).takeIf { it in 0 until count }
+            direction = step.toFloat()
+        }
+        position = if (destination == null) 0f else next.coerceIn(-1f, 1f)
+    }
+
+    fun endDrag(cancelled: Boolean) {
+        if (!dragging) return
+        val commit = !cancelled && destination != null && abs(position) >= 0.25f
+        selected = if (commit) destination!! else anchor
+        dragging = false
+        settle(if (commit) direction else 0f)
+    }
+
     private fun rebaseToDominantPage() {
         val other = destination ?: return
         if (abs(direction - position) < abs(position)) {
@@ -69,3 +95,9 @@ internal class ReactionEmojiPagerState(private val scope: CoroutineScope) {
         }
     }
 }
+
+internal class ReactionEmojiDragCallbacks(
+    val onStart: () -> Unit,
+    val onDelta: (Float, Float, Boolean) -> Unit,
+    val onEnd: (Boolean) -> Unit,
+)

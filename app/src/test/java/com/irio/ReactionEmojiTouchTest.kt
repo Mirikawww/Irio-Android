@@ -44,6 +44,7 @@ class ReactionEmojiTouchTest {
         val runner = launch(clock) { recomposer.runRecomposeAndApplyChanges() }
         val view = ComposeView(controller.get())
         val selected = mutableListOf<String>()
+        val categorySwipes = mutableListOf<Int>()
         var dismissals = 0
         try {
             view.setParentCompositionContext(recomposer)
@@ -55,6 +56,7 @@ class ReactionEmojiTouchTest {
                             category = ReactionEmojiCatalog.categories[1],
                             color = Color.Black,
                             modifier = Modifier.size(400.dp, 240.dp),
+                            onCategorySwipe = { categorySwipes += it },
                             onSelect = { selected += it },
                         )
                     }
@@ -117,6 +119,7 @@ class ReactionEmojiTouchTest {
                 (grid.layoutManager as GridLayoutManager).findFirstVisibleItemPosition() > 0,
             )
             assertTrue("Dragging must not accidentally select an emoji", selected.isEmpty())
+            assertTrue("Vertical native scrolling must not switch categories", categorySwipes.isEmpty())
             grid.stopScroll()
             val cell = grid.getChildAt((grid.layoutManager as GridLayoutManager).spanCount) as TextView
             val cellLocation = IntArray(2).also(cell::getLocationInWindow)

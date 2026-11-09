@@ -6,6 +6,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.compose.runtime.Composable
@@ -21,6 +22,8 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.max
+import kotlin.math.abs
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /** The sheet stays Compose; scrolling and the simple emoji cells are native Android Views. */
@@ -30,14 +33,22 @@ internal fun ReactionEmojiGrid(
     color: Color,
     modifier: Modifier = Modifier,
     bottomPadding: Dp = 8.dp,
+    onCategorySwipe: ((Int) -> Unit)? = null,
+    dragCallbacks: ReactionEmojiDragCallbacks? = null,
+    horizontalPadding: Dp = 0.dp,
     onSelect: (String) -> Unit,
 ) {
     val bottomPaddingPx = with(LocalDensity.current) { bottomPadding.roundToPx() }
+    val horizontalPaddingPx = with(LocalDensity.current) { horizontalPadding.roundToPx() }
     AndroidView(
         modifier = modifier,
         factory = { ReactionEmojiRecyclerView(it) },
         update = { view ->
-            if (view.paddingBottom != bottomPaddingPx) view.setPadding(0, 0, 0, bottomPaddingPx)
+            if (view.paddingBottom != bottomPaddingPx || view.paddingLeft != horizontalPaddingPx) {
+                view.setPadding(horizontalPaddingPx, 0, horizontalPaddingPx, bottomPaddingPx)
+            }
+            view.onCategorySwipe = onCategorySwipe
+            view.dragCallbacks = dragCallbacks
             view.update(category?.name.orEmpty(), category?.emojis.orEmpty(), color.toArgb(), onSelect)
         },
         onRelease = { it.release() },
@@ -53,6 +64,16 @@ internal class ReactionEmojiRecyclerView(context: Context) : RecyclerView(contex
     private var emojis: List<String> = emptyList()
     private var updateGeneration = 0L
     private var released = false
+    var onCategorySwipe: ((Int) -> Unit)? = null
+    var dragCallbacks: ReactionEmojiDragCallbacks? = null
+    private var lastRawX = 0f
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private var downX = 0f
+    private var downY = 0f
+    private var touchActive = false
+    private var touchAxis = TouchAxis.Pending
+
+    private enum class TouchAxis { Pending, Horizontal, Vertical, Cancelled }
 
     init {
         layoutManager = gridManager
@@ -85,18 +106,83 @@ internal class ReactionEmojiRecyclerView(context: Context) : RecyclerView(contex
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        // Claim the native gesture on DOWN, before the modal sheet's Compose drag detector
-        // reaches touch slop and cancels AndroidView. Nested scroll still handles boundary handoff.
+        // Retain the established AndroidView/BottomSheet ownership. Vertical gestures still
+        // go through RecyclerView and nested scrolling; only a locked horizontal gesture is ours.
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            touchActive = true
+            downX = event.x
+            downY = event.y
+            touchAxis = TouchAxis.Pending
+            lastRawX = event.rawX
             parent?.requestDisallowInterceptTouchEvent(true)
         }
         return try {
-            super.dispatchTouchEvent(event)
+            when (event.actionMasked) {
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    // Never turn a pinch, pointer replacement or its coordinate jump into a page.
+                    if (touchAxis == TouchAxis.Horizontal) dragCallbacks?.onEnd?.invoke(true)
+                    cancelNativeTouch(event)
+                    touchAxis = TouchAxis.Cancelled
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (touchAxis == TouchAxis.Pending && (onCategorySwipe != null || dragCallbacks != null)) {
+                        val dx = abs(event.x - downX)
+                        val dy = abs(event.y - downY)
+                        if (max(dx, dy) > touchSlop) {
+                            touchAxis = if (dx > dy) TouchAxis.Horizontal else TouchAxis.Vertical
+                            if (touchAxis == TouchAxis.Horizontal) {
+                                // Cancel pressed TextViews and the native scroll before taking over.
+                                cancelNativeTouch(event)
+                                stopScroll()
+                                parent?.requestDisallowInterceptTouchEvent(true)
+                                dragCallbacks?.onStart?.invoke()
+                            }
+                        }
+                    }
+                    if (touchAxis == TouchAxis.Horizontal) {
+                        dragCallbacks?.onDelta?.invoke(event.rawX - lastRawX, width.toFloat(), layoutDirection == View.LAYOUT_DIRECTION_RTL)
+                        lastRawX = event.rawX
+                        true
+                    } else if (touchAxis == TouchAxis.Cancelled) true
+                    else super.dispatchTouchEvent(event)
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (touchAxis == TouchAxis.Horizontal) {
+                        if (dragCallbacks != null) {
+                            dragCallbacks?.onEnd?.invoke(false)
+                            return true
+                        }
+                        val dx = event.x - downX
+                        val threshold = max(touchSlop * 2f, min(width * 0.15f, 64f * resources.displayMetrics.density))
+                        if (abs(dx) >= threshold) {
+                            val physicalStep = if (dx < 0) 1 else -1
+                            onCategorySwipe?.invoke(if (layoutDirection == View.LAYOUT_DIRECTION_RTL) -physicalStep else physicalStep)
+                        }
+                        true
+                    } else if (touchAxis == TouchAxis.Cancelled) true
+                    else super.dispatchTouchEvent(event)
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    if (touchAxis == TouchAxis.Horizontal) dragCallbacks?.onEnd?.invoke(true)
+                    if (touchAxis == TouchAxis.Horizontal || touchAxis == TouchAxis.Cancelled) true
+                    else super.dispatchTouchEvent(event)
+                }
+                else -> super.dispatchTouchEvent(event)
+            }
         } finally {
             if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                touchActive = false
+                touchAxis = TouchAxis.Pending
                 parent?.requestDisallowInterceptTouchEvent(false)
             }
         }
+    }
+
+    private fun cancelNativeTouch(event: MotionEvent) {
+        val cancel = MotionEvent.obtain(event)
+        cancel.action = MotionEvent.ACTION_CANCEL
+        try { super.dispatchTouchEvent(cancel) } finally { cancel.recycle() }
     }
 
     override fun onMeasure(widthSpec: Int, heightSpec: Int) {
@@ -133,6 +219,11 @@ internal class ReactionEmojiRecyclerView(context: Context) : RecyclerView(contex
         released = true
         updateGeneration++
         stopScroll()
+        touchAxis = TouchAxis.Cancelled
+        onCategorySwipe = null
+        dragCallbacks = null
+        if (touchActive) parent?.requestDisallowInterceptTouchEvent(false)
+        touchActive = false
         emojiAdapter.onSelect = {}
         adapter = null
     }

@@ -75,6 +75,7 @@ internal fun ReactionEmojiSheet(
     val scope = rememberCoroutineScope()
     val pager = remember(scope) { ReactionEmojiPagerState(scope) }
     pager.count = categories.size
+    val dragCallbacks = remember(pager) { ReactionEmojiDragCallbacks(pager::beginDrag, pager::dragBy, pager::endDrag) }
     val content = Theme[colors][onPanelColor]
     val sheetHeight = with(LocalDensity.current) {
         (LocalWindowInfo.current.containerSize.height * 0.62f).toDp()
@@ -83,15 +84,15 @@ internal fun ReactionEmojiSheet(
         state = state,
         onDismissRequest = onDismiss,
         contentColor = content,
-        contentPadding = PaddingValues(start = 12.dp, top = 28.dp, end = 12.dp, bottom = 8.dp),
+        contentPadding = PaddingValues(top = 28.dp, bottom = 8.dp),
         scrollableBody = true,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().height(sheetHeight),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(tr("添加响应"), fontSize = 18.sp, color = content, modifier = Modifier.padding(horizontal = 4.dp))
-            Box(Modifier) {
+            Text(tr("添加响应"), fontSize = 18.sp, color = content, modifier = Modifier.padding(horizontal = 16.dp))
+            Box(Modifier.padding(horizontal = 12.dp)) {
                 ReactionEmojiCategoryTabs(categories, pager.selected) { pager.select(it) }
             }
             val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -106,6 +107,8 @@ internal fun ReactionEmojiSheet(
                             translationX = pager.offsetFor(page) * size.width * if (rtl) -1f else 1f
                         },
                         bottomPadding = 8.dp + LocalBottomSheetBottomPadding.current,
+                        horizontalPadding = 12.dp,
+                        dragCallbacks = dragCallbacks,
                         onSelect = { if (page == pager.selected && !pager.dragging) onSelect(it) },
                     )
                 } }

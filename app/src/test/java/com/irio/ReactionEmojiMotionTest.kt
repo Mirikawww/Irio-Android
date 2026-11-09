@@ -50,7 +50,6 @@ class ReactionEmojiMotionTest {
         withPicker {
             suspend fun jump(from: Int, to: Int) {
                 val source = grids().single()
-                val sourceLeft = tagged("reaction-emoji-page-$from").positionInRoot.x
                 clickCategory(to)
                 frames(1)
                 val destination = grids().single { it !== source }
@@ -62,15 +61,48 @@ class ReactionEmojiMotionTest {
                     assertTrue("Only the source and destination may mount, not intervening categories: $mounted",
                         mounted.all { it == from || it == to })
                     assertTrue("The destination must start at most one viewport away",
-                        kotlin.math.abs(tagged("reaction-emoji-page-$to").positionInRoot.x - sourceLeft) <= destination.width + 1f)
+                        kotlin.math.abs(tagged("reaction-emoji-page-$to").positionInRoot.x) <= destination.width + 1f)
                     frames(1)
                 }
                 assertTrue("The destination grid must survive settling", grids().single() === destination)
                 assertTrue(tagged("reaction-emoji-tab-$to").config[SemanticsProperties.Selected])
-                assertEquals(sourceLeft, tagged("reaction-emoji-page-$to").positionInRoot.x, 1f)
+                assertEquals(0f, tagged("reaction-emoji-page-$to").positionInRoot.x, 1f)
             }
             jump(0, 8)
             jump(8, 0)
+        }
+    }
+
+    @Test fun draggingMovesPagesBeforeReleaseAndKeepsTheDestinationGridAfterSettling() = runTest {
+        withPicker {
+            val first = grids().single { (it.getChildAt(0) as? TextView)?.text.toString() == ReactionEmojiCatalog.categories[0].emojis.first() }
+            val page = tagged("reaction-emoji-page-0")
+            assertEquals("The moving viewport must extend to the sheet edge", 0f, page.positionInRoot.x, 1f)
+            val original = page.positionInRoot.x
+            val origin = IntArray(2).also(first::getLocationInWindow)
+            val rootOrigin = IntArray(2).also(root::getLocationInWindow)
+            val x = origin[0] - rootOrigin[0] + first.width * 0.8f
+            val y = origin[1] - rootOrigin[1] + first.height / 2f
+            val down = SystemClock.uptimeMillis()
+            fun touch(action: Int, dx: Float, step: Int) {
+                val e = MotionEvent.obtain(down, down + step * 20L, action, x + dx, y, 0)
+                try { root.dispatchTouchEvent(e) } finally { e.recycle() }
+                frames(1)
+            }
+            touch(MotionEvent.ACTION_DOWN, 0f, 0)
+            touch(MotionEvent.ACTION_MOVE, -100f, 1)
+            val moved = tagged("reaction-emoji-page-0").positionInRoot.x
+            assertEquals("Movement must follow the held finger, not wait for ACTION_UP", original - 100f, moved, 2f)
+            touch(MotionEvent.ACTION_MOVE, -200f, 2)
+            assertEquals(original - 200f, tagged("reaction-emoji-page-0").positionInRoot.x, 2f)
+            val destination = grids().single { grid ->
+                (grid.getChildAt(0) as? TextView)?.text.toString() == ReactionEmojiCatalog.categories[1].emojis.first()
+            }
+            touch(MotionEvent.ACTION_UP, -200f, 3)
+            frames(80)
+            assertTrue(tagged("reaction-emoji-tab-1").config[SemanticsProperties.Selected])
+            assertTrue("Settling must retain the same destination view, not flash a newly empty grid", grids().any { it === destination })
+            assertEquals(0f, tagged("reaction-emoji-page-1").positionInRoot.x, 1f)
         }
     }
 
@@ -98,6 +130,35 @@ class ReactionEmojiMotionTest {
             frames(80)
             assertEquals(1, grids().size)
             assertEquals(ReactionEmojiCatalog.categories[0].emojis.first(), (grids().single().getChildAt(0) as TextView).text.toString())
+        }
+    }
+
+    @Test
+    fun fingerSwipesInsideTheRealSheetSwitchPagesAndClampAtTheEnds() = runTest {
+        withPicker {
+            fun assertSelected(index: Int) {
+                assertTrue(tagged("reaction-emoji-tab-$index").config[SemanticsProperties.Selected])
+                assertEquals(ReactionEmojiCatalog.categories[index].emojis.first(),
+                    (grids().single().getChildAt(0) as TextView).text.toString())
+            }
+            swipe(right = true)
+            frames(80)
+            assertSelected(0)
+            swipe(right = false)
+            frames(80)
+            assertSelected(1)
+            swipe(right = false, cancel = true)
+            frames(80)
+            assertSelected(1)
+            swipe(right = true)
+            frames(80)
+            assertSelected(0)
+            clickCategory(8)
+            frames(80)
+            swipe(right = false)
+            frames(80)
+            assertSelected(8)
+            assertTrue("Category drags must never select a native emoji", selections.isEmpty())
         }
     }
 
