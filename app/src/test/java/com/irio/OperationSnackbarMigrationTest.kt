@@ -56,6 +56,43 @@ import org.robolectric.shadows.ShadowWindowManagerImpl
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class OperationSnackbarMigrationTest {
+    @Test fun reenteringLinkDoesNotReplayOldPairingResultsButNewFailuresStillNotify() = runTest {
+        val state = mutableStateOf(LinkUiState(settings = LinkSettings(enabled = true), pairErrorNonce = 7))
+        val open = mutableStateOf(true)
+        withUi {
+            if (open.value) LinkSettingsScreen(onBack = {}, state = state.value, initialize = {}, pairWithCode = {})
+        }.use { ui ->
+            ui.flushLayout = true
+            ui.frames(40)
+            assertFalse("Opening the screen must not replay a historical failure", ui.hasText(tr("配对失败")))
+            state.value = state.value.copy(pairErrorNonce = 8)
+            ui.frames(40)
+            assertTrue("A new failure on this screen must still notify", ui.isSnackbarText(tr("配对失败")))
+            ui.swipeText(tr("配对失败"), 1f); ui.frames(60)
+            state.value = state.value.copy(pairErrorNonce = 9)
+            ui.frames(40)
+            assertTrue("Repeated identical failures must notify again", ui.isSnackbarText(tr("配对失败")))
+            open.value = false; ui.frames(40)
+            // Even a failure completed while the screen was absent must not replay on entry.
+            state.value = state.value.copy(pairErrorNonce = 10)
+            open.value = true; ui.frames(40)
+            assertFalse("Reentering must start with no stale pairing notice", ui.hasText(tr("配对失败")))
+            ui.edit(tr("输入配对码"), "draft-code")
+            state.value = state.value.copy(pairErrorNonce = 0, pairSuccessNonce = 1)
+            ui.frames(40)
+            assertTrue("A new success must still clear the submitted code", ui.hasEditableText(""))
+            open.value = false; ui.frames(40)
+            state.value = state.value.copy(pairErrorNonce = 11)
+            open.value = true; ui.frames(40)
+            assertFalse(ui.hasText(tr("配对失败")))
+            ui.edit(tr("输入配对码"), "retry-code")
+            state.value = state.value.copy(pairErrorNonce = 12)
+            ui.frames(40)
+            assertTrue("Historical success must not swallow a new failure", ui.isSnackbarText(tr("配对失败")))
+            assertTrue(ui.hasEditableText("retry-code"))
+        }
+    }
+
     @Test fun blankPairingCodeOnlyShowsSnackbarWithoutChangingTheFieldOrStartingPairing() = runTest {
         var attempts = 0
         val state = mutableStateOf(LinkUiState(settings = LinkSettings(enabled = true)))

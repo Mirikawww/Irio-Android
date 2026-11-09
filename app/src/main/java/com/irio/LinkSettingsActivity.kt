@@ -108,6 +108,11 @@ internal fun LinkSettingsScreen(
     val clipboard = LocalClipboardManager.current
 
     val notice = remember { LinkSettingsNotice() }
+    // Runtime counters outlive this screen. Treat their entry values as history,
+    // not pending UI events; only results arriving during this visit may notify.
+    var observedPairError by remember { mutableIntStateOf(state.pairErrorNonce) }
+    var observedPairSuccess by remember { mutableIntStateOf(state.pairSuccessNonce) }
+
     LaunchedEffect(state.statusNonce, state.status) { notice.onStatus(state.status) }
 
     LaunchedEffect(Unit) {
@@ -115,11 +120,15 @@ internal fun LinkSettingsScreen(
     }
 
     LaunchedEffect(state.pairErrorNonce) {
+        if (state.pairErrorNonce == observedPairError) return@LaunchedEffect
+        observedPairError = state.pairErrorNonce
         if (state.pairErrorNonce == 0) return@LaunchedEffect
         notice.onPairError(tr("配对失败"))
     }
 
     LaunchedEffect(state.pairSuccessNonce) {
+        if (state.pairSuccessNonce == observedPairSuccess) return@LaunchedEffect
+        observedPairSuccess = state.pairSuccessNonce
         if (state.pairSuccessNonce == 0) return@LaunchedEffect
         codeState.clearText()
         notice.dismiss()
