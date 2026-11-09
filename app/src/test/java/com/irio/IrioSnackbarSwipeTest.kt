@@ -6,8 +6,11 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.BroadcastFrameClock
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Recomposer
@@ -40,6 +43,62 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
 class IrioSnackbarSwipeTest {
+    @Test fun committedSwipeAlsoReleasesTheActionButtonTouchRegion() = runTest {
+        withUi(action = true) { ui ->
+            ui.frames(40)
+            ui.swipe(-180f)
+            val action = requireNotNull(ui.text("View")).boundsInRoot
+            ui.drag(action.center.x, action.center.y, 0f, -100f)
+            assertTrue("The exiting View action must not block the scroll underneath", ui.scroll.value > 40)
+        }
+    }
+    @Test fun committedSwipeLetsUnderlyingContentScrollBeforeTheExitFinishes() = runTest {
+        for (direction in listOf(-1f, 1f)) withUi { ui ->
+            ui.frames(40)
+            ui.swipe(direction * 180f)
+            val exiting = requireNotNull(ui.surface()).boundsInRoot
+            assertTrue("The released snackbar must still be visibly animating", exiting.width > 20f)
+            assertTrue("The exit must not finish before testing the next touch", ui.visible.value)
+
+            ui.drag(exiting.center.x, exiting.center.y, 0f, -100f)
+            assertTrue("A committed swipe must immediately stop blocking the underlying scroll",
+                ui.scroll.value > 40)
+            ui.frames(60)
+            assertEquals("The untouched exit must still complete normally", 1, ui.dismissals)
+        }
+    }
+
+    @Test fun committedSwipeCannotBeGrabbedBackByAnotherFingerDrag() = runTest {
+        for (direction in listOf(-1f, 1f)) withUi { ui ->
+            ui.frames(40)
+            ui.swipe(direction * 180f)
+            val exiting = requireNotNull(ui.surface()).boundsInRoot
+            assertTrue("The second drag must start on the still-visible exit", exiting.width > 20f)
+            ui.drag(exiting.center.x, exiting.center.y, -direction * 100f, 0f)
+            ui.frames(60)
+            assertFalse("A new drag must not cancel a committed dismissal", ui.visible.value)
+            assertEquals(1, ui.dismissals)
+        }
+    }
+
+    @Test fun repeatingACommittedSwipeRestoresTouchAndRestartsTheTimeout() = runTest {
+        withUi { ui ->
+            ui.frames(200)
+            ui.swipe(180f)
+            ui.nonce.value++
+            ui.frames(60)
+            // This real drag also verifies that removing the old hit target is reversible.
+            ui.swipe(-80f, endAction = MotionEvent.ACTION_CANCEL)
+            ui.frames(120)
+            assertTrue("Repeating the notice must survive the original five-second deadline", ui.visible.value)
+            assertEquals(0, ui.dismissals)
+            assertEquals(180f, requireNotNull(ui.text(ui.message.value)).boundsInRoot.center.x, 1f)
+            ui.frames(200)
+            assertFalse("The repeated notice must still expire on its restarted timer", ui.visible.value)
+            assertEquals(1, ui.dismissals)
+        }
+    }
+
     @Test fun retriggerBeforeLeavingTheScreenSpringsBackInsteadOfTeleporting() = runTest {
         for (direction in listOf(-1f, 1f)) withUi { ui ->
             ui.frames(40)
@@ -178,7 +237,7 @@ class IrioSnackbarSwipeTest {
         }
     }
 
-    private fun TestScope.withUi(clearMessageOnDismiss: Boolean = false, block: (Ui) -> Unit) {
+    private fun TestScope.withUi(clearMessageOnDismiss: Boolean = false, action: Boolean = false, block: (Ui) -> Unit) {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup().visible()
         val clock = BroadcastFrameClock()
         val recomposer = Recomposer(coroutineContext + clock)
@@ -192,12 +251,16 @@ class IrioSnackbarSwipeTest {
                 CompositionLocalProvider(LocalDensity provides Density(1f)) {
                     AppTheme {
                         Box(Modifier.fillMaxSize()) {
+                            Box(Modifier.fillMaxSize().verticalScroll(ui.scroll)) {
+                                Box(Modifier.fillMaxSize().height(1280.dp))
+                            }
                             IrioSnackbar(ui.visible.value, ui.message.value, 0.dp,
                                 onDismiss = {
                                     ui.dismissals++
                                     ui.visible.value = false
                                     if (clearMessageOnDismiss) ui.message.value = ""
-                                }, restartKey = ui.nonce.value)
+                                }, restartKey = ui.nonce.value, actionLabel = if (action) "View" else null,
+                                onAction = if (action) ({}) else null)
                         }
                     }
                 }
@@ -213,6 +276,7 @@ class IrioSnackbarSwipeTest {
         val visible = mutableStateOf(true)
         val message = mutableStateOf("old notice")
         val nonce = mutableStateOf(0)
+        val scroll = ScrollState(0)
         var dismissals = 0
         private var time = 0L
 
@@ -255,6 +319,19 @@ class IrioSnackbarSwipeTest {
             assertTrue("The fixture must exercise the actual drag handler",
                 kotlin.math.abs(requireNotNull(text(message.value)).boundsInRoot.center.x - bounds.center.x) > 20f)
             event(endAction, 9)
+        }
+
+        fun drag(x: Float, y: Float, dx: Float, dy: Float) {
+            val down = SystemClock.uptimeMillis()
+            fun event(action: Int, step: Int) {
+                val motion = MotionEvent.obtain(down, down + step * 16L, action,
+                    x + dx * step.coerceAtMost(8) / 8f, y + dy * step.coerceAtMost(8) / 8f, 0)
+                try { view.dispatchTouchEvent(motion) } finally { motion.recycle() }
+                frames()
+            }
+            event(MotionEvent.ACTION_DOWN, 0)
+            (1..8).forEach { event(MotionEvent.ACTION_MOVE, it) }
+            event(MotionEvent.ACTION_UP, 9)
         }
     }
 }

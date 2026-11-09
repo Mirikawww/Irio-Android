@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +39,9 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,6 +78,8 @@ internal fun BoxScope.IrioSnackbar(
 ) {
     val dismiss by rememberUpdatedState(onDismiss)
     val scope = rememberCoroutineScope()
+    var actionSize by remember { mutableStateOf(IntSize.Zero) }
+    val density = LocalDensity.current
     var displayedMessage by remember { mutableStateOf(message) }
     var replacing by remember { mutableStateOf(false) }
     var wasVisible by remember { mutableStateOf(visible) }
@@ -155,7 +161,8 @@ internal fun BoxScope.IrioSnackbar(
                 },
             ) {
                 val surfaceModifier = Modifier
-                    .pointerInput(swipe, trigger) {
+                    // Keep drawing the committed exit, but remove its hit target on release.
+                    .then(if (swipeOff) Modifier else Modifier.pointerInput(swipe, trigger) {
                         val travel = size.width + 32.dp.toPx()
                         fun settle(target: Float, dismissAfter: Boolean = false) {
                             if (currentSwipe !== swipe || currentTrigger != trigger || !currentlyVisible) return
@@ -186,7 +193,7 @@ internal fun BoxScope.IrioSnackbar(
                                 }
                             },
                         )
-                    }
+                    })
                     .graphicsLayer { translationX = offsetX }
                     .onGloballyPositioned { swipe.coordinates = it }
                     .fillMaxWidth()
@@ -200,9 +207,14 @@ internal fun BoxScope.IrioSnackbar(
                     ) {
                         Text(text, modifier = Modifier.weight(1f).padding(end = 8.dp),
                             color = Theme[colors][onPrimaryColor], fontSize = 16.sp, lineHeight = 21.sp)
-                        Button(onClick = onAction, style = ButtonStyle.Ghost, buttonSize = ButtonSize.Small,
+                        if (swipeOff) {
+                            Box(Modifier.size(with(density) { actionSize.width.toDp() }, with(density) { actionSize.height.toDp() }),
+                                contentAlignment = Alignment.Center) {
+                                Text(actionLabel, color = Theme[colors][onPrimaryColor], fontSize = 14.sp)
+                            }
+                        } else Button(onClick = onAction, style = ButtonStyle.Ghost, buttonSize = ButtonSize.Small,
                             shape = ContinuousCapsule, contentColor = Theme[colors][onPrimaryColor],
-                            modifier = Modifier.heightIn(min = 48.dp)) {
+                            modifier = Modifier.heightIn(min = 48.dp).onSizeChanged { actionSize = it }) {
                             Text(actionLabel, color = LocalContentColor.current)
                         }
                     }
