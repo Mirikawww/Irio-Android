@@ -2,7 +2,7 @@ package com.irio
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.compose.animation.core.Animatable
+
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
+
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -53,7 +53,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.IntOffset
+
 import com.composables.ui.components.Button
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
@@ -92,43 +92,36 @@ class LinkSettingsActivity : ComponentActivity() {
 }
 
 @Composable
-internal fun LinkSettingsScreen(onBack: () -> Unit) {
+internal fun LinkSettingsScreen(
+    onBack: () -> Unit,
+    state: LinkUiState = LinkRuntime.state.collectAsState().value,
+    initialize: (android.content.Context) -> Unit = { LinkRuntime.ensure(it); LinkRuntime.refreshPairing() },
+    pairWithCode: (String) -> Unit = LinkRuntime::pairWithCode,
+) {
     val context = LocalContext.current
     val background = Theme[colors][backgroundColor]
     val content = Theme[colors][onBackgroundColor]
     val muted = Theme[colors][mutedColor]
-    val state by LinkRuntime.state.collectAsState()
+
     val codeState = rememberTextFieldState()
     var modeMenuOpen by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
-    val shake = remember { Animatable(0f) }
-    var pairInvalid by remember { mutableStateOf(false) }
-    val notice = remember { LinkSettingsNotice() }
 
+    val notice = remember { LinkSettingsNotice() }
     LaunchedEffect(state.statusNonce, state.status) { notice.onStatus(state.status) }
 
     LaunchedEffect(Unit) {
-        LinkRuntime.ensure(context)
-        LinkRuntime.refreshPairing()
+        initialize(context)
     }
 
     LaunchedEffect(state.pairErrorNonce) {
-        if (state.pairErrorNonce == 0) {
-            pairInvalid = false
-            return@LaunchedEffect
-        }
-        pairInvalid = true
+        if (state.pairErrorNonce == 0) return@LaunchedEffect
         notice.onPairError(tr("配对失败"))
-        shake.snapTo(0f)
-        listOf(-10f, 10f, -8f, 8f, -4f, 4f, 0f).forEach { target ->
-            shake.animateTo(target, irioSpring<Float>(stiffness = 2600f, dampingRatio = 0.78f))
-        }
     }
 
     LaunchedEffect(state.pairSuccessNonce) {
         if (state.pairSuccessNonce == 0) return@LaunchedEffect
         codeState.clearText()
-        pairInvalid = false
         notice.dismiss()
     }
 
@@ -195,12 +188,7 @@ internal fun LinkSettingsScreen(onBack: () -> Unit) {
                     state = codeState,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .then(
-                            rememberInputFieldBorder(
-                                errorColor = if (pairInvalid) irioErrorTextColor() else null,
-                            ),
-                        )
-                        .offset { IntOffset(shake.value.toInt(), 0) },
+                        .then(rememberInputFieldBorder()),
                     accessibilityLabel = tr("输入配对码"),
                     placeholder = {
                         Text(
@@ -218,7 +206,11 @@ internal fun LinkSettingsScreen(onBack: () -> Unit) {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                 )
                 Button(
-                    onClick = { LinkRuntime.pairWithCode(codeState.text.toString()) },
+                    onClick = {
+                        val code = codeState.text.toString()
+                        if (code.isBlank()) notice.onPairError(tr("输入配对码"))
+                        else pairWithCode(code)
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     style = ButtonStyle.Primary,
                 ) { Text(tr("配对"), color = LocalContentColor.current) }

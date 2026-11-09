@@ -56,6 +56,38 @@ import org.robolectric.shadows.ShadowWindowManagerImpl
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class OperationSnackbarMigrationTest {
+    @Test fun blankPairingCodeOnlyShowsSnackbarWithoutChangingTheFieldOrStartingPairing() = runTest {
+        var attempts = 0
+        val state = mutableStateOf(LinkUiState(settings = LinkSettings(enabled = true)))
+        withUi {
+            LinkSettingsScreen(onBack = {}, state = state.value,
+                initialize = {}, pairWithCode = { attempts++ })
+        }.use { ui ->
+            ui.flushLayout = true
+            ui.frames(40)
+            fun field() = ui.all().single { it.config.contains(SemanticsActions.SetText) &&
+                it.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }.contains(tr("输入配对码")) }
+            val initial = field().positionInRoot
+            ui.click(tr("配对"))
+            ui.frames(40)
+            assertEquals("Blank input must not start a pairing operation", 0, attempts)
+            assertTrue(ui.isSnackbarText(tr("输入配对码")))
+            repeat(30) { ui.frames(1); assertEquals("The input must not shake", initial, field().positionInRoot) }
+            ui.swipeText(tr("输入配对码"), 1f); ui.frames(60)
+            ui.edit(tr("输入配对码"), "   ")
+            ui.click(tr("配对")); ui.frames(40)
+            assertTrue("Whitespace must show the same notice again", ui.isSnackbarText(tr("输入配对码")))
+            assertEquals(0, attempts)
+            ui.edit(tr("输入配对码"), "123456@127.0.0.1:17432")
+            ui.click(tr("配对")); ui.frames(1)
+            assertEquals("Nonempty codes still reach pairing", 1, attempts)
+            state.value = state.value.copy(pairErrorNonce = 1)
+            repeat(40) { ui.frames(1); assertEquals("Pairing failures must not shake the input either", initial, field().positionInRoot) }
+            assertTrue(ui.isSnackbarText(tr("配对失败")))
+            assertTrue("A failed attempt must keep the entered code", ui.hasEditableText("123456@127.0.0.1:17432"))
+        }
+    }
+
     @Test fun docsManagementNoticeStaysAtWindowBottomWithoutAvoidingControls() = runTest {
         IrioDocsMcpStore.install(org.robolectric.RuntimeEnvironment.getApplication())
         withUi { McpSettingsScreen(discoverDocsTools = { throw java.io.IOException("fixture") }, onBack = {}) }.use { ui ->
