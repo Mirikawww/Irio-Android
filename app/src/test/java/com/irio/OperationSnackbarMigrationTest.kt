@@ -56,6 +56,61 @@ import org.robolectric.shadows.ShadowWindowManagerImpl
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class OperationSnackbarMigrationTest {
+    @Test fun expandingModelListStartsAtTheSelectedProviderAndVariantWithoutPinningManualScroll() = runTest {
+        lateinit var state: ChatScreenState
+        val startup = StartupUpdateCheck(this)
+        withUi {
+            state = rememberChatScreenState()
+            ChatScreenLayout(state, startupCheck = startup)
+        }.use { ui ->
+            ui.flushLayout = true
+            ui.frames(40)
+            state.providers = listOf(
+                ProviderConfig("first", "First", "https://example.test", "", models = List(80) { "fixture-$it" }),
+                ProviderConfig("second", "Second", "https://example.test", "", models = List(80) { "fixture-$it" } + "fixture-72-thinking"),
+            )
+            state.activeProviderId = "second"
+            state.selectedModel = "fixture-72-thinking"
+            state.mergeModels = true
+            state.modelMenuOpen = true; ui.frames(40)
+            repeat(2) {
+                val expand = ui.all().single { node ->
+                    node.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }.contains(tr("选择模型")) &&
+                        node.config.contains(SemanticsProperties.StateDescription)
+                }
+                assertTrue(expand.config[SemanticsActions.OnClick].action!!.invoke())
+                ui.frames(40)
+                fun views(view: View): List<View> = listOf(view) + if (view is ViewGroup)
+                    (0 until view.childCount).flatMap { views(view.getChildAt(it)) } else emptyList()
+                val recycler = ui.roots().flatMap(::views).filterIsInstance<androidx.recyclerview.widget.RecyclerView>()
+                    .single { it.alpha > 0.9f && it.adapter!!.itemCount > 100 }
+                val manager = recycler.layoutManager as androidx.recyclerview.widget.LinearLayoutManager
+                val rows = (recycler.adapter as androidx.recyclerview.widget.ListAdapter<*, *>).currentList
+                val selectedIndex = rows.indexOfFirst { row -> row is ModelPickerRow.Model &&
+                    row.providerId == state.activeProviderId && state.selectedModel in row.variants }
+                assertTrue("The selected provider and merged variant must exist in the real adapter", selectedIndex >= 0)
+                val selected = manager.findViewByPosition(selectedIndex)
+                assertNotNull("The selected model must be laid out on first reveal, not the start of the list; first=${manager.findFirstVisibleItemPosition()}, last=${manager.findLastVisibleItemPosition()}, " +
+                    "selectedIndex=$selectedIndex, selectedState=${state.selectedModel}/${state.activeProviderId}, items=${recycler.adapter!!.itemCount}", selected)
+                assertTrue("The selected row must actually intersect the viewport", selected!!.bottom > recycler.paddingTop && selected.top < recycler.height - recycler.paddingBottom)
+                val before = manager.findFirstVisibleItemPosition()
+                recycler.scrollBy(0, -400); ui.frames(20)
+                val scrolled = manager.findFirstVisibleItemPosition()
+                assertTrue("Manual scrolling must remain free after positioning", scrolled < before)
+                state.webSearchEnabled = !state.webSearchEnabled; ui.frames(20)
+                assertEquals("An unrelated recomposition must not reset the user's scroll", scrolled, manager.findFirstVisibleItemPosition())
+                // Selecting another visible row closes the list; reopen at that new selection.
+                val newRow = rows[manager.findFirstVisibleItemPosition()] as ModelPickerRow.Model
+                val itemAction = ui.nodes(manager.findViewByPosition(manager.findFirstVisibleItemPosition())!!)
+                    .single { it.config.contains(SemanticsProperties.Selected) }
+                assertTrue(itemAction.config[SemanticsActions.OnClick].action!!.invoke())
+                ui.frames(40)
+                assertEquals(newRow.providerId, state.activeProviderId)
+                assertEquals(newRow.target, state.selectedModel)
+            }
+        }
+    }
+
     @Test fun unavailableModelSearchClosesThePopupAndShowsTheConfigurationNoticeOnChat() = runTest {
         lateinit var state: ChatScreenState
         val startup = StartupUpdateCheck(this)

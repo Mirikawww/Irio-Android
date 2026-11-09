@@ -49,6 +49,7 @@ internal fun <T : Any> AndroidComposeRecyclerList(
     interactionEnabled: Boolean = true,
     prioritizeScrollGestures: Boolean = false,
     maintainEndPosition: Boolean = false,
+    scrollToItemKey: Any? = null,
     content: @Composable (T) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -74,6 +75,7 @@ internal fun <T : Any> AndroidComposeRecyclerList(
                 view.updateCornerRadius(cornerRadiusPx)
                 view.updatePadding(padding)
                 view.updateItemSpacing(spacingPx)
+                view.updateScrollTarget(scrollToItemKey)
                 view.updateItems(items)
             }
         },
@@ -85,6 +87,7 @@ internal fun <T : Any> AndroidComposeRecyclerList(
             view.updatePadding(padding)
             view.updateItemSpacing(spacingPx)
             view.updateContent(content)
+            view.updateScrollTarget(scrollToItemKey)
             view.updateItems(items)
         },
     )
@@ -102,6 +105,7 @@ private class ComposeRecyclerView<T : Any>(
     key: (T) -> Any,
     content: @Composable (T) -> Unit,
 ) : RecyclerView(context) {
+    private val keyOf = key
     private val listAdapter = ComposeListAdapter(key, content)
     private val listLayoutManager = EndAnchoredLayoutManager(context)
     var maintainEndPosition: Boolean
@@ -112,6 +116,8 @@ private class ComposeRecyclerView<T : Any>(
     private var acceptsTouch = true
     var prioritizeScrollGestures = false
     private var lastTouchY = 0f
+    private var scrollTarget: Any? = null
+    private var pendingScrollTarget: Any? = null
 
     init {
         layoutManager = listLayoutManager
@@ -195,7 +201,22 @@ private class ComposeRecyclerView<T : Any>(
     }
 
     fun updateItems(next: List<T>) {
-        listAdapter.submitList(next)
+        // The target must resolve against the committed list, not an in-flight diff.
+        listAdapter.submitList(next) { applyScrollTarget() }
+    }
+
+    fun updateScrollTarget(key: Any?) {
+        if (key == scrollTarget) return
+        scrollTarget = key
+        pendingScrollTarget = key
+    }
+
+    private fun applyScrollTarget() {
+        val target = pendingScrollTarget ?: return
+        val position = listAdapter.currentList.indexOfFirst { keyOf(it) == target }
+        if (position < 0) return
+        pendingScrollTarget = null
+        listLayoutManager.scrollToPositionWithOffset(position, 0)
     }
 
     fun updateContent(next: @Composable (T) -> Unit) {

@@ -355,6 +355,8 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                     cornerRadius = 12.dp,
                     opacity = listOpacityState,
                     interactionEnabled = modelsExpanded,
+                    scrollToItemKey = if (modelsExpanded) rows.filterIsInstance<ModelPickerRow.Model>()
+                        .firstOrNull { it.providerId == activeProviderId && selectedModel in it.variants }?.key else null,
                 ) { row ->
                     when (row) {
                         is ModelPickerRow.Gap -> Spacer(Modifier.height(6.dp))
