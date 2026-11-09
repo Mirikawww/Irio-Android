@@ -90,7 +90,12 @@ for model in openrouter_data.get("data", []):
 # /api/v1/models/qwen/qwen3.8-max/endpoints resolves it to qwen3.8-max-0902
 # (verified 2026-10-28). Use the canonical metadata, never infer from a name suffix.
 # If OpenRouter lists the alias explicitly later, its own values take precedence.
-for alias, canonical in {"qwen/qwen3.8-max": "qwen/qwen3.8-max-0902"}.items():
+# The user-confirmed gateway splits Gemini 2.5 Flash into a -thinking alias.
+# Alias metadata only; preserve the gateway id in actual API requests.
+for alias, canonical in {
+    "qwen/qwen3.8-max": "qwen/qwen3.8-max-0902",
+    "google/gemini-2.5-flash-thinking": "google/gemini-2.5-flash",
+}.items():
     if canonical in names:
         names.setdefault(alias, names[canonical])
         names.setdefault(alias.split("/")[-1], names[alias])

@@ -13,6 +13,34 @@ SCRATCH = pathlib.Path.home() / "AppData/Local/hermes/cache/scratch"
 
 
 class ReasoningCatalogTest(unittest.TestCase):
+    def test_gemini_thinking_gateway_alias_has_persistent_targeted_metadata(self):
+        fixture = {"data": [{"id": "google/gemini-2.5-flash", "name": "Google: Gemini 2.5 Flash",
+                             "context_length": 1048576, "reasoning": {"mandatory": False}}]}
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            root = pathlib.Path(directory)
+            assets = root / "app/src/main/assets"
+            assets.mkdir(parents=True)
+            for name in ("model-names.json", "model-context.json", "model-reasoning.json"):
+                (assets / name).write_text('{"unrelated":"sentinel"}', encoding="utf-8")
+            import os
+            previous = os.getcwd()
+            try:
+                os.chdir(root)
+                with patch("urllib.request.urlopen", return_value=io.BytesIO(json.dumps(fixture).encode())), \
+                     patch("sys.argv", [str(SCRIPT), "--patch-model=google/gemini-2.5-flash-thinking"]):
+                    runpy.run_path(str(SCRIPT), run_name="__main__")
+                for filename, expected in (("model-names.json", "Gemini 2.5 Flash"),
+                                           ("model-context.json", 1048576),
+                                           ("model-reasoning.json", {"supports": True, "toggleable": True})):
+                    actual = json.loads((assets / filename).read_text(encoding="utf-8"))
+                    self.assertEqual({"unrelated", "google/gemini-2.5-flash-thinking", "gemini-2.5-flash-thinking"}, set(actual))
+                    self.assertEqual("sentinel", actual["unrelated"])
+                    self.assertEqual(expected, actual["gemini-2.5-flash-thinking"])
+                    self.assertEqual(expected, actual["google/gemini-2.5-flash-thinking"])
+            finally:
+                os.chdir(previous)
+
     def test_targeted_patch_only_updates_the_requested_model_and_bare_id(self):
         fixture = {"data": [{
             "id": "qwen/qwen3.8-max-0902", "name": "Qwen: Qwen3.8 Max (0902)",
