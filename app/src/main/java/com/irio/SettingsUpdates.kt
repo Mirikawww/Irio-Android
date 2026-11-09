@@ -95,7 +95,7 @@ internal fun SettingsUpdateSection(
             }
         },
     )
-    GitHubUpdateDialog(
+    UpdateBottomSheet(
         release = available,
         onDismiss = { available = null },
         onLinkError = { onNotice(tr("无法打开链接")) },
@@ -103,8 +103,19 @@ internal fun SettingsUpdateSection(
 }
 
 @Composable
-internal fun GitHubUpdateDialog(release: GitHubUpdate?, onDismiss: () -> Unit, onLinkError: () -> Unit) {
+internal fun UpdateBottomSheet(release: GitHubUpdate?, onDismiss: () -> Unit, onLinkError: () -> Unit) {
     val context = LocalContext.current
+    val sheet = rememberBottomSheetState()
+    var retainedRelease by remember { mutableStateOf<GitHubUpdate?>(null) }
+    LaunchedEffect(release) {
+        if (release != null) {
+            retainedRelease = release
+            sheet.targetDetent = BottomSheetDetent.FullyExpanded
+        } else {
+            sheet.hide()
+            retainedRelease = null
+        }
+    }
     val controller = AppUpdateDownloads.controller
     val transfer by controller.state.collectAsState()
     val download = transfer.takeIf { release != null && it.release?.tag == release.tag &&
@@ -134,8 +145,8 @@ internal fun GitHubUpdateDialog(release: GitHubUpdate?, onDismiss: () -> Unit, o
             if (!installAttempted || (permissionPending && context.packageManager.canRequestPackageInstalls())) install()
         }
     }
-    IrioAlertDialog(visible = release != null, onDismissRequest = ::close) {
-        release?.let { contentRelease ->
+    ScaledBottomSheet(state = sheet, onDismissRequest = ::close) {
+        retainedRelease?.let { contentRelease ->
             Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
             UpdateDialogContent(
                 release = contentRelease,

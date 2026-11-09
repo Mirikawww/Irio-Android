@@ -124,7 +124,7 @@ internal fun BoxScope.ChatNoticeSnackbar(
             startupNotice?.let(startupCheck::dismiss)
         }) else null,
     )
-    GitHubUpdateDialog(
+    UpdateBottomSheet(
         release = viewingUpdate,
         onDismiss = { viewingUpdate = null },
         onLinkError = { linkError = true },
