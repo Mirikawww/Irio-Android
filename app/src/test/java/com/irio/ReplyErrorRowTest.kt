@@ -179,9 +179,12 @@ class ReplyErrorRowTest {
             assertFalse("Inline code delimiters must not be displayed", code.text.contains('`'))
             assertTrue("Error codes must retain monospace formatting", code.spanStyles.any { it.item.fontFamily == FontFamily.Monospace })
             text(chatRetryLine(status.value))
-            status.value = status.value.copy(error = "A plain network error", stopped = true, remainingSeconds = null)
+            val plainError = "A plain network error"
+            // Virtual frames do not wait for Markdown parsing on Dispatchers.Default.
+            FinishedMarkdownCache.prepare(plainError, this)
+            status.value = status.value.copy(error = plainError, stopped = true, remainingSeconds = null)
             frames()
-            text("A plain network error")
+            text(plainError)
             text(chatRetryLine(status.value))
         } finally {
             view.disposeComposition(); recomposer.close(); runner.cancel()
