@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
 import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.Icon
@@ -86,9 +88,13 @@ internal fun AcknowledgementCard(credit: Acknowledgement, expanded: Boolean, onT
     val foreground = Theme[colors][onBackgroundColor]
     val muted = Theme[colors][mutedColor]
     val shape = Theme[shapes][largeShape]
+    val disclosureSpring = remember {
+        spring(dampingRatio = 1f, stiffness = irioSpring<IntSize>().stiffness,
+            visibilityThreshold = IntSize(1, 1))
+    }
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
-        animationSpec = irioSpring(),
+        animationSpec = irioSpring(dampingRatio = 1f),
         label = "acknowledgementChevron",
     )
     Column(Modifier.testTag("credit-${credit.id}").fillMaxWidth().clip(shape).background(Theme[colors][secondaryColor])) {
@@ -109,7 +115,11 @@ internal fun AcknowledgementCard(credit: Acknowledgement, expanded: Boolean, onT
             Icon(imageVector = IrioIcons.ChevronDown, contentDescription = null, tint = muted,
                 modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = chevronRotation })
         }
-        AnimatedVisibility(expanded, enter = expandVertically(irioSpring()), exit = shrinkVertically(irioSpring())) {
+        // License text arrives asynchronously and can greatly increase the target height.
+        // Critical damping avoids a content-length-dependent overshoot on first expansion.
+        AnimatedVisibility(expanded,
+            enter = expandVertically(disclosureSpring),
+            exit = shrinkVertically(disclosureSpring)) {
             Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 credit.modification?.let { Text(tr(it), color = foreground, fontSize = 13.sp, lineHeight = 18.sp) }

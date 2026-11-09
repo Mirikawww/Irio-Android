@@ -81,6 +81,27 @@ class AcknowledgementsExpansionTest {
                 assertTrue(header.config[SemanticsActions.OnClick].action!!.invoke())
             }
             val collapsed = row().height
+            for (opening in listOf("First", "Repeat")) {
+                val heights = mutableListOf(collapsed)
+                toggle()
+                repeat(120) {
+                    frames()
+                    if (nodes(row()).none { node -> node.config.getOrElse(SemanticsProperties.TestTag) { "" } == "credit-license-$id" }) Thread.sleep(5)
+                    heights += tag("credit-$id").size.height
+                }
+                val finalHeight = heights.last()
+                assertTrue("$opening expansion must not overshoot and bounce: final=$finalHeight, peak=${heights.max()}, trace=$heights",
+                    heights.max() <= finalHeight + 1)
+                assertTrue("$opening expansion must progress forward even as the license loads: $heights",
+                    heights.zipWithNext().all { (before, after) -> after >= before - 1 })
+                assertTrue("No-bounce expansion must still animate through intermediate heights",
+                    heights.any { it > collapsed && it < finalHeight })
+                toggle()
+                val shrinking = List(90) { frames(); tag("credit-$id").size.height }
+                assertTrue("Collapse must not undershoot the header or reverse direction: $shrinking",
+                    shrinking.min() >= collapsed - 1 && shrinking.zipWithNext().all { (before, after) -> after <= before + 1 })
+                assertEquals(collapsed, row().height)
+            }
             // Interrupt both directions at different intermediate animation frames.
             for (delay in listOf(1, 3, 7, 2, 12, 4)) {
                 toggle(); frames(delay)
