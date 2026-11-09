@@ -8,6 +8,7 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -300,13 +302,31 @@ private class ComposeListViewHolder<T : Any>(
 ) : RecyclerView.ViewHolder(composeView) {
     private var item by mutableStateOf<T?>(null)
     private var boundKey: Any? = null
+    private var rowLayoutPosted = false
+    private val remeasureRow = Runnable {
+        rowLayoutPosted = false
+        if (composeView.isAttachedToWindow) {
+            // A Compose size change can occur inside RecyclerView's intercepted layout.
+            // Requesting layout on the row there leaves it requested but the list unaware.
+            // Replay on the parent outside that traversal, then bypass its cached row size.
+            composeView.forceLayout()
+            (composeView.parent as? RecyclerView)?.requestLayout()
+        }
+    }
 
     init {
         composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         composeView.setContent {
             val currentItem = item
             if (currentItem != null) {
-                ProvideAppTextScale { contentState.value(currentItem) }
+                ProvideAppTextScale {
+                    Box(Modifier.onSizeChanged {
+                        if (!rowLayoutPosted) {
+                            rowLayoutPosted = true
+                            composeView.post(remeasureRow)
+                        }
+                    }) { contentState.value(currentItem) }
+                }
             }
         }
     }
@@ -326,6 +346,8 @@ private class ComposeListViewHolder<T : Any>(
     }
 
     fun clear() {
+        composeView.removeCallbacks(remeasureRow)
+        rowLayoutPosted = false
         composeView.disposeComposition()
         boundKey = null
         item = null
