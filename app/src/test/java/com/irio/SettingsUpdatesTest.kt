@@ -44,6 +44,23 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SettingsUpdatesTest {
+    @Test fun updateHeadingDoesNotRepeatTheVersionAlreadyPresentInTheArticle() = runTest {
+        val release = GitHubUpdate("1.2.0-gamma", IRIO_RELEASES_URL, true, notes = "## Irio Android 1.2.0-γ 预发布\n\n技术版本：`1.2.0-gamma`。")
+        withUi(content = { UpdateDialogContent(release, {}, {}) }) { fixture ->
+            fun text(value: String) = fixture.nodes().single { node ->
+                node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == value }
+            }
+            assertNotNull(text(tr("发现新版本")))
+            assertNotNull(text("Irio Android 1.2.0-γ 预发布"))
+            assertFalse(fixture.nodes().any { node ->
+                node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == release.tag }
+            })
+            assertFalse(fixture.nodes().any { node ->
+                node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == "Gamma" || it.text == "Iota" }
+            })
+        }
+    }
+
     @Test fun inAppDownloadHasNoWebsiteActionAndShowsProgress() = runTest {
         val release = GitHubUpdate("1.2.0-gamma", IRIO_RELEASES_URL, true, asset =
             UpdateAsset("universal", "https://irio.relithy.space/releases/download/fixture?via=cdn", "a".repeat(64), 100, "com.irio"))

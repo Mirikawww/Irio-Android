@@ -188,7 +188,7 @@ internal fun UpdateDialogContent(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             DialogTitle(tr("发现新版本"))
-            Text(release.tag, color = Theme[colors][onPanelColor], fontSize = 18.sp, lineHeight = 24.sp)
+
             if (release.testDownload) Text(tr("Debug 下载测试：真实网站版本，安装正式版，与 Debug 并存。"),
                 color = Theme[colors][onPanelColor], fontSize = 13.sp, lineHeight = 18.sp)
         }
