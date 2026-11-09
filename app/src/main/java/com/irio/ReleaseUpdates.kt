@@ -54,7 +54,7 @@ internal fun parseReleaseUpdates(json: String, abis: List<String>, channel: Upda
             }
             val asset = abis.firstNotNullOfOrNull { abi -> assets.firstOrNull { it.abi == abi } }
                 ?: assets.firstOrNull { it.abi == "universal" } ?: return@mapNotNull null
-            GitHubUpdate(versionName, IRIO_RELEASES_URL, kind == "gamma", "", code, asset)
+            GitHubUpdate(versionName, IRIO_RELEASES_URL, kind == "gamma", release.optString("notes"), code, asset)
         }.sortedByDescending { it.versionCode }
     } catch (e: UpdateCheckException) {
         throw e
