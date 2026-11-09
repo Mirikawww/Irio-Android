@@ -115,6 +115,7 @@ dependencies {
     // Composables UI
     implementation("com.composables:ui:0.2.0")
     implementation("com.composables:composeunstyled-modal:2.7.0")
+    implementation("com.composables:composeunstyled-dialog:2.7.0")
     implementation("com.composables:composeunstyled-dropdown-menu:2.7.0")
     implementation("com.composables:composeunstyled-internal-anchored:2.7.0")
     // G2 continuous corners. The AAR calls AndroidX directly; keep its UI dependency

@@ -1,6 +1,7 @@
 package com.irio
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -18,19 +19,30 @@ fun IrioAlertDialog(
     modifier: Modifier = Modifier,
     backgroundColor: Color = Theme[colors][panelColor],
     contentColor: Color = Theme[colors][onPanelColor],
+    overlay: (@Composable BoxScope.() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     BackHandler(enabled = visible) {}
+    val scaledContent: @Composable () -> Unit = {
+        ProvideAppTextScale {
+            DismissComposerFocusWhenImeHides()
+            content()
+        }
+    }
+    if (overlay != null) {
+        OverlayAlertDialog(visible, onDismissRequest, modifier, backgroundColor, contentColor,
+            overlay = {
+                val host = this
+                ProvideAppTextScale { overlay(host) }
+            }, content = scaledContent)
+        return
+    }
     AlertDialog(
         visible = visible,
         onDismissRequest = onDismissRequest,
         modifier = modifier,
         backgroundColor = backgroundColor,
         contentColor = contentColor,
-    ) {
-        ProvideAppTextScale {
-            DismissComposerFocusWhenImeHides()
-            content()
-        }
-    }
+        content = scaledContent,
+    )
 }

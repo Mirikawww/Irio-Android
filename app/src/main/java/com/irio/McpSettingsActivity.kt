@@ -383,11 +383,10 @@ internal fun McpSettingsScreen(
             }
         }
     }
-    val detailsClearance = remember(selectedIntegration) { SnackbarControlClearance() }
-    val loginClearance = remember(login) { SnackbarControlClearance() }
+
     BottomSheet(state = details, onDismissRequest = { closeDetails() },
         contentPadding = PaddingValues(top = 32.dp, bottom = 16.dp), scrollableBody = true) {
-        Box(Modifier.fillMaxWidth().then(detailsClearance.hostModifier)) {
+        Box(Modifier.fillMaxWidth().testTag("mcp-details-notice-host")) {
         SheetBody {
             when (selectedIntegration) {
                 McpIntegration.GITHUB -> GitHubLogo(80.dp, Modifier.align(Alignment.CenterHorizontally))
@@ -396,7 +395,7 @@ internal fun McpSettingsScreen(
             }
             if (selectedIntegration == McpIntegration.IRIO_DOCS) {
                 IrioDocsMcpManagement(
-                    actionsModifier = detailsClearance.controlsModifier,
+                    actionsModifier = Modifier,
                     installed = docsInstalled, enabled = docsEnabled, toolCount = docsToolCount,
                     refreshingTools = refreshingTools, onRefreshTools = ::refreshTools,
                     onWebsite = {
@@ -453,13 +452,13 @@ internal fun McpSettingsScreen(
                             }
                         }, enabled = !refreshingTools)
                     }
-                    McpRefreshToolsButton(refreshingTools, ::refreshTools, detailsClearance.controlsModifier)
+                    McpRefreshToolsButton(refreshingTools, ::refreshTools)
                     Button(onClick = { removeDialogOpen = true }, enabled = !refreshingTools, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
                         modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(tr("移除集成"), color = LocalContentColor.current)
                     }
                  } ?: TodoistButton(tr("安装"), method = "OAuth",
-                     modifier = detailsClearance.controlsModifier.padding(horizontal = 24.dp).fillMaxWidth(),
+                     modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth(),
                      onClick = { openLogin(GitHubLogin.TODOIST) })
             } else {
             Text("GitHub", Modifier.fillMaxWidth(), color = content, fontSize = 24.sp,
@@ -497,13 +496,13 @@ internal fun McpSettingsScreen(
                 }
             }
             if (installation == null) {
-                Row(detailsClearance.controlsModifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     GitHubButton(tr("安装"), "PAT", Modifier.weight(1f), onClick = { openLogin(GitHubLogin.PAT) })
                     GitHubButton(tr("安装"), "OAuth", Modifier.weight(1f), onClick = { openLogin(GitHubLogin.OAuth) })
                 }
             }
             if (installation != null) {
-                McpRefreshToolsButton(refreshingTools, ::refreshTools, detailsClearance.controlsModifier)
+                McpRefreshToolsButton(refreshingTools, ::refreshTools)
                 Button(onClick = { removeDialogOpen = true }, enabled = !refreshingTools, style = ButtonStyle.Destructive, shape = ContinuousCapsule,
                     modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(tr("移除集成"), color = LocalContentColor.current)
@@ -514,7 +513,8 @@ internal fun McpSettingsScreen(
         OperationErrorSnackbar(
             visible = detailsError != null,
             message = detailsError.orEmpty(),
-            bottomInset = with(LocalDensity.current) { detailsClearance.bottomPx.toDp() },
+            // SheetBody's IME padding already moves this local host above the keyboard.
+            bottomInset = WindowInsets.navigationBars.exclude(WindowInsets.ime).asPaddingValues().calculateBottomPadding(),
             onDismiss = { sheets.detailsError = null },
             restartKey = detailsErrorNonce,
         )
@@ -564,7 +564,7 @@ internal fun McpSettingsScreen(
     )
     if (login != null) BottomSheet(state = loginSheet, onDismissRequest = { clearLogin() },
         contentPadding = PaddingValues(start = 24.dp, top = 32.dp, end = 24.dp, bottom = 16.dp), scrollableBody = true) {
-        Box(Modifier.fillMaxWidth().then(loginClearance.hostModifier)) {
+        Box(Modifier.fillMaxWidth()) {
         SheetBody {
             if (login == GitHubLogin.TODOIST) {
                 TodoistLogo(64.dp, Modifier.align(Alignment.CenterHorizontally))
@@ -616,7 +616,7 @@ internal fun McpSettingsScreen(
                         })
                 }
             }
-            Column(loginClearance.controlsModifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (deviceCode == null || !busy) {
                 val actionLabel = when {
                     busy && login == GitHubLogin.TODOIST -> tr("正在连接")
@@ -636,7 +636,7 @@ internal fun McpSettingsScreen(
             GitHubButton(tr("取消"), modifier = Modifier.fillMaxWidth(), secondary = true, onClick = { clearLogin() })
             }
         }
-        McpLoginErrorSnackbar(sheets, bottomInset = with(LocalDensity.current) { loginClearance.bottomPx.toDp() })
+        McpLoginErrorSnackbar(sheets, bottomInset = WindowInsets.navigationBars.exclude(WindowInsets.ime).asPaddingValues().calculateBottomPadding())
         }
     }
 }

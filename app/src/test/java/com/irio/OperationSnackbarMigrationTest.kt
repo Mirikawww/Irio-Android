@@ -56,7 +56,7 @@ import org.robolectric.shadows.ShadowWindowManagerImpl
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class OperationSnackbarMigrationTest {
-    @Test fun docsManagementNoticeClearsRefreshAndRemovalControls() = runTest {
+    @Test fun docsManagementNoticeStaysAtWindowBottomWithoutAvoidingControls() = runTest {
         IrioDocsMcpStore.install(org.robolectric.RuntimeEnvironment.getApplication())
         withUi { McpSettingsScreen(discoverDocsTools = { throw java.io.IOException("fixture") }, onBack = {}) }.use { ui ->
             ui.flushLayout = true
@@ -67,11 +67,11 @@ class OperationSnackbarMigrationTest {
             ui.frames(40); ui.scrollToBottom(tr("刷新工具")); ui.click(tr("刷新工具"))
             ui.until { ui.hasText(tr("刷新工具失败，请检查登录和网络后重试")) }
             ui.frames(40)
-            ui.assertSnackbarAboveAction(tr("刷新工具"))
+            ui.assertSnackbarAtWindowBottom(tr("刷新工具"))
         }
     }
 
-    @Test fun actualMcpLoginNoticeClearsCancelWithoutDoubleCountingWindowInsets() = runTest {
+    @Test fun actualMcpLoginNoticeOnlyAvoidsSystemInsetsNotCancel() = runTest {
         okhttp3.mockwebserver.MockWebServer().use { server ->
             server.enqueue(okhttp3.mockwebserver.MockResponse().setBody(
                 """{"device_code":"fixture-device","user_code":"FIXT-TEST","verification_uri":"https://github.com/login/device","expires_in":1800,"interval":60}"""))
@@ -86,22 +86,13 @@ class OperationSnackbarMigrationTest {
                 ui.frames(40); ui.click(tr("安装") + " OAuth"); ui.frames(40)
                 ui.click(tr("获取授权码")); ui.until { ui.hasText("FIXT-TEST") }
                 ui.click(tr("打开 GitHub 授权")); ui.frames(60)
-                fun verifyGap() {
-                    var cancel = ui.text(tr("取消"))
-                    while (!cancel.config.contains(SemanticsActions.OnClick)) cancel = cancel.parent!!
-                    val surface = ui.all().single {
-                        it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-snackbar-surface"
-                    }
-                    assertEquals("MCP authentication notice must clear Cancel by one gap inside its own sheet",
-                        16f, cancel.boundsInWindow.top - surface.boundsInWindow.bottom, 1f)
-                }
-                verifyGap()
+                ui.assertSnackbarAtWindowBottom(tr("取消"))
                 val owner = ui.ownerOfText(tr("取消"))
                 androidx.core.view.ViewCompat.dispatchApplyWindowInsets(owner, androidx.core.view.WindowInsetsCompat.Builder()
                     .setInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars(), androidx.core.graphics.Insets.of(0, 0, 0, 24))
                     .setInsets(androidx.core.view.WindowInsetsCompat.Type.ime(), androidx.core.graphics.Insets.of(0, 0, 0, 220))
                     .setVisible(androidx.core.view.WindowInsetsCompat.Type.ime(), true).build())
-                ui.frames(40); verifyGap()
+                ui.frames(40); ui.assertSnackbarAtWindowBottom(tr("取消"), 220f)
             }
         }
     }
@@ -404,7 +395,7 @@ class OperationSnackbarMigrationTest {
                     if (todoist) tasks.load()!!.tools.size else github.load()!!.tools.size)
                 assertTrue("The refresh control must recover after failure", ui.hasText(tr("刷新工具")))
                 ui.frames(40)
-                ui.assertSnackbarAboveAction(tr("刷新工具"))
+                ui.assertSnackbarAtWindowBottom(tr("刷新工具"))
                 ui.click(tr("移除集成"))
                 ui.frames(40)
                 assertNotNull("Opening confirmation must preserve the saved integration",
@@ -778,7 +769,7 @@ class OperationSnackbarMigrationTest {
         }
     }
 
-    @Test fun addProviderFailureStaysInTheDialogAndRetainsTheDraft() = runTest {
+    @Test fun addProviderFailureUsesFullWindowBottomOutsideThePanelAndRetainsTheDraft() = runTest {
         var requests = 0
         withUi {
             ProviderSettingsScreen(onBack = {}, loadProviders = { emptyList() },
@@ -797,7 +788,11 @@ class OperationSnackbarMigrationTest {
             assertTrue(ui.isSnackbarText("Add failed fixture"))
             assertEquals("Notice must be in the modal window, not behind it",
                 ui.ownerOfText(tr("取消")), ui.ownerOfText("Add failed fixture"))
-            assertTrue("The notice must sit above the dialog buttons", ui.text("Add failed fixture").boundsInRoot.bottom <= ui.text(tr("取消")).boundsInRoot.top)
+            ui.assertSnackbarAtWindowBottom(tr("取消"))
+            val surface = ui.all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-snackbar-surface" }
+            assertEquals("Dialog padding must not narrow or clip the notice", 16f, surface.boundsInWindow.left, 1f)
+            assertEquals(ui.ownerOfText(tr("取消")).width - 16f, surface.boundsInWindow.right, 1f)
+            assertTrue("The notice is below the centered panel, not inside its content", surface.boundsInWindow.top > ui.text(tr("取消")).boundsInWindow.bottom)
             assertTrue(ui.hasEditableText("Draft fixture"))
             assertTrue(ui.hasEditableText("https://example.test"))
         }
@@ -941,12 +936,10 @@ class OperationSnackbarMigrationTest {
             requireNotNull(node).config[SemanticsActions.ScrollBy].action!!.invoke(0f, 10000f)
             frames(40)
         }
-        fun assertSnackbarAboveAction(label: String) {
-            var action = text(label)
-            while (!action.config.contains(SemanticsActions.OnClick)) action = action.parent!!
+        fun assertSnackbarAtWindowBottom(label: String, systemBottomInset: Float = 0f) {
             val surface = all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "irio-snackbar-surface" }
-            assertEquals("Notice must clear $label in the same modal window: action=${action.boundsInWindow}/${action.positionInRoot}/${action.size}, surface=${surface.boundsInWindow}/${surface.positionInRoot}/${surface.size}", 16f,
-                action.boundsInWindow.top - surface.boundsInWindow.bottom, 1f)
+            assertEquals("Notice must ignore $label and clear only system insets", ownerOfText(label).height - systemBottomInset - 16f,
+                surface.boundsInWindow.bottom, 1f)
         }
         // A visible Activity's decor can also contain view; prefer the direct host listed first.
         fun ownerOfText(value: String) = roots().first { root -> nodes(root).any { it.hasText(value) } }

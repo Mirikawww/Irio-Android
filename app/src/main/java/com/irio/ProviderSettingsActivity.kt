@@ -45,7 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.layout.onSizeChanged
+
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -196,7 +196,7 @@ internal fun ProviderSettingsScreen(
     val addDialogMaxHeight = with(LocalDensity.current) {
         (LocalWindowInfo.current.containerSize.height - WindowInsets.ime.getBottom(this)).toDp() - 64.dp
     }.coerceAtLeast(160.dp)
-    var dialogButtonsHeight by remember { mutableStateOf(0) }
+
 
     IrioAlertDialog(
         visible = dialogOpen,
@@ -204,6 +204,12 @@ internal fun ProviderSettingsScreen(
         onDismissRequest = { if (!saving) dialogOpen = false },
         backgroundColor = Theme[colors][panelColor],
         contentColor = Theme[colors][onPanelColor],
+        overlay = {
+            OperationErrorSnackbar(
+                visible = dialogOpen && formError != null, message = formError.orEmpty(),
+                bottomInset = 0.dp, onDismiss = { formError = null }, restartKey = formErrorNonce,
+            )
+        },
     ) {
         Box(Modifier.fillMaxWidth().heightIn(max = addDialogMaxHeight)) {
         Column(modifier = Modifier.fillMaxWidth().heightIn(max = addDialogMaxHeight)) {
@@ -228,7 +234,6 @@ internal fun ProviderSettingsScreen(
                 Spacer(Modifier.height(12.dp))
             }
             Spacer(Modifier.height(16.dp))
-            Box(Modifier.onSizeChanged { dialogButtonsHeight = it.height }) {
             DialogButtonRow(
                 confirmLabel = if (saving) tr("保存中") else tr("保存"),
                 confirmEnabled = !saving &&
@@ -269,15 +274,7 @@ internal fun ProviderSettingsScreen(
                 onCancel = { if (!saving) dialogOpen = false },
                 cancelEnabled = !saving,
             )
-            }
         }
-        OperationErrorSnackbar(
-            visible = dialogOpen && formError != null,
-            message = formError.orEmpty(),
-            bottomInset = with(LocalDensity.current) { dialogButtonsHeight.toDp() },
-            onDismiss = { formError = null },
-            restartKey = formErrorNonce,
-        )
         }
     }
 }
