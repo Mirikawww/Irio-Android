@@ -44,6 +44,50 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SettingsUpdatesTest {
+    @Test fun inAppDownloadHasNoWebsiteActionAndShowsProgress() = runTest {
+        val release = GitHubUpdate("1.2.0-gamma", IRIO_RELEASES_URL, true, asset =
+            UpdateAsset("universal", "https://irio.relithy.space/releases/download/fixture?via=cdn", "a".repeat(64), 100, "com.irio"))
+        val progress = mutableStateOf(UpdateDownloadState())
+        var downloads = 0
+
+        var cancellations = 0
+        var progressFill = androidx.compose.ui.graphics.Color.Unspecified
+        var progressTrack = androidx.compose.ui.graphics.Color.Unspecified
+        withUi(content = {
+            progressFill = com.composeunstyled.theme.Theme[com.composables.ui.theme.colors][com.composables.ui.theme.primaryColor]
+            progressTrack = com.composeunstyled.theme.Theme[com.composables.ui.theme.colors][com.composables.ui.theme.secondaryColor]
+            UpdateDialogContent(release, {}, { downloads++ },
+                downloadAvailable = true, downloadState = progress.value, onCancelDownload = { cancellations++ })
+        }) { fixture ->
+            fun text(value: String) = fixture.nodes().single {
+                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { t -> t.text == tr(value) }
+            }
+            fixture.click(text("下载")); assertEquals(1, downloads)
+            assertFalse(fixture.nodes().any { fixture.textsWithin(it).contains(tr("前往下载")) })
+            progress.value = UpdateDownloadState(release, UpdateDownloadPhase.Downloading, UpdateDownloadProgress(45, 100))
+            fixture.frames()
+            assertEquals(0.45f, fixture.tag("update-download-progress").config[SemanticsProperties.ProgressBarRangeInfo].current, 0.01f)
+            val progressButton = fixture.tag("update-download-progress")
+            assertTrue("Progress must belong to the actual download button", progressButton.config.contains(SemanticsActions.OnClick))
+            assertTrue("The button label must switch to a percentage", fixture.textsWithin(progressButton).contains("45%"))
+            val bitmap = android.graphics.Bitmap.createBitmap(360, 800, android.graphics.Bitmap.Config.ARGB_8888)
+            try {
+                fixture.view.draw(android.graphics.Canvas(bitmap))
+                val bounds = progressButton.boundsInRoot
+                fun pixel(fraction: Float) = bitmap.getPixel((bounds.left + bounds.width * fraction).toInt(), (bounds.top + 8f).toInt())
+                assertEquals("Left side fills with the active button color", progressFill, androidx.compose.ui.graphics.Color(pixel(0.25f)))
+                assertEquals("The remaining track must stay unfilled", progressTrack, androidx.compose.ui.graphics.Color(pixel(0.75f)))
+            } finally { bitmap.recycle() }
+            assertFalse("No separate progress sentence", fixture.nodes().any { fixture.textsWithin(it).contains(tr("下载中：%s%%").format(45)) })
+            assertFalse("No separate cancel-download row", fixture.nodes().any { fixture.textsWithin(it).contains(tr("取消下载")) })
+            assertFalse(progressButton.config.contains(SemanticsProperties.Disabled))
+            fixture.click(progressButton)
+            assertEquals("Tapping the percentage cancels", 1, cancellations)
+            assertEquals("Cancelling must not start another download", 1, downloads)
+            assertFalse(fixture.nodes().any { fixture.textsWithin(it).contains(tr("前往下载")) })
+        }
+    }
+
     @Test fun channelLabelsUsePublicCodenamesWithoutChangingStoredIds() {
         assertEquals("Iota", UpdateChannel.RELEASE.label)
         assertEquals("Gamma", UpdateChannel.PRE_RELEASE.label)
@@ -178,10 +222,11 @@ class SettingsUpdatesTest {
             failure = false
             response = UpdateCheckResult.Available(release)
             fixture.click(fixture.tag("check-updates")); fixture.frames(30)
-            fixture.click(fixture.nodes().single {
-                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == tr("前往下载") }
-            })
-            assertEquals(release.url, shadowOf(fixture.context).nextStartedActivity.dataString)
+            var download = fixture.nodes().single { node ->
+                node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == tr("下载") }
+            }
+            while (!download.config.contains(SemanticsActions.OnClick)) download = download.parent!!
+            assertTrue("Missing APK metadata disables download rather than opening a browser", download.config.contains(SemanticsProperties.Disabled))
         }
     }
 
@@ -205,7 +250,7 @@ class SettingsUpdatesTest {
             (1..50).joinToString("\n\n") { "## Change $it\n\nA detailed release note with **important changes** and more information." })
         var closes = 0
         var downloads = 0
-        withUi(content = { UpdateDialogContent(release, { closes++ }, { downloads++ }) }) { fixture ->
+        withUi(content = { UpdateDialogContent(release, { closes++ }, { downloads++ }, downloadAvailable = true) }) { fixture ->
             val notes = fixture.tag("update-release-notes")
             val axis = notes.config[SemanticsProperties.VerticalScrollAxisRange]
             assertTrue("Long release notes must scroll", axis.maxValue() > 0f)
@@ -213,7 +258,7 @@ class SettingsUpdatesTest {
             val close = buttons.single { node ->
                 fixture.textsWithin(node).any { it == "关闭" || it == "Close" }
             }
-            val download = buttons.single { node -> fixture.textsWithin(node).contains(tr("前往下载")) }
+            val download = buttons.single { node -> fixture.textsWithin(node).contains(tr("下载")) }
             val before = listOf(close.boundsInRoot, download.boundsInRoot)
             assertEquals(close.boundsInRoot.center.y, download.boundsInRoot.center.y, 0.5f)
             assertTrue("Actions must stay below the scroll viewport", notes.boundsInRoot.bottom <= close.boundsInRoot.top)
@@ -241,7 +286,8 @@ class SettingsUpdatesTest {
                     val texts = fixture.nodes().flatMap { it.config.getOrElse(SemanticsProperties.Text) { emptyList() } }.map { it.text }
                     assertTrue(texts.contains(tr("暂无更新说明")))
                     assertTrue(texts.contains(if (language == AppLanguage.EN) "Close" else "关闭"))
-                    assertTrue(texts.contains(tr("前往下载")))
+                    assertTrue(texts.contains(tr("下载")))
+                    assertFalse(texts.contains(tr("前往下载")))
                     assertFalse("The old Cancel action must be replaced", texts.contains(tr("取消")))
                 }
             } finally { ThemeStore.saveLanguage(fixture.context, previousLanguage) }
@@ -288,6 +334,14 @@ class SettingsUpdatesTest {
             view.requestLayout()
             view.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(800, View.MeasureSpec.EXACTLY))
             view.layout(0, 0, 360, 800)
+            val windows = Class.forName("android.view.WindowManagerGlobal").getMethod("getInstance").invoke(null)
+            val roots = windows.javaClass.getDeclaredField("mViews").apply { isAccessible = true }.get(windows) as List<*>
+            roots.filterIsInstance<View>().filter { it !== view }.forEach { root ->
+                root.requestLayout()
+                root.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(800, View.MeasureSpec.EXACTLY))
+                root.layout(0, 0, 360, 800)
+            }
         }
         fun nodes(): List<SemanticsNode> {
             fun descend(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descend)

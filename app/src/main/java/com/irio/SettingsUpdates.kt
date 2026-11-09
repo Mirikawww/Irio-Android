@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +39,13 @@ import com.composables.ui.components.DropdownMenuItem
 import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
 import com.composables.ui.components.Icon
 import com.composables.ui.components.Text
+
+import com.composables.ui.components.BottomSheetDetent
+import com.composables.ui.components.rememberBottomSheetState
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import com.composeunstyled.LocalContentColor
 import com.composeunstyled.theme.Theme
 import com.composables.ui.theme.colors
@@ -48,9 +57,7 @@ import java.io.IOException
 @Composable
 internal fun SettingsUpdateSection(
     onNotice: (String) -> Unit,
-    checkForUpdates: suspend (String, UpdateChannel) -> UpdateCheckResult = { version, channel ->
-        ReleaseUpdateClient().check(version, channel)
-    },
+    checkForUpdates: (suspend (String, UpdateChannel) -> UpdateCheckResult)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -67,9 +74,10 @@ internal fun SettingsUpdateSection(
                 val requestedChannel = channel
                 scope.launch {
                     try {
-                        val version = context.packageManager.getPackageInfo(context.packageName,
-                            PackageManager.PackageInfoFlags.of(0)).versionName.orEmpty()
-                        when (val result = checkForUpdates(version, requestedChannel)) {
+                        val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0))
+                        val result = checkForUpdates?.invoke(info.versionName.orEmpty(), requestedChannel)
+                            ?: ReleaseUpdateClient().check(info.versionName.orEmpty(), requestedChannel, info.longVersionCode.toInt())
+                        when (result) {
                             is UpdateCheckResult.Available -> available = result.release
                             UpdateCheckResult.UpToDate -> onNotice(tr("当前已是最新版本"))
                             UpdateCheckResult.NoReleases -> onNotice(tr("所选渠道暂无已发布版本"))
@@ -97,22 +105,68 @@ internal fun SettingsUpdateSection(
 @Composable
 internal fun GitHubUpdateDialog(release: GitHubUpdate?, onDismiss: () -> Unit, onLinkError: () -> Unit) {
     val context = LocalContext.current
-    IrioAlertDialog(visible = release != null, onDismissRequest = onDismiss) {
-        release?.let {
+    val controller = AppUpdateDownloads.controller
+    val transfer by controller.state.collectAsState()
+    val download = transfer.takeIf { release != null && it.release?.tag == release.tag &&
+        it.release?.asset?.sha256 == release.asset?.sha256 } ?: UpdateDownloadState()
+    val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    var installAttempted by remember(release?.tag, download.file) { mutableStateOf(false) }
+    var permissionPending by remember(release?.tag, download.file) { mutableStateOf(false) }
+    var installError by remember(release?.tag) { mutableStateOf<String?>(null) }
+    fun close() {
+        if (download.phase == UpdateDownloadPhase.Downloading) controller.cancel()
+        onDismiss()
+    }
+    fun install() {
+        val file = download.file ?: return
+        try {
+            val launched = launchUpdateInstaller(context, file)
+            permissionPending = !launched
+            installAttempted = true
+            installError = null
+        } catch (_: Exception) {
+            installError = tr("无法打开系统安装器")
+            installAttempted = true
+        }
+    }
+    LaunchedEffect(download.file, lifecycle, permissionPending) {
+        if (release != null && download.phase == UpdateDownloadPhase.Ready && lifecycle.isAtLeast(Lifecycle.State.RESUMED)) {
+            if (!installAttempted || (permissionPending && context.packageManager.canRequestPackageInstalls())) install()
+        }
+    }
+    IrioAlertDialog(visible = release != null, onDismissRequest = ::close) {
+        release?.let { contentRelease ->
+            Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
             UpdateDialogContent(
-                release = release,
-                onClose = onDismiss,
+                release = contentRelease,
+                onClose = ::close,
                 onDownload = {
-                    if (!context.openAboutLink(release.url)) onLinkError()
-                    onDismiss()
+                    if (contentRelease.asset != null) {
+                        if (download.phase == UpdateDownloadPhase.Ready) install()
+                        else controller.start(context, contentRelease)
+                    }
                 },
+                downloadAvailable = contentRelease.asset != null,
+                downloadState = download,
+                onCancelDownload = controller::cancel,
+                installError = installError,
             )
+            }
         }
     }
 }
 
 @Composable
-internal fun UpdateDialogContent(release: GitHubUpdate, onClose: () -> Unit, onDownload: () -> Unit) {
+internal fun UpdateDialogContent(
+    release: GitHubUpdate,
+    onClose: () -> Unit,
+    onDownload: () -> Unit,
+
+    downloadAvailable: Boolean = false,
+    downloadState: UpdateDownloadState = UpdateDownloadState(),
+    onCancelDownload: () -> Unit = {},
+    installError: String? = null,
+) {
     val renderScope = rememberCoroutineScope()
     val maxHeight = with(LocalDensity.current) {
         LocalWindowInfo.current.containerSize.height.toDp() * 0.8f
@@ -125,6 +179,8 @@ internal fun UpdateDialogContent(release: GitHubUpdate, onClose: () -> Unit, onD
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(release.tag, color = Theme[colors][onPanelColor], fontSize = 18.sp, lineHeight = 24.sp)
             Text(if (release.prerelease) UpdateChannel.PRE_RELEASE.label else UpdateChannel.RELEASE.label, color = Theme[colors][onPanelColor])
+            if (release.testDownload) Text(tr("Debug 下载测试：真实网站版本，安装正式版，与 Debug 并存。"),
+                color = Theme[colors][onPanelColor], fontSize = 13.sp, lineHeight = 18.sp)
         }
         Column(
             modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
@@ -133,13 +189,19 @@ internal fun UpdateDialogContent(release: GitHubUpdate, onClose: () -> Unit, onD
             if (release.notes.isBlank()) Text(tr("暂无更新说明"), color = Theme[colors][onPanelColor])
             else AssistantMarkdown(text = release.notes, streaming = false, renderScope = renderScope)
         }
-        DialogButtonRow(
-            confirmLabel = tr("前往下载"),
-            onConfirm = onDownload,
-            // The existing generic “关闭” translation is “Off” for switches.
-            cancelLabel = if (ThemeStore.language == AppLanguage.EN) "Close" else "关闭",
-            onCancel = onClose,
-        )
+        if (downloadAvailable) {
+            val error = installError ?: downloadState.error
+            if (error != null) Text(tr(error), color = irioErrorTextColor(), fontSize = 13.sp, lineHeight = 18.sp)
+            if (downloadState.phase == UpdateDownloadPhase.Ready) Text(tr("下载已完成。若尚未开始安装，请允许安装应用后重试。"),
+                color = Theme[colors][onPanelColor], fontSize = 13.sp, lineHeight = 18.sp)
+
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = onClose, style = ButtonStyle.Secondary, modifier = Modifier.weight(1f)) {
+                Text(if (ThemeStore.language == AppLanguage.EN) "Close" else "关闭", color = LocalContentColor.current)
+            }
+            UpdateDownloadButton(downloadState, downloadAvailable, onDownload, Modifier.weight(1f), onCancel = onCancelDownload)
+        }
     }
 }
 

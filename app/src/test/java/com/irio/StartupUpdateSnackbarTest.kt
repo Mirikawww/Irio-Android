@@ -39,6 +39,24 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], manifest = Config.NONE)
 class StartupUpdateSnackbarTest {
+    @Test fun debugWebsitePreviewOpensTheRealUpdateDialogWithoutAViewTap() = runTest {
+        withUi { fixture ->
+            val release = availableUpdate().release.copy(testDownload = true, versionCode = 11,
+                asset = UpdateAsset("arm64-v8a", "https://irio.relithy.space/releases/download/fixture?via=cdn", "a".repeat(64), 123, "com.irio"))
+            fixture.check.start { UpdateCheckResult.Available(release) }
+            repeat(40) {
+                fixture.frames(1)
+                assertNull("A direct Debug dialog must not flash a shrinking snackbar first",
+                    fixture.text(tr("发现新版本：%s").format(release.tag)))
+            }
+            assertNotNull(fixture.text(tr("发现新版本")))
+            assertNotNull(fixture.text(tr("下载")))
+            assertNull(fixture.text(tr("前往下载")))
+            assertNotNull(fixture.text(tr("Debug 下载测试：真实网站版本，安装正式版，与 Debug 并存。")))
+            assertNull("The dialog owns the pending test preview", fixture.check.notice.value)
+        }
+    }
+
     @Test fun startupResultUsesTheBottomSnackbarAndDismissesWithoutRechecking() = runTest {
         withUi { fixture ->
             var requests = 0
@@ -145,7 +163,7 @@ class StartupUpdateSnackbarTest {
             fixture.click(requireNotNull(fixture.text(tr("查看"))))
             fixture.frames(30)
             assertNotNull("The action must open the existing Markdown update dialog", fixture.text("Startup release notes"))
-            assertNotNull(fixture.text(tr("前往下载")))
+            assertNotNull(fixture.text(tr("下载")))
             val close = fixture.text(if (ThemeStore.language == AppLanguage.EN) "Close" else "关闭")
             assertNotNull(close)
             assertNull("Viewing the update consumes its pending notification", fixture.check.notice.value)
@@ -157,16 +175,15 @@ class StartupUpdateSnackbarTest {
         }
     }
 
-    @Test fun downloadFromTheStartupDialogOpensTheMatchingReleasePage() = runTest {
+    @Test fun startupSheetNeverOffersTheRemovedWebsiteDownloadAction() = runTest {
         withUi { fixture ->
             val release = GitHubUpdate("1.1.0-beta.2", "$IRIO_PROJECT_URL/releases/tag/1.1.0-beta.2", true)
             fixture.check.start { UpdateCheckResult.Available(release) }
             fixture.frames(30)
             fixture.click(requireNotNull(fixture.text(tr("查看"))))
             fixture.frames(30)
-            fixture.click(requireNotNull(fixture.text(tr("前往下载"))))
-            fixture.frames(30)
-            assertEquals(release.url, shadowOf(fixture.view.context as ComponentActivity).nextStartedActivity.dataString)
+            assertNull(fixture.text(tr("前往下载")))
+            assertNotNull(fixture.text(tr("下载")))
             assertNull(fixture.check.notice.value)
         }
     }
@@ -218,6 +235,14 @@ class StartupUpdateSnackbarTest {
             view.requestLayout()
             view.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(640, View.MeasureSpec.EXACTLY))
             view.layout(0, 0, 360, 640)
+            val windows = Class.forName("android.view.WindowManagerGlobal").getMethod("getInstance").invoke(null)
+            val roots = windows.javaClass.getDeclaredField("mViews").apply { isAccessible = true }.get(windows) as List<*>
+            roots.filterIsInstance<View>().filter { it !== view }.forEach { root ->
+                root.requestLayout()
+                root.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(640, View.MeasureSpec.EXACTLY))
+                root.layout(0, 0, 360, 640)
+            }
         }
         fun text(value: String): SemanticsNode? {
             fun descend(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descend)

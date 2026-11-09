@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,9 +65,14 @@ internal object StartupUpdates {
     fun start(context: Context) {
         val app = context.applicationContext
         check.start {
-            val version = app.packageManager.getPackageInfo(app.packageName,
-                PackageManager.PackageInfoFlags.of(0)).versionName.orEmpty()
-            ReleaseUpdateClient().check(version, UpdateChannel.load(app))
+            val info = app.packageManager.getPackageInfo(app.packageName, PackageManager.PackageInfoFlags.of(0))
+            val client = ReleaseUpdateClient()
+            if (app.packageName == "com.irio.debug" &&
+                app.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+                client.preview(UpdateChannel.PRE_RELEASE)?.let { UpdateCheckResult.Available(it) } ?: UpdateCheckResult.NoReleases
+            } else {
+                client.check(info.versionName.orEmpty(), UpdateChannel.load(app), info.longVersionCode.toInt())
+            }
         }
     }
 }
@@ -94,8 +100,14 @@ internal fun BoxScope.ChatNoticeSnackbar(
     val showStartup = startupNotice != null && lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
     val update = (startupNotice as? StartupUpdateNotice.Checked)?.result?.release
     val canViewUpdate = titleNotice == null && !linkError && update != null
+    LaunchedEffect(startupNotice, enabled, lifecycleState) {
+        if (enabled && showStartup && titleNotice == null && update?.testDownload == true) {
+            viewingUpdate = update
+            startupNotice?.let(startupCheck::dismiss)
+        }
+    }
     IrioSnackbar(
-        visible = enabled && viewingUpdate == null && (titleNotice != null || showStartup ||
+        visible = enabled && viewingUpdate == null && (titleNotice != null || (showStartup && update?.testDownload != true) ||
             (linkError && lifecycleState.isAtLeast(Lifecycle.State.RESUMED))),
         message = titleNotice ?: if (linkError) tr("无法打开链接") else
             startupNotice?.let { startupUpdateMessage(it) }.orEmpty(),
