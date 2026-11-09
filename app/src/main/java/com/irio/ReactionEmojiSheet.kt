@@ -121,21 +121,65 @@ internal fun ReactionEmojiCategoryTabs(
     indication: androidx.compose.foundation.Indication = Theme[indications][defaultIndication],
     onSelect: (Int) -> Unit,
 ) {
-    androidx.compose.foundation.layout.Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        categories.forEachIndexed { index, category ->
-            Text(reactionCategoryLabel(category.name),
-                color = if (index == selected) Theme[colors][onPanelColor] else Theme[colors][mutedColor],
-                fontSize = 13.sp,
-                modifier = Modifier.testTag("reaction-emoji-tab-$index")
-                    .clip(ToolbarCapsuleShape)
-                    .background(if (index == selected) Theme[colors][secondaryColor] else androidx.compose.ui.graphics.Color.Transparent, ToolbarCapsuleShape)
-                    .selectable(selected = index == selected, role = Role.Tab,
-                        interactionSource = remember { MutableInteractionSource() }, indication = indication,
-                        onClick = { onSelect(index) })
-                    .padding(horizontal = 10.dp, vertical = 8.dp))
+    val progress by animateFloatAsState(
+        targetValue = selected.toFloat(),
+        animationSpec = irioSpring<Float>(stiffness = 520f),
+        label = "reactionCategoryIndicator",
+    )
+    val ink = Theme[colors][onPanelColor]
+    val muted = Theme[colors][mutedColor]
+    val fill = Theme[colors][secondaryColor]
+    // A single measured indicator follows variable-width labels, even on interrupted changes.
+    Layout(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).selectableGroup(),
+        content = {
+            Box(Modifier.testTag("reaction-emoji-tab-indicator").background(fill, ToolbarCapsuleShape))
+            categories.forEachIndexed { index, category ->
+                val requester = remember { BringIntoViewRequester() }
+                LaunchedEffect(selected, categories.size) {
+                    if (index == selected) requester.bringIntoView()
+                }
+                val color by animateColorAsState(
+                    if (index == selected) ink else muted,
+                    irioSpring(),
+                    label = "reactionCategoryInk",
+                )
+                Text(
+                    reactionCategoryLabel(category.name),
+                    color = color,
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .testTag("reaction-emoji-tab-$index")
+                        .bringIntoViewRequester(requester)
+                        .clip(ToolbarCapsuleShape)
+                        .selectable(selected = index == selected, role = Role.Tab,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = indication, onClick = { onSelect(index) })
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                )
+            }
+        },
+    ) { measurables, constraints ->
+        val labels = measurables.drop(1).map {
+            it.measure(constraints.copy(minWidth = 0, minHeight = 0))
+        }
+        val gap = 4.dp.roundToPx()
+        val starts = IntArray(labels.size)
+        labels.indices.drop(1).forEach { starts[it] = starts[it - 1] + labels[it - 1].width + gap }
+        val height = labels.maxOfOrNull { it.height } ?: 0
+        val width = constraints.constrainWidth(labels.sumOf { it.width } + gap * (labels.size - 1).coerceAtLeast(0))
+        val fraction = progress.coerceIn(0f, (labels.size - 1).coerceAtLeast(0).toFloat())
+        val from = floor(fraction).toInt()
+        val to = (from + 1).coerceAtMost(labels.lastIndex)
+        val part = fraction - from
+        val indicatorWidth = if (labels.isEmpty()) 0 else
+            (labels[from].width + (labels[to].width - labels[from].width) * part).roundToInt()
+        val indicatorStart = if (labels.isEmpty()) 0 else
+            (starts[from] + (starts[to] - starts[from]) * part).roundToInt()
+        val indicator = measurables[0].measure(Constraints.fixed(indicatorWidth, height))
+        layout(width, constraints.constrainHeight(height)) {
+            indicator.placeRelative(indicatorStart, 0)
+            labels.forEachIndexed { index, label -> label.placeRelative(starts[index], (height - label.height) / 2) }
         }
     }
 }

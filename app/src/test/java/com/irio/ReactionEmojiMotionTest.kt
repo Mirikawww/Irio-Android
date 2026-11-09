@@ -102,6 +102,28 @@ class ReactionEmojiMotionTest {
     }
 
     @Test
+    fun indicatorSlidesBetweenMeasuredCapsulesAndRetargetsWithoutJumping() = runTest {
+        withPicker {
+            fun indicator() = tagged("reaction-emoji-tab-indicator").positionInRoot.x
+            val start = indicator()
+            val target = tagged("reaction-emoji-tab-1").positionInRoot.x
+            clickCategory(1)
+            frames(3)
+            val between = indicator()
+            assertTrue("The active capsule must move continuously, not disappear/reappear", between > start && between < target)
+            clickCategory(0)
+            frames(1)
+            assertTrue("Interrupted selection must retarget the same capsule", indicator() < target)
+            frames(80)
+            val active = tagged("reaction-emoji-tab-indicator")
+            val first = tagged("reaction-emoji-tab-0")
+            assertEquals(first.positionInRoot.x, active.positionInRoot.x, 1f)
+            assertEquals(first.size.width, active.size.width)
+            assertEquals(first.size.height, active.size.height)
+        }
+    }
+
+    @Test
     fun heldTabRippleStaysInsideTheSameCapsuleOutline() = runTest {
         withPicker(tabsOnly = true) {
             val tab = tagged("reaction-emoji-tab-1").boundsInWindow
