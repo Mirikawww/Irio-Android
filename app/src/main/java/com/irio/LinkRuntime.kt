@@ -448,10 +448,15 @@ object LinkRuntime {
             .put("providers", ProviderStore.snapshot(context))
             .put("stt", SttStore.snapshot(context))
             .put("search", SearchStore.snapshot(context))
+            .put("portableData", LinkPortableData.snapshot(context))
     }
 
     private fun applySnapshot(context: Context, json: JSONObject) {
+        // Validate the entire extension before any legacy stores can be changed.
+        // Older peers omit it; absence must not clear newly supported local data.
+        val portable = if (json.has("portableData")) LinkPortableData.prepare(context, json.getJSONObject("portableData")) else null
         val conversations = LinkCodec.conversationsFrom(json.optJSONArray("conversations") ?: org.json.JSONArray())
+        require(conversations.all { it.id.matches(Regex("[A-Za-z0-9_-]+")) }) { "Invalid Link conversation id" }
         val last = json.optString("lastOpenedId").takeIf { it.isNotBlank() }
         val overwrite = json.optBoolean("overwrite") || LinkStore.load(context).syncMode == LinkSyncMode.OVERWRITE
         if (overwrite) {
@@ -465,6 +470,7 @@ object LinkRuntime {
             json.optJSONObject("stt")?.let { SttStore.applySnapshot(context, it, false) }
             json.optJSONObject("search")?.let { SearchStore.applySnapshot(context, it, false) }
         }
+        portable?.apply(context, overwrite)
     }
 
     private fun mark(peerId: String, state: LinkConnectionState) {

@@ -65,6 +65,7 @@ object LinkProtocol {
 
     fun writeJson(socket: Socket, json: JSONObject) {
         val bytes = json.toString().toByteArray(Charsets.UTF_8)
+        require(bytes.size in 1..MAX_FRAME) { "Link data exceeds the frame limit" }
         val header = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(bytes.size).array()
         val out = BufferedOutputStream(socket.getOutputStream())
         out.write(header)

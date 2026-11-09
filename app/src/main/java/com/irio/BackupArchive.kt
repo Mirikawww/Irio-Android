@@ -151,7 +151,7 @@ internal object BackupArchive {
     private fun legacyPreference(path: String): Boolean = path.startsWith("shared_prefs/") &&
         path.removePrefix("shared_prefs/").let { it.endsWith(".xml") && '/' !in it && it.removeSuffix(".xml") in BackupPreferences.names }
 
-    private fun allowedFile(path: String): Boolean = path.startsWith("files/") &&
+    internal fun allowedFile(path: String): Boolean = path.startsWith("files/") &&
         path != "files/attachments" && !path.startsWith("files/attachments/") &&
         (!path.startsWith("files/linux-sandbox/") || path == "files/linux-sandbox/state.json") &&
         !path.endsWith(".tmp") && !path.endsWith(".part") && !path.contains("/.avatar-")

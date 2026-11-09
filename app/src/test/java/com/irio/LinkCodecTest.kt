@@ -5,6 +5,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LinkCodecTest {
+    @Test fun oversizedOutgoingDataFailsBeforeWritingAnUnreadableFrame() {
+        val output = java.io.ByteArrayOutputStream()
+        val socket = object : java.net.Socket() {
+            override fun getOutputStream(): java.io.OutputStream = output
+        }
+        val message = JSONObject().put("data", "x".repeat(32 * 1024 * 1024))
+        val error = runCatching { LinkProtocol.writeJson(socket, message) }.exceptionOrNull()
+        org.junit.Assert.assertTrue("Sending must honor the receiver's frame limit", error is IllegalArgumentException)
+        assertEquals("No partial frame may reach the wire", 0, output.size())
+    }
+
     @Test
     fun peerFromBlankNameFallsBackToUnknownDevice() {
         val json = JSONObject().put("id", "abc").put("name", "")
