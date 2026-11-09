@@ -50,7 +50,7 @@ import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 
 internal const val IRIO_PROJECT_URL = "https://github.com/Mirikawww/Irio-Android"
-internal const val IRIO_DOCS_URL = "https://irio.mirikawww.workers.dev"
+internal const val IRIO_DOCS_URL = "https://irio.relithy.space/docs/"
 
 class AboutActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
