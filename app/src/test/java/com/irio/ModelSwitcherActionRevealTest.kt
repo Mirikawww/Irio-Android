@@ -41,6 +41,26 @@ import java.time.Duration
 @Config(sdk = [35], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ModelSwitcherActionRevealTest {
+    @Test fun unavailableSearchTapExplainsConfigurationWithoutEnablingSearch() = runTest {
+        Harness(this).use { h ->
+            h.available.value = false
+            h.advance(160)
+            assertTrue(h.button("网络搜索").config.contains(SemanticsProperties.Disabled))
+            h.touch("网络搜索", MotionEvent.ACTION_DOWN); h.advance(32)
+            h.touch("网络搜索", MotionEvent.ACTION_UP); h.advance(64)
+            assertEquals("A real tap on unavailable search must explain the prerequisite", 1, h.searchConfigurationNotices)
+            assertFalse(h.search.value)
+            assertFalse(h.labelShown("网络搜索"))
+            h.active.value = false; h.advance(32)
+            h.click("网络搜索"); h.advance(32)
+            assertEquals("An outgoing panel must not issue notices", 1, h.searchConfigurationNotices)
+            h.active.value = true; h.available.value = true; h.advance(32)
+            h.click("网络搜索"); h.advance(64)
+            assertTrue(h.search.value)
+            assertEquals(1, h.searchConfigurationNotices)
+        }
+    }
+
     @Test fun restingActionsShowOnlyCenteredIconsWithAccessibleToggleNames() = runTest {
         Harness(this).use { h ->
             h.advance(160)
@@ -244,6 +264,7 @@ class ModelSwitcherActionRevealTest {
         val search = mutableStateOf(false)
         val read = mutableStateOf(false)
         val available = mutableStateOf(true)
+        var searchConfigurationNotices = 0
         val active = mutableStateOf(true)
         val scale = mutableStateOf(1f)
         private var nanos = 0L
@@ -261,6 +282,7 @@ class ModelSwitcherActionRevealTest {
                             webSearchEnabled = search.value, autoRead = read.value, active = active.value,
                             onFastModeChange = { fast.value = it }, onWebSearchChange = { search.value = it },
                             onAutoReadChange = { read.value = it },
+                            onWebSearchUnavailable = { searchConfigurationNotices++ },
                         )
                     }
                 }

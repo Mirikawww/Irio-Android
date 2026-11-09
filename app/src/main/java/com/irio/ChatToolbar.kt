@@ -79,6 +79,10 @@ internal fun BoxScope.ChatToolbar(state: ChatScreenState) {
                         webSearchEnabled = enabled
                         SearchStore.saveWebSearchEnabled(context, enabled)
                     },
+                    onWebSearchUnavailable = {
+                        modelMenuOpen = false
+                        showComposerError(tr("请先在「搜索」中配置搜索提供商的 API 密钥"))
+                    },
                     onAutoReadChange = { enabled ->
                         autoRead = enabled
                         SpeechStore.saveAutoRead(context, enabled)

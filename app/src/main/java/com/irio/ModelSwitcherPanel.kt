@@ -187,6 +187,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
     onFastModeChange: (Boolean) -> Unit,
     onWebSearchChange: (Boolean) -> Unit,
     onAutoReadChange: (Boolean) -> Unit,
+    onWebSearchUnavailable: () -> Unit = {},
 ) {
     val configuration = LocalConfiguration.current
     val width = (configuration.screenWidthDp.dp - 32.dp).coerceAtMost(280.dp)
@@ -300,6 +301,7 @@ internal fun DropdownMenuScope.ModelSwitcherPanel(
                     onWebSearchChange = onWebSearchChange,
                     onAutoReadChange = onAutoReadChange,
                     onImageOptionsChange = ::saveImageOptions,
+                    onWebSearchUnavailable = onWebSearchUnavailable,
                     videoModel = videoModel,
                     videoOptions = videoOptions,
                     selectedModel = selectedModel,
@@ -410,6 +412,7 @@ internal fun ModelSwitcherParameterControls(
     fastMode: Boolean = false,
     onFastModeChange: (Boolean) -> Unit = {},
     onThinkingPreviewChange: (ThinkingRollState) -> Unit = {},
+    onWebSearchUnavailable: () -> Unit = {},
 ) {
     ThinkingDepthSlider(reasoningEffort, supportsThinking && !videoModel, reasoningLevels, onReasoningChange,
         active = compactInteractive, onPreviewChange = onThinkingPreviewChange)
@@ -429,6 +432,7 @@ internal fun ModelSwitcherParameterControls(
         onFastModeChange = onFastModeChange,
         onWebSearchChange = onWebSearchChange,
         onAutoReadChange = onAutoReadChange,
+        onWebSearchUnavailable = onWebSearchUnavailable,
     )
 }
 

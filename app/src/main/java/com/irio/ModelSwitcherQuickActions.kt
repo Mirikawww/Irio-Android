@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -121,6 +122,7 @@ internal fun ModelSwitcherQuickActions(
     onFastModeChange: (Boolean) -> Unit,
     onWebSearchChange: (Boolean) -> Unit,
     onAutoReadChange: (Boolean) -> Unit,
+    onWebSearchUnavailable: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val state = remember(scope) { ModelSwitcherActionReveal(scope) }
@@ -161,6 +163,7 @@ internal fun ModelSwitcherQuickActions(
                 iconTag = "model-web-search-icon",
                 checked = webSearchAvailable && webSearchEnabled,
                 enabled = webSearchAvailable && active,
+                onUnavailableClick = if (active && !webSearchAvailable) onWebSearchUnavailable else null,
                 modifier = Modifier.width(width(1)), height = layout.height,
                 labelWidth = layout.labelWidths[1], reveal = reveal[1], expanded = expanded == 1,
                 onLongPress = { if (it) state.hold(1) else state.show(1) }, onRelease = { state.release(1) },
@@ -193,6 +196,7 @@ private fun ModelSwitcherActionTile(
     onLongPress: (Boolean) -> Unit,
     onRelease: () -> Unit,
     onCheckedChange: (Boolean) -> Unit,
+    onUnavailableClick: (() -> Unit)? = null,
 ) {
     val labelReveal = reveal.coerceIn(0f, 1f)
     val interactions = remember { MutableInteractionSource() }
@@ -211,11 +215,12 @@ private fun ModelSwitcherActionTile(
             .clip(ContinuousCapsule)
             .background(fill)
             .combinedClickable(interactionSource = interactions, indication = LocalIndication.current,
-                enabled = enabled, role = Role.Switch,
-                onClick = { if (enabled) onCheckedChange(!checked) },
+                enabled = enabled || onUnavailableClick != null, role = Role.Switch,
+                onClick = { if (enabled) onCheckedChange(!checked) else onUnavailableClick?.invoke() },
                 onLongClick = { if (enabled) onLongPress(pressed) })
             .semantics {
                 contentDescription = label
+                if (!enabled) disabled()
                 stateDescription = tr(if (checked) "开启" else "关闭")
                 toggleableState = if (checked) ToggleableState.On else ToggleableState.Off
             }

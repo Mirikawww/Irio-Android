@@ -64,6 +64,7 @@ internal fun ModelPicker(
     onFastModeChange: (Boolean) -> Unit,
     onWebSearchChange: (Boolean) -> Unit,
     onAutoReadChange: (Boolean) -> Unit,
+    onWebSearchUnavailable: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val content = Theme[colors][onBackgroundColor]
@@ -161,6 +162,7 @@ internal fun ModelPicker(
                 onReasoningChange = onReasoningChange,
                 onFastModeChange = onFastModeChange,
                 onWebSearchChange = onWebSearchChange,
+                onWebSearchUnavailable = onWebSearchUnavailable,
                 onAutoReadChange = onAutoReadChange,
             )
         },

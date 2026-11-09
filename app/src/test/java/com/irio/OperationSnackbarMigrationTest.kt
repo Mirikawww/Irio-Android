@@ -56,6 +56,39 @@ import org.robolectric.shadows.ShadowWindowManagerImpl
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class OperationSnackbarMigrationTest {
+    @Test fun unavailableModelSearchClosesThePopupAndShowsTheConfigurationNoticeOnChat() = runTest {
+        lateinit var state: ChatScreenState
+        val startup = StartupUpdateCheck(this)
+        withUi {
+            state = rememberChatScreenState()
+            ChatScreenLayout(state, startupCheck = startup)
+        }.use { ui ->
+            ui.flushLayout = true
+            ui.frames(40)
+            state.providers = listOf(ProviderConfig("fixture", "Fixture", "https://example.test", "", models = listOf("fixture-model")))
+            state.activeProviderId = "fixture"
+            state.selectedModel = "fixture-model"
+            state.webSearchAvailable = false
+            state.webSearchEnabled = false
+            repeat(2) {
+                state.modelMenuOpen = true; ui.frames(40)
+                val icon = ui.all().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "model-web-search-icon" }
+                var action = icon
+                while (!action.config.contains(SemanticsActions.OnClick)) action = action.parent!!
+                assertTrue(action.config.contains(SemanticsProperties.Disabled))
+                val nonce = state.composerStatusNonce
+                assertTrue(action.config[SemanticsActions.OnClick].action!!.invoke())
+                ui.frames(40)
+                assertFalse(state.modelMenuOpen)
+                assertFalse(state.webSearchEnabled)
+                assertTrue(state.composerStatusNonce > nonce)
+                val message = tr("请先在「搜索」中配置搜索提供商的 API 密钥")
+                assertTrue(ui.isSnackbarText(message))
+                assertSame("The notice must be owned by the chat, not the popup", ui.view, ui.ownerOfText(message))
+            }
+        }
+    }
+
     @Test fun reenteringLinkDoesNotReplayOldPairingResultsButNewFailuresStillNotify() = runTest {
         val state = mutableStateOf(LinkUiState(settings = LinkSettings(enabled = true), pairErrorNonce = 7))
         val open = mutableStateOf(true)
