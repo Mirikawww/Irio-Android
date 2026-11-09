@@ -49,7 +49,7 @@ import java.io.IOException
 internal fun SettingsUpdateSection(
     onNotice: (String) -> Unit,
     checkForUpdates: suspend (String, UpdateChannel) -> UpdateCheckResult = { version, channel ->
-        GitHubUpdateClient().check(version, channel)
+        ReleaseUpdateClient().check(version, channel)
     },
 ) {
     val context = LocalContext.current

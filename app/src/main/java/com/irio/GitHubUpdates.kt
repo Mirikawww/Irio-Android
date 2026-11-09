@@ -78,6 +78,9 @@ internal data class GitHubUpdate(
     val url: String,
     val prerelease: Boolean,
     val notes: String = "",
+    val versionCode: Int = 0,
+    val asset: UpdateAsset? = null,
+    val testDownload: Boolean = false,
 )
 
 internal sealed interface UpdateCheckResult {

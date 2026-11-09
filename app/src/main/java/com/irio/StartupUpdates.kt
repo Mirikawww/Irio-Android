@@ -66,7 +66,7 @@ internal object StartupUpdates {
         check.start {
             val version = app.packageManager.getPackageInfo(app.packageName,
                 PackageManager.PackageInfoFlags.of(0)).versionName.orEmpty()
-            GitHubUpdateClient().check(version, UpdateChannel.load(app))
+            ReleaseUpdateClient().check(version, UpdateChannel.load(app))
         }
     }
 }
