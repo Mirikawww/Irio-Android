@@ -7,6 +7,44 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatProtocolTest {
+    @Test fun chatCompletionsArgumentChunksPreserveStandaloneWhitespaceBeforeAccumulation() {
+        for (fragment in listOf(" ", "  ", "\t", "\n", "\r\n")) {
+            val call = JSONObject().put("index", 0).put("function", JSONObject().put("arguments", fragment))
+            val deltas = ChatProtocol.parseChatCompletionsToolCalls(org.json.JSONArray().put(call))
+            assertEquals("Whitespace is meaningful inside a streamed string", fragment, deltas.single().argumentsDelta)
+        }
+    }
+
+    @Test fun foregroundAndBackgroundCommandsKeepEveryArgumentCharacterAcrossStreamBoundaries() {
+        val command = "printf '%s' 'a  b'\n\tprintf '%s' 'c d'"
+        val arguments = JSONObject().put("commands", org.json.JSONArray().put(command))
+            .put("background", org.json.JSONArray().put(command)).toString()
+        for (chatCompletions in listOf(false, true)) {
+            val calls = linkedMapOf<String, MutableToolCall>()
+            ChatProtocol.applyToolCallDeltas(calls, listOf(ToolCallDelta(index = 0, key = "c0", id = "fixture", name = LinuxShellTool.NAME)))
+            // Every character may be its own network delta, including spaces inside JSON strings.
+            arguments.forEach { character ->
+                val fragment = character.toString()
+                val deltas = if (chatCompletions) ChatProtocol.parseChatCompletionsToolCalls(org.json.JSONArray().put(
+                    JSONObject().put("index", 0).put("function", JSONObject().put("arguments", fragment))))
+                else listOf(ToolCallDelta(index = 0, key = "c0", argumentsDelta = fragment))
+                ChatProtocol.applyToolCallDeltas(calls, deltas)
+            }
+            val completed = ChatProtocol.completedToolCalls(calls).single()
+            assertEquals("Tool arguments must be byte-for-byte stable (chat=$chatCompletions)", arguments, completed.arguments)
+            val selection = linuxSandboxSelectCommands(completed.arguments, 0, backgroundEnabled = true)
+            for (actual in selection.commands + selection.background) {
+                assertEquals(command, linuxSandboxNormalizeCommand(actual))
+                assertEquals(command, linuxSandboxProotArguments("proot", "/rootfs", null, "/scratch", actual).last())
+            }
+            assertEquals(listOf(command), selection.commands)
+            assertEquals(listOf(command), selection.background)
+            val board = LinuxBackgroundBoard()
+            val id = board.add(selection.background.single()) {}
+            assertEquals(command, board.find(id.toString())!!.command)
+        }
+    }
+
     @Test
     fun chatCompletionsOffIsExplicit() {
         val body = JSONObject()

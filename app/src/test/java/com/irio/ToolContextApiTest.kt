@@ -12,6 +12,49 @@ import org.junit.Test
 import java.util.concurrent.TimeUnit
 
 class ToolContextApiTest {
+    @Test fun streamedShellCommandsReachExecutionAndContinuationWithoutLosingSpaces() = runBlocking {
+        val command = "printf '%s' 'alpha  beta'\n\tprintf '%s' 'gamma delta'"
+        val arguments = JSONObject().put("commands", JSONArray().put(command)).put("background", JSONArray().put(command)).toString()
+        val executed = mutableListOf<ChatToolCall>()
+        val fixture = object : ToolProvider {
+            override val id = "shell-whitespace-fixture"
+            override fun definitions(protocol: ProviderProtocol) = LinuxShellToolProvider(backgroundEnabled = true).definitions(protocol)
+            override fun handles(name: String) = name == LinuxShellTool.NAME
+            override suspend fun execute(call: ChatToolCall, context: ToolExecutionContext): ToolExecutionResult {
+                executed += call
+                val selected = linuxSandboxSelectCommands(call.arguments, 0, true)
+                assertEquals(listOf(command), selected.commands)
+                assertEquals(listOf(command), selected.background)
+                // Transport test only: never run the received shell on a user device.
+                return ToolExecutionResult("fixture complete")
+            }
+        }
+        fun chunk(function: JSONObject) = "data: " + JSONObject().put("choices", JSONArray().put(JSONObject()
+            .put("delta", JSONObject().put("tool_calls", JSONArray().put(JSONObject().put("index", 0)
+                .put("id", "whitespace-call").put("function", function)))))) + "\n\n"
+        val stream = buildString {
+            append(chunk(JSONObject().put("name", LinuxShellTool.NAME)))
+            arguments.forEach { append(chunk(JSONObject().put("arguments", it.toString()))) }
+            append("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n")
+        }
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(stream))
+            server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream")
+                .setBody("data: {\"choices\":[{\"delta\":{\"content\":\"done\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
+            val result = ChatApi.streamChat(ProviderConfig("fixture", "Fixture", server.url("/v1").toString(), "fixture-key"),
+                "fixture-model", listOf(ChatRequestMessage("user", "run fixture")), ReasoningEffort.OFF, false,
+                maxToolRounds = 2, toolRegistry = ToolRegistry(listOf(fixture)),
+                cancellation = ChatRequestCancellation(), onUpdate = {})
+            assertEquals(null, result.error)
+            assertEquals(arguments, executed.single().arguments)
+            server.takeRequest(2, TimeUnit.SECONDS)!!
+            val followup = JSONObject(server.takeRequest(2, TimeUnit.SECONDS)!!.body.readUtf8()).getJSONArray("messages")
+            val assistant = (0 until followup.length()).map { followup.getJSONObject(it) }
+                .single { it.has("tool_calls") }
+            assertEquals(arguments, assistant.getJSONArray("tool_calls").getJSONObject(0).getJSONObject("function").getString("arguments"))
+        }
+    }
+
     @Test
     fun allRegisteredToolsSurviveReopeningAndReachEveryProtocolsNextRequest() = runBlocking {
         val builtIns = ToolRegistry.default().register(MemoryToolProvider())

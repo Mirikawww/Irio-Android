@@ -89,7 +89,7 @@ internal object ChatProtocol {
                         name = presentString(function?.opt("name")).ifBlank {
                             presentString(item.opt("name"))
                         },
-                        argumentsDelta = presentString(function?.opt("arguments")).ifBlank {
+                        argumentsDelta = presentString(function?.opt("arguments")).ifEmpty {
                             presentString(item.opt("arguments"))
                         },
                     )
@@ -108,7 +108,9 @@ internal object ChatProtocol {
             if (delta.id.isNotBlank()) existing.id = delta.id
             if (delta.name.isNotBlank()) existing.name = delta.name
             if (delta.geminiFunctionId != null) existing.geminiFunctionId = delta.geminiFunctionId
-            if (delta.argumentsDelta.isNotBlank()) existing.arguments.append(delta.argumentsDelta)
+            // Deltas are fragments, not complete values: a standalone space can be
+            // inside a quoted command or any other tool argument string.
+            existing.arguments.append(delta.argumentsDelta)
         }
     }
 
