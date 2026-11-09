@@ -101,6 +101,37 @@ class ReactionEmojiMotionTest {
         }
     }
 
+    @Test
+    fun heldTabRippleStaysInsideTheSameCapsuleOutline() = runTest {
+        withPicker(tabsOnly = true) {
+            val tab = tagged("reaction-emoji-tab-1").boundsInWindow
+            assertTrue("The tab must be visible before pressing: $tab", tab.width > 1f && tab.height > 1f)
+            val rootLocation = IntArray(2).also(root::getLocationInWindow)
+            val left = (tab.left - rootLocation[0]).roundToInt()
+            val top = (tab.top - rootLocation[1]).roundToInt()
+            val width = tab.width.roundToInt()
+            val height = tab.height.roundToInt()
+            fun pixel(x: Int, y: Int): Int {
+                val bitmap = android.graphics.Bitmap.createBitmap(600, 900, android.graphics.Bitmap.Config.ARGB_8888)
+                root.draw(android.graphics.Canvas(bitmap))
+                return bitmap.getPixel(x, y).also { bitmap.recycle() }
+            }
+            val corner = pixel(left + 1, top + 1)
+            val inside = pixel(left + width / 2, top + height - 4)
+            val downTime = SystemClock.uptimeMillis()
+            val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN,
+                left + width / 2f, top + height / 2f, 0)
+            try { assertTrue("Press must reach the real tabs", root.dispatchTouchEvent(down)) } finally { down.recycle() }
+            frames(12)
+
+            assertEquals("Bounded ripple must not paint the capsule corner", corner, pixel(left + 1, top + 1))
+            assertNotEquals("Ripple must remain visible inside the capsule, not be disabled", inside, pixel(left + width / 2, top + height - 4))
+            val cancel = MotionEvent.obtain(downTime, downTime + 200, MotionEvent.ACTION_CANCEL,
+                left + width / 2f, top + height / 2f, 0)
+            try { root.dispatchTouchEvent(cancel) } finally { cancel.recycle() }
+        }
+    }
+
     private suspend fun TestScope.withPicker(tabsOnly: Boolean = false, block: suspend Picker.() -> Unit) {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup().visible()
         val clock = BroadcastFrameClock()
