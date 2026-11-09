@@ -133,6 +133,10 @@ internal fun AboutScreen(onBack: () -> Unit, onAcknowledgements: () -> Unit) {
                         supportingText = IRIO_DOCS_URL, style = ButtonStyle.Ghost,
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                         searchId = "about.docs", onClick = { openLink(IRIO_DOCS_URL) })
+                    ListRowButton(label = tr("版本发布"), icon = IrioIcons.Download,
+                        supportingText = IRIO_RELEASES_URL, style = ButtonStyle.Ghost,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        searchId = "about.releases", onClick = { openLink(IRIO_RELEASES_URL) })
                 }
                 }
             }

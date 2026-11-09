@@ -257,6 +257,7 @@ private val settingsSearchEntries = listOf(
     item("about.version", "版本信息", "关于", AboutActivity::class.java),
     item("about.project", "项目地址", "关于", AboutActivity::class.java),
     item("about.docs", "文档与更新日志", "关于", AboutActivity::class.java),
+    item("about.releases", "版本发布", "关于", AboutActivity::class.java),
 
     item("appearance.language", "语言", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.theme", "主题", "外观与偏好", AppearanceSettingsActivity::class.java),

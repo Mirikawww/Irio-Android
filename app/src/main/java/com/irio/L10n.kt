@@ -762,6 +762,7 @@ private val English = mapOf(
     "版本信息" to "Version information",
     "项目地址" to "Project",
     "文档与更新日志" to "Documentation & changelog",
+    "版本发布" to "Releases",
     "无法打开链接" to "Couldn't open the link",
     "本地修改" to "Modified locally",
     "本地适配" to "Adapted locally",

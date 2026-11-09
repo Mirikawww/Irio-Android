@@ -141,12 +141,14 @@ class AboutScreenTest {
             assertLinkSubtitle("项目地址", IRIO_PROJECT_URL)
             assertLinkSubtitle("文档与更新日志", IRIO_DOCS_URL)
             fun assertRowAlignment() {
-                val titles = listOf("项目地址", "文档与更新日志", "鸣谢").map { label ->
+                assertLinkSubtitle("版本发布", IRIO_RELEASES_URL)
+                val titles = listOf("项目地址", "文档与更新日志", "鸣谢", "版本发布").map { label ->
                     nodes().single { it.config.getOrElse(SemanticsProperties.Text) { emptyList() }
                         .any { value -> value.text == tr(label) } }.boundsInRoot
                 }
                 assertEquals("All About rows must share the same icon and title inset", titles[0].left, titles[1].left, 0.5f)
                 assertEquals("Acknowledgements must align with the project and docs icons", titles[0].left, titles[2].left, 0.5f)
+                assertEquals(titles[0].left, titles[3].left, 0.5f)
             }
             assertRowAlignment()
             fun assertResourceGroup() {
@@ -160,10 +162,12 @@ class AboutScreenTest {
                 }
                 val project = row("项目地址").boundsInRoot
                 val docs = row("文档与更新日志").boundsInRoot
+                val releases = row("版本发布").boundsInRoot
                 assertEquals("Project and docs must be adjacent rows within one settings card", project.bottom, docs.top, 0.5f)
+                assertEquals("Releases must be the next row of the same card", docs.bottom, releases.top, 0.5f)
                 val group = nodes().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "about-resources" }.boundsInRoot
                 assertEquals(project.top, group.top, 0.5f)
-                assertEquals(docs.bottom, group.bottom, 0.5f)
+                assertEquals(releases.bottom, group.bottom, 0.5f)
                 assertTrue("Acknowledgements must remain a separate card above the two links",
                     row("鸣谢").boundsInRoot.bottom + 11.5f <= group.top)
             }
@@ -179,6 +183,14 @@ class AboutScreenTest {
             assertEquals(IRIO_DOCS_URL, shadowOf(context).nextStartedActivity.dataString)
             click(IRIO_DOCS_URL)
             assertEquals(IRIO_DOCS_URL, shadowOf(context).nextStartedActivity.dataString)
+            val releasesHit = searchSettings("版本发布", label = { it }).single { it.id == "about.releases" }
+            assertEquals(AboutActivity::class.java, releasesHit.destination)
+            click(tr("版本发布"))
+            val releases = shadowOf(context).nextStartedActivity
+            assertEquals(Intent.ACTION_VIEW, releases.action)
+            assertEquals("https://irio.relithy.space/releases/", releases.dataString)
+            click(IRIO_RELEASES_URL)
+            assertEquals(IRIO_RELEASES_URL, shadowOf(context).nextStartedActivity.dataString)
             click(tr("鸣谢"))
             assertTrue(openedCredits)
             for (theme in listOf(ThemePreference.LIGHT, ThemePreference.DARK, ThemePreference.AMOLED)) {
