@@ -201,7 +201,8 @@ private fun ModelSwitcherActionTile(
     val labelReveal = reveal.coerceIn(0f, 1f)
     val interactions = remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
-    LaunchedEffect(pressed, enabled) { if (!pressed || !enabled) onRelease() }
+    val interactive = enabled || onUnavailableClick != null
+    LaunchedEffect(pressed, interactive) { if (!pressed || !interactive) onRelease() }
     val accent = Theme[colors][primaryColor]
     val selected = checked && enabled
     val fill = if (selected) accent.copy(alpha = 0.12f) else Theme[colors][secondaryColor]
@@ -215,9 +216,9 @@ private fun ModelSwitcherActionTile(
             .clip(ContinuousCapsule)
             .background(fill)
             .combinedClickable(interactionSource = interactions, indication = LocalIndication.current,
-                enabled = enabled || onUnavailableClick != null, role = Role.Switch,
+                enabled = interactive, role = Role.Switch,
                 onClick = { if (enabled) onCheckedChange(!checked) else onUnavailableClick?.invoke() },
-                onLongClick = { if (enabled) onLongPress(pressed) })
+                onLongClick = { if (interactive) onLongPress(pressed) })
             .semantics {
                 contentDescription = label
                 if (!enabled) disabled()

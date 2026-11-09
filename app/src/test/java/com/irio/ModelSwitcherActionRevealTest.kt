@@ -41,6 +41,32 @@ import java.time.Duration
 @Config(sdk = [35], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ModelSwitcherActionRevealTest {
+    @Test fun unavailableSearchLongPressRevealsUntilReleaseWithoutTogglingOrNotifying() = runTest {
+        Harness(this).use { h ->
+            h.available.value = false; h.advance(160)
+            val resting = h.button("网络搜索").boundsInRoot.width
+            h.touch("网络搜索", MotionEvent.ACTION_DOWN); h.advance(650)
+            assertTrue("Missing configuration must not block the label preview", h.labelShown("网络搜索"))
+            assertTrue(h.button("网络搜索").boundsInRoot.width > resting)
+            assertTrue(h.button("网络搜索").config.contains(SemanticsProperties.Disabled))
+            h.advance(2000)
+            assertTrue(h.labelShown("网络搜索"))
+            h.touch("网络搜索", MotionEvent.ACTION_UP); h.advance(320)
+            assertFalse(h.labelShown("网络搜索"))
+            assertFalse(h.search.value)
+            assertEquals("Long press must not act like a configuration click", 0, h.searchConfigurationNotices)
+            h.button("网络搜索").config[SemanticsActions.OnLongClick].action!!.invoke()
+            h.advance(100)
+            assertTrue("Accessibility long click must also preview the label", h.labelShown("网络搜索"))
+            h.advance(1800)
+            assertFalse(h.labelShown("网络搜索"))
+            h.active.value = false; h.advance(32)
+            h.button("网络搜索").config[SemanticsActions.OnLongClick].action!!.invoke()
+            h.advance(100)
+            assertFalse("Inactive outgoing controls stay inert", h.labelShown("网络搜索"))
+        }
+    }
+
     @Test fun unavailableSearchTapExplainsConfigurationWithoutEnablingSearch() = runTest {
         Harness(this).use { h ->
             h.available.value = false
