@@ -39,21 +39,20 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], manifest = Config.NONE)
 class StartupUpdateSnackbarTest {
-    @Test fun debugWebsitePreviewOpensTheRealUpdateDialogWithoutAViewTap() = runTest {
+    @Test fun debugWebsitePreviewNeverOpensTheUpdateDialogWithoutAViewTap() = runTest {
         withUi { fixture ->
             val release = availableUpdate().release.copy(testDownload = true, versionCode = 11,
                 asset = UpdateAsset("arm64-v8a", "https://irio.relithy.space/releases/download/fixture?via=cdn", "a".repeat(64), 123, "com.irio"))
             fixture.check.start { UpdateCheckResult.Available(release) }
-            repeat(40) {
-                fixture.frames(1)
-                assertNull("A direct Debug dialog must not flash a shrinking snackbar first",
-                    fixture.text(tr("发现新版本：%s").format(release.tag)))
-            }
-            assertNotNull(fixture.text(tr("发现新版本")))
+            fixture.frames(40)
+            assertNull("Startup must never force the Debug download dialog open", fixture.text(tr("下载")))
+            assertNotNull(fixture.text(tr("查看")))
+            assertNotNull(fixture.check.notice.value)
+            fixture.click(requireNotNull(fixture.text(tr("查看"))))
+            fixture.frames(30)
             assertNotNull(fixture.text(tr("下载")))
             assertNull(fixture.text(tr("前往下载")))
-            assertNotNull(fixture.text(tr("Debug 下载测试：真实网站版本，安装正式版，与 Debug 并存。")))
-            assertNull("The dialog owns the pending test preview", fixture.check.notice.value)
+            assertNull(fixture.check.notice.value)
         }
     }
 
