@@ -22,7 +22,6 @@ import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.primaryColor
-import com.composeunstyled.UnstyledSlider
 import com.composeunstyled.theme.Theme
 import kotlin.math.roundToInt
 
@@ -56,7 +55,7 @@ fun SettingsSlider(
             Text(label, modifier = Modifier.weight(1f), color = content)
             Text(valueLabel?.invoke(current) ?: "$current", color = muted)
         }
-        UnstyledSlider(
+        ScrollSafeSlider(
             value = current.toFloat(),
             onValueChange = {
                 onValueChange((min + ((it - min) / step).roundToInt() * step).coerceIn(min, max))
