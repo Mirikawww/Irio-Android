@@ -128,8 +128,8 @@ internal fun ComposerField(
     expandedFooter: (@Composable () -> Unit)? = null,
     onEnterSend: (() -> Unit)? = null,
     onPasteAsAttachment: ((String) -> Boolean)? = null,
+    shape: Shape = rememberComposerFieldShape(),
 ) {
-    val shape = rememberComposerFieldShape()
     val contentColor = Theme[colors][onFieldColor]
     val textStyle = ComposerTextStyle.copy(
         color = contentColor,

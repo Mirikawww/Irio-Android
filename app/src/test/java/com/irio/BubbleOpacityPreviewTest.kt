@@ -38,6 +38,37 @@ import org.robolectric.shadows.ShadowWindowManagerImpl
 @Config(sdk = [35], manifest = Config.NONE, qualifiers = "w400dp-h1000dp-mdpi")
 @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
 class BubbleOpacityPreviewTest {
+    @Test fun inputCornerPreviewUsesThePendingRadiusAndOnlySavesOnRelease() = runTest {
+        withUi { f ->
+            val original = ThemeStore.inputCornerRadius
+            val slider = f.slider("输入框圆角").boundsInRoot
+            f.touch(MotionEvent.ACTION_DOWN, slider.center.x, slider.center.y)
+            f.touch(MotionEvent.ACTION_MOVE, slider.right - 10f, slider.center.y)
+            f.frames(15)
+            val sample = f.nodes().singleOrNull {
+                it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "input-corner-preview-field"
+            }
+            assertNotNull("Dragging input corners must show an input preview", sample)
+            assertTrue("The preview must contain the real ComposerField editor, not a painted Box", f.descend(requireNotNull(sample)).any {
+                it.config.contains(SemanticsProperties.EditableText)
+            })
+            assertTrue("Preview input must not take focus or open the keyboard", f.descend(requireNotNull(sample)).none {
+                it.config.getOrElse(SemanticsProperties.Focused) { false }
+            })
+            val preview = requireNotNull(sample).config[SemanticsProperties.StateDescription].removeSuffix(" dp").toInt()
+            assertTrue(preview >= 28)
+            assertEquals("Do not persist preview radius during a drag", original, ThemeStore.inputCornerRadius)
+            f.touch(MotionEvent.ACTION_UP, slider.right - 10f, slider.center.y)
+            f.frames(20)
+            assertEquals(preview, ThemeStore.inputCornerRadius)
+            assertTrue(f.nodes().none { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "input-corner-preview" })
+            f.tap(.2f, "输入框圆角")
+            assertTrue(f.nodes().any { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "input-corner-preview" })
+            advanceTimeBy(3100); f.frames(20)
+            assertTrue(f.nodes().none { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "input-corner-preview" })
+        }
+    }
+
     @Test fun resizingForPercentageNeverPausesThumbFollowingDuringContinuousDrag() = runTest {
         withUi { f ->
             val slider = f.slider().boundsInRoot
