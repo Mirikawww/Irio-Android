@@ -14,11 +14,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -50,8 +50,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.composables.ui.components.Button
 import com.composables.ui.components.ButtonStyle
+import com.composables.ui.components.BottomSheetDetent
 import com.composables.ui.components.Text
 import com.composables.ui.components.TextField
+import com.composables.ui.components.rememberBottomSheetState
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.fieldShape
 import com.composables.ui.theme.mutedColor
@@ -77,7 +79,7 @@ internal fun MeSettingsScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val name = rememberTextFieldState(ProfileStore.loadNameInput(context))
     val lifecycleOwner = LocalLifecycleOwner.current
-    var avatarActionsOpen by remember { mutableStateOf(false) }
+    val avatarActions = rememberBottomSheetState()
     var confirmDelete by remember { mutableStateOf(false) }
     var cropSource by remember { mutableStateOf<Bitmap?>(null) }
     DisposableEffect(lifecycleOwner, name) {
@@ -115,7 +117,7 @@ internal fun MeSettingsScreen(onBack: () -> Unit) {
                         .settingsSearchAnchor("me.avatar", horizontalOutset = 0.dp,
                             edge = SettingsSearchEdge.All, verticalOutset = 0.dp)
                         .clip(CircleShape).background(Theme[colors][primaryColor])
-                        .clickable { avatarActionsOpen = true }
+                        .clickable { avatarActions.targetDetent = BottomSheetDetent.FullyExpanded }
                         .semantics { contentDescription = tr("头像") },
                 ) {
                     ProfileStore.avatar?.let { avatar ->
@@ -140,27 +142,40 @@ internal fun MeSettingsScreen(onBack: () -> Unit) {
                 )
             }
         }
-        IrioAlertDialog(visible = avatarActionsOpen, onDismissRequest = { avatarActionsOpen = false }) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        ScaledBottomSheet(
+            state = avatarActions,
+            onDismissRequest = { avatarActions.targetDetent = BottomSheetDetent.Hidden },
+        ) {
+            Column(Modifier.fillMaxWidth().navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 DialogTitle(tr("头像"))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = {
-                            avatarActionsOpen = false
+                Button(
+                    onClick = {
+                        scope.launch {
+                            avatarActions.hide()
                             pickAlbum.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        },
-                        style = ButtonStyle.Secondary, modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
-                    ) { Text(tr("相册选择"), color = LocalContentColor.current) }
-                    Button(
-                        onClick = { avatarActionsOpen = false; pickDocument.launch(arrayOf("image/*")) },
-                        style = ButtonStyle.Secondary, modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
-                    ) { Text(tr("文件选择"), color = LocalContentColor.current) }
-                }
+                        }
+                    },
+                    style = ButtonStyle.Secondary, modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
+                ) { Text(tr("相册选择"), color = LocalContentColor.current) }
+                Button(
+                    onClick = {
+                        scope.launch {
+                            avatarActions.hide()
+                            pickDocument.launch(arrayOf("image/*"))
+                        }
+                    },
+                    style = ButtonStyle.Secondary, modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
+                ) { Text(tr("文件选择"), color = LocalContentColor.current) }
                 if (ProfileStore.avatar != null) {
                     Button(
-                        onClick = { avatarActionsOpen = false; confirmDelete = true },
+                        onClick = {
+                            scope.launch {
+                                avatarActions.hide()
+                                confirmDelete = true
+                            }
+                        },
                         style = ButtonStyle.Destructive, modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
                     ) { Text(tr("删除头像"), color = LocalContentColor.current) }

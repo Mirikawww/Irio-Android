@@ -109,23 +109,46 @@ class MeSettingsTest {
             assertNotNull(ProfileStore.avatar)
             assertEquals("Avatar must use the 96dp preview", 96f, avatar().boundsInRoot.width, 0.5f)
             assertEquals("Avatar must be horizontally centered", 200f, avatar().boundsInRoot.center.x, 0.5f)
-            assertTrue("Avatar opens its actions dialog", avatar().config.contains(SemanticsActions.OnClick))
+            assertTrue("Avatar opens its action sheet", avatar().config.contains(SemanticsActions.OnClick))
             assertFalse("Actions must not be displayed on the page", all().any { hasText(it, tr("相册选择")) })
             fun openAvatarActions() {
                 assertTrue(avatar().config[SemanticsActions.OnClick].action!!.invoke()); frames()
+            }
+            fun awaitActionsClosed() {
+                repeat(120) {
+                    if (all().none { hasText(it, tr("相册选择")) }) return
+                    frames(1)
+                }
+                fail("The dismissed action sheet must release its content after its exit animation")
             }
             openAvatarActions()
             for (label in listOf("相册选择", "文件选择", "删除头像")) {
                 assertTrue("$label must be an explicit button", all().any { hasText(it, tr(label)) })
 
             }
-            assertEquals("Picker actions must share one row", row("相册选择").positionInRoot.y,
-                row("文件选择").positionInRoot.y, 0.5f)
-            assertTrue(row("相册选择").positionInRoot.x + row("相册选择").size.width <= row("文件选择").positionInRoot.x)
-            assertTrue("Delete avatar belongs on a separate row below the pickers",
-                row("删除头像").positionInRoot.y >= row("文件选择").positionInRoot.y + row("文件选择").size.height)
+            val actions = listOf("相册选择", "文件选择", "删除头像").map(::row)
+            val sheetTitle = all().single { hasText(it, tr("头像")) }
+            assertEquals("Keep the avatar sheet title close to its first action", 8f,
+                actions.first().boundsInRoot.top - sheetTitle.boundsInRoot.bottom, 0.5f)
+            for (action in actions) {
+                assertEquals("Each action must fill its own sheet row", 360f, action.size.width.toFloat(), 0.5f)
+                assertEquals("Action rows must share the same left edge", actions.first().positionInRoot.x,
+                    action.positionInRoot.x, 0.5f)
+            }
+            for ((above, below) in actions.zipWithNext()) {
+                assertTrue("Avatar actions must be vertically stacked without overlap",
+                    below.positionInRoot.y >= above.positionInRoot.y + above.size.height)
+            }
+            assertTrue("The action sheet must be anchored at the screen bottom, not centered",
+                actions.last().boundsInRoot.bottom >= 1160f)
+            (org.robolectric.shadows.ShadowDialog.getLatestDialog() as androidx.activity.ComponentDialog)
+                .onBackPressedDispatcher.onBackPressed()
+            frames()
+            assertFalse("Back must dismiss the action sheet", all().any { hasText(it, tr("相册选择")) })
+            openAvatarActions()
             click(tr("相册选择"))
             assertNotNull("Album button opens the photo picker", shadowOf(context).nextStartedActivity)
+            awaitActionsClosed()
             nameField.config[SemanticsActions.SetText].action!!.invoke(AnnotatedString("  New   Name  "))
             frames()
             controller.pause()
@@ -136,14 +159,17 @@ class MeSettingsTest {
             val document = shadowOf(context).nextStartedActivity
             assertEquals("DocumentsUI must open via ACTION_OPEN_DOCUMENT", android.content.Intent.ACTION_OPEN_DOCUMENT, document.action)
             assertArrayEquals(arrayOf("image/*"), document.getStringArrayExtra(android.content.Intent.EXTRA_MIME_TYPES))
+            awaitActionsClosed()
             openAvatarActions(); click(tr("删除头像"))
             assertTrue(all().any { hasText(it, tr("确定要删除头像吗？")) })
+            awaitActionsClosed()
             click(tr("取消")); assertNotNull(ProfileStore.avatar)
             openAvatarActions(); click(tr("删除头像"))
             click(tr("删除")); assertNull(ProfileStore.avatar)
             openAvatarActions()
             assertFalse("No avatar means no delete-avatar button", all().any { hasText(it, tr("删除头像")) })
             click(tr("文件选择")); shadowOf(context).nextStartedActivity
+            awaitActionsClosed()
             ProfileStore.forgetForTest(); ProfileStore.ensureLoaded(context)
             assertEquals("New Name", ProfileStore.name)
             assertNull(ProfileStore.avatar)
