@@ -113,15 +113,7 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SettingsSectionCard(title = tr("字体与语言")) {
-                AppearanceChoiceSetting(
-                    title = tr("字体"),
-                    options = AppFont.entries,
-                    selected = ThemeStore.appFont,
-                    optionLabel = { tr(it.label) },
-                    onSelect = { ThemeStore.saveAppFont(context, it) },
-                    modifier = Modifier
-                        .settingsSearchAnchor("appearance.font", edge = SettingsSearchEdge.Top),
-                )
+                AppearanceFontSetting()
                 TextScaleSettings()
                 DropdownMenu(
                     expanded = languageMenuOpen,

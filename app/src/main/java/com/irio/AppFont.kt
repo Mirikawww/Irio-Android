@@ -74,8 +74,8 @@ internal fun systemFontWeightAdjustment(configuration: Configuration): Int? =
 
 /** Observe once at the theme root, rather than registering an observer for every text node. */
 @Composable
-internal fun rememberSystemFontWeightScale(): Int? {
-    if (ThemeStore.appFont != AppFont.SERIF) return null
+internal fun rememberSystemFontWeightScale(enabled: Boolean = ThemeStore.appFont == AppFont.SERIF): Int? {
+    if (!enabled) return null
     val resolver = LocalContext.current.contentResolver
     fun readScale(): Int? = runCatching {
         Settings.Secure.getInt(resolver, VendorFontWeightScale, 0).takeIf { it > 0 }
@@ -142,8 +142,8 @@ private object LoraTypefaceLoader : AndroidFont.TypefaceLoader {
 }
 
 @Composable
-internal fun rememberAppFontFamily(): FontFamily? {
-    if (ThemeStore.appFont != AppFont.SERIF) return null
+internal fun rememberAppFontFamily(font: AppFont = ThemeStore.appFont): FontFamily? {
+    if (font != AppFont.SERIF) return null
     val adjustment = systemFontWeightAdjustment(LocalConfiguration.current)
     val scale = LocalSystemFontWeightScale.current
     return remember(adjustment, scale) {
