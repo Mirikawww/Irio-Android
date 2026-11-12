@@ -13,9 +13,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import com.composables.ui.components.Text
 import com.composables.ui.theme.colors
@@ -35,6 +42,7 @@ fun SettingsSlider(
     onValueChangeFinished: (() -> Unit)? = null,
     step: Int = 1,
     modifier: Modifier = Modifier,
+    preview: (@Composable (Int, Boolean) -> Unit)? = null,
 ) {
     require(step > 0)
     val content = Theme[colors][onBackgroundColor]
@@ -44,6 +52,8 @@ fun SettingsSlider(
     val max = valueRange.last
     val current = value.coerceIn(min, max)
     val interactionSource = remember { MutableInteractionSource() }
+    var previewTap by remember { mutableIntStateOf(0) }
+    var valueBounds by remember { mutableStateOf(Rect.Zero) }
     Column(
         modifier = modifier.settingsSliderInset(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -53,7 +63,8 @@ fun SettingsSlider(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(label, modifier = Modifier.weight(1f), color = content)
-            Text(valueLabel?.invoke(current) ?: "$current", color = muted)
+            Text(valueLabel?.invoke(current) ?: "$current", color = muted,
+                modifier = Modifier.onGloballyPositioned { valueBounds = it.boundsInWindow() })
         }
         ScrollSafeSlider(
             value = current.toFloat(),
@@ -61,6 +72,9 @@ fun SettingsSlider(
                 onValueChange((min + ((it - min) / step).roundToInt() * step).coerceIn(min, max))
             },
             onValueChangeFinished = onValueChangeFinished,
+            onTrackTap = if (preview != null) { { previewTap++ } } else null,
+            // A transient touch preview must not start focus-driven page scrolling.
+            focusOnTap = preview == null,
             valueRange = min.toFloat()..max.toFloat(),
             steps = ((max - min) / step - 1).coerceAtLeast(0),
             interactionSource = interactionSource,
@@ -88,13 +102,19 @@ fun SettingsSlider(
                     }
                 }
             },
-            thumb = {
+            thumb = { state ->
                 Box(
                     modifier = Modifier
                         .size(16.dp)
                         .clip(ContinuousCapsule)
                         .background(accentFill),
-                )
+                ) {
+                    if (preview != null) {
+                        SliderValuePreview(dragging = state.isDragging, tapSequence = previewTap, valueBounds = valueBounds) { covered ->
+                            preview(current, covered)
+                        }
+                    }
+                }
             },
         )
     }

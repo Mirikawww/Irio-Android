@@ -344,14 +344,7 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
                         },
                     )
                 }
-                SettingsSlider(
-                    modifier = Modifier.settingsSearchAnchor("appearance.bubbleOpacity"),
-                    label = tr("气泡透明度"),
-                    value = ThemeStore.bubbleOpacity,
-                    valueRange = 0..100,
-                    valueLabel = { "$it%" },
-                    onValueChange = { ThemeStore.saveBubbleOpacity(context, it) },
-                )
+                BubbleOpacitySetting()
                 SettingsSlider(
                     modifier = Modifier.settingsSearchAnchor("appearance.inputCorners"),
                     label = tr("输入框圆角"),

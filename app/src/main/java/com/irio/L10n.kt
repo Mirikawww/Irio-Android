@@ -544,6 +544,7 @@ private val English = mapOf(
     "实验室" to "Laboratory",
     "外观" to "Appearance",
     "更好的设置项展示" to "Better settings display",
+    "这是一条预览消息" to "This is a preview message",
     "名称" to "Name",
     "外观与偏好" to "Appearance and preferences",
     "密钥" to "API key",

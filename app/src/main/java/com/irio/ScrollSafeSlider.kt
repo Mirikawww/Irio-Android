@@ -138,6 +138,8 @@ internal fun ScrollSafeSlider(
     @IntRange(from = 0)
     steps: Int = 0,
     onValueChangeFinished: (() -> Unit)? = null,
+    onTrackTap: (() -> Unit)? = null,
+    focusOnTap: Boolean = true,
     orientation: Orientation = Orientation.Horizontal,
     reverseDirection: Boolean = false,
     track: @Composable (SliderState) -> Unit,
@@ -186,6 +188,8 @@ internal fun ScrollSafeSlider(
 
     val scope = rememberCoroutineScope()
     val currentOnValueChangeFinished by rememberUpdatedState(onValueChangeFinished)
+    val currentOnTrackTap by rememberUpdatedState(onTrackTap)
+    val currentFocusOnTap by rememberUpdatedState(focusOnTap)
     val sliderMainAxisSize = if (orientation == Orientation.Horizontal) {
         sliderSize.width.toFloat()
     } else {
@@ -285,10 +289,11 @@ internal fun ScrollSafeSlider(
                 onTap = {
                     scope.launch {
                         draggableState.drag(MutatePriority.UserInput) {
-                            focusRequester.requestFocus()
+                            if (currentFocusOnTap) focusRequester.requestFocus()
                             dragBy(0f)
                         }
                         currentOnValueChangeFinished?.invoke()
+                        currentOnTrackTap?.invoke()
                     }
                 },
             )
