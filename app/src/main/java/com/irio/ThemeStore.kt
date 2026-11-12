@@ -157,6 +157,7 @@ object ThemeStore {
     private const val GLYPH_FADE_KEY = "glyph_fade"
     private const val IMAGE_GENERATION_STREAMING_KEY = "image_generation_streaming"
     private const val MODEL_DIFF_KEY = "model_diff"
+    private const val BETTER_SETTINGS_DISPLAY_KEY = "better_settings_display"
     private const val MODEL_PICKER_ON_LEFT_KEY = "model_picker_on_left"
     private const val NEW_MESSAGE_SCROLL_KEY = "new_message_scroll"
     private const val COMPOSER_WRAP_ANIMATION_KEY = "composer_wrap_animation"
@@ -215,6 +216,10 @@ object ThemeStore {
 
     /** 提供商详情里新增/移除模型的绿红底。默认关。 */
     var modelDiff by mutableStateOf(false)
+        private set
+
+    /** Laboratory opt-in. Display changes are introduced separately. */
+    var betterSettingsDisplay by mutableStateOf(false)
         private set
 
     /** 发送新消息时用固定时长滑到底，并重新打开自动滚动。默认关。 */
@@ -325,6 +330,7 @@ object ThemeStore {
             glyphFade = appearance.getBoolean(GLYPH_FADE_KEY, false)
             imageGenerationStreaming = appearance.getBoolean(IMAGE_GENERATION_STREAMING_KEY, false)
             modelDiff = appearance.getBoolean(MODEL_DIFF_KEY, false)
+            betterSettingsDisplay = appearance.getBoolean(BETTER_SETTINGS_DISPLAY_KEY, false)
             modelPickerOnLeft = appearance.getBoolean(MODEL_PICKER_ON_LEFT_KEY, false)
             newMessageScroll = appearance.getBoolean(NEW_MESSAGE_SCROLL_KEY, false)
             composerWrapAnimation = appearance.getBoolean(COMPOSER_WRAP_ANIMATION_KEY, false)
@@ -434,6 +440,14 @@ object ThemeStore {
         imageGenerationStreaming = enabled
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putBoolean(IMAGE_GENERATION_STREAMING_KEY, enabled).apply()
+    }
+
+    fun saveBetterSettingsDisplay(context: Context, enabled: Boolean) {
+        ensureLoaded(context)
+        if (betterSettingsDisplay == enabled) return
+        betterSettingsDisplay = enabled
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(BETTER_SETTINGS_DISPLAY_KEY, enabled).apply()
     }
 
     fun saveNewMessageScroll(context: Context, enabled: Boolean) {

@@ -35,6 +35,10 @@ class LaboratorySettingsTest {
     @Test fun homepageOpensLaboratoryFromAppPreferences() = runTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val context = controller.get()
+        val preferences = context.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
+        val originalSettings = preferences.all
+        preferences.edit().remove("better_settings_display").commit()
+        ThemeStore.reload(context)
         val clock = BroadcastFrameClock()
         val recomposer = Recomposer(coroutineContext + clock)
         val runner = launch(clock) { recomposer.runRecomposeAndApplyChanges() }
@@ -89,9 +93,31 @@ class LaboratorySettingsTest {
                 shadowOf(context).nextStartedActivity.component!!.className)
             laboratoryOpen.value = true
             frames()
+            val appearanceTitle = nodes().singleOrNull {
+                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == tr("外观") }
+            }
+            assertNotNull("The switch must belong to an Appearance group", appearanceTitle)
+            assertTrue(requireNotNull(appearanceTitle).config.contains(SemanticsProperties.Heading))
             assertTrue("The laboratory page must keep its settings title", nodes().any {
                 it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == tr("实验室") }
             })
+            assertTrue("The laboratory must expose the new setting", nodes().any {
+                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == tr("更好的设置项展示") }
+            })
+            fun toggle() = nodes().single { it.config.contains(SemanticsProperties.ToggleableState) }
+            assertEquals(androidx.compose.ui.state.ToggleableState.Off,
+                toggle().config[SemanticsProperties.ToggleableState])
+            assertTrue(toggle().config[SemanticsActions.OnClick].action!!.invoke())
+            frames()
+            assertTrue(preferences.getBoolean("better_settings_display", false))
+            laboratoryOpen.value = false; frames()
+            ThemeStore.reload(context)
+            laboratoryOpen.value = true; frames()
+            assertEquals("Reopening must retain the saved switch", androidx.compose.ui.state.ToggleableState.On,
+                toggle().config[SemanticsProperties.ToggleableState])
+            assertTrue(toggle().config[SemanticsActions.OnClick].action!!.invoke())
+            frames()
+            assertFalse(preferences.getBoolean("better_settings_display", true))
             var back = nodes().single {
                 it.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }.contains(tr("返回"))
             }
@@ -103,6 +129,11 @@ class LaboratorySettingsTest {
             recomposer.close()
             runner.cancel()
             controller.pause().stop().destroy()
+            preferences.edit().apply {
+                val original = originalSettings["better_settings_display"] as? Boolean
+                if (original == null) remove("better_settings_display") else putBoolean("better_settings_display", original)
+            }.commit()
+            ThemeStore.reload(context)
         }
     }
 }

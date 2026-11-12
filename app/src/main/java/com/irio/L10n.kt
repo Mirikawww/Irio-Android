@@ -542,6 +542,8 @@ private val English = mapOf(
     "保存中" to "Saving",
     "其他" to "Other",
     "实验室" to "Laboratory",
+    "外观" to "Appearance",
+    "更好的设置项展示" to "Better settings display",
     "名称" to "Name",
     "外观与偏好" to "Appearance and preferences",
     "密钥" to "API key",

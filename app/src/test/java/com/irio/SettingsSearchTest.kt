@@ -6,6 +6,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsSearchTest {
+    @Test fun betterSettingsDisplayIsSearchableInTheLaboratoryInBothLanguages() {
+        for (language in AppLanguage.entries) {
+            val label = translate(language, "更好的设置项展示")
+            val hit = searchSettings(label, label = { translate(language, it) }).single()
+            assertEquals("laboratory.betterSettingsDisplay", hit.id)
+            assertEquals(hit.id, hit.anchor)
+            assertEquals("com.irio.LaboratorySettingsActivity", hit.destination.name)
+            assertEquals(translate(language, "实验室"), hit.page)
+        }
+        assertEquals("Better settings display", translate(AppLanguage.EN, "更好的设置项展示"))
+    }
+
     @Test fun laboratoryPageIsSearchableInBothLanguages() {
         val chinese = searchSettings("实验室", label = { it }).singleOrNull()
         assertTrue("Laboratory must be included in settings search", chinese != null)
