@@ -260,8 +260,7 @@ internal fun ProviderSettingsScreen(
                             fetchModels(config)
                         }
                         if (result.error == null) {
-                            ProviderStore.saveProvider(context, config.copy(models = result.models))
-                            ProviderStore.saveActiveProviderId(context, config.id)
+                            ProviderStore.saveNewProvider(context, config.copy(models = result.models))
                             reload()
                             dialogOpen = false
                         } else {

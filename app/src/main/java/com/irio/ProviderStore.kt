@@ -257,6 +257,11 @@ object ProviderStore {
         persist(context, providers, activeId)
     }
 
+    /** Add a provider without changing the chat's current provider or selected model. */
+    fun saveNewProvider(context: Context, config: ProviderConfig) {
+        saveProvider(context, config)
+    }
+
     /** Validate the whole newline-separated batch before saving; no discovery or selection change. */
     fun addCustomModel(context: Context, providerId: String, input: String): String? {
         val current = loadProviders(context).firstOrNull { it.id == providerId }

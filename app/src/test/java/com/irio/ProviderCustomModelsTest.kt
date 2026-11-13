@@ -141,4 +141,19 @@ class ProviderCustomModelsTest {
         assertEquals("", saved.selectedModel)
         assertFalse(saved.enabled)
     }
+
+    @Test fun addingProviderPreservesTheCurrentProviderAndModelSelection() {
+        val newProvider = ProviderConfig(
+            id = "new",
+            name = "New",
+            endpointUrl = "https://new.example.test",
+            apiKey = "new-fixture",
+            models = listOf("new-model"),
+        )
+        ProviderStore.saveNewProvider(context, newProvider)
+
+        assertEquals("two", ProviderStore.loadActiveProviderId(context))
+        assertEquals("other", ProviderStore.loadProvider(context, "two")?.selectedModel)
+        assertEquals("new-model", ProviderStore.loadProvider(context, "new")?.selectedModel)
+    }
 }
