@@ -32,8 +32,9 @@ class ModelCatalogImageTest {
 
     @Test fun actualImageGenerationModelsRetainFullAndBareAliasRecognition() {
         for (model in listOf("gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5", "gpt-image-2", "gpt-image-2.5",
-            "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gemini-3.1-flash-image")) {
-            for (id in listOf(model, "gateway/$model", model.uppercase())) {
+            "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2.6", "gpt-image-2.6-flare",
+            "gpt-image-2.6-sunburst", "gemini-3.1-flash-image")) {
+            for (id in listOf(model, "openai/$model", "gateway/$model", model.uppercase())) {
                 assertTrue("Real image model must remain selectable: $id", ModelCatalog.isImageModel(context, id))
             }
         }

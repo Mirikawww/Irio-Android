@@ -136,10 +136,19 @@ for mid, entry in reasoning.items():
     reasoning_tails[tail] = merged
 reasoning.update(reasoning_tails)
 
-# OpenRouter 未收录的网关自定义生图模型（models.dev 也未收录）在此补充，避免目录命中失败：
-# 例：gpt-image-2.5（api.yjs.im Image 组，无上游记录）。
-image.setdefault("gpt-image-2.5", True)
-names.setdefault("gpt-image-2.5", "GPT Image 2.5")
+# OpenRouter 页面已公开、但 /api/v1/models 尚未返回的生图模型在此补充名称和分类。
+for custom_model, display_name in {
+    "gpt-image-2": "GPT Image 2",
+    "gpt-image-2.5": "GPT Image 2.5",
+    "gpt-image-2.5-flare": "GPT Image 2.5 Flare",
+    "gpt-image-2.5-sunburst": "GPT Image 2.5 Sunburst",
+    "gpt-image-2.6": "GPT Image 2.6",
+    "gpt-image-2.6-flare": "GPT Image 2.6 Flare",
+    "gpt-image-2.6-sunburst": "GPT Image 2.6 Sunburst",
+}.items():
+    for model_id in (custom_model, f"openai/{custom_model}"):
+        image.setdefault(model_id, True)
+        names.setdefault(model_id, display_name)
 
 # OpenAI Responses compact 别名以及 OpenRouter 官方名裁决：
 # OpenRouter API 不公开 compact 别名，但它们是实际可用的 OpenAI Responses 模型名。

@@ -239,7 +239,7 @@ class ImageCatalogTest(unittest.TestCase):
         for model in ("gpt-5-nano", "gpt-5.4", "multimodal-chat", "vision-reader", "malformed"):
             self.assertNotIn(model, images)
             self.assertFalse(any(key.endswith("/" + model) for key in images), model)
-        for model in ("openai/gpt-image-2", "gpt-image-2", "openai/gpt-image-1.5", "gpt-image-1.5", "google/imagen-fixture", "imagen-fixture", "gpt-image-2.5"):
+        for model in ("openai/gpt-image-2", "gpt-image-2", "openai/gpt-image-1.5", "gpt-image-1.5", "google/imagen-fixture", "imagen-fixture", "gpt-image-2.5", "gpt-image-2.6", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst"):
             self.assertTrue(images[model], model)
 
     def test_image_only_refresh_does_not_fetch_or_rewrite_openrouter_catalogs(self):

@@ -28,6 +28,9 @@ class ModelCatalogPrettifyTest {
         assertEquals("GPT Image 2.5 Flare", prettify("gpt-image-2.5-flare"))
         assertEquals("GPT Image 2.5 Sunburst", prettify("gpt-image-2.5-sunburst"))
         assertEquals("GPT Image 2.5", prettify("gpt-image-2.5"))
+        assertEquals("GPT Image 2.6 Flare", prettify("gpt-image-2.6-flare"))
+        assertEquals("GPT Image 2.6 Sunburst", prettify("gpt-image-2.6-sunburst"))
+        assertEquals("GPT Image 2.6", prettify("gpt-image-2.6"))
         assertEquals("GLM 4.5", prettify("glm-4.5"))
     }
 
