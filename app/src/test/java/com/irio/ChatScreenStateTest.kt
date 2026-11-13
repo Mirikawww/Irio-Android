@@ -48,6 +48,223 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE, shadows = [ChatScreenStateTest.CountingTokenizer::class])
 class ChatScreenStateTest {
+    @Test fun actualGenerationCompletionVibratesIndependentlyOfStreamAndFailure() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val context = RuntimeEnvironment.getApplication()
+        ShadowEnvironment.addExternalDir(context.cacheDir.resolve("completion-haptics-external").absolutePath)
+        val prefs = context.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
+        val original = prefs.all.filterKeys { it.startsWith("haptics_") }
+        val system = android.provider.Settings.System.getInt(context.contentResolver, "haptic_feedback_enabled", 1)
+        val vibrator = context.getSystemService(android.os.VibratorManager::class.java).defaultVibrator
+        val vibration = org.robolectric.Shadows.shadowOf(vibrator)
+        vibration.setHasVibrator(true)
+        android.provider.Settings.System.putInt(context.contentResolver, "haptic_feedback_enabled", 1)
+        HapticPreferences.saveEnabled(context, true)
+        prefs.edit().putBoolean("haptics_stream_output", false).putBoolean("haptics_reply_completed", true).commit()
+        val oldRetry = ThemeStore.autoRetry
+        ThemeStore.saveAutoRetry(context, false)
+        try {
+            MockWebServer().use { server ->
+                IrioHttp.resetForTests()
+                withState { harness ->
+                    val state = harness.state
+                    state.requestReplyNotification = {}
+                    state.providers = listOf(ProviderConfig("haptic-completion", "Fixture", server.url("/v1").toString(), "", models = listOf("fixture-model")))
+                    state.activeProviderId = "haptic-completion"; state.selectedModel = "fixture-model"
+                    state.currentConversation = state.currentConversation.copy(title = "Fixture", titlePending = false)
+                    val id = state.currentConversation.id
+                    try {
+                        for (case in listOf("success", "disabled", "error", "stopped")) {
+                            prefs.edit().putBoolean("haptics_reply_completed", case != "disabled").commit()
+                            when (case) {
+                                "error" -> server.enqueue(MockResponse().setResponseCode(400).setBody("fixture failure"))
+                                "stopped" -> server.enqueue(MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE))
+                                else -> server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream")
+                                    .setBody("data: {\"choices\":[{\"delta\":{\"content\":\"local answer\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
+                            }
+                            val user = ChatMessage(MessageIds.next(), "local completion fixture", true)
+                            val reply = ChatMessage(MessageIds.next(), "", false, isPending = true, responseToUserId = user.id)
+                            state.messages = listOf(user, reply)
+                            vibrator.cancel()
+                            state.startGeneration(id, listOf(user), reply)
+                            if (case == "stopped") state.stopGeneration(id)
+                            repeat(300) {
+                                runCurrent()
+                                if (state.busyThisChat) withContext(Dispatchers.IO) { Thread.sleep(10) }
+                            }
+                            assertFalse("The real request must finish for $case", state.busyThisChat)
+                            if (case == "success") {
+                                assertEquals("local answer", state.messages.last().text)
+                                assertTrue("Completion must vibrate even with stream-output feedback off", vibration.isVibrating)
+                            } else assertFalse("Completion feedback must not fire for $case", vibration.isVibrating)
+                        }
+                    } finally { state.stopGeneration(id); ConversationStore.delete(context, id) }
+                }
+            }
+        } finally {
+            vibrator.cancel(); ThemeStore.saveAutoRetry(context, oldRetry)
+            android.provider.Settings.System.putInt(context.contentResolver, "haptic_feedback_enabled", system)
+            prefs.edit().apply {
+                prefs.all.keys.filter { it.startsWith("haptics_") }.forEach(::remove)
+                original.forEach { (key, value) -> when (value) {
+                    is Boolean -> putBoolean(key, value)
+                    is String -> putString(key, value)
+                } }
+            }.commit()
+            IrioHttp.resetForTests(); Dispatchers.resetMain()
+        }
+    }
+
+    @Test fun eachPublishedTextBurstVibratesWithoutReplayingMetadataHistoryOrBackgroundUpdates() = runTest {
+        val controller = org.robolectric.Robolectric.buildActivity(androidx.activity.ComponentActivity::class.java).setup()
+        val context = controller.get()
+        val prefs = context.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
+        val original = prefs.all.filterKeys { it.startsWith("haptics_") }
+        val system = android.provider.Settings.System.getInt(context.contentResolver, "haptic_feedback_enabled", 1)
+        val vibrator = context.getSystemService(android.os.VibratorManager::class.java).defaultVibrator
+        val shadow = org.robolectric.Shadows.shadowOf(vibrator)
+        shadow.setHasVibrator(true)
+        android.provider.Settings.System.putInt(context.contentResolver, "haptic_feedback_enabled", 1)
+        HapticPreferences.saveEnabled(context, true)
+        prefs.edit().putBoolean("haptics_stream_output", true).commit()
+        try {
+            withState(context = context) { harness ->
+                val state = harness.state
+                val id = state.currentConversation.id
+                val pending = ChatMessage(8001, "", false, isPending = true)
+                state.messages = listOf(pending)
+                vibrator.cancel()
+                val thinking = ProcessEvent(8002, ProcessEventKind.THINKING, "Thinking", live = true)
+                state.replaceInConversation(id, pending.id, pending.copy(process = listOf(thinking), isPending = false, isStreaming = true))
+                assertTrue("New thinking text is also model output", shadow.isVibrating)
+                vibrator.cancel()
+                state.replaceInConversation(id, pending.id, state.messages.single().copy(process = listOf(thinking.copy(millis = 100L))))
+                assertFalse("Thinking timers must not vibrate", shadow.isVibrating)
+                state.replaceInConversation(id, pending.id, state.messages.single().copy(process = listOf(thinking.copy(content = "Thinking more"))))
+                assertTrue("A further thinking-text burst must vibrate", shadow.isVibrating)
+                var text = ""
+                for (delta in listOf("你", "好", " world", "🙂")) {
+                    vibrator.cancel()
+                    text += delta
+                    state.replaceInConversation(id, pending.id, pending.copy(text = text, isPending = false, isStreaming = true))
+                    assertTrue("Each actual text publication must trigger one heavy pulse: $delta", shadow.isVibrating)
+                    assertEquals(34L, shadow.milliseconds)
+                    vibrator.cancel()
+                    state.replaceInConversation(id, pending.id, state.messages.single().copy(finishedAt = 12L))
+                    harness.recompose()
+                    assertFalse("Metadata-only changes and recomposition must not vibrate", shadow.isVibrating)
+                }
+                prefs.edit().putBoolean("haptics_stream_output", false).commit()
+                state.replaceInConversation(id, pending.id, state.messages.single().copy(text = text + " disabled"))
+                assertFalse("Per-location disabling must take effect during an active stream", shadow.isVibrating)
+                prefs.edit().putBoolean("haptics_stream_output", true).commit()
+                state.replaceInConversation(id, pending.id, state.messages.single().copy(text = "retry replacement"))
+                assertFalse("A retry reset/rewrite is not newly appended text", shadow.isVibrating)
+                state.cacheConversationContent(ConversationStore.newConversation().copy(id = "offscreen-stream", messages = listOf(pending)))
+                state.replaceInConversation("offscreen-stream", pending.id, pending.copy(text = "offscreen output", isPending = false, isStreaming = true))
+                assertFalse("An offscreen conversation must not vibrate", shadow.isVibrating)
+                controller.pause()
+                state.replaceInConversation(id, pending.id, state.messages.single().copy(text = state.messages.single().text + " background"))
+                assertFalse("The model must not vibrate while its chat Activity is paused", shadow.isVibrating)
+                controller.resume()
+                state.replaceInConversation(id, pending.id, state.messages.single().copy(text = "restored history", isStreaming = false), persist = true)
+                assertFalse("History/final persistence is not a text burst", shadow.isVibrating)
+                state.messages = listOf(pending)
+                state.replaceInConversation(id, pending.id, pending.copy(text = "single final chunk", isPending = false))
+                assertTrue("A short reply arriving in a single final publication still vibrates", shadow.isVibrating)
+                vibrator.cancel()
+                state.replaceInConversation(id, pending.id, state.messages.single().copy(text = "single final chunk plus history"))
+                assertFalse("Completed history updates must not restart output feedback", shadow.isVibrating)
+                ConversationStore.delete(context, id)
+            }
+        } finally {
+            vibrator.cancel()
+            android.provider.Settings.System.putInt(context.contentResolver, "haptic_feedback_enabled", system)
+            prefs.edit().apply {
+                prefs.all.keys.filter { it.startsWith("haptics_") }.forEach(::remove)
+                original.forEach { (key, value) -> when (value) {
+                    is Boolean -> putBoolean(key, value)
+                    is String -> putString(key, value)
+                } }
+            }.commit()
+            controller.pause().stop().destroy()
+        }
+    }
+
+    @Test fun realChatActionsUseLivePerLocationChoicesIncludingModelReactions() = runTest {
+        val app = RuntimeEnvironment.getApplication()
+        val preferences = app.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
+        val original = preferences.all.filterKeys { it.startsWith("haptics_") }
+        val systemHaptics = android.provider.Settings.System.getInt(app.contentResolver, "haptic_feedback_enabled", 1)
+        val vibrator = app.getSystemService(android.os.VibratorManager::class.java).defaultVibrator
+        val shadow = org.robolectric.Shadows.shadowOf(vibrator)
+        shadow.setHasVibrator(true)
+        shadow.setHasAmplitudeControl(true)
+        android.provider.Settings.System.putInt(app.contentResolver, "haptic_feedback_enabled", 1)
+        HapticPreferences.saveEnabled(app, true)
+        try {
+            withState { harness ->
+                val state = harness.state
+                val id = state.currentConversation.id
+                val user = ChatMessage(1001, "fixture user", true)
+                val assistant = ChatMessage(1002, "fixture assistant", false)
+                state.messages = listOf(user, assistant)
+                try {
+                    vibrator.cancel()
+                    harness.callbacks.onCopy(assistant)
+                    assertTrue("Actual message copy must provide feedback", shadow.isVibrating)
+                    vibrator.cancel()
+                    HapticPreferences.saveEvent(app, HapticEvent.COPY_MESSAGE, false)
+                    // Reuse exactly the same remembered callback: a settings return must not leave stale choices.
+                    harness.callbacks.onCopy(assistant)
+                    assertFalse(shadow.isVibrating)
+                    assertTrue(state.updateMessageReaction(id, assistant.id, "👍", fromModel = false))
+                    assertTrue("User-authored reactions must provide feedback", shadow.isVibrating)
+                    vibrator.cancel()
+                    assertTrue(state.updateMessageReaction(id, user.id, "❤", fromModel = true))
+                    assertTrue("A model-authored reaction must have its own feedback", shadow.isVibrating)
+                    vibrator.cancel()
+                    assertTrue(state.updateMessageReaction(id, user.id, "❤", fromModel = true))
+                    assertFalse("Repeated identical reactions must not vibrate", shadow.isVibrating)
+                    preferences.edit().putBoolean("haptics_model_reaction", false).commit()
+                    assertTrue(state.updateMessageReaction(id, user.id, "👍", fromModel = true))
+                    assertFalse("Model reaction feedback can be independently disabled", shadow.isVibrating)
+                    HapticPreferences.saveEvent(app, HapticEvent.REACTION, false)
+                    assertTrue(state.updateMessageReaction(id, assistant.id, "😂", fromModel = false))
+                    assertFalse(shadow.isVibrating)
+                    state.submitMessage()
+                    assertFalse("Empty sends must not vibrate", shadow.isVibrating)
+                    state.message.edit { append("local send fixture") }
+                    state.preparing = mapOf(123L to id)
+                    state.submitMessage()
+                    assertFalse("Rejected busy sends must not vibrate", shadow.isVibrating)
+                    state.preparing = emptyMap()
+                    state.submitMessage()
+                    assertTrue("The common send path, including keyboard sends, must vibrate", shadow.isVibrating)
+                    assertEquals("local send fixture", state.messages.last { it.fromUser }.text)
+                    vibrator.cancel()
+                    state.newConversation()
+                    assertTrue("The shared user new-conversation action must vibrate", shadow.isVibrating)
+                    vibrator.cancel()
+                    state.newConversation(closeDrawer = false)
+                    assertFalse("Automatic empty-state replacement must not vibrate", shadow.isVibrating)
+                } finally {
+                    ConversationStore.delete(app, id)
+                }
+            }
+        } finally {
+            vibrator.cancel()
+            android.provider.Settings.System.putInt(app.contentResolver, "haptic_feedback_enabled", systemHaptics)
+            preferences.edit().apply {
+                preferences.all.keys.filter { it.startsWith("haptics_") }.forEach(::remove)
+                original.forEach { (key, value) -> when (value) {
+                    is Boolean -> putBoolean(key, value)
+                    is String -> putString(key, value)
+                } }
+            }.commit()
+        }
+    }
+
     @Test fun newGenerationPublishesRequestingBeforeAnyServerOutputInsteadOfKeepingOldWriting() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val app = RuntimeEnvironment.getApplication()
@@ -505,8 +722,9 @@ class ChatScreenStateTest {
         }
     }
 
-    private suspend fun TestScope.withState(observeIdleContext: Boolean = false, block: suspend (Harness) -> Unit) {
-        val harness = Harness(this, observeIdleContext)
+    private suspend fun TestScope.withState(observeIdleContext: Boolean = false,
+        context: android.content.Context = RuntimeEnvironment.getApplication(), block: suspend (Harness) -> Unit) {
+        val harness = Harness(this, observeIdleContext, context)
         try {
             harness.start()
             block(harness)
@@ -518,26 +736,29 @@ class ChatScreenStateTest {
         }
     }
 
-    private class Harness(val scope: TestScope, val observeIdleContext: Boolean = false) {
+    private class Harness(val scope: TestScope, val observeIdleContext: Boolean = false,
+        val context: android.content.Context = RuntimeEnvironment.getApplication()) {
         val clock = BroadcastFrameClock()
         val recomposer = Recomposer(scope.coroutineContext + clock)
         val runner = scope.launch(clock) { recomposer.runRecomposeAndApplyChanges() }
         val composition = Composition(NoNodesApplier(), recomposer)
         val revision = mutableIntStateOf(0)
         lateinit var state: ChatScreenState
+        lateinit var callbacks: AndroidMessageCallbacks
         private var frameTime = 0L
 
         fun start() {
             composition.setContent {
                 revision.intValue
                 CompositionLocalProvider(
-                    LocalContext provides RuntimeEnvironment.getApplication(),
+                    LocalContext provides context,
                     LocalDensity provides Density(1f),
                     LocalFocusManager provides TestFocusManager,
                     LocalClipboardManager provides TestClipboard,
                     LocalWindowInfo provides TestWindowInfo,
                 ) {
                     state = rememberChatScreenState()
+                    callbacks = rememberChatMessageCallbacks(state)
                     if (observeIdleContext) ObserveIdleContextEstimate(state)
                 }
             }

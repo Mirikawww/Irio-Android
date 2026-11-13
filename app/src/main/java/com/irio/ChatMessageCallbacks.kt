@@ -37,8 +37,10 @@ internal fun rememberChatMessageCallbacks(state: ChatScreenState): AndroidMessag
                 onOpenAttachment = state::openAttachment,
                 onCopy = { chatMessage ->
                     clipboard.setText(AnnotatedString(chatMessage.visibleText()))
+                    AppHaptics.perform(context, HapticEvent.COPY_MESSAGE)
                 },
                 onQuote = { excerpt ->
+                    AppHaptics.perform(context, HapticEvent.QUOTE_MESSAGE)
                     pendingQuote = excerpt
                     composerFocusRequester.requestFocus()
                     keyboardController?.show()

@@ -30,6 +30,7 @@ internal fun ChatScreenState.startSttRecording() {
         return
     }
     if (sttRecorder.start()) {
+        AppHaptics.perform(context, HapticEvent.START_RECORDING)
         sttRecording = true
         sttRecordingStartedAt = SystemClock.elapsedRealtime()
         sttRecordingElapsedMillis = 0L
@@ -42,6 +43,7 @@ internal fun ChatScreenState.startSttRecording() {
 
 internal fun ChatScreenState.finishSttRecording() {
     if (!sttRecording) return
+    AppHaptics.perform(context, HapticEvent.STOP_RECORDING)
     sttRecording = false
     val file = sttRecorder.stop()
     if (file == null) {
@@ -188,6 +190,7 @@ internal fun ChatScreenState.submitMessage() {
     if (pendingAttachments.any { it.filePath in writingPastedText }) return
     val text = message.text.toString().trim()
     if (busyThisChat || (text.isEmpty() && pendingAttachments.isEmpty())) return
+    AppHaptics.perform(context, HapticEvent.SEND_MESSAGE)
     val attachments = pendingAttachments
     val userMessage =
         ChatMessage(
@@ -223,6 +226,7 @@ internal fun ChatScreenState.submitMessage() {
 internal fun ChatScreenState.beginEdit(target: ChatMessage) {
     if (busyThisChat) return
     if (target.id != visibleMessages(messages).lastOrNull { it.fromUser }?.id) return
+    AppHaptics.perform(context, HapticEvent.EDIT_MESSAGE)
     editingMessageId = target.id
     message.edit { replace(0, length, target.text) }
     pendingAttachments = target.attachments
@@ -255,6 +259,7 @@ internal fun ChatScreenState.commitEdit() {
     val target = messages[targetIndex]
     val text = message.text.toString().trim()
     if (text.isEmpty() && pendingAttachments.isEmpty()) return
+    AppHaptics.perform(context, HapticEvent.SEND_MESSAGE)
     val committed =
         commitEditedTurn(
             messages = messages,
@@ -306,6 +311,7 @@ internal fun ChatScreenState.retryMessage(assistant: ChatMessage) {
     val history =
         contextMessages(messages.take(firstIndex)).filterNot { it.isError || it.isPending }
     if (history.isEmpty()) return
+    AppHaptics.perform(context, HapticEvent.RETRY_MESSAGE)
     val reply =
         ChatMessage(
             id = MessageIds.next(),

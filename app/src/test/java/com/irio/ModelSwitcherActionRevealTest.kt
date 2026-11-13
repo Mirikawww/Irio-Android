@@ -38,9 +38,61 @@ import java.time.Duration
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], manifest = Config.NONE)
+@Config(sdk = [35], manifest = Config.NONE, shadows = [ModelSwitcherActionRevealTest.RecordingVibrator::class])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ModelSwitcherActionRevealTest {
+    @Test fun longPressRevealAndPhysicalReleaseHaveIndependentHapticChoices() = runTest {
+        Harness(this).use { h ->
+            val prefs = h.context.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
+            val original = prefs.all.filterKeys { it.startsWith("haptics_") }
+            val system = android.provider.Settings.System.getInt(h.context.contentResolver, "haptic_feedback_enabled", 1)
+            val vibrator = h.context.getSystemService(android.os.VibratorManager::class.java).defaultVibrator
+            val vibration = shadowOf(vibrator)
+            vibration.setHasVibrator(true)
+            android.provider.Settings.System.putInt(h.context.contentResolver, "haptic_feedback_enabled", 1)
+            HapticPreferences.saveEnabled(h.context, true)
+            try {
+                for (label in h.labels) {
+                    h.advance(160); vibrator.cancel()
+                    RecordingVibrator.calls = 0
+                    h.touch(label, MotionEvent.ACTION_DOWN); h.advance(650)
+                    assertEquals("Long-press expansion must vibrate exactly once: $label", 1, RecordingVibrator.calls)
+                    assertTrue(h.labelShown(label))
+                    vibrator.cancel(); h.advance(300)
+                    assertEquals("Holding/recomposition must not replay feedback", 1, RecordingVibrator.calls)
+                    h.touch(label, MotionEvent.ACTION_UP); h.advance(32)
+                    assertEquals("Releasing the expanded action must vibrate exactly once: $label", 2, RecordingVibrator.calls)
+                    assertFalse(h.labelShown(label))
+                    h.advance(320)
+                }
+                prefs.edit().putBoolean("haptics_quick_long_press", false).commit()
+                RecordingVibrator.calls = 0
+                vibrator.cancel(); h.touch("快速", MotionEvent.ACTION_DOWN); h.advance(650)
+                assertEquals("Reveal feedback must be independently disableable", 0, RecordingVibrator.calls)
+                h.touch("快速", MotionEvent.ACTION_UP); h.advance(32)
+                assertEquals("Release feedback remains enabled", 1, RecordingVibrator.calls)
+                h.advance(320)
+                prefs.edit().putBoolean("haptics_quick_long_press", true).putBoolean("haptics_quick_long_release", false).commit()
+                RecordingVibrator.calls = 0
+                vibrator.cancel(); h.touch("快速", MotionEvent.ACTION_DOWN); h.advance(650)
+                assertEquals(1, RecordingVibrator.calls)
+                vibrator.cancel(); h.touch("快速", MotionEvent.ACTION_UP); h.advance(32)
+                assertEquals("Release feedback must be independently disableable", 1, RecordingVibrator.calls)
+                assertFalse(h.fast.value); assertFalse(h.search.value); assertFalse(h.read.value)
+            } finally {
+                vibrator.cancel()
+                android.provider.Settings.System.putInt(h.context.contentResolver, "haptic_feedback_enabled", system)
+                prefs.edit().apply {
+                    prefs.all.keys.filter { it.startsWith("haptics_") }.forEach(::remove)
+                    original.forEach { (key, value) -> when (value) {
+                        is Boolean -> putBoolean(key, value)
+                        is String -> putString(key, value)
+                    } }
+                }.commit()
+            }
+        }
+    }
+
     @Test fun unavailableSearchLongPressRevealsUntilReleaseWithoutTogglingOrNotifying() = runTest {
         Harness(this).use { h ->
             h.available.value = false; h.advance(160)
@@ -274,6 +326,17 @@ class ModelSwitcherActionRevealTest {
                 }
                 assertEquals(listOf(name), h.labels.filter(h::labelShown))
             }
+        }
+    }
+
+    @org.robolectric.annotation.Implements(className = "android.os.SystemVibrator", isInAndroidSdk = false)
+    class RecordingVibrator : org.robolectric.shadows.ShadowSystemVibrator() {
+        companion object { var calls = 0 }
+        @org.robolectric.annotation.Implementation(minSdk = 33)
+        protected fun vibrate(uid: Int, packageName: String, effect: android.os.VibrationEffect,
+            reason: String?, attributes: android.os.VibrationAttributes) {
+            calls++
+            super.vibrate(uid, packageName, effect as Any, reason, attributes as Any)
         }
     }
 

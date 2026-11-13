@@ -66,7 +66,7 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -78,7 +78,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
-import androidx.compose.ui.platform.LocalHapticFeedback
+
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
@@ -631,7 +631,7 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
     val accent = Theme[colors][primaryColor]
     val trackColor = Theme[colors][secondaryColor]
     val density = LocalDensity.current
-    val haptics = LocalHapticFeedback.current
+    val hapticContext = LocalContext.current
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     var sliderWidth by remember { mutableIntStateOf(0) }
     var value by remember(levels) { mutableFloatStateOf(selectedIndex.toFloat()) }
@@ -663,7 +663,7 @@ private fun ThinkingDepthSlider(effort: ReasoningEffort, enabled: Boolean, suppo
         if (next != preview) {
             preview = next
             onPreviewChange(next)
-            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            AppHaptics.perform(hapticContext, HapticEvent.THINKING_LEVEL)
         }
     }
     val commitSelection by rememberUpdatedState<() -> Unit> {

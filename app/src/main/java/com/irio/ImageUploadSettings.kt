@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import com.composables.ui.components.Switch
+import com.irio.IrioSwitch as Switch
 import com.composables.ui.components.Text
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.onPanelColor

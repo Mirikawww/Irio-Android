@@ -191,7 +191,10 @@ internal fun ChatConversationDrawer(state: ChatScreenState, drawerOpenProgress: 
                                     active = conversation.id == currentConversation.id,
                                     modifier = Modifier.generatingRipple(generating),
                                     onClick = { openConversation(conversation) },
-                                    onLongClick = { conversationAction = conversation },
+                                    onLongClick = {
+                                        AppHaptics.perform(context, HapticEvent.CONVERSATION_MENU)
+                                        conversationAction = conversation
+                                    },
                                 )
                             }
                         }

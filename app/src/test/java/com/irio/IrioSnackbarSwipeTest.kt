@@ -43,6 +43,49 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
 class IrioSnackbarSwipeTest {
+    @Test fun entrancesAndRepeatedNoticesVibrateButRecompositionAndDismissalDoNot() = runTest {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
+        val original = prefs.all.filterKeys { it.startsWith("haptics_") }
+        val system = android.provider.Settings.System.getInt(context.contentResolver, "haptic_feedback_enabled", 1)
+        val vibrator = context.getSystemService(android.os.VibratorManager::class.java).defaultVibrator
+        val shadow = shadowOf(vibrator)
+        shadow.setHasVibrator(true)
+        android.provider.Settings.System.putInt(context.contentResolver, "haptic_feedback_enabled", 1)
+        HapticPreferences.saveEnabled(context, true)
+        prefs.edit().putBoolean("haptics_snackbar", true).commit()
+        try {
+            withUi { ui ->
+                vibrator.cancel(); ui.frames()
+                assertTrue("An initially visible snackbar must vibrate", shadow.isVibrating)
+                vibrator.cancel(); ui.frames(2)
+                assertFalse("Ordinary recomposition must not replay feedback", shadow.isVibrating)
+                ui.nonce.value++; ui.frames()
+                assertTrue("Repeated identical snackbar events must vibrate again", shadow.isVibrating)
+                vibrator.cancel(); ui.visible.value = false; ui.frames()
+                assertFalse("Dismissal must not vibrate", shadow.isVibrating)
+                ui.visible.value = true; ui.frames()
+                assertTrue("A fresh visible lifetime must vibrate", shadow.isVibrating)
+                vibrator.cancel(); prefs.edit().putBoolean("haptics_snackbar", false).commit()
+                ui.nonce.value++; ui.frames()
+                assertFalse("The independent snackbar choice must apply immediately", shadow.isVibrating)
+                prefs.edit().putBoolean("haptics_snackbar", true).commit()
+                ui.message.value = "another notice"; ui.frames()
+                assertTrue("A replacement message must vibrate", shadow.isVibrating)
+            }
+        } finally {
+            vibrator.cancel()
+            android.provider.Settings.System.putInt(context.contentResolver, "haptic_feedback_enabled", system)
+            prefs.edit().apply {
+                prefs.all.keys.filter { it.startsWith("haptics_") }.forEach(::remove)
+                original.forEach { (key, value) -> when (value) {
+                    is Boolean -> putBoolean(key, value)
+                    is String -> putString(key, value)
+                } }
+            }.commit()
+        }
+    }
+
     @Test fun committedSwipeAlsoReleasesTheActionButtonTouchRegion() = runTest {
         withUi(action = true) { ui ->
             ui.frames(40)

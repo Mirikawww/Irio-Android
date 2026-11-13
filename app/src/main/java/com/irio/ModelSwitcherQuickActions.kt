@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -79,8 +80,10 @@ private class ModelSwitcherActionReveal(private val scope: CoroutineScope) {
         held = index
         expanded = index
     }
-    fun release(index: Int) {
-        if (held == index && expanded == index) close()
+    fun release(index: Int): Boolean {
+        if (held != index || expanded != index) return false
+        close()
+        return true
     }
     fun close() {
         timeout?.cancel()
@@ -125,7 +128,16 @@ internal fun ModelSwitcherQuickActions(
     onWebSearchUnavailable: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val state = remember(scope) { ModelSwitcherActionReveal(scope) }
+    fun longPress(index: Int, held: Boolean) {
+        if (!active) return
+        AppHaptics.perform(context, HapticEvent.QUICK_LONG_PRESS)
+        if (held) state.hold(index) else state.show(index)
+    }
+    fun release(index: Int) {
+        if (state.release(index) && active) AppHaptics.perform(context, HapticEvent.QUICK_LONG_RELEASE)
+    }
     val expanded = state.expanded
     LaunchedEffect(active, webSearchAvailable) {
         if (!active || (expanded == 1 && !webSearchAvailable)) state.close()
@@ -155,8 +167,11 @@ internal fun ModelSwitcherQuickActions(
                 iconTag = "model-fast-mode-icon", checked = fastMode, enabled = active,
                 modifier = Modifier.width(width(0)), height = layout.height,
                 labelWidth = layout.labelWidths[0], reveal = reveal[0], expanded = expanded == 0,
-                onLongPress = { if (it) state.hold(0) else state.show(0) }, onRelease = { state.release(0) },
-                onCheckedChange = { if (active) { onFastModeChange(it); state.show(0) } },
+                onLongPress = { longPress(0, it) }, onRelease = { release(0) },
+                onCheckedChange = { if (active) {
+                    if (it != fastMode) AppHaptics.perform(context, if (it) HapticEvent.FAST_MODE_ON else HapticEvent.FAST_MODE_OFF)
+                    onFastModeChange(it); state.show(0)
+                } },
             )
             ModelSwitcherActionTile(
                 label = tr("网络搜索"), icon = if (webSearchAvailable && webSearchEnabled) IrioIcons.Globe else IrioIcons.GlobeOff,
@@ -166,16 +181,22 @@ internal fun ModelSwitcherQuickActions(
                 onUnavailableClick = if (active && !webSearchAvailable) onWebSearchUnavailable else null,
                 modifier = Modifier.width(width(1)), height = layout.height,
                 labelWidth = layout.labelWidths[1], reveal = reveal[1], expanded = expanded == 1,
-                onLongPress = { if (it) state.hold(1) else state.show(1) }, onRelease = { state.release(1) },
-                onCheckedChange = { if (active && webSearchAvailable) { onWebSearchChange(it); state.show(1) } },
+                onLongPress = { longPress(1, it) }, onRelease = { release(1) },
+                onCheckedChange = { if (active && webSearchAvailable) {
+                    if (it != webSearchEnabled) AppHaptics.perform(context, if (it) HapticEvent.WEB_SEARCH_ON else HapticEvent.WEB_SEARCH_OFF)
+                    onWebSearchChange(it); state.show(1)
+                } },
             )
             ModelSwitcherActionTile(
                 label = tr("自动朗读"), icon = if (autoRead) IrioIcons.Volume2 else IrioIcons.VolumeOff,
                 iconTag = "model-auto-read-icon",
                 checked = autoRead, enabled = active, modifier = Modifier.width(width(2)), height = layout.height,
                 labelWidth = layout.labelWidths[2], reveal = reveal[2], expanded = expanded == 2,
-                onLongPress = { if (it) state.hold(2) else state.show(2) }, onRelease = { state.release(2) },
-                onCheckedChange = { if (active) { onAutoReadChange(it); state.show(2) } },
+                onLongPress = { longPress(2, it) }, onRelease = { release(2) },
+                onCheckedChange = { if (active) {
+                    if (it != autoRead) AppHaptics.perform(context, if (it) HapticEvent.AUTO_READ_ON else HapticEvent.AUTO_READ_OFF)
+                    onAutoReadChange(it); state.show(2)
+                } },
             )
         }
     }
@@ -216,7 +237,7 @@ private fun ModelSwitcherActionTile(
             .clip(ContinuousCapsule)
             .background(fill)
             .combinedClickable(interactionSource = interactions, indication = LocalIndication.current,
-                enabled = interactive, role = Role.Switch,
+                enabled = interactive, role = Role.Switch, hapticFeedbackEnabled = false,
                 onClick = { if (enabled) onCheckedChange(!checked) else onUnavailableClick?.invoke() },
                 onLongClick = { if (interactive) onLongPress(pressed) })
             .semantics {

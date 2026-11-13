@@ -33,7 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.ui.components.Button
-import com.composables.ui.components.Checkbox
+import com.irio.IrioCheckbox as Checkbox
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.DropdownMenu
@@ -43,7 +43,7 @@ import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
 import com.composables.ui.components.Icon
 import com.composables.ui.components.IconButton
 import com.composables.ui.components.Text
-import com.composables.ui.components.Switch
+import com.irio.IrioSwitch as Switch
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.fieldShape

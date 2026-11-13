@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.ui.components.*
+import com.irio.IrioSwitch as Switch
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.mutedColor

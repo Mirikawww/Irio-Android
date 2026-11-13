@@ -39,7 +39,7 @@ import com.composables.ui.components.ButtonStyle
 import com.composables.ui.components.Icon
 import com.composables.ui.components.IconButton
 import com.composables.ui.components.Text
-import com.composables.ui.components.Switch
+import com.irio.IrioSwitch as Switch
 import com.composables.ui.components.TextField
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.colors

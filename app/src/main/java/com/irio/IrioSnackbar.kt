@@ -41,6 +41,7 @@ import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -77,6 +78,10 @@ internal fun BoxScope.IrioSnackbar(
     onAction: (() -> Unit)? = null,
 ) {
     val dismiss by rememberUpdatedState(onDismiss)
+    val hapticContext = LocalContext.current
+    LaunchedEffect(visible, message, restartKey) {
+        if (visible) AppHaptics.perform(hapticContext, HapticEvent.SNACKBAR)
+    }
     val scope = rememberCoroutineScope()
     var actionSize by remember { mutableStateOf(IntSize.Zero) }
     val density = LocalDensity.current

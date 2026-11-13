@@ -46,6 +46,15 @@ class ModelSwitcherQuickActionsTest {
         val context = activity.get()
         ThemeStore.ensureLoaded(context)
         val oldLanguage = ThemeStore.language
+        val prefs = context.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
+        val originalHaptics = prefs.all.filterKeys { it.startsWith("haptics_") }
+        val originalSystemHaptics = android.provider.Settings.System.getInt(context.contentResolver, "haptic_feedback_enabled", 1)
+        android.provider.Settings.System.putInt(context.contentResolver, "haptic_feedback_enabled", 1)
+        HapticPreferences.saveEnabled(context, true)
+        listOf("fast_mode", "web_search", "auto_read").forEach { prefs.edit().putBoolean("haptics_$it", true).commit() }
+        val vibrator = context.getSystemService(android.os.VibratorManager::class.java).defaultVibrator
+        val vibration = org.robolectric.Shadows.shadowOf(vibrator)
+        vibration.setHasVibrator(true)
         val clock = BroadcastFrameClock()
         val recomposer = Recomposer(coroutineContext + clock)
         val runner = launch(clock) { recomposer.runRecomposeAndApplyChanges() }
@@ -136,7 +145,9 @@ class ModelSwitcherQuickActionsTest {
                     assertEquals("Text-model actions use the same zero outer gap as generation parameters", 0f,
                         first.top - thinking.boundsInRoot.bottom, 0.1f)
                     for ((name, tag) in listOf("快速" to "model-fast-mode-icon", "网络搜索" to "model-web-search-icon", "自动朗读" to "model-auto-read-icon")) {
+                        vibrator.cancel()
                         assertTrue(button(name).config[SemanticsActions.OnClick].action!!.invoke())
+                        assertTrue("Each accepted quick-action toggle must vibrate in both directions: $name", vibration.isVibrating)
                         frames(25)
                         val icon = nodes().single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == tag }
                         assertEquals(18f, icon.boundsInRoot.width, 0.1f)
@@ -173,16 +184,51 @@ class ModelSwitcherQuickActionsTest {
             assertTrue(fast.value); assertTrue(search.value); assertTrue(read.value)
             assertEquals(ToggleableState.On, button("网络搜索").config[SemanticsProperties.ToggleableState])
             assertEquals(ToggleableState.On, button("自动朗读").config[SemanticsProperties.ToggleableState])
+            for ((name, events) in listOf("快速" to listOf(HapticEvent.FAST_MODE_ON, HapticEvent.FAST_MODE_OFF),
+                "网络搜索" to listOf(HapticEvent.WEB_SEARCH_ON, HapticEvent.WEB_SEARCH_OFF),
+                "自动朗读" to listOf(HapticEvent.AUTO_READ_ON, HapticEvent.AUTO_READ_OFF))) {
+                events.forEach { HapticPreferences.saveEvent(context, it, false) }
+                repeat(2) {
+                    vibrator.cancel()
+                    assertTrue(button(name).config[SemanticsActions.OnClick].action!!.invoke())
+                    assertFalse("A disabled feedback location must still toggle without vibration: $name", vibration.isVibrating)
+                    frames()
+                }
+                events.forEach { HapticPreferences.saveEvent(context, it, true) }
+                for ((on, off) in listOf(false to true, true to false)) {
+                    HapticPreferences.saveEvent(context, events[0], on)
+                    HapticPreferences.saveEvent(context, events[1], off)
+                    vibrator.cancel(); assertTrue(button(name).config[SemanticsActions.OnClick].action!!.invoke())
+                    assertEquals("$name off must use only its own direction", off, vibration.isVibrating); frames()
+                    vibrator.cancel(); assertTrue(button(name).config[SemanticsActions.OnClick].action!!.invoke())
+                    assertEquals("$name on must use only its own direction", on, vibration.isVibrating); frames()
+                }
+                events.forEach { HapticPreferences.saveEvent(context, it, true) }
+            }
             available.value = false; frames()
             assertTrue(button("网络搜索").config.contains(SemanticsProperties.Disabled))
             assertEquals(ToggleableState.Off, button("网络搜索").config[SemanticsProperties.ToggleableState])
+            vibrator.cancel()
+            button("网络搜索").config[SemanticsActions.OnClick].action!!.invoke()
+            assertFalse("Unavailable web search must not emit toggle feedback", vibration.isVibrating)
             active.value = false; frames()
+            vibrator.cancel()
             button("快速").config[SemanticsActions.OnClick].action!!.invoke()
             button("自动朗读").config[SemanticsActions.OnClick].action!!.invoke()
+            assertFalse("Inactive controls must not vibrate", vibration.isVibrating)
             assertTrue("Transitioning controls must not change saved state", fast.value && read.value)
         } finally {
             view.disposeComposition(); recomposer.close(); runner.cancel()
             ThemeStore.saveLanguage(context, oldLanguage)
+            vibrator.cancel()
+            android.provider.Settings.System.putInt(context.contentResolver, "haptic_feedback_enabled", originalSystemHaptics)
+            prefs.edit().apply {
+                prefs.all.keys.filter { it.startsWith("haptics_") }.forEach(::remove)
+                originalHaptics.forEach { (key, value) -> when (value) {
+                    is Boolean -> putBoolean(key, value)
+                    is String -> putString(key, value)
+                } }
+            }.commit()
             activity.pause().stop().destroy()
         }
     }

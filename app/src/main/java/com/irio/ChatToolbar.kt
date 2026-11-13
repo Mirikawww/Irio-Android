@@ -49,6 +49,9 @@ internal fun BoxScope.ChatToolbar(state: ChatScreenState) {
                     expanded = modelMenuOpen,
                     onExpandedChange = { modelMenuOpen = it },
                     onSelectedModelChange = { model, providerId ->
+                        if (model != selectedModel || providerId != activeProviderId) {
+                            AppHaptics.perform(context, HapticEvent.SELECT_MODEL)
+                        }
                         suppressProviderEcho.fn()
                         selectedModel = model
                         // 记录最近一次选中的非图片对话模型（标题生成在图片模型场景的回退目标）

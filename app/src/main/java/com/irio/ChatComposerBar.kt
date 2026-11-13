@@ -168,7 +168,10 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
                 onClick = {
                     if (!generatingThisChat && canSend) composerFullscreen = false
                     when {
-                        generatingThisChat -> stopGeneration()
+                        generatingThisChat -> {
+                            AppHaptics.perform(context, HapticEvent.STOP_REPLY)
+                            stopGeneration()
+                        }
                         editingMessageId != null -> commitEdit()
                         else -> submitMessage()
                     }

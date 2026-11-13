@@ -743,6 +743,7 @@ internal fun ChatScreenState.startGeneration(
                                 }
                                 val completed = result.error == null && !result.stopped
                                 if (completed) {
+                                    AppHaptics.perform(context, HapticEvent.REPLY_COMPLETED)
                                     val preview =
                                         replyNotificationPreview(finalMessage.text).ifEmpty {
                                             if (finalMessage.attachments.any { it.isVideo }) tr("已生成视频")

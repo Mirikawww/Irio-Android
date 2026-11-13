@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.composables.ui.components.*
+import com.irio.IrioSwitch as Switch
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.backgroundColor
 import com.composables.ui.theme.mutedColor

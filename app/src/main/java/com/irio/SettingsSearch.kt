@@ -252,6 +252,7 @@ private val settingsSearchEntries = listOf(
     page("page.linux", "Linux 沙盒", LinuxSandboxSettingsActivity::class.java),
     page("page.laboratory", "实验室", LaboratorySettingsActivity::class.java),
     item("laboratory.betterSettingsDisplay", "更好的设置项展示", "实验室", LaboratorySettingsActivity::class.java),
+    item("laboratory.haptics", "触感反馈", "实验室", LaboratorySettingsActivity::class.java),
     page("page.other", "其他", OtherSettingsActivity::class.java),
     page("page.about", "关于", AboutActivity::class.java),
     page("page.acknowledgements", "鸣谢", AcknowledgementsActivity::class.java),
@@ -352,7 +353,7 @@ private val settingsSearchEntries = listOf(
     item("other.import", "导入数据", "其他", OtherSettingsActivity::class.java),
 
     item("provider.add", "添加提供商", "提供商", ProviderSettingsActivity::class.java),
-)
+) + HapticEvent.entries.map { item(it.searchId, it.label, "触感反馈", HapticSettingsActivity::class.java) }
 
 private fun page(id: String, title: String, destination: Class<out Activity>) =
     SettingsSearchEntry(id, title, "设置", destination, anchor = null)

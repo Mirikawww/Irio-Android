@@ -111,6 +111,7 @@ internal fun ChatScreenState.replaceInConversation(
 ) {
     if (clearingHistory) return
     if (currentConversation.id == conversationId) {
+        if (!persist) outputHaptics(messages.firstOrNull { it.id == replyId }, updated)
         messages =
             if (messages.any { it.id == replyId }) {
                 messages.map { if (it.id == replyId) updated else it }
@@ -187,6 +188,8 @@ internal fun ChatScreenState.updateMessageReaction(
     val updated = if (fromModel) setModelReaction(target, emoji) else setUserReaction(target, emoji)
     if (updated == null) return false
     if (updated == target) return true
+    if (!fromModel) AppHaptics.perform(context, HapticEvent.REACTION)
+    else if (updated.modelReaction.isNotEmpty()) AppHaptics.perform(context, HapticEvent.MODEL_REACTION)
     reactionAnimations.record(
         messageId,
         if (fromModel) updated.modelReaction else updated.userReaction,
@@ -208,6 +211,7 @@ internal fun ChatScreenState.openConversation(conversation: ConversationSummary)
         drawerProgress = 0f
         return
     }
+    AppHaptics.perform(context, HapticEvent.SWITCH_CONVERSATION)
     SpeechPlayer.stop()
     val requestToken = conversationLoadToken + 1
     conversationLoadToken = requestToken
@@ -239,6 +243,7 @@ internal fun ChatScreenState.openConversation(conversation: ConversationSummary)
 }
 
 internal fun ChatScreenState.newConversation(closeDrawer: Boolean = true) {
+    if (closeDrawer) AppHaptics.perform(context, HapticEvent.NEW_CONVERSATION)
     SpeechPlayer.stop()
     val previous = currentConversation
     val previousMessages = messages
