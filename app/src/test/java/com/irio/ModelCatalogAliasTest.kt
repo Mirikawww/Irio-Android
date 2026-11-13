@@ -50,4 +50,21 @@ class ModelCatalogAliasTest {
                 ReasoningEffort.HIGH, ReasoningEffort.XHIGH), ModelCatalog.reasoningLevels(reasoning))
         }
     }
+
+    @Test
+    fun openRouterImageModelsExposeThePublishedFourHundredKContext() {
+        val context = RuntimeEnvironment.getApplication()
+        for (id in listOf(
+            "gpt-image-2", "openai/gpt-image-2", "gateway/gpt-image-2",
+            "gpt-image-2.5", "openai/gpt-image-2.5", "gateway/gpt-image-2.5",
+            "gpt-image-2.5-flare", "openai/gpt-image-2.5-flare",
+            "gpt-image-2.5-sunburst", "openai/gpt-image-2.5-sunburst",
+            "gpt-image-2.6", "openai/gpt-image-2.6",
+            "gpt-image-2.6-flare", "openai/gpt-image-2.6-flare",
+            "gpt-image-2.6-sunburst", "openai/gpt-image-2.6-sunburst",
+        )) {
+            assertEquals(id, 400_000, ModelCatalog.contextWindow(context, id))
+            assertEquals(id, true, ModelCatalog.isImageModel(context, id))
+        }
+    }
 }

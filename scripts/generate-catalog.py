@@ -136,19 +136,22 @@ for mid, entry in reasoning.items():
     reasoning_tails[tail] = merged
 reasoning.update(reasoning_tails)
 
-# OpenRouter 页面已公开、但 /api/v1/models 尚未返回的生图模型在此补充名称和分类。
-for custom_model, display_name in {
-    "gpt-image-2": "GPT Image 2",
-    "gpt-image-2.5": "GPT Image 2.5",
-    "gpt-image-2.5-flare": "GPT Image 2.5 Flare",
-    "gpt-image-2.5-sunburst": "GPT Image 2.5 Sunburst",
-    "gpt-image-2.6": "GPT Image 2.6",
-    "gpt-image-2.6-flare": "GPT Image 2.6 Flare",
-    "gpt-image-2.6-sunburst": "GPT Image 2.6 Sunburst",
+# OpenRouter 页面已确认 GPT Image 2 与 GPT Image 2.5/2.6 系列为 400K；
+# /api/v1/models 尚未返回这些条目时，在此补充，不伪造 reasoning 元数据。
+for custom_model, (display_name, window) in {
+    "gpt-image-2": ("GPT Image 2", 400000),
+    "gpt-image-2.5": ("GPT Image 2.5", 400000),
+    "gpt-image-2.5-flare": ("GPT Image 2.5 Flare", 400000),
+    "gpt-image-2.5-sunburst": ("GPT Image 2.5 Sunburst", 400000),
+    "gpt-image-2.6": ("GPT Image 2.6", 400000),
+    "gpt-image-2.6-flare": ("GPT Image 2.6 Flare", 400000),
+    "gpt-image-2.6-sunburst": ("GPT Image 2.6 Sunburst", 400000),
 }.items():
     for model_id in (custom_model, f"openai/{custom_model}"):
         image.setdefault(model_id, True)
         names.setdefault(model_id, display_name)
+        if window is not None:
+            context.setdefault(model_id, window)
 
 # OpenAI Responses compact 别名以及 OpenRouter 官方名裁决：
 # OpenRouter API 不公开 compact 别名，但它们是实际可用的 OpenAI Responses 模型名。
