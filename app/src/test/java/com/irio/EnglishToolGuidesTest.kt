@@ -12,16 +12,21 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33], manifest = Config.NONE)
 class EnglishToolGuidesTest {
     @Test fun titlesAndPagesAreEnglishWithoutTruncationAndChineseAliasesRemainSearchable() {
-        val bundled = ToolGuideIndex.load(RuntimeEnvironment.getApplication())
+        val context = RuntimeEnvironment.getApplication()
+        ThemeStore.ensureLoaded(context)
+        val originalLanguage = ThemeStore.language
+        try {
+        ThemeStore.saveLanguage(context, AppLanguage.EN)
+        val bundled = ToolGuideIndex.load(context)
         val han = Regex("[\\p{IsHan}]")
         assertEquals(23, bundled.guides.size)
         assertEquals(41, bundled.guides.sumOf { it.pages.size })
         for (guide in bundled.guides) {
-            assertFalse("Tutorial title must be English: ${guide.id}", han.containsMatchIn(guide.title))
+            assertFalse("Tutorial title must be English: ${guide.id}", han.containsMatchIn(tr(guide.title)))
             for (page in guide.pages) {
-                assertFalse("Tutorial body must be English: ${guide.id}", han.containsMatchIn(page.content))
+                assertFalse("Tutorial body must be English: ${guide.id}", han.containsMatchIn(tr(page.content)))
             }
-            val content = guide.pages.joinToString("\n\n") { it.content }
+            val content = guide.pages.joinToString("\n\n") { tr(it.content) }
             assertTrue("Tutorial must fit the existing retrieval budget: ${guide.id}",
                 content.length <= ToolGuideIndex.MAX_CHUNK_CHARS)
             val result = JSONObject(ToolGuideIndex.search(bundled, guide.tool)).getJSONArray("results")
@@ -32,5 +37,6 @@ class EnglishToolGuidesTest {
             .getJSONArray("results").getJSONObject(0).getString("tool"))
         assertEquals("get_location", JSONObject(ToolGuideIndex.search(bundled, "用户位置"))
             .getJSONArray("results").getJSONObject(0).getString("tool"))
+        } finally { ThemeStore.saveLanguage(context, originalLanguage) }
     }
 }

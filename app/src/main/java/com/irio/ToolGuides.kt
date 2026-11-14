@@ -52,16 +52,20 @@ internal data class ToolGuideIndex(val guides: List<ToolGuide>) {
             val terms = tokens(query)
             require(terms.isNotEmpty())
             val ranked = index.guides.mapNotNull { guide ->
-                val haystack = (listOf(guide.title, guide.tool) + guide.aliases + guide.pages.map { it.content })
+                // Search both languages regardless of output language so scores and pagination
+                // remain stable when the app language changes on an already-loaded index.
+                val titles = listOf(guide.title, translate(AppLanguage.EN, guide.title))
+                val contents = guide.pages.map { listOf(it.content, translate(AppLanguage.EN, it.content)).distinct() }
+                val haystack = (titles + guide.tool + guide.aliases + contents.flatten())
                     .joinToString(" ").lowercase()
                 val matched = terms.count { haystack.contains(it) }
                 val minimumMatches = if (terms.size >= 4) 2 else 1
                 if (matched < minimumMatches) return@mapNotNull null
                 val score = terms.sumOf { term ->
                     (if (guide.tool.lowercase().contains(term)) 10 else 0) +
-                        (if (guide.title.lowercase().contains(term)) 6 else 0) +
+                        (if (titles.any { it.lowercase().contains(term) }) 6 else 0) +
                         (if (guide.aliases.any { it.lowercase().contains(term) }) 5 else 0) +
-                        guide.pages.sumOf { page -> if (page.content.lowercase().contains(term)) 1 else 0 }
+                        contents.sumOf { page -> if (page.any { it.lowercase().contains(term) }) 1 else 0 }
                 }
                 if (score == 0) null else guide to score
             }.sortedWith(compareByDescending<Pair<ToolGuide, Int>> { it.second }.thenBy { it.first.id })
@@ -74,9 +78,9 @@ internal data class ToolGuideIndex(val guides: List<ToolGuide>) {
                 .put("hasMore", offset + page.size < ranked.size)
                 .apply { if (offset + page.size < ranked.size) put("nextOffset", offset + page.size) }
                 .put("results", JSONArray(page.map { (guide, score) ->
-                    JSONObject().put("guideId", guide.id).put("tool", guide.tool).put("title", guide.title)
+                    JSONObject().put("guideId", guide.id).put("tool", guide.tool).put("title", tr(guide.title))
                         .put("score", score).put("pages", guide.pages.size)
-                        .put("content", guide.pages.joinToString("\n\n") { it.content }.take(MAX_CHUNK_CHARS))
+                        .put("content", guide.pages.joinToString("\n\n") { tr(it.content) }.take(MAX_CHUNK_CHARS))
                 })).toString()
         }
 

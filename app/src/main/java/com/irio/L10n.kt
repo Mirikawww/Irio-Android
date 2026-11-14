@@ -2,7 +2,7 @@ package com.irio
 
 internal fun translate(language: AppLanguage, text: String): String {
     if (language != AppLanguage.EN) return text
-    return GitHubProgressEnglish[text] ?: TodoistProgressEnglish[text] ?: English[text] ?: text
+    return GitHubProgressEnglish[text] ?: TodoistProgressEnglish[text] ?: English[text] ?: ToolGuideEnglish[text] ?: text
 }
 
 fun tr(text: String): String = translate(ThemeStore.language, text)
