@@ -31,7 +31,6 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Density
@@ -467,23 +466,27 @@ private class IrioInlineCodeSpanPainter(
         padH: Float,
         padV: Float,
     ): List<Rect> {
-        if (startOffset == endOffset) return emptyList()
+        if (startOffset >= endOffset) return emptyList()
+        val text = layoutInput.text.text
         val startLine = getLineForOffset(startOffset)
-        val endLine = getLineForOffset(endOffset)
-        val isLtr = multiParagraph.getParagraphDirection(offset = layoutInput.text.lastIndex) ==
-            ResolvedTextDirection.Ltr
-        return (startLine..endLine).map { lineNum ->
+        // The span end is exclusive; at a soft wrap its caret belongs to the next line.
+        val endLine = getLineForOffset(endOffset - 1)
+        val hasCode = (startOffset until endOffset).any { !text[it].isWhitespace() }
+        return (startLine..endLine).mapNotNull { lineNum ->
+            val start = maxOf(startOffset, getLineStart(lineNum))
+            val end = minOf(endOffset, getLineEnd(lineNum))
+            if (start >= end) return@mapNotNull null
+            // Markdown's code-edge spacing can wrap separately from the actual code.
+            if (hasCode && (start until end).all { text[it].isWhitespace() }) return@mapNotNull null
+            var left = Float.POSITIVE_INFINITY
+            var right = Float.NEGATIVE_INFINITY
+            for (offset in start until end) {
+                // Glyph boxes have unambiguous line ownership, unlike boundary carets.
+                val glyph = getBoundingBox(offset)
+                left = minOf(left, glyph.left)
+                right = maxOf(right, glyph.right)
+            }
             val baseline = getLineBaseline(lineNum)
-            val left = if (lineNum == startLine) {
-                getHorizontalPosition(startOffset, usePrimaryDirection = isLtr)
-            } else {
-                getLineLeft(lineNum)
-            }
-            val right = if (lineNum == endLine) {
-                getHorizontalPosition(endOffset, usePrimaryDirection = isLtr)
-            } else {
-                getLineRight(lineNum)
-            }
             Rect(
                 left = left - padH,
                 top = baseline - fontPx - padV,
