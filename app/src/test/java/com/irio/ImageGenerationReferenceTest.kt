@@ -97,7 +97,7 @@ class ImageGenerationReferenceTest {
                 server.enqueue(MockResponse().setResponseCode(status).setBody("""{"error":{"message":"edits unsupported"}}"""))
                 server.enqueue(MockResponse().setResponseCode(503).setBody("""{"error":{"message":"unexpected text-only fallback"}}"""))
                 val provider = ProviderConfig("fixture", "Fixture", server.url("/v1").toString(), "fixture")
-                val result = ImageGenToolProvider().execute(
+                val result = ImageGenToolProvider { it.provider }.execute(
                     ChatToolCall("image", ImageGenTool.NAME, """{"prompt":"Edit the reference"}"""),
                     ToolExecutionContext(provider, "chat-model", history = listOf(ChatRequestMessage(
                         "user", "My reference", attachments = listOf(ChatAttachment("ref.png", "image/png", image.absolutePath)),
@@ -121,7 +121,7 @@ class ImageGenerationReferenceTest {
                     ChatAttachment("reference.png", "image/png", image.absolutePath),
                     ChatAttachment("notes.txt", "text/plain", document.absolutePath),
                 )))
-                val result = ImageGenToolProvider().execute(
+                val result = ImageGenToolProvider { it.provider }.execute(
                     ChatToolCall("image", ImageGenTool.NAME, """{"prompt":"Paint the reference blue"}"""),
                     ToolExecutionContext(provider, "chat-model", history = history, imageGenModel = "gpt-image-2"),
                 )

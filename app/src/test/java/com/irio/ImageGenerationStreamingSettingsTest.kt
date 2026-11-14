@@ -63,7 +63,7 @@ class ImageGenerationStreamingSettingsTest {
                 val attachments = mutableListOf<ChatAttachment>()
                 try {
                     if (tool) runBlocking {
-                        val result = ImageGenToolProvider().execute(
+                        val result = ImageGenToolProvider { it.provider }.execute(
                             ChatToolCall("image", ImageGenTool.NAME, """{"prompt":"fixture"}"""),
                             ToolExecutionContext(provider, "chat-model", imageGenModel = "gpt-image-2", onUpdate = {
                                 progress += it.imageGeneration

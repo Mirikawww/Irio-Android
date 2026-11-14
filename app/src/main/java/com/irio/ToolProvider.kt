@@ -345,7 +345,16 @@ internal class WebFetchToolProvider : ToolProvider {
     }
 }
 
-internal class ImageGenToolProvider : ToolProvider {
+internal class ImageGenToolProvider(
+    private val providerForModel: (ToolExecutionContext) -> ProviderConfig? = { context ->
+        context.appContext?.let { app ->
+            ProviderStore.loadProviders(app).firstOrNull { provider ->
+                provider.enabled && provider.protocol != ProviderProtocol.MINIMAX_VIDEO &&
+                    context.imageGenModel in provider.enabledModels()
+            }
+        }
+    },
+) : ToolProvider {
     override val id: String = "image-generation"
 
     override fun definitions(protocol: ProviderProtocol): List<JSONObject> =
@@ -376,10 +385,16 @@ internal class ImageGenToolProvider : ToolProvider {
             val prompt = ToolArguments.value(call.arguments, "prompt")
             require(prompt.isNotBlank()) { "prompt must not be empty" }
             val options = ImageGenerationOptions.fromToolArguments(call.arguments)
+            // A tool's image model can belong to a different provider than the chat model.
+            // Use its complete configuration; never borrow the chat endpoint or credentials.
+            val imageProvider = providerForModel(context) ?: return@withContext ToolExecutionResult(
+                tr("图片生成工具当前不可用：找不到已启用的图片模型提供商，请检查模型设置"),
+                outcome = ToolOutcome.FAILED,
+            )
             // 当前用户参考图和历史生成图都必须进入实际的生图请求。
             val imageContext = imageGenerationContext(context.history)
             val result = ProviderApi.generateImage(
-                config = context.provider,
+                config = imageProvider,
                 model = context.imageGenModel,
                 prompt = prompt,
                 context = imageContext,

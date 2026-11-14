@@ -49,7 +49,7 @@ class ImageGenToolTest {
             server.enqueue(MockResponse().setResponseCode(503).setBody("""{"error":{"message":"fixture"}}"""))
             val provider = ProviderConfig("fixture", "Fixture", server.url("/v1").toString(), "fixture")
             val context = ToolExecutionContext(provider, "chat-model", imageGenModel = "gpt-image-2")
-            val registry = ToolRegistry(listOf(ImageGenToolProvider()))
+            val registry = ToolRegistry(listOf(ImageGenToolProvider { it.provider }))
             val result = registry.execute(ChatToolCall("image", ImageGenTool.NAME, """{
                 "prompt":"A blue tree","resolution":"2K","aspect_ratio":"1:1","background":"transparent","quality":"high"
             }"""), context)
@@ -72,7 +72,7 @@ class ImageGenToolTest {
         MockWebServer().use { server ->
             val context = ToolExecutionContext(ProviderConfig("fixture", "Fixture", server.url("/v1").toString(), "fixture"),
                 "chat-model", imageGenModel = "gpt-image-2")
-            val registry = ToolRegistry(listOf(ImageGenToolProvider()))
+            val registry = ToolRegistry(listOf(ImageGenToolProvider { it.provider }))
             listOf("""{"prompt":"x","aspect_ratio":"4:1"}""", """{"prompt":"x","resolution":"8K"}""",
                 """{"prompt":"x","quality":"max"}""", """{"prompt":"x","background":"blue"}""").forEach { arguments ->
                 val result = registry.execute(ChatToolCall("image", ImageGenTool.NAME, arguments), context)

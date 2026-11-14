@@ -780,6 +780,7 @@ private val English = mapOf(
     "图片生成中" to "Generating an image",
     "生成图片失败" to "Couldn't generate an image",
     "图片生成工具当前不可用：请先配置图片生成模型" to "Image generation is unavailable. Choose an image model first",
+    "图片生成工具当前不可用：找不到已启用的图片模型提供商，请检查模型设置" to "Image generation is unavailable: no enabled provider owns the image model. Check model settings.",
     "图片生成模型" to "Image model",
     "视频生成模型" to "Video model",
     "选择视频生成模型" to "Video model",

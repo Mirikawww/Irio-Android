@@ -135,7 +135,7 @@ class ImageGenerationStreamTest {
             val updates = mutableListOf<ChatStreamUpdate>()
             val context = ToolExecutionContext(ProviderConfig("p", "P", server.url("/v1").toString(), "fixture"), "chat-model",
                 imageGenModel = "gpt-image-2", onUpdate = { updates += it })
-            val result = ImageGenToolProvider().execute(ChatToolCall("image", ImageGenTool.NAME, """{"prompt":"fixture"}"""), context)
+            val result = ImageGenToolProvider { it.provider }.execute(ChatToolCall("image", ImageGenTool.NAME, """{"prompt":"fixture"}"""), context)
             val attachments = updates.flatMap { it.attachments }
             try {
                 assertEquals(ToolOutcome.SUCCESS, result.outcome)
