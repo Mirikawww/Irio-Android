@@ -868,7 +868,6 @@ private val English = mapOf(
     "已复制" to "Copied",
     "导入数据" to "Import",
     "导出数据" to "Export",
-    "实验性" to "Experimental",
     "更智能的工具调用提示" to "Smarter tool-call labels",
     "子智能体" to "Subagents",
     "子智能体默认模型" to "Default subagent model",

@@ -13,10 +13,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import com.kyant.shapes.RoundedRectangle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,7 +28,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -45,8 +42,6 @@ import com.composables.ui.theme.largeShape
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPanelColor
-import com.composables.ui.theme.onPrimaryColor
-import com.composables.ui.theme.primaryColor
 import com.composables.ui.theme.shapes
 import com.composeunstyled.theme.Theme
 import com.composeunstyled.LocalContentColor
@@ -63,7 +58,6 @@ fun ListRowButton(
     shape: Shape = Theme[shapes][largeShape],
     contentPadding: PaddingValues? = null,
     onLongClick: (() -> Unit)? = null,
-    experimental: Boolean = false,
     iconPainter: Painter? = null,
     labelFontWeight: FontWeight? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
@@ -99,13 +93,7 @@ fun ListRowButton(
             modifier = if (supportingText != null) Modifier.weight(1f) else Modifier,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label, color = LocalContentColor.current, fontWeight = labelFontWeight)
-                if (experimental) {
-                    Spacer(Modifier.width(8.dp))
-                    ExperimentalBadge()
-                }
-            }
+            Text(label, color = LocalContentColor.current, fontWeight = labelFontWeight)
             supportingText?.let {
                 Text(it, color = Theme[colors][mutedColor], fontSize = 13.sp, lineHeight = 18.sp)
             }
@@ -186,32 +174,4 @@ fun ListRowButton(
             content = buttonContent,
         )
     }
-}
-
-@Composable
-fun ExperimentalLabel(
-    text: String,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(text, color = color)
-        ExperimentalBadge()
-    }
-}
-
-@Composable
-fun ExperimentalBadge() {
-    Text(
-        tr("实验性"),
-        modifier = Modifier
-            .background(Theme[colors][primaryColor], RoundedRectangle(4.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        color = Theme[colors][onPrimaryColor],
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        fontWeight = FontWeight.Medium,
-        singleLine = true,
-        overflow = TextOverflow.Clip,
-    )
 }

@@ -60,7 +60,7 @@ internal fun LaboratorySettingsScreen(onBack: () -> Unit) {
                             .settingsSearchAnchor("laboratory.glyph", edge = SettingsSearchEdge.Bottom),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        ExperimentalLabel(
+                        Text(
                             tr("文本淡入"),
                             color = Theme[colors][onBackgroundColor],
                             modifier = Modifier.weight(1f),

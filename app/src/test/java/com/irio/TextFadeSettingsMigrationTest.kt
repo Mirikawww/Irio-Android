@@ -97,7 +97,9 @@ class TextFadeSettingsMigrationTest {
                 laboratory.value = true; frames()
                 assertTrue("Laboratory must contain the moved switch", nodes().any { hasText(it, tr("文本淡入")) })
                 assertEquals(ToggleableState.On, toggle().config[SemanticsProperties.ToggleableState])
-                assertTrue(nodes().any { hasText(it, tr("实验性")) })
+                assertFalse("Experimental badges must not remain in either language", nodes().any {
+                    hasText(it, "实验性") || hasText(it, "Experimental")
+                })
                 assertTrue(toggle().config[SemanticsActions.OnClick].action!!.invoke()); frames()
                 assertFalse(ThemeStore.glyphFade)
                 assertFalse(preferences.getBoolean("glyph_fade", true))
