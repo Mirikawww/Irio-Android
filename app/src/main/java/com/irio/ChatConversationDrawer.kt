@@ -183,6 +183,8 @@ internal fun ChatConversationDrawer(state: ChatScreenState, drawerOpenProgress: 
                                 ListRowButton(
                                     label = displayConversationTitle(conversation.title),
                                     style = ButtonStyle.Ghost,
+                                    buttonSize = ButtonSize.Small,
+                                    labelMaxLines = 1,
                                     contentPadding =
                                         if (generating) {
                                             PaddingValues(start = 16.dp, end = 56.dp)

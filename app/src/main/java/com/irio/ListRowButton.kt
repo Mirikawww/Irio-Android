@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -63,6 +64,8 @@ fun ListRowButton(
     trailing: (@Composable RowScope.() -> Unit)? = null,
     searchId: String? = null,
     supportingText: String? = null,
+    buttonSize: ButtonSize = ButtonSize.Large,
+    labelMaxLines: Int = Int.MAX_VALUE,
 ) {
     val contentColor = if (style == ButtonStyle.Ghost) {
         Theme[colors][onBackgroundColor]
@@ -90,15 +93,17 @@ fun ListRowButton(
             Spacer(Modifier.width(12.dp))
         }
         Column(
-            modifier = if (supportingText != null) Modifier.weight(1f) else Modifier,
+            modifier = if (supportingText != null || labelMaxLines != Int.MAX_VALUE) Modifier.weight(1f) else Modifier,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(label, color = LocalContentColor.current, fontWeight = labelFontWeight)
+            Text(label, color = LocalContentColor.current, fontWeight = labelFontWeight,
+                maxLines = labelMaxLines,
+                overflow = if (labelMaxLines != Int.MAX_VALUE) TextOverflow.Ellipsis else TextOverflow.Clip)
             supportingText?.let {
                 Text(it, color = Theme[colors][mutedColor], fontSize = 13.sp, lineHeight = 18.sp)
             }
         }
-        if (supportingText == null) Spacer(Modifier.weight(1f))
+        if (supportingText == null && labelMaxLines == Int.MAX_VALUE) Spacer(Modifier.weight(1f))
         if (trailing != null) {
             Spacer(Modifier.width(8.dp))
             trailing()
@@ -157,7 +162,7 @@ fun ListRowButton(
             enabled = enabled,
             style = style,
             shape = shape,
-            buttonSize = ButtonSize.Large,
+            buttonSize = buttonSize,
             contentColor = contentColor,
             contentPadding = contentPadding,
             content = buttonContent,
@@ -169,7 +174,7 @@ fun ListRowButton(
             enabled = enabled,
             style = style,
             shape = shape,
-            buttonSize = ButtonSize.Large,
+            buttonSize = buttonSize,
             contentColor = contentColor,
             content = buttonContent,
         )
