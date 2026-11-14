@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal const val EXTRA_OPEN_CONVERSATION = "com.irio.OPEN_CONVERSATION"
 internal const val ACTION_DISMISS_REPLY = "com.irio.reply.DISMISS"
 private const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
-internal const val REPLY_NOTIFICATION_PREVIEW_LENGTH = 25
+internal const val REPLY_NOTIFICATION_PREVIEW_LENGTH = 50
 internal const val REPLY_DONE_VISIBLE_MS = 10_000L
 
 private const val REPLY_CHANNEL_ID = "irio-reply"
@@ -60,7 +60,7 @@ internal fun appInForeground(): Boolean = ReplyLiveNotice.foreground()
 
 /**
  * 后台通知的下一步文案。界面里不显示调用提示的工具，这里仍用它们自己的状态句。
- * 同一次更新里后面的信号覆盖前面的，结束时改成最终输出的前 25 个字符。
+ * 同一次更新里后面的信号覆盖前面的，结束时改成最终输出的前 50 个字符。
  */
 internal fun advanceReplyNotice(current: String, update: ChatStreamUpdate, finished: Boolean = false, preview: String = ""): String {
     var step = if (update.newRound || update.resetAttempt) tr("请求中") else current

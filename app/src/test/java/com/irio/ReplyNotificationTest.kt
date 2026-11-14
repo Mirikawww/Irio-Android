@@ -21,10 +21,13 @@ class ReplyNotificationTest {
     }
 
     @Test
-    fun previewKeepsOnlyTheFirst25Characters() {
-        val text = "一二三四五六七八九十一二三四五六七八九十甲乙丙丁戊多出来"
-        assertEquals(25, replyNotificationPreview(text).length)
-        assertEquals("一二三四五六七八九十一二三四五六七八九十甲乙丙丁戊", replyNotificationPreview(text))
+    fun previewKeepsOnlyTheFirst50Characters() {
+        val expected = "一二三四五六七八九十".repeat(5)
+        assertEquals(50, REPLY_NOTIFICATION_PREVIEW_LENGTH)
+        assertEquals(expected, replyNotificationPreview(expected))
+        assertEquals(expected, replyNotificationPreview(expected + "多出来"))
+        assertEquals(50, replyNotificationPreview("x".repeat(51)).length)
+        assertEquals("x".repeat(49), replyNotificationPreview("x".repeat(49)))
     }
 
     @Test
@@ -53,8 +56,8 @@ class ReplyNotificationTest {
         assertEquals("创建子智能体", step)
         step = advanceReplyNotice(step, ChatStreamUpdate(delta = "正文"))
         assertEquals("输出中", step)
-        step = advanceReplyNotice(step, ChatStreamUpdate(), finished = true, preview = "正文前二十五字")
-        assertEquals("正文前二十五字", step)
+        step = advanceReplyNotice(step, ChatStreamUpdate(), finished = true, preview = "正文前五十字")
+        assertEquals("正文前五十字", step)
         assertEquals("完成", advanceReplyNotice("输出中", ChatStreamUpdate(), finished = true, preview = ""))
         assertEquals(
             "已生成图片",
