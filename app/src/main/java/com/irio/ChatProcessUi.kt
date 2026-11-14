@@ -115,17 +115,14 @@ internal fun ProcessEventRow(
     val thinkingMode = thinkingRowMode(event.kind, event.live, ThemeStore.thinkingBlock)
     if (thinkingMode == ThinkingRowMode.Hidden) return
     if (thinkingMode == ThinkingRowMode.StatusOnly) {
-        StatusSweepText(tr("思考中"))
+        ProcessStatusLine(event) { StatusSweepText(tr("思考中")) }
         return
     }
     val muted = Theme[colors][mutedColor]
     if (event.toolName == MERGED_TOOL_CALLS_NAME) {
-        Text(
-            event.content,
-            color = muted,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(bottom = 2.dp),
-        )
+        ProcessStatusLine(event, Modifier.padding(bottom = 2.dp)) {
+            Text(event.content, color = muted, fontSize = 13.sp)
+        }
         return
     }
     val terminal = event.kind == ProcessEventKind.TOOL && event.toolName == LinuxShellTool.NAME
@@ -144,10 +141,9 @@ internal fun ProcessEventRow(
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (event.live) {
             if (terminal) {
-                Row(
+                ProcessStatusLine(
+                    event = event,
                     modifier = Modifier.clickable { onOpen(event) },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     StatusSweepText(
                         event.displayText.ifEmpty { MemoryTool.liveLabel(event.toolName) }
@@ -160,18 +156,20 @@ internal fun ProcessEventRow(
                     )
                 }
             } else {
-                StatusSweepText(
-                    event.displayText.ifEmpty {
-                        when (event.kind) {
-                            ProcessEventKind.THINKING -> tr("思考中")
-                            ProcessEventKind.SEARCH -> searchStatusLabel(event.searchQuery)
-                            ProcessEventKind.TOOL ->
-                                MemoryTool.liveLabel(event.toolName, event.webDomain)
-                            ProcessEventKind.BUBBLE,
-                            ProcessEventKind.SUBAGENT -> ""
+                ProcessStatusLine(event) {
+                    StatusSweepText(
+                        event.displayText.ifEmpty {
+                            when (event.kind) {
+                                ProcessEventKind.THINKING -> tr("思考中")
+                                ProcessEventKind.SEARCH -> searchStatusLabel(event.searchQuery)
+                                ProcessEventKind.TOOL ->
+                                    MemoryTool.liveLabel(event.toolName, event.webDomain)
+                                ProcessEventKind.BUBBLE,
+                                ProcessEventKind.SUBAGENT -> ""
+                            }
                         }
-                    }
-                )
+                    )
+                }
                 if (event.kind == ProcessEventKind.THINKING && event.content.isNotBlank()) {
                     val thinkingScrollState = rememberScrollState()
                     val thinkingFollowGate = remember { TranscriptScrollGate() }
@@ -248,7 +246,8 @@ internal fun ProcessEventRow(
                 }
             }
         } else if (label != null) {
-            Row(
+            ProcessStatusLine(
+                event = event,
                 modifier =
                     Modifier.padding(bottom = 2.dp)
                         .then(
@@ -258,8 +257,6 @@ internal fun ProcessEventRow(
                                 Modifier
                             }
                         ),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 if (videoGenerationPending(event)) {
                     // Task creation has ended, but the video is still being generated.
