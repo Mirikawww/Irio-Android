@@ -319,36 +319,33 @@ internal fun ProcessEventSheet(
             with(LocalDensity.current) {
                 (LocalWindowInfo.current.containerSize.height * 0.85f).toDp()
             }
-        val body = event?.content.orEmpty()
-        if (event?.kind == ProcessEventKind.SEARCH || event?.toolName == WebSearchTool.NAME) {
-            SearchResultsSheetContent(
-                body,
-                modifier =
-                    Modifier.fillMaxWidth().heightIn(min = minSheetHeight, max = maxSheetHeight),
-            )
-            return@BottomSheet
-        }
-        val chunks = remember(body) { splitSheetChunks(body) }
-        val longContent = body.length > 800 || chunks.size > 1
-        if (longContent) {
-            LazyColumn(
-                modifier =
-                    Modifier.fillMaxWidth().heightIn(min = minSheetHeight, max = maxSheetHeight),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = LocalBottomSheetBottomPadding.current),
-            ) {
-                items(chunks.size) { index ->
-                    Text(chunks[index], fontSize = 16.sp, color = content)
-                }
+        Column(Modifier.fillMaxWidth().heightIn(min = minSheetHeight, max = maxSheetHeight)) {
+            WebToolSheetTitle(event)
+            val body = event?.content.orEmpty()
+            if (event?.kind == ProcessEventKind.SEARCH || event?.toolName == WebSearchTool.NAME) {
+                SearchResultsSheetContent(body, Modifier.fillMaxWidth().weight(1f, fill = false))
+                return@Column
             }
-        } else {
-            Column(
-                modifier =
-                    Modifier.fillMaxWidth().heightIn(min = minSheetHeight, max = maxSheetHeight)
+            val chunks = remember(body) { splitSheetChunks(body) }
+            val longContent = body.length > 800 || chunks.size > 1
+            if (longContent) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = LocalBottomSheetBottomPadding.current),
+                ) {
+                    items(chunks.size) { index ->
+                        Text(chunks[index], fontSize = 16.sp, color = content)
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
                         .padding(bottom = LocalBottomSheetBottomPadding.current)
-            ) {
-                if (body.isNotBlank()) {
-                    Text(body, fontSize = 16.sp, color = content)
+                ) {
+                    if (body.isNotBlank()) {
+                        Text(body, fontSize = 16.sp, color = content)
+                    }
                 }
             }
         }

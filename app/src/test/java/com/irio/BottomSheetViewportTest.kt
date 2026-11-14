@@ -46,6 +46,51 @@ import org.robolectric.shadows.ShadowDialog
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class BottomSheetViewportTest {
+    @Test fun webSheetTitlesNeverInventMissingRequestMetadata() {
+        val fetch = ProcessEvent(1, ProcessEventKind.TOOL, toolName = WebFetchTool.NAME,
+            webDomain = "example.test", displayText = "Generated hint")
+        for (arguments in listOf("", "{}", "{invalid", "{\"url\":42}")) {
+            assertEquals("", webToolSheetTitle(fetch.copy(toolArguments = arguments)))
+        }
+        assertEquals("original query", webToolSheetTitle(ProcessEvent(2, ProcessEventKind.SEARCH,
+            searchQuery = "original query", toolArguments = "{\"query\":\"other\"}")))
+        assertEquals("", webToolSheetTitle(ProcessEvent(3, ProcessEventKind.THINKING)))
+    }
+
+    @Test fun webToolSheetsShowTheOriginalQueryOrFullUrlAsTheirHeading() = runTest {
+        val query = "Compose BottomSheet 搜索词"
+        val url = "https://example.test/docs/page?lang=zh-CN&section=sheet#title"
+        val fixtures = listOf(
+            ProcessEvent(1, ProcessEventKind.SEARCH, searchQuery = query,
+                content = "search fixture results", displayText = "Custom model hint") to query,
+            ProcessEvent(2, ProcessEventKind.TOOL, toolName = WebSearchTool.NAME,
+                toolArguments = JSONObject().put("query", query).toString(), content = "search fixture results") to query,
+            ProcessEvent(3, ProcessEventKind.TOOL, toolName = WebFetchTool.NAME, webDomain = "example.test",
+                toolArguments = JSONObject().put("url", url).toString(), content = "fetch fixture body",
+                displayText = "Custom model hint") to url,
+        )
+        for ((event, expected) in fixtures) {
+            for (failed in listOf(false, true)) {
+                withSheet(content = {
+                    val state = rememberBottomSheetState(initialDetent = BottomSheetDetent.FullyExpanded)
+                    ProcessEventSheet(event.copy(toolOutcome = if (failed) ToolOutcome.FAILED else ToolOutcome.SUCCESS), state, {})
+                }) { root, _ ->
+                    fun descend(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descend)
+                    val nodes = descendants(root).filterIsInstance<ViewRootForTest>().flatMap {
+                        descend(it.semanticsOwner.unmergedRootSemanticsNode)
+                    }
+                    val heading = nodes.singleOrNull { node ->
+                        node.config.contains(SemanticsProperties.Heading) &&
+                            node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == expected }
+                    }
+                    assertNotNull("${event.toolName}/${event.kind} failed=$failed needs its original query/URL title", heading)
+                    assertTrue("The title must be visible inside the sheet", heading!!.boundsInRoot.width > 0f)
+                    assertTrue(heading.boundsInRoot.right <= 400f)
+                }
+            }
+        }
+    }
+
     @Test fun searchListReachesTheSheetBottomAndKeepsItsTrailingInsetScrollable() = runTest {
         val body = JSONObject().put("results", JSONArray().apply {
             repeat(30) { put(JSONObject().put("url", "https://example.com/$it")
@@ -53,7 +98,7 @@ class BottomSheetViewportTest {
         }).toString()
         withSheet(content = {
             val state = rememberBottomSheetState(initialDetent = BottomSheetDetent.FullyExpanded)
-            ProcessEventSheet(ProcessEvent(1L, ProcessEventKind.SEARCH, content = body), state, {})
+            ProcessEventSheet(ProcessEvent(1L, ProcessEventKind.SEARCH, content = body, searchQuery = "Search viewport fixture"), state, {})
         }) { root, frames ->
             val list = descendants(root).filterIsInstance<RecyclerView>().single()
             fun assertViewport(nav: Int) {
@@ -103,12 +148,12 @@ class BottomSheetViewportTest {
     }
 
     @Test fun longThinkingAndTerminalViewportsReachTheBottom() = runTest {
-        for (terminal in listOf(false, true)) {
+        for (tool in listOf("", LinuxShellTool.NAME, WebFetchTool.NAME)) {
             withSheet(content = {
                 val state = rememberBottomSheetState(initialDetent = BottomSheetDetent.FullyExpanded)
-                val event = ProcessEvent(1L, if (terminal) ProcessEventKind.TOOL else ProcessEventKind.THINKING,
+                val event = ProcessEvent(1L, if (tool.isNotEmpty()) ProcessEventKind.TOOL else ProcessEventKind.THINKING,
                     content = (1..60).joinToString("\n\n") { "A long output paragraph $it" },
-                    toolName = if (terminal) LinuxShellTool.NAME else "")
+                    toolName = tool, toolArguments = JSONObject().put("url", "https://example.test/" + "long-path/".repeat(12)).toString())
                 ProcessEventSheet(event, state, {})
             }) { root, frames ->
                 frames()
@@ -116,7 +161,7 @@ class BottomSheetViewportTest {
                 val scroll = descendants(root).filterIsInstance<ViewRootForTest>().flatMap {
                     descend(it.semanticsOwner.unmergedRootSemanticsNode)
                 }.single { it.config.contains(SemanticsProperties.VerticalScrollAxisRange) }
-                assertEquals("terminal=$terminal must not have a fixed blank footer", root.height.toFloat(),
+                assertEquals("tool=$tool must not have a fixed blank footer", root.height.toFloat(),
                     scroll.boundsInRoot.bottom, 1f)
             }
         }
