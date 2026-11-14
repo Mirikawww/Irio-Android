@@ -252,6 +252,7 @@ private val settingsSearchEntries = listOf(
     page("page.linux", "Linux 沙盒", LinuxSandboxSettingsActivity::class.java),
     page("page.laboratory", "实验室", LaboratorySettingsActivity::class.java),
     item("laboratory.betterSettingsDisplay", "更好的设置项展示", "实验室", LaboratorySettingsActivity::class.java),
+    item("laboratory.glyph", "文本淡入", "实验室", LaboratorySettingsActivity::class.java),
     item("laboratory.haptics", "触感反馈", "实验室", LaboratorySettingsActivity::class.java),
     page("page.other", "其他", OtherSettingsActivity::class.java),
     page("page.about", "关于", AboutActivity::class.java),
@@ -286,7 +287,7 @@ private val settingsSearchEntries = listOf(
     item("appearance.retry", "自动重试", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.retry.limit", "重试次数上限", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.retry.cooldown", "重试冷却时长", "外观与偏好", AppearanceSettingsActivity::class.java),
-    item("appearance.glyph", "文本淡入", "外观与偏好", AppearanceSettingsActivity::class.java),
+
     item("appearance.imageStreaming", "图片生成流式传输", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.diff", "模型差异", "外观与偏好", AppearanceSettingsActivity::class.java),
     item("appearance.pickerLeft", "模型切换器居左", "外观与偏好", AppearanceSettingsActivity::class.java),

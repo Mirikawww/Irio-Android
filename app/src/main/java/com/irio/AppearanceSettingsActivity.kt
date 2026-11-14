@@ -515,23 +515,7 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
             }
             SettingsSectionCard(title = tr("界面交互")) {
                 Row(
-                    modifier = Modifier.settingsSearchAnchor("appearance.glyph", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ExperimentalLabel(
-                        tr("文本淡入"),
-                        color = Theme[colors][onPanelColor],
-                        modifier = Modifier.weight(1f),
-                    )
-                    Switch(
-                        checked = ThemeStore.glyphFade,
-                        onCheckedChange = { enabled ->
-                            ThemeStore.saveGlyphFade(context, enabled)
-                        },
-                    )
-                }
-                Row(
-                    modifier = Modifier.settingsSearchAnchor("appearance.imageStreaming").settingsSwitchRow(),
+                    modifier = Modifier.settingsSearchAnchor("appearance.imageStreaming", edge = SettingsSearchEdge.Top).settingsSwitchRow(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(

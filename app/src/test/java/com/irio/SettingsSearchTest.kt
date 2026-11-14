@@ -6,6 +6,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsSearchTest {
+    @Test fun textFadeSearchOpensLaboratoryInBothLanguages() {
+        for (language in AppLanguage.entries) {
+            val hit = searchSettings(translate(language, "文本淡入"), label = { translate(language, it) }).single()
+            assertEquals("laboratory.glyph", hit.id)
+            assertEquals("laboratory.glyph", hit.anchor)
+            assertEquals("com.irio.LaboratorySettingsActivity", hit.destination.name)
+            assertEquals(translate(language, "实验室"), hit.page)
+        }
+    }
+
     @Test fun betterSettingsDisplayIsSearchableInTheLaboratoryInBothLanguages() {
         for (language in AppLanguage.entries) {
             val label = translate(language, "更好的设置项展示")

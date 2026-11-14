@@ -45,13 +45,30 @@ internal fun LaboratorySettingsScreen(onBack: () -> Unit) {
                 SettingsSectionCard(title = tr("外观")) {
                     Row(
                         modifier = Modifier.settingsSwitchRow()
-                            .settingsSearchAnchor("laboratory.betterSettingsDisplay"),
+                            .settingsSearchAnchor("laboratory.betterSettingsDisplay", edge = SettingsSearchEdge.Top),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(tr("更好的设置项展示"), modifier = Modifier.weight(1f), color = Theme[colors][onBackgroundColor])
                         Switch(
                             checked = ThemeStore.betterSettingsDisplay,
+                            accessibilityLabel = tr("更好的设置项展示"),
                             onCheckedChange = { ThemeStore.saveBetterSettingsDisplay(context, it) },
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.settingsSwitchRow()
+                            .settingsSearchAnchor("laboratory.glyph", edge = SettingsSearchEdge.Bottom),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ExperimentalLabel(
+                            tr("文本淡入"),
+                            color = Theme[colors][onBackgroundColor],
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = ThemeStore.glyphFade,
+                            accessibilityLabel = tr("文本淡入"),
+                            onCheckedChange = { ThemeStore.saveGlyphFade(context, it) },
                         )
                     }
                 }
