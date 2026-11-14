@@ -23,6 +23,7 @@ class AcknowledgementsTest {
             "talloc" to ("talloc" to "https://talloc.samba.org"),
             "android-shmem" to ("libandroid-shmem" to "https://github.com/termux/libandroid-shmem"),
             "alpine" to ("Alpine Linux" to "https://alpinelinux.org"),
+            "noto-serif-cjk" to ("Noto Serif CJK" to "https://github.com/notofonts/noto-cjk"),
         )
         for ((id, project) in expected) {
             val credit = acknowledgements.singleOrNull { it.id == id }
@@ -66,6 +67,14 @@ class AcknowledgementsTest {
         assertNull("Alpine is bundled unchanged", acknowledgements.single { it.id == "alpine" }.adaptation)
         assertNull(acknowledgements.single { it.id == "mermaid" }.adaptation)
         assertNull(acknowledgements.single { it.id == "jlatexmath" }.adaptation)
+    }
+
+    @Test fun notoSerifCjkLicenseIsBundled() {
+        val credit = acknowledgements.single { it.id == "noto-serif-cjk" }
+        assertEquals("SIL Open Font License 1.1", credit.licenseLabel)
+        val license = RuntimeEnvironment.getApplication().assets.open(credit.licenses.single().assetPath)
+            .bufferedReader().use { it.readText() }
+        assertTrue(license.contains("SIL OPEN FONT LICENSE"))
     }
 
     @Test fun aboutAndAcknowledgementsActivitiesAreRegisteredAndPrivate() {

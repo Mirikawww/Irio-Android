@@ -1,6 +1,7 @@
 package com.irio
 
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontListFontFamily
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -27,5 +28,14 @@ class AppFontTest {
         assertEquals(AppFont.SERIF, AppFont.fromStored("serif"))
         assertEquals("Sans", translate(AppLanguage.EN, "非衬线体"))
         assertEquals("Serif", translate(AppLanguage.EN, "衬线体"))
+    }
+
+    @Test
+    fun serifFamilyHasOneNativeFallbackChainPerWeightAndStyle() {
+        for (family in listOf(LoraFontFamily, LoraRegularFamily)) {
+            val fonts = (family as FontListFontFamily).fonts
+            assertEquals("Compose must not choose between separate Lora and CJK entries",
+                fonts.size, fonts.map { it.weight to it.style }.distinct().size)
+        }
     }
 }

@@ -43,6 +43,7 @@ private fun loraFont(resId: Int, weight: Int, style: FontStyle, adjustment: Int)
     resourceId = resId,
     // Both bundled Lora files declare a 400..700 wght axis.
     axisWeight = resolvedVariableWeight(FontWeight(weight), adjustment).coerceIn(400, 700),
+    cjkAxisWeight = resolvedVariableWeight(FontWeight(weight), adjustment).coerceIn(100, 900),
     weight = FontWeight(weight),
     style = style,
 )
@@ -56,7 +57,7 @@ private fun loraFamily(weights: List<Int>, adjustment: Int = 0) = FontFamily(
     },
 )
 
-/** 字重轴上的 Lora。系统粗细调节会落到最近的一档。 */
+/** Lora 字重轴与原生 Noto Serif CJK 字形回退。 */
 internal val LoraFontFamily = loraFamily(LoraAxisWeights)
 
 /** 读不到系统粗细时只用 Regular。 */
@@ -110,6 +111,7 @@ internal fun resolvedVariableWeight(requested: FontWeight, adjustment: Int?): In
 private class LoraAxisFont(
     val resourceId: Int,
     val axisWeight: Int,
+    val cjkAxisWeight: Int,
     override val weight: FontWeight,
     override val style: FontStyle,
 ) : AndroidFont(
@@ -119,6 +121,13 @@ private class LoraAxisFont(
 )
 
 private object LoraTypefaceLoader : AndroidFont.TypefaceLoader {
+    private var cjkSource: android.graphics.fonts.Font? = null
+
+    @Synchronized
+    private fun cjkSource(context: Context): android.graphics.fonts.Font =
+        cjkSource ?: android.graphics.fonts.Font.Builder(context.resources, R.font.noto_serif_cjk_sc_variable)
+            .build().also { cjkSource = it }
+
     override fun loadBlocking(context: Context, font: AndroidFont): Typeface {
         val lora = font as LoraAxisFont
         val slant = if (lora.style == FontStyle.Italic) {
@@ -132,7 +141,16 @@ private object LoraTypefaceLoader : AndroidFont.TypefaceLoader {
             .setFontVariationSettings("'wght' ${lora.axisWeight}")
             .build()
         val family = android.graphics.fonts.FontFamily.Builder(face).build()
+        // Reuse the large immutable font source across weight/style instances.
+        val cjkFace = android.graphics.fonts.Font.Builder(cjkSource(context))
+            .setWeight(lora.cjkAxisWeight)
+            .setSlant(PlatformFontStyle.FONT_SLANT_UPRIGHT)
+            .setFontVariationSettings("'wght' ${lora.cjkAxisWeight}")
+            .build()
+        // Compose's FontFamily list selects a weight/style; it is not a glyph fallback chain.
+        // Attach CJK to every selected Lora typeface, including italic and Regular-only paths.
         return Typeface.CustomFallbackBuilder(family)
+            .addCustomFallback(android.graphics.fonts.FontFamily.Builder(cjkFace).build())
             .setStyle(PlatformFontStyle(lora.axisWeight, slant))
             .build()
     }

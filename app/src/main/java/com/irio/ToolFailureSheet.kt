@@ -56,7 +56,8 @@ internal fun ToolFailureSheet(event: ProcessEvent, state: BottomSheetState, onDi
             Text(tr("错误信息"), color = foreground, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium)
             SelectionContainer {
                 Text(event.content.ifBlank { tr("工具执行失败") }, color = foreground, fontSize = 16.sp,
-                    lineHeight = 22.sp, fontFamily = if (terminal) FontFamily.Monospace else FontFamily.Default)
+                    lineHeight = 22.sp,
+                    fontFamily = if (terminal) FontFamily.Monospace else rememberAppFontFamily())
             }
             Text(tr("输入参数"), color = foreground, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium)
             SelectionContainer {

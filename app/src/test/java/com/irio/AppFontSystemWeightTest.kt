@@ -1,6 +1,9 @@
 package com.irio
 
 import android.content.res.Configuration
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.text.TextRunShaper
 import android.provider.Settings
 import android.view.View
 import androidx.activity.ComponentActivity
@@ -16,6 +19,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontListFontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.createFontFamilyResolver
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -28,10 +32,12 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AppFontSystemWeightTest {
     @Test fun honorWeightScaleAffectsTheActualLoraVariationAxis() = runTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
@@ -59,8 +65,16 @@ class AppFontSystemWeightTest {
             }
         }
         fun axis(weight: FontWeight = FontWeight.Normal, style: FontStyle = FontStyle.Normal): Float {
-            val font = (family as FontListFontFamily).single { it.weight == weight && it.style == style } as AndroidFont
+            val font = (family as FontListFontFamily).single {
+                it.weight == weight && it.style == style
+            } as AndroidFont
             return font.variationSettings.settings.single { it.axisName == "wght" }.toVariationValue(null)
+        }
+        fun cjkAxis(weight: FontWeight = FontWeight.Normal, style: FontStyle = FontStyle.Normal): Float {
+            val typeface = createFontFamilyResolver(context).resolve(family, weight, style).value as Typeface
+            val paint = Paint().apply { this.typeface = typeface; textSize = 32f }
+            val glyphs = TextRunShaper.shapeTextRun("中", 0, 1, 0, 1, 0f, 0f, false, paint)
+            return requireNotNull(glyphs.getFont(0).axes).single { it.tag == "wght" }.styleValue
         }
         fun scale(value: String?) {
             Settings.Secure.putString(context.contentResolver, "font_weight_scale", value)
@@ -84,11 +98,16 @@ class AppFontSystemWeightTest {
                 656f, axis(), 0.01f)
             assertEquals("Italic must receive the same system weight", 656f, axis(style = FontStyle.Italic), 0.01f)
             assertEquals("Bold must clamp to Lora's real maximum", 700f, axis(FontWeight.Bold), 0.01f)
+            assertEquals("The same vendor setting must reach the actual Chinese glyph", 656f, cjkAxis(), 0.01f)
+            assertEquals("Italic text must retain the CJK fallback weight", 656f, cjkAxis(style = FontStyle.Italic), 0.01f)
+            assertEquals("CJK uses its own 900 maximum, not Lora's 700 maximum", 900f, cjkAxis(FontWeight.Bold), 0.01f)
 
             scale("100")
             assertEquals("Changing the system setting must invalidate the cached family", 400f, axis(), 0.01f)
+            assertEquals(400f, cjkAxis(), 0.01f)
             scale("164")
             assertEquals(656f, axis(), 0.01f)
+            assertEquals(656f, cjkAxis(), 0.01f)
 
             configuration.value = Configuration(configuration.value).apply { fontWeightAdjustment = 300 }
             frames()
@@ -102,6 +121,7 @@ class AppFontSystemWeightTest {
             assertEquals("An undefined Android adjustment must still allow vendor detection", 656f, axis(), 0.01f)
             scale(null)
             assertEquals("Unavailable settings must safely fall back to Regular", 400f, axis(), 0.01f)
+            assertEquals("Chinese also falls back to Regular", 400f, cjkAxis(), 0.01f)
 
             configuration.value = Configuration(configuration.value).apply { fontWeightAdjustment = 0 }
             scale("not-a-number")
