@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -478,7 +479,7 @@ private fun CompressionStatusLine(state: SummaryState) {
 }
 
 @Composable
-internal fun StatusSweepText(label: String) {
+internal fun StatusSweepText(label: String, modifier: Modifier = Modifier) {
     val highlight = Theme[colors][onBackgroundColor]
     val base = Theme[colors][mutedColor]
     val shift by
@@ -497,8 +498,10 @@ internal fun StatusSweepText(label: String) {
         label,
         fontSize = 13.sp,
         color = base,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier =
-            Modifier.testTag("status-sweep")
+            modifier.testTag("status-sweep")
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
                     drawContent()

@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -121,7 +122,8 @@ internal fun ProcessEventRow(
     val muted = Theme[colors][mutedColor]
     if (event.toolName == MERGED_TOOL_CALLS_NAME) {
         ProcessStatusLine(event, Modifier.padding(bottom = 2.dp)) {
-            Text(event.content, color = muted, fontSize = 13.sp)
+            Text(event.content, color = muted, fontSize = 13.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         return
     }
@@ -146,7 +148,8 @@ internal fun ProcessEventRow(
                     onClick = { onOpen(event) },
                 ) {
                     StatusSweepText(
-                        event.displayText.ifEmpty { MemoryTool.liveLabel(event.toolName) }
+                        event.displayText.ifEmpty { MemoryTool.liveLabel(event.toolName) },
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                     Icon(
                         imageVector = IrioIcons.ChevronRight,
@@ -254,10 +257,12 @@ internal fun ProcessEventRow(
                 if (videoGenerationPending(event)) {
                     // Task creation has ended, but the video is still being generated.
                     // Keep the native tool-call highlight until the background query settles.
-                    StatusSweepText(event.displayText.ifEmpty { MemoryTool.liveLabel(event.toolName) })
+                    StatusSweepText(event.displayText.ifEmpty { MemoryTool.liveLabel(event.toolName) },
+                        modifier = Modifier.weight(1f, fill = false))
                 } else {
                     Text(
                         label,
+                        modifier = Modifier.weight(1f, fill = false),
                         color =
                             toolStatusTextColor(
                                 event.toolOutcome,
@@ -266,6 +271,8 @@ internal fun ProcessEventRow(
                                 irioErrorTextColor(),
                             ),
                         fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 if (openable) {

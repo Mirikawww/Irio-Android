@@ -143,6 +143,37 @@ class ProcessStatusIconTest {
                 content = "Merged tools fixture", live = true)
             frames()
             assertLeading("wrench", sweeping = false)
+            val longHint = "正在查询工具调用的详细信息和相关资料 ".repeat(24)
+            val longStatuses = fixtures.flatMap { (event, _) ->
+                listOf(event.copy(live = true, displayText = longHint),
+                    event.copy(content = "fixture output", displayText = longHint, toolOutcome = ToolOutcome.SUCCESS))
+            } + listOf(
+                ProcessEvent(9, ProcessEventKind.TOOL, toolName = MERGED_TOOL_CALLS_NAME, content = longHint),
+                ProcessEvent(10, ProcessEventKind.TOOL, toolName = VideoGenTool.NAME,
+                    content = """{"status":"running"}""", displayText = longHint, toolOutcome = ToolOutcome.SUCCESS),
+            )
+            for (fontScale in listOf(1f, 2f)) {
+                density.value = Density(1f, fontScale)
+                for (event in longStatuses) {
+                    current.value = event
+                    frames()
+                    val text = nodes().single {
+                        it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { it.text == longHint }
+                    }
+                    val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                    assertTrue(text.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts))
+                    val layout = layouts.single()
+                    assertEquals("Tool hint must explicitly cap maxLines: ${event.toolName}/${event.live}",
+                        1, layout.layoutInput.maxLines)
+                    assertEquals("Long tool hints must stay on one line", 1, layout.lineCount)
+                    assertTrue("Long tool hints must ellipsize rather than wrap or clip", layout.isLineEllipsized(0))
+                    assertTrue("Single-line hints must remain inside the transcript", text.boundsInRoot.right <= 320f)
+                    nodes().filter { it.config.contains(SemanticsActions.OnClick) }.forEach {
+                        assertTrue(it.config[SemanticsActions.OnClick].action!!.invoke())
+                        assertEquals(event, opened)
+                    }
+                }
+            }
             for (theme in listOf(ThemePreference.LIGHT, ThemePreference.DARK, ThemePreference.AMOLED)) {
                 ThemeStore.save(context, theme)
                 density.value = Density(1f, 2f)
