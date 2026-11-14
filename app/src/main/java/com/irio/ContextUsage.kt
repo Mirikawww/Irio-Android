@@ -41,6 +41,7 @@ internal fun chatToolRegistry(
         if (imageGenModel.isNotBlank()) add(ImageGenToolProvider())
         configuredVideoGenModel(context).takeIf(String::isNotBlank)?.let { add(VideoGenToolProvider(it)) }
         add(TimeToolProvider())
+        add(UserLocationToolProvider())
         add(LinguaLibreToolProvider())
         add(ReactionToolProvider())
         add(ColoredBubbleToolProvider())

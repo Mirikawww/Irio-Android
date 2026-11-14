@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 
 @Composable
 internal fun ChatScreenLaunchers(state: ChatScreenState) {
+    UserLocationPermissionHost()
     val context = state.context
     val requestRecordAudio =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->

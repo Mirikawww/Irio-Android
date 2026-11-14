@@ -240,6 +240,7 @@ class ToolRegistry(
                 ImageGenToolProvider(),
                 VideoGenToolProvider(),
                 TimeToolProvider(),
+                UserLocationToolProvider(),
                 LinguaLibreToolProvider(),
                 ReactionToolProvider(),
                 ColoredBubbleToolProvider(),

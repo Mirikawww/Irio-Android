@@ -26,6 +26,7 @@ internal fun toolFailureLabel(name: String): String = when (name) {
     HistoryTool.NAME -> tr("历史会话查询失败")
     ToolGuideSearchTool.NAME -> tr("工具教程搜索失败")
     TimeTool.NAME -> tr("获取时间失败")
+    UserLocationTool.NAME -> tr("获取用户位置失败")
     LinguaLibreTool.NAME -> tr("检索发音失败")
     MemoryTool.GET -> tr("读取记忆失败")
     MemoryTool.UPDATE -> tr("写入记忆失败")
@@ -43,6 +44,7 @@ internal fun toolFailureLabel(name: String): String = when (name) {
 
 internal fun toolStoppedLabel(name: String, webDomain: String = ""): String = when (name) {
     WebSearchTool.NAME -> tr("搜索已停止")
+    UserLocationTool.NAME -> tr("获取用户位置已停止")
     WebFetchTool.NAME -> tr("网页读取已停止")
     LinguaLibreTool.NAME -> tr("发音检索已停止")
     ImageGenTool.NAME -> tr("图片生成已停止")

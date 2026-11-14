@@ -126,6 +126,7 @@ internal object ToolCatalog {
         ImageGenTool.NAME -> "生成图片"
         VideoGenTool.NAME -> "生成视频"
         TimeTool.NAME -> "获取时间"
+        UserLocationTool.NAME -> "获取用户位置"
         LinguaLibreTool.NAME -> "检索发音"
         HistoryTool.NAME -> "查询历史会话"
         ToolGuideSearchTool.NAME -> "搜索工具教程"

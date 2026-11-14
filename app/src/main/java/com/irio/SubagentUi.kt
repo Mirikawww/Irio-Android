@@ -243,6 +243,7 @@ class SubagentActivity : ComponentActivity() {
 
 @Composable
 private fun SubagentScreen(id: String, onBack: () -> Unit) {
+    UserLocationPermissionHost()
     val session = SubagentHub.get(id)
     val background = Theme[colors][backgroundColor]
     val running = session?.state == SubagentState.RUNNING
