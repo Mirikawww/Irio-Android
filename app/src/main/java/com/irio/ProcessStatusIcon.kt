@@ -1,7 +1,9 @@
 package com.irio
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -10,11 +12,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import com.composables.ui.components.Icon
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.mutedColor
@@ -25,9 +32,11 @@ import com.composeunstyled.theme.Theme
 internal fun ProcessStatusLine(
     event: ProcessEvent,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+    val feedback = if (onClick != null) Modifier.processStatusClick(onClick) else Modifier
+    Row(modifier.then(feedback), verticalAlignment = Alignment.CenterVertically) {
         ProcessStatusIcon(event)
         Spacer(Modifier.width(6.dp))
         Row(
@@ -38,6 +47,24 @@ internal fun ProcessStatusLine(
         )
     }
 }
+
+/** Grow the feedback surface without changing content position, wrapping or the list's row pitch. */
+private fun Modifier.processStatusClick(onClick: () -> Unit): Modifier =
+    this.layout { measurable, constraints ->
+        val horizontal = 8.dp.roundToPx()
+        val vertical = 4.dp.roundToPx()
+        val feedback = measurable.measure(
+            constraints.offset(horizontal = horizontal * 2, vertical = vertical * 2)
+        )
+        layout(
+            constraints.constrainWidth(feedback.width - horizontal * 2),
+            constraints.constrainHeight(feedback.height - vertical * 2),
+        ) {
+            feedback.placeRelative(-horizontal, -vertical)
+        }
+    }.clip(ContinuousCapsule)
+        .clickable(onClick = onClick)
+        .padding(horizontal = 8.dp, vertical = 4.dp)
 
 @Composable
 private fun ProcessStatusIcon(event: ProcessEvent) {

@@ -1,6 +1,6 @@
 package com.irio
 
-import androidx.compose.foundation.clickable
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -143,7 +143,7 @@ internal fun ProcessEventRow(
             if (terminal) {
                 ProcessStatusLine(
                     event = event,
-                    modifier = Modifier.clickable { onOpen(event) },
+                    onClick = { onOpen(event) },
                 ) {
                     StatusSweepText(
                         event.displayText.ifEmpty { MemoryTool.liveLabel(event.toolName) }
@@ -248,15 +248,8 @@ internal fun ProcessEventRow(
         } else if (label != null) {
             ProcessStatusLine(
                 event = event,
-                modifier =
-                    Modifier.padding(bottom = 2.dp)
-                        .then(
-                            if (openable) {
-                                Modifier.clickable { onOpen(event) }
-                            } else {
-                                Modifier
-                            }
-                        ),
+                modifier = Modifier.padding(bottom = 2.dp),
+                onClick = if (openable) ({ onOpen(event) }) else null,
             ) {
                 if (videoGenerationPending(event)) {
                     // Task creation has ended, but the video is still being generated.
