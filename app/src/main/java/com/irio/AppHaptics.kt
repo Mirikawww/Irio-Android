@@ -17,6 +17,7 @@ internal enum class HapticEvent(val stored: String, val label: String, val legac
     REACTION("reaction", "消息回应"),
     MODEL_REACTION("model_reaction", "模型添加回应"),
     REPLY_COMPLETED("reply_completed", "模型完成回复"),
+    REQUEST_ERROR("request_error", "请求错误"),
     SELECT_MODEL("model", "切换模型"),
     THINKING_LEVEL("thinking", "调节思考强度"),
     SWITCH_ON("switch_toggle_on", "普通开关开启", "switch_toggle"),

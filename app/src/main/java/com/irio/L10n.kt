@@ -569,6 +569,7 @@ private val English = mapOf(
     "快捷开关松手收起" to "Quick action release collapse",
     "模型添加回应" to "Model adds a reaction",
     "模型完成回复" to "Model reply completed",
+    "请求错误" to "Request error",
     "Snackbar 弹出" to "Snackbar appearance",
     "模型输出" to "Model output",
     "新建对话" to "Create conversation",

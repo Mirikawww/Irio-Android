@@ -39,7 +39,7 @@ class HapticFeedbackTest {
             assertEquals(label + "开启", enabled.label)
             assertEquals(label + "关闭", disabled.label)
         }
-        for (stored in listOf("reply_completed", "model_reaction", "quick_long_press", "quick_long_release")) {
+        for (stored in listOf("reply_completed", "request_error", "model_reaction", "quick_long_press", "quick_long_release")) {
             assertTrue("The new location must be independently configurable: $stored", HapticEvent.entries.any { it.stored == stored })
         }
     }

@@ -48,6 +48,87 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE, shadows = [ChatScreenStateTest.CountingTokenizer::class])
 class ChatScreenStateTest {
+    @Test fun actualRequestFailureVibratesWithItsOwnChoiceButNotForSuccessOrStop() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val context = RuntimeEnvironment.getApplication()
+        ShadowEnvironment.addExternalDir(context.cacheDir.resolve("error-haptics-external").absolutePath)
+        ThemeStore.ensureLoaded(context)
+        val prefs = context.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
+        val original = prefs.all.filterKeys { it.startsWith("haptics_") }
+        val system = android.provider.Settings.System.getInt(context.contentResolver, "haptic_feedback_enabled", 1)
+        val oldRetry = ThemeStore.autoRetry
+        val oldRetryLimit = ThemeStore.retryLimit
+        val oldRetryCooldown = ThemeStore.retryCooldownSeconds
+        val vibrator = context.getSystemService(android.os.VibratorManager::class.java).defaultVibrator
+        val vibration = org.robolectric.Shadows.shadowOf(vibrator)
+        vibration.setHasVibrator(true)
+        ThemeStore.saveAutoRetry(context, false)
+        prefs.edit().putBoolean("haptics_stream_output", false).putBoolean("haptics_reply_completed", false).commit()
+        try {
+            MockWebServer().use { server ->
+                IrioHttp.resetForTests()
+                withState { harness ->
+                    val state = harness.state
+                    state.requestReplyNotification = {}
+                    state.providers = listOf(ProviderConfig("haptic-error", "Fixture", server.url("/v1").toString(), "", models = listOf("fixture-model")))
+                    state.activeProviderId = "haptic-error"; state.selectedModel = "fixture-model"
+                    state.currentConversation = state.currentConversation.copy(title = "Fixture", titlePending = false)
+                    val id = state.currentConversation.id
+                    try {
+                        for (case in listOf("error", "disabled", "master-off", "system-off", "retry-success", "retry-failure", "success", "stopped")) {
+                            val retry = case.startsWith("retry-")
+                            ThemeStore.saveAutoRetry(context, retry)
+                            if (retry) {
+                                ThemeStore.saveRetryLimit(context, 1)
+                                ThemeStore.saveRetryCooldown(context, 2)
+                                server.enqueue(MockResponse().setResponseCode(503).setBody("transient fixture failure"))
+                            }
+                            HapticPreferences.saveEnabled(context, case != "master-off")
+                            prefs.edit().putBoolean("haptics_request_error", case != "disabled").commit()
+                            android.provider.Settings.System.putInt(context.contentResolver, "haptic_feedback_enabled", if (case == "system-off") 0 else 1)
+                            when (case) {
+                                "success", "retry-success" -> server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream")
+                                    .setBody("data: {\"choices\":[{\"delta\":{\"content\":\"local answer\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
+                                "stopped" -> server.enqueue(MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE))
+                                else -> server.enqueue(MockResponse().setResponseCode(400).setBody("fixture request failure"))
+                            }
+                            val user = ChatMessage(MessageIds.next(), "error feedback fixture", true)
+                            val reply = ChatMessage(MessageIds.next(), "", false, isPending = true, responseToUserId = user.id)
+                            state.messages = listOf(user, reply)
+                            vibrator.cancel()
+                            state.startGeneration(id, listOf(user), reply)
+                            if (case == "stopped") state.stopGeneration(id)
+                            if (retry) {
+                                for (step in 0 until 300) {
+                                    runCurrent()
+                                    if (state.messages.last().retryStatus?.remainingSeconds != null) break
+                                    withContext(Dispatchers.IO) { Thread.sleep(10) }
+                                }
+                                assertNotNull("Retry countdown must actually be reached", state.messages.last().retryStatus?.remainingSeconds)
+                                assertFalse("Transient errors and retry countdowns must stay silent", vibration.isVibrating)
+                                testScheduler.advanceTimeBy(2_001)
+                            }
+                            repeat(300) { runCurrent(); if (state.busyThisChat) withContext(Dispatchers.IO) { Thread.sleep(10) } }
+                            assertFalse("Real generation must finish for $case", state.busyThisChat)
+                            assertEquals("Only an enabled terminal request failure should vibrate: $case", case in listOf("error", "retry-failure"), vibration.isVibrating)
+                            if (case !in listOf("success", "retry-success", "stopped")) assertTrue(state.messages.last().isError)
+                        }
+                    } finally { state.stopGeneration(id); ConversationStore.delete(context, id) }
+                }
+            }
+        } finally {
+            vibrator.cancel(); ThemeStore.saveAutoRetry(context, oldRetry)
+            ThemeStore.saveRetryLimit(context, oldRetryLimit)
+            ThemeStore.saveRetryCooldown(context, oldRetryCooldown)
+            android.provider.Settings.System.putInt(context.contentResolver, "haptic_feedback_enabled", system)
+            prefs.edit().apply {
+                prefs.all.keys.filter { it.startsWith("haptics_") }.forEach(::remove)
+                original.forEach { (key, value) -> when (value) { is Boolean -> putBoolean(key, value); is String -> putString(key, value) } }
+            }.commit()
+            IrioHttp.resetForTests(); Dispatchers.resetMain()
+        }
+    }
+
     @Test fun actualGenerationCompletionVibratesIndependentlyOfStreamAndFailure() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val context = RuntimeEnvironment.getApplication()
@@ -60,7 +141,8 @@ class ChatScreenStateTest {
         vibration.setHasVibrator(true)
         android.provider.Settings.System.putInt(context.contentResolver, "haptic_feedback_enabled", 1)
         HapticPreferences.saveEnabled(context, true)
-        prefs.edit().putBoolean("haptics_stream_output", false).putBoolean("haptics_reply_completed", true).commit()
+        prefs.edit().putBoolean("haptics_stream_output", false).putBoolean("haptics_reply_completed", true)
+            .putBoolean("haptics_request_error", false).commit()
         val oldRetry = ThemeStore.autoRetry
         ThemeStore.saveAutoRetry(context, false)
         try {

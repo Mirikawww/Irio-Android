@@ -753,6 +753,10 @@ internal fun ChatScreenState.startGeneration(
                                         }
                                     pushNotice(preview.ifEmpty { tr("完成") }, finished = true)
                                 } else {
+                                    // Only the terminal failure vibrates, not retry countdown updates.
+                                    if (result.error != null && !result.stopped && !requestCancellation.isCancelled()) {
+                                        AppHaptics.perform(context, HapticEvent.REQUEST_ERROR)
+                                    }
                                     ReplyLiveNotice.dismiss(context, requestConversationId)
                                 }
                                 if (
