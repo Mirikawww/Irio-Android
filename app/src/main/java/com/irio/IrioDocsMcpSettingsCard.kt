@@ -67,7 +67,7 @@ internal fun IrioDocsMcpManagement(
         SettingsGroupTitle(tr("信息"))
         GitHubInfoRow(tr("开发者"), "Pirikawww")
         GitHubInfoDivider()
-        GitHubInfoRow(tr("官网"), "irio.mirikawww.workers.dev", onClick = onWebsite)
+        GitHubInfoRow(tr("官网"), "irio.relithy.space/docs/", onClick = onWebsite)
         if (installed) {
             GitHubInfoDivider()
             GitHubInfoRow(tr("工具数量"), toolCount.toString())

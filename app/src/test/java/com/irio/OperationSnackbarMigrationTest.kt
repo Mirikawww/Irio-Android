@@ -305,7 +305,7 @@ class OperationSnackbarMigrationTest {
             assertTrue(ui.hasText(tr("信息")))
             assertTrue(ui.hasText(tr("开发者")))
             assertTrue(ui.hasText("Pirikawww"))
-            assertTrue(ui.hasText("irio.mirikawww.workers.dev"))
+            assertTrue(ui.hasText("irio.relithy.space/docs/"))
             assertFalse("Do not add an access-permission information row", ui.hasText(tr("访问权限")))
             assertTrue(ui.hasText(tr("工具数量")))
             assertTrue(ui.hasText("3"))
@@ -319,6 +319,10 @@ class OperationSnackbarMigrationTest {
             assertTrue(toggle.config[SemanticsActions.OnClick].action!!.invoke()); ui.frames(10)
             assertTrue(IrioDocsMcpStore.loadEnabled(app))
             assertTrue(chatToolRegistry(app, false, "").handles("irio_docs_mcp_search_irio_docs"))
+            ui.click("irio.relithy.space/docs/")
+            val website = shadowOf(ui.view.context as ComponentActivity).nextStartedActivity
+            assertEquals(android.content.Intent.ACTION_VIEW, website.action)
+            assertEquals("https://irio.relithy.space/docs/", website.dataString)
         }
         withUi { McpSettingsScreen(onBack = {}) }.use { ui ->
             ui.frames(40)

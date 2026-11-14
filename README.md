@@ -18,7 +18,7 @@ Irio 是一款 Android AI 对话客户端，可连接不同的模型服务，在
 
 ## 链接
 
-- [文档与更新日志](https://irio.mirikawww.workers.dev)
+- [文档与更新日志](https://irio.relithy.space/docs/)
 - [下载](https://github.com/Mirikawww/Irio-Android/releases)
 - [Irio Windows](https://github.com/Mirikawww/Irio-Windows)
 

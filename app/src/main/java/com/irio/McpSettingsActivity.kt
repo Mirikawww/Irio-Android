@@ -400,7 +400,7 @@ internal fun McpSettingsScreen(
                     installed = docsInstalled, enabled = docsEnabled, toolCount = docsToolCount,
                     refreshingTools = refreshingTools, onRefreshTools = ::refreshTools,
                     onWebsite = {
-                        if (!openGitHubPage(context, "https://irio.mirikawww.workers.dev")) showDetailsError(tr("未找到可打开网页的浏览器"))
+                        if (!openGitHubPage(context, IRIO_DOCS_URL)) showDetailsError(tr("未找到可打开网页的浏览器"))
                     },
                     onEnabledChange = { enabled ->
                         IrioDocsMcpStore.saveEnabled(context, enabled)

@@ -12,7 +12,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 internal class IrioDocsMcpClient(
-    private val endpoint: HttpUrl = "https://irio-docs-mcp.mirikawww.workers.dev/mcp".toHttpUrl(),
+    private val endpoint: HttpUrl = "https://irio.relithy.space/docs/mcp".toHttpUrl(),
     private val cancellation: ChatRequestCancellation = ChatRequestCancellation(),
     private val http: OkHttpClient = client,
 ) {

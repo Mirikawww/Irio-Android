@@ -7,11 +7,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class IrioDocsMcpClientTest {
+    @Test fun defaultEndpointUsesPublicVpsMcpRoute() {
+        var requestedUrl: String? = null
+        val http = okhttp3.OkHttpClient.Builder().addInterceptor { chain ->
+            requestedUrl = chain.request().url.toString()
+            throw java.io.IOException("Offline endpoint capture")
+        }.build()
+        try {
+            val failure = runCatching { IrioDocsMcpClient(http = http).listTools() }.exceptionOrNull()
+            assertEquals("Offline endpoint capture", failure?.message)
+            assertEquals("https://irio.relithy.space/docs/mcp", requestedUrl)
+        } finally { http.dispatcher.executorService.shutdownNow(); http.connectionPool.evictAll() }
+    }
+
     @Test fun liveAnonymousDocsServiceWhenExplicitlyRequested() {
         org.junit.Assume.assumeTrue(System.getenv("IRIO_DOCS_MCP_LIVE_TEST") == "1")
         val ip = System.getenv("IRIO_DOCS_MCP_LIVE_IP")
         val http = okhttp3.OkHttpClient.Builder().dns { host ->
-            if (!ip.isNullOrBlank() && host == "irio-docs-mcp.mirikawww.workers.dev") listOf(java.net.InetAddress.getByName(ip))
+            if (!ip.isNullOrBlank() && host == "irio.relithy.space") listOf(java.net.InetAddress.getByName(ip))
             else okhttp3.Dns.SYSTEM.lookup(host)
         }.followRedirects(false).followSslRedirects(false).build()
         try {
