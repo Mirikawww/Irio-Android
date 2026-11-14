@@ -231,7 +231,16 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
                         )
                         .onSizeChanged { if (!expandedLayout) composerBarHeightPx = it.height }
             ) {
-                if (!expandedLayout) AttachmentChips()
+                SpeechTransportBar()
+                LinuxBackgroundBar(
+                    onOpen = { id ->
+                        backgroundCommandId = id
+                        LinuxBackgroundJobs.find(id.toString())?.let { job ->
+                            backgroundSheetEvent = linuxBackgroundTerminalEvent(job)
+                        }
+                        backgroundSheetState.targetDetent = BottomSheetDetent.FullyExpanded
+                    }
+                )
                 // 编辑模式提示条：正在编辑某条用户消息
                 if (editingMessageId != null) {
                     val editFill = Theme[colors][primaryColor]
@@ -266,16 +275,6 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
                     }
                 }
 
-                SpeechTransportBar()
-                LinuxBackgroundBar(
-                    onOpen = { id ->
-                        backgroundCommandId = id
-                        LinuxBackgroundJobs.find(id.toString())?.let { job ->
-                            backgroundSheetEvent = linuxBackgroundTerminalEvent(job)
-                        }
-                        backgroundSheetState.targetDetent = BottomSheetDetent.FullyExpanded
-                    }
-                )
                 if (pendingQuote.isNotBlank()) {
                     MessageQuotePreview(
                         quote = pendingQuote,
@@ -283,6 +282,7 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
                         onCancel = { pendingQuote = "" },
                     )
                 }
+                AttachmentChips()
 
                 AnimatedContent(
                     targetState = sttRecording,
@@ -383,7 +383,6 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
                             },
                             expandedFooter = {
                                 Column(Modifier.fillMaxWidth()) {
-                                    AttachmentChips()
                                     Row(
                                         modifier =
                                             Modifier.fillMaxWidth()

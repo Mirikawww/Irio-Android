@@ -20,6 +20,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -56,6 +58,11 @@ internal fun ChatScreenLayout(
         // IME clearance belongs to the host; IrioSnackbar adds its own 16dp gap.
         val composerNoticeBottomInset = composerBarHeight + with(LocalDensity.current) {
             WindowInsets.navigationBars.exclude(WindowInsets.ime).getBottom(this).toDp()
+        }
+        var sharedNoticeHeightPx by remember { mutableIntStateOf(0) }
+        var composerNoticeHeightPx by remember { mutableIntStateOf(0) }
+        val returnButtonBottomInset = composerNoticeBottomInset + with(LocalDensity.current) {
+            maxOf(sharedNoticeHeightPx, composerNoticeHeightPx).toDp()
         }
         val toolbarHeight = with(LocalDensity.current) { toolbarHeightPx.toDp() }
         val toolbarContentPaddingPx =
@@ -197,7 +204,7 @@ internal fun ChatScreenLayout(
                                     pendingConversationScroll != currentConversation.id,
                                 followingBottom = stickToBottom,
                                 responding = busyThisChat,
-                                bottomInset = composerBarHeight,
+                                bottomInset = returnButtonBottomInset,
                                 onClick = {
                                     stickToBottom = true
                                     messageRecyclerController.revealTail()
@@ -213,6 +220,7 @@ internal fun ChatScreenLayout(
                                 onDismissTitle = { titleGeneration.notice = null },
                                 startupCheck = startupCheck,
                                 enabled = composerStatus == null && !composerFullscreen,
+                                onOccupiedHeightChanged = { sharedNoticeHeightPx = it },
                             )
                             IrioSnackbar(
                                 visible = composerStatus != null,
@@ -220,6 +228,7 @@ internal fun ChatScreenLayout(
                                 bottomInset = composerNoticeBottomInset,
                                 onDismiss = { composerStatus = null },
                                 restartKey = composerStatusNonce,
+                                onOccupiedHeightChanged = { composerNoticeHeightPx = it },
                             )
                         }
                     }

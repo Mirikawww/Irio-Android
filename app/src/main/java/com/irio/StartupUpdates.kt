@@ -87,6 +87,7 @@ internal fun BoxScope.ChatNoticeSnackbar(
     bottomInset: Dp,
     startupCheck: StartupUpdateCheck = StartupUpdates.check,
     enabled: Boolean = true,
+    onOccupiedHeightChanged: (Int) -> Unit = {},
 ) {
     val startupNotice by startupCheck.notice.collectAsState()
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
@@ -102,6 +103,7 @@ internal fun BoxScope.ChatNoticeSnackbar(
         message = titleNotice ?: if (linkError) tr("无法打开链接") else
             startupNotice?.let { startupUpdateMessage(it) }.orEmpty(),
         bottomInset = bottomInset,
+        onOccupiedHeightChanged = onOccupiedHeightChanged,
         onDismiss = {
             if (titleNotice != null) onDismissTitle()
             else if (linkError) linkError = false

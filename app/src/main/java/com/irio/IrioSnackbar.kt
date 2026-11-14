@@ -76,6 +76,7 @@ internal fun BoxScope.IrioSnackbar(
     restartKey: Int = 0,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    onOccupiedHeightChanged: (Int) -> Unit = {},
 ) {
     val dismiss by rememberUpdatedState(onDismiss)
     val hapticContext = LocalContext.current
@@ -85,6 +86,8 @@ internal fun BoxScope.IrioSnackbar(
     val scope = rememberCoroutineScope()
     var actionSize by remember { mutableStateOf(IntSize.Zero) }
     val density = LocalDensity.current
+    val occupiedHeightChanged by rememberUpdatedState(onOccupiedHeightChanged)
+    DisposableEffect(Unit) { onDispose { occupiedHeightChanged(0) } }
     var displayedMessage by remember { mutableStateOf(message) }
     var replacing by remember { mutableStateOf(false) }
     var wasVisible by remember { mutableStateOf(visible) }
@@ -146,7 +149,11 @@ internal fun BoxScope.IrioSnackbar(
             .testTag("irio-snackbar")
             .align(Alignment.BottomCenter)
             .padding(start = 16.dp, end = 16.dp, bottom = bottomInset + 16.dp)
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .onSizeChanged {
+                // Reserve only the actual notice and its gap, never the composer below it.
+                occupiedHeightChanged(if (it.height > 0) it.height + with(density) { 16.dp.roundToPx() } else 0)
+            },
     ) {
         key(swipe) {
             swipe.visibility.targetState = visible && !replacing
