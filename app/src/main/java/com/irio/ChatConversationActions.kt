@@ -189,7 +189,9 @@ internal fun ChatScreenState.updateMessageReaction(
     if (updated == null) return false
     if (updated == target) return true
     if (!fromModel) AppHaptics.perform(context, HapticEvent.REACTION)
-    else if (updated.modelReaction.isNotEmpty()) AppHaptics.perform(context, HapticEvent.MODEL_REACTION)
+    else if (currentConversation.id == conversationId && updated.modelReaction.isNotEmpty()) {
+        AppHaptics.perform(context, HapticEvent.MODEL_REACTION)
+    }
     reactionAnimations.record(
         messageId,
         if (fromModel) updated.modelReaction else updated.userReaction,

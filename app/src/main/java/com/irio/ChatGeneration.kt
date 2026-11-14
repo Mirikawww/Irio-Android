@@ -743,7 +743,9 @@ internal fun ChatScreenState.startGeneration(
                                 }
                                 val completed = result.error == null && !result.stopped
                                 if (completed) {
-                                    AppHaptics.perform(context, HapticEvent.REPLY_COMPLETED)
+                                    if (currentConversation.id == requestConversationId) {
+                                        AppHaptics.perform(context, HapticEvent.REPLY_COMPLETED)
+                                    }
                                     val preview =
                                         replyNotificationPreview(finalMessage.text).ifEmpty {
                                             if (finalMessage.attachments.any { it.isVideo }) tr("已生成视频")
@@ -754,7 +756,8 @@ internal fun ChatScreenState.startGeneration(
                                     pushNotice(preview.ifEmpty { tr("完成") }, finished = true)
                                 } else {
                                     // Only the terminal failure vibrates, not retry countdown updates.
-                                    if (result.error != null && !result.stopped && !requestCancellation.isCancelled()) {
+                                    if (currentConversation.id == requestConversationId &&
+                                        result.error != null && !result.stopped && !requestCancellation.isCancelled()) {
                                         AppHaptics.perform(context, HapticEvent.REQUEST_ERROR)
                                     }
                                     ReplyLiveNotice.dismiss(context, requestConversationId)

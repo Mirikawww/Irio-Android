@@ -197,6 +197,111 @@ class ChatScreenStateTest {
         }
     }
 
+    @Test fun generationFeedbackFollowsTheCurrentlyOpenedConversation() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val app = RuntimeEnvironment.getApplication()
+        ShadowEnvironment.addExternalDir(app.cacheDir.resolve("switched-haptics-external").absolutePath)
+        ThemeStore.ensureLoaded(app)
+        val prefs = app.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
+        val original = prefs.all.filterKeys { it.startsWith("haptics_") }
+        val system = android.provider.Settings.System.getInt(app.contentResolver, "haptic_feedback_enabled", 1)
+        val oldRetry = ThemeStore.autoRetry
+        val vibrator = app.getSystemService(android.os.VibratorManager::class.java).defaultVibrator
+        val vibration = org.robolectric.Shadows.shadowOf(vibrator)
+        vibration.setHasVibrator(true)
+        android.provider.Settings.System.putInt(app.contentResolver, "haptic_feedback_enabled", 1)
+        HapticPreferences.saveEnabled(app, true)
+        HapticPreferences.saveEvent(app, HapticEvent.SWITCH_CONVERSATION, false)
+        HapticPreferences.saveEvent(app, HapticEvent.STREAM_OUTPUT, false)
+        ThemeStore.saveAutoRetry(app, false)
+        try {
+            MockWebServer().use { server ->
+                IrioHttp.resetForTests()
+                withState { harness ->
+                    val state = harness.state
+                    state.requestReplyNotification = {}
+                    state.providers = listOf(ProviderConfig("switched-haptics", "Fixture", server.url("/v1").toString(), "", models = listOf("fixture-model")))
+                    state.activeProviderId = "switched-haptics"
+                    state.selectedModel = "fixture-model"
+                    for (event in listOf(HapticEvent.REPLY_COMPLETED, HapticEvent.REQUEST_ERROR)) {
+                        HapticPreferences.saveEvent(app, HapticEvent.REPLY_COMPLETED, event == HapticEvent.REPLY_COMPLETED)
+                        HapticPreferences.saveEvent(app, HapticEvent.REQUEST_ERROR, event == HapticEvent.REQUEST_ERROR)
+                        for (navigation in listOf("foreground", "new", "existing", "returned")) {
+                            state.newConversation(closeDrawer = false)
+                            state.currentConversation = state.currentConversation.copy(title = "Fixture", titlePending = false)
+                            val id = state.currentConversation.id
+                            val other = ConversationStore.newConversation().copy(title = "Other", titlePending = false)
+                            state.cacheConversationContent(other)
+                            val user = ChatMessage(MessageIds.next(), "switched feedback fixture", true)
+                            val reply = ChatMessage(MessageIds.next(), "", false, isPending = true, responseToUserId = user.id)
+                            state.messages = listOf(user, reply)
+                            state.cacheConversationContent(state.currentConversation.copy(messages = state.messages))
+                            val release = java.util.concurrent.CountDownLatch(1)
+                            server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                                override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse {
+                                    check(release.await(10, java.util.concurrent.TimeUnit.SECONDS)) { "Response was not released" }
+                                    return if (event == HapticEvent.REQUEST_ERROR) {
+                                        MockResponse().setResponseCode(400).setBody("fixture failure")
+                                    } else MockResponse().setHeader("Content-Type", "text/event-stream")
+                                        .setBody("data: {\"choices\":[{\"delta\":{\"content\":\"background answer\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+                                }
+                            }
+                            try {
+                                state.startGeneration(id, listOf(user), reply)
+                                runCurrent()
+                                assertNotNull("The real request must start before switching", withContext(Dispatchers.IO) {
+                                    server.takeRequest(5, java.util.concurrent.TimeUnit.SECONDS)
+                                })
+                                when (navigation) {
+                                    "new" -> state.newConversation(closeDrawer = false)
+                                    "existing", "returned" -> {
+                                        state.openConversation(other.summary())
+                                        harness.awaitConversation(other.id)
+                                        if (navigation == "returned") {
+                                            state.openConversation(state.conversationContent(id)!!.summary())
+                                            harness.awaitConversation(id)
+                                        }
+                                    }
+                                }
+                                assertTrue("Switching must not cancel the background request", id in state.generatingIds)
+                                vibrator.cancel()
+                                release.countDown()
+                                repeat(300) {
+                                    runCurrent()
+                                    if (id in state.generatingIds) withContext(Dispatchers.IO) { Thread.sleep(10) }
+                                }
+                                assertFalse("The original request must finish", id in state.generatingIds)
+                                val final = state.conversationContent(id)!!.messages.last()
+                                assertEquals(event == HapticEvent.REQUEST_ERROR, final.isError)
+                                if (!final.isError) assertEquals("background answer", final.text)
+                                assertEquals("$event must follow the visible conversation after $navigation",
+                                    navigation in listOf("foreground", "returned"), vibration.isVibrating)
+                            } finally {
+                                release.countDown()
+                                state.stopGeneration(id)
+                                ConversationStore.delete(app, id)
+                                ConversationStore.delete(app, other.id)
+                            }
+                        }
+                    }
+                }
+            }
+        } finally {
+            vibrator.cancel()
+            ThemeStore.saveAutoRetry(app, oldRetry)
+            android.provider.Settings.System.putInt(app.contentResolver, "haptic_feedback_enabled", system)
+            prefs.edit().apply {
+                prefs.all.keys.filter { it.startsWith("haptics_") }.forEach(::remove)
+                original.forEach { (key, value) -> when (value) {
+                    is Boolean -> putBoolean(key, value)
+                    is String -> putString(key, value)
+                } }
+            }.commit()
+            IrioHttp.resetForTests()
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test fun eachPublishedTextBurstVibratesWithoutReplayingMetadataHistoryOrBackgroundUpdates() = runTest {
         val controller = org.robolectric.Robolectric.buildActivity(androidx.activity.ComponentActivity::class.java).setup()
         val context = controller.get()
@@ -274,6 +379,7 @@ class ChatScreenStateTest {
     }
 
     @Test fun realChatActionsUseLivePerLocationChoicesIncludingModelReactions() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val app = RuntimeEnvironment.getApplication()
         val preferences = app.getSharedPreferences("appearance_settings", android.content.Context.MODE_PRIVATE)
         val original = preferences.all.filterKeys { it.startsWith("haptics_") }
@@ -284,6 +390,7 @@ class ChatScreenStateTest {
         shadow.setHasAmplitudeControl(true)
         android.provider.Settings.System.putInt(app.contentResolver, "haptic_feedback_enabled", 1)
         HapticPreferences.saveEnabled(app, true)
+        HapticPreferences.saveEvent(app, HapticEvent.SWITCH_CONVERSATION, false)
         try {
             withState { harness ->
                 val state = harness.state
@@ -308,6 +415,18 @@ class ChatScreenStateTest {
                     vibrator.cancel()
                     assertTrue(state.updateMessageReaction(id, user.id, "❤", fromModel = true))
                     assertFalse("Repeated identical reactions must not vibrate", shadow.isVibrating)
+                    state.newConversation(closeDrawer = false)
+                    vibrator.cancel()
+                    assertTrue(state.updateMessageReaction(id, user.id, "👍", fromModel = true))
+                    assertEquals("👍", state.conversationContent(id)!!.messages.first().modelReaction)
+                    assertFalse("A model reaction in a switched-away conversation must stay silent", shadow.isVibrating)
+                    assertTrue("Background reactions must not appear in the new chat", state.messages.isEmpty())
+                    state.openConversation(state.conversationContent(id)!!.summary())
+                    harness.awaitConversation(id)
+                    assertFalse("Returning must not replay existing model feedback", shadow.isVibrating)
+                    assertTrue(state.updateMessageReaction(id, user.id, "❤", fromModel = true))
+                    assertTrue("New reactions in the reopened chat must provide feedback again", shadow.isVibrating)
+                    vibrator.cancel()
                     preferences.edit().putBoolean("haptics_model_reaction", false).commit()
                     assertTrue(state.updateMessageReaction(id, user.id, "👍", fromModel = true))
                     assertFalse("Model reaction feedback can be independently disabled", shadow.isVibrating)
@@ -336,6 +455,7 @@ class ChatScreenStateTest {
             }
         } finally {
             vibrator.cancel()
+            Dispatchers.resetMain()
             android.provider.Settings.System.putInt(app.contentResolver, "haptic_feedback_enabled", systemHaptics)
             preferences.edit().apply {
                 preferences.all.keys.filter { it.startsWith("haptics_") }.forEach(::remove)
