@@ -79,9 +79,13 @@ class ChatMenuImeTest {
 
     @Test fun openingContextRingDoesNotTakeFocusFromComposerIme() = verify(Menu.CONTEXT, true)
     @Test fun openingModelSwitcherDoesNotTakeFocusFromComposerIme() = verify(Menu.MODEL, true)
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Config(qualifiers = "w360dp-h640dp-mdpi")
     @Test fun openingAttachmentMenuDoesNotTakeFocusFromComposerIme() = verify(Menu.ATTACH, true)
     @Test fun openingContextRingWithoutImeKeepsNormalMenuFocus() = verify(Menu.CONTEXT, false)
     @Test fun openingModelSwitcherWithoutImeKeepsNormalMenuFocus() = verify(Menu.MODEL, false)
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Config(qualifiers = "w360dp-h640dp-mdpi")
     @Test fun openingAttachmentMenuWithoutImeKeepsNormalMenuFocus() = verify(Menu.ATTACH, false)
     @Test fun transientImeInsetsDoNotMakeAnOpenMenuClaimFocus() = verify(Menu.CONTEXT, true, true)
     @Test fun imageParameterInputsCanTakeImeFocusAfterOpeningTheMenu() = verify(Menu.IMAGE_MODEL, true)
@@ -121,6 +125,8 @@ class ChatMenuImeTest {
         val expanded = mutableStateOf(false)
         val draft = mutableStateOf("Draft")
         var attachmentState: ChatScreenState? = null
+        var photoSelections = 0
+        var fileSelections = 0
         var imeVisible = false
         var visibleStatusTop = 0
         var frameTime = 0L
@@ -175,6 +181,8 @@ class ChatMenuImeTest {
                                     Menu.ATTACH -> Box(Modifier.fillMaxSize()) {
                                         val state = rememberChatScreenState()
                                         attachmentState = state
+                                        state.pickPhotos = { photoSelections++ }
+                                        state.pickFiles = { fileSelections++ }
                                         ChatComposerBar(state, 600.dp)
                                     }
                                 }
@@ -195,6 +203,15 @@ class ChatMenuImeTest {
                     View.MeasureSpec.makeMeasureSpec(640, View.MeasureSpec.EXACTLY))
                 host.layout(0, 0, 360, 640)
                 if (backgroundRoundTrip) host.draw(canvas)
+                if (menu == Menu.ATTACH) {
+                    host.draw(canvas)
+                    ShadowDialog.getLatestDialog()?.takeIf { it.isShowing }?.window?.decorView?.let { decor ->
+                        decor.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
+                            View.MeasureSpec.makeMeasureSpec(640, View.MeasureSpec.EXACTLY))
+                        decor.layout(0, 0, 360, 640)
+                        decor.draw(canvas)
+                    }
+                }
             }
             fun descendants(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descendants)
             fun nodes(view: View): List<SemanticsNode> =
@@ -242,11 +259,59 @@ class ChatMenuImeTest {
             }
             val trigger = triggerNode()
             assertTrue(trigger.config[SemanticsActions.OnClick].action!!.invoke())
-            repeat(8) { frame() }
+            repeat(if (menu == Menu.ATTACH) 35 else 8) { frame() }
             if (menu != Menu.SEARCH && menu != Menu.LINK)
                 assertTrue("$menu menu must open", if (menu == Menu.ATTACH) attachmentState!!.attachMenuOpen else expanded.value)
             val dialog = ShadowDialog.getLatestDialog()
             assertTrue(dialog.isShowing)
+            if (menu == Menu.ATTACH) {
+                val menuNodes = nodes(dialog.window!!.decorView)
+                val surface = menuNodes.single {
+                    it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "attachment-menu-surface"
+                }
+                assertEquals(220f, surface.boundsInRoot.width, .5f)
+                assertEquals(124f, surface.boundsInRoot.height, .5f)
+                fun item(text: String) = menuNodes.single { node ->
+                    node.config.contains(SemanticsActions.OnClick) && descendants(node).any {
+                        it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == text }
+                    }
+                }
+                val photos = item(tr("照片"))
+                val files = item(tr("文件"))
+                assertTrue("Attachment menu must cover the plus trigger: files=${files.boundsInWindow}, trigger=${trigger.boundsInWindow}",
+                    files.boundsInWindow.contains(trigger.boundsInWindow.center))
+                assertEquals("Attachment menu keeps a compact reference-style surface", 208f, photos.boundsInRoot.width, .5f)
+                assertEquals("Compact rows keep even icon spacing", 56f, photos.boundsInRoot.height, .5f)
+                for (name in listOf("photos", "files")) {
+                    val icon = menuNodes.single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "attachment-icon:$name" }
+                    assertEquals(40f, icon.boundsInRoot.width, .5f)
+                    assertEquals(40f, icon.boundsInRoot.height, .5f)
+                    val glyph = menuNodes.single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "attachment-glyph:$name" }
+                    assertEquals(22f, glyph.boundsInRoot.width, .5f)
+                    assertEquals(22f, glyph.boundsInRoot.height, .5f)
+                    val row = if (name == "photos") photos else files
+                    assertEquals("Attachment icon must be centered within its menu row: $name",
+                        row.boundsInRoot.center.y, icon.boundsInRoot.center.y, .5f)
+                    val text = menuNodes.single { node ->
+                        node.config.getOrElse(SemanticsProperties.Text) { emptyList() }
+                            .any { it.text == tr(if (name == "photos") "照片" else "文件") }
+                    }
+                    assertEquals("Attachment text must be centered within its menu row: $name",
+                        row.boundsInRoot.center.y, text.boundsInRoot.center.y, .5f)
+                    assertEquals("Reference keeps a clear gap between circle and label", 12f,
+                        text.boundsInRoot.left - icon.boundsInRoot.right, .5f)
+                }
+                val capture = android.graphics.Bitmap.createBitmap(360, 640, android.graphics.Bitmap.Config.ARGB_8888)
+                try {
+                    capture.eraseColor(android.graphics.Color.WHITE)
+                    val captureCanvas = android.graphics.Canvas(capture)
+                    host.draw(captureCanvas)
+                    dialog.window!!.decorView.draw(captureCanvas)
+                    val target = java.io.File("build/reports/attachment-menu-${if (showIme) "ime" else "normal"}.png")
+                    requireNotNull(target.parentFile).mkdirs()
+                    target.outputStream().use { capture.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                } finally { capture.recycle() }
+            }
             val shadow = org.robolectric.shadow.api.Shadow.extract<RecordingDialogShadow>(dialog)
             assertEquals("$menu must preserve composer IME from the first window show, not repair focus afterward",
                 if (showIme) WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE else 0,
@@ -315,6 +380,24 @@ class ChatMenuImeTest {
                     if (showIme) WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE else 0,
                     org.robolectric.shadow.api.Shadow.extract<RecordingDialogShadow>(reopened)
                         .flagsAtShow!! and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+                if (menu == Menu.ATTACH) {
+                    for ((index, text) in listOf(tr("照片"), tr("文件")).withIndex()) {
+                        if (index > 0) assertTrue(triggerNode().config[SemanticsActions.OnClick].action!!.invoke())
+                        repeat(35) { frame() }
+                        val currentDialog = ShadowDialog.getLatestDialog()
+                        val action = nodes(currentDialog.window!!.decorView).single { node ->
+                            node.config.contains(SemanticsActions.OnClick) && descendants(node).any {
+                                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == text }
+                            }
+                        }
+                        assertTrue(action.config[SemanticsActions.OnClick].action!!.invoke())
+                        repeat(20) { frame() }
+                        assertFalse("Selection must close the menu", attachmentState!!.attachMenuOpen)
+                        assertFalse("Selection must release the menu window", currentDialog.isShowing)
+                    }
+                    assertEquals("Photo choice must still call its picker", 1, photoSelections)
+                    assertEquals("File choice must still call its picker", 1, fileSelections)
+                }
             }
         } finally {
             host.disposeComposition(); recomposer.close(); runner.cancel()

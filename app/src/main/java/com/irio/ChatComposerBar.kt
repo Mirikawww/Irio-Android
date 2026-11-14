@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.runtime.Composable
@@ -53,11 +52,6 @@ import androidx.compose.ui.unit.sp
 import com.composables.ui.components.BottomSheetDetent
 import com.composables.ui.components.ButtonSize
 import com.composables.ui.components.ButtonStyle
-import com.irio.ImePreservingDropdownMenu as DropdownMenu
-import com.composables.ui.components.DropdownMenuAlignment
-import com.composables.ui.components.DropdownMenuItem
-import com.irio.ScaledDropdownMenuPanel as DropdownMenuPanel
-import com.composables.ui.components.DropdownMenuSide
 import com.composables.ui.components.Icon
 import com.composables.ui.components.IconButton
 import com.composables.ui.components.Text
@@ -68,7 +62,6 @@ import com.composables.ui.theme.onBackgroundColor
 import com.composables.ui.theme.onPrimaryColor
 import com.composables.ui.theme.primaryColor
 import com.composeunstyled.theme.Theme
-import com.composeunstyled.LocalContentColor
 import com.kyant.shapes.RoundedRectangle
 
 @Composable
@@ -87,62 +80,12 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
 
         @Composable
         fun AttachmentButton() {
-            val keepIme = rememberKeepImeOnMenuOpen(attachMenuOpen)
-            DropdownMenu(
+            ComposerAttachmentMenu(
                 expanded = attachMenuOpen,
                 onExpandedChange = { attachMenuOpen = it },
-                modifier = Modifier.wrapContentWidth(Alignment.Start),
-                alignment = DropdownMenuAlignment.Start,
-                side = DropdownMenuSide.Top,
-                panel = {
-                    DropdownMenuPanel(keepIme = keepIme) {
-                        DropdownMenuItem(
-                            onClick = {
-                                attachMenuOpen = false
-                                pickPhotos()
-                            },
-                            leading = {
-                                Icon(
-                                    imageVector = IrioIcons.Image,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            },
-                        ) {
-                            Text(tr("照片"), color = LocalContentColor.current)
-                        }
-                        DropdownMenuItem(
-                            onClick = {
-                                attachMenuOpen = false
-                                pickFiles()
-                            },
-                            leading = {
-                                Icon(
-                                    imageVector = IrioIcons.Paperclip,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            },
-                        ) {
-                            Text(tr("文件"), color = LocalContentColor.current)
-                        }
-                    }
-                },
-            ) {
-                IconButton(
-                    onClick = { attachMenuOpen = !attachMenuOpen },
-                    style = ButtonStyle.Ghost,
-                    buttonSize = ButtonSize.Small,
-                    modifier = Modifier.size(32.dp).semantics { contentDescription = tr("添加附件") },
-                ) {
-                    Icon(
-                        imageVector = IrioIcons.Plus,
-                        contentDescription = tr("添加附件"),
-                        modifier = Modifier.size(20.dp),
-                        tint = content,
-                    )
-                }
-            }
+                onPhotos = { pickPhotos() },
+                onFiles = { pickFiles() },
+            )
         }
 
         @Composable
