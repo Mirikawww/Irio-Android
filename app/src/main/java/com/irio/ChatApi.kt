@@ -1598,7 +1598,7 @@ internal object MemoryTool {
         LinguaLibreTool.NAME -> tr("检索发音中")
         HistoryTool.NAME -> tr("查询历史会话")
         ToolGuideSearchTool.NAME -> tr("正在搜索工具教程")
-        LinuxShellTool.NAME -> tr("运行命令中")
+        LinuxShellTool.NAME -> tr("运行中")
         LinuxBackgroundTool.NAME -> tr("处理后台命令")
         WebFetchTool.NAME -> tr("浏览网页中").let { status ->
             if (webDomain.isBlank()) status else "$status - $webDomain"

@@ -283,10 +283,10 @@ class LinuxSandboxTest {
         }
         val registry = ToolRegistry(listOf(LinuxShellToolProvider()))
         assertTrue(registry.handles("linux_shell"))
-        assertEquals("运行命令中", MemoryTool.liveLabel(LinuxShellTool.NAME))
+        assertEquals("运行中", MemoryTool.liveLabel(LinuxShellTool.NAME))
         assertEquals("已运行命令", MemoryTool.doneLabel(LinuxShellTool.NAME))
         assertEquals("Linux sandbox", translate(AppLanguage.EN, "Linux 沙盒"))
-        assertEquals("Running a command", translate(AppLanguage.EN, "运行命令中"))
+        assertEquals("Running", translate(AppLanguage.EN, "运行中"))
         assertEquals("Commands per call", translate(AppLanguage.EN, "单次命令数"))
         assertEquals("Unlimited", translate(AppLanguage.EN, "无限"))
     }

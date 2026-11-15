@@ -1189,7 +1189,6 @@ private val English = mapOf(
     "退出码 %s" to "Exit code %s",
     "Linux 沙盒当前不可用。" to "The Linux sandbox is unavailable.",
     "Linux 沙盒已关闭。" to "The Linux sandbox is off.",
-    "运行命令中" to "Running a command",
     "已运行命令" to "Ran a command",
     "处理后台命令" to "Checking background commands",
     "已处理后台命令" to "Checked background commands",

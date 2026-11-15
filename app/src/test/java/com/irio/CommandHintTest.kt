@@ -12,7 +12,7 @@ class CommandHintTest {
     @Test fun queuedCommandsStayHiddenUntilTheCallFinishes() {
         val commands = listOf("printf 'hello  world'", "printf 'a\\nb'", "echo 中文")
         val args = JSONObject().put("commands", JSONArray(commands)).put("background", JSONArray().put("server start"))
-        assertEquals("运行命令中", shell(args.toString()).copy(live = true).withCommandHint("运行命令中"))
+        assertEquals("运行中", shell(args.toString()).copy(live = true).withCommandHint("运行中"))
         assertEquals("Ran a command - ${commands.joinToString("; ")}", shell(args.toString()).withCommandHint("Ran a command"))
     }
 

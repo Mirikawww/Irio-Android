@@ -148,8 +148,8 @@ class ProcessStatusIconTest {
                 toolArguments = org.json.JSONObject().put("commands", org.json.JSONArray().put(command)).toString(),
                 content = "fixture output")
             for ((event, expected) in listOf(
-                shell.copy(live = true, runningCommand = command) to "${tr("运行命令中")} - $command",
-                shell.copy(live = true, runningCommand = "echo next") to "${tr("运行命令中")} - echo next",
+                shell.copy(live = true, runningCommand = command) to "${tr("运行中")} - $command",
+                shell.copy(live = true, runningCommand = "echo next") to "${tr("运行中")} - echo next",
                 shell.copy(toolOutcome = ToolOutcome.SUCCESS) to "${tr("已运行命令")} - $command",
                 shell.copy(toolOutcome = ToolOutcome.FAILED) to "${tr("运行命令失败")} - $command",
             )) {
