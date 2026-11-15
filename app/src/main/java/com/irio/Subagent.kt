@@ -179,7 +179,8 @@ internal class SubagentTurn {
             changed = true
         }
         if (update.toolActive == true) {
-            tracker.onToolStarted(update.toolName, update.webDomain, update.displayText, update.toolArguments)
+            tracker.onToolStarted(update.toolName, update.webDomain, update.displayText, update.toolArguments,
+                update.runningCommand)
             changed = true
         }
         if (update.toolOutput != null) {

@@ -91,12 +91,16 @@ internal class ProcessTracker {
     }
 
     /** 本地工具调用开始：锚在当前正文长度上，后续正文排在它后面，而不是整段的最下面。 */
-    fun onToolStarted(name: String = "", webDomain: String = "", displayText: String = "", arguments: String = "") {
+    fun onToolStarted(name: String = "", webDomain: String = "", displayText: String = "", arguments: String = "",
+        runningCommand: String = "") {
         finishThinking()
         liveToolId?.let { id ->
             // toolOutput snapshots may carry toolActive=true as well. They update the
             // existing event; they must not create one completed row per output refresh.
-            if (events.firstOrNull { it.id == id }?.toolName == name) return
+            if (events.firstOrNull { it.id == id }?.toolName == name) {
+                events.replaceAll { if (it.id == id) it.copy(runningCommand = runningCommand) else it }
+                return
+            }
             finishLiveTool()
         }
         val id = nextId++
@@ -109,6 +113,7 @@ internal class ProcessTracker {
             toolName = name,
             toolArguments = arguments,
             webDomain = webDomain,
+            runningCommand = runningCommand,
             displayText = displayText,
             textOffset = eventAnchor(),
         )
@@ -254,6 +259,7 @@ internal class ProcessTracker {
             if (event.id == id) event.copy(
                 content = content.ifBlank { event.content },
                 live = false,
+                runningCommand = "",
                 toolOutcome = outcome,
                 imageGeneration = event.imageGeneration?.let {
                     it.copy(active = false, failed = outcome == ToolOutcome.FAILED, preview = null)

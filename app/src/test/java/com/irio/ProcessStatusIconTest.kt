@@ -143,6 +143,25 @@ class ProcessStatusIconTest {
                 content = "Merged tools fixture", live = true)
             frames()
             assertLeading("wrench", sweeping = false)
+            val command = "printf 'hello  world'"
+            val shell = ProcessEvent(20, ProcessEventKind.TOOL, toolName = LinuxShellTool.NAME,
+                toolArguments = org.json.JSONObject().put("commands", org.json.JSONArray().put(command)).toString(),
+                content = "fixture output")
+            for ((event, expected) in listOf(
+                shell.copy(live = true, runningCommand = command) to "${tr("运行命令中")} - $command",
+                shell.copy(live = true, runningCommand = "echo next") to "${tr("运行命令中")} - echo next",
+                shell.copy(toolOutcome = ToolOutcome.SUCCESS) to "${tr("已运行命令")} - $command",
+                shell.copy(toolOutcome = ToolOutcome.FAILED) to "${tr("运行命令失败")} - $command",
+            )) {
+                current.value = event
+                frames()
+                assertTrue("The actual shell row must show the command with a spaced hyphen: $expected", nodes().any {
+                    it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == expected }
+                })
+                nodes().single { it.config.contains(SemanticsActions.OnClick) }
+                    .config[SemanticsActions.OnClick].action!!.invoke()
+                assertEquals(event, opened)
+            }
             val longHint = "正在查询工具调用的详细信息和相关资料 ".repeat(24)
             val longStatuses = fixtures.flatMap { (event, _) ->
                 listOf(event.copy(live = true, displayText = longHint),

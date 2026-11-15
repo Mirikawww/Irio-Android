@@ -136,7 +136,7 @@ internal fun ProcessEventRow(
             ProcessEventKind.THINKING ->
                 if (event.live) null else tr("已思考 %s").format(formatThinkingDuration(event.millis))
             ProcessEventKind.SEARCH,
-            ProcessEventKind.TOOL -> if (event.live) null else event.completedLabel()
+            ProcessEventKind.TOOL -> if (event.live) null else event.withCommandHint(event.completedLabel())
             ProcessEventKind.BUBBLE,
             ProcessEventKind.SUBAGENT -> null
         }
@@ -148,7 +148,7 @@ internal fun ProcessEventRow(
                     onClick = { onOpen(event) },
                 ) {
                     StatusSweepText(
-                        event.displayText.ifEmpty { MemoryTool.liveLabel(event.toolName) },
+                        event.withCommandHint(event.displayText.ifEmpty { MemoryTool.liveLabel(event.toolName) }),
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     Icon(

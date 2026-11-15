@@ -480,6 +480,7 @@ internal fun ChatScreenState.startGeneration(
                                                     update.webDomain,
                                                     update.displayText,
                                                     update.toolArguments,
+                                                    update.runningCommand,
                                                 )
                                             if (!cancelled)
                                                 update.imageGeneration.forEach(

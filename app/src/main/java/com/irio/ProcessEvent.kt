@@ -36,6 +36,8 @@ data class ProcessEvent(
     val imageGeneration: ImageGenerationProgress? = null,
     /** Original model arguments, kept separately from tool output for failure details. */
     val toolArguments: String = "",
+    /** Runtime-only command currently executing; never inferred from queued arguments or output. */
+    val runningCommand: String = "",
 )
 
 internal const val MERGED_TOOL_CALLS_NAME = "__merged_tool_calls__"

@@ -144,6 +144,8 @@ data class ChatStreamUpdate(
     val imageGeneration: List<ImageGenerationProgress> = emptyList(),
     /** Original model arguments attached by the request-scoped tool registry. */
     val toolArguments: String = "",
+    /** Runtime-only execution progress, not the list of queued shell commands. */
+    val runningCommand: String = "",
 )
 
 data class ToolCallDelta(

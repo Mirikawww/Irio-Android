@@ -2,6 +2,15 @@ package com.irio
 
 import androidx.compose.ui.graphics.Color
 
+/** Display-only command suffix; leave execution arguments and background-management labels alone. */
+internal fun ProcessEvent.withCommandHint(status: String): String {
+    if (kind != ProcessEventKind.TOOL || toolName != LinuxShellTool.NAME) return status
+    val command = if (live) runningCommand else {
+        linuxSandboxSelectCommands(toolArguments, LinuxSandboxStore.COMMANDS_UNLIMITED).commands.joinToString("; ")
+    }
+    return if (command.isBlank()) status else "$status - $command"
+}
+
 /** Creation completed, but the real video task remains queued or running. */
 internal fun videoGenerationPending(event: ProcessEvent): Boolean =
     event.toolName == VideoGenTool.NAME && event.toolOutcome == ToolOutcome.SUCCESS &&

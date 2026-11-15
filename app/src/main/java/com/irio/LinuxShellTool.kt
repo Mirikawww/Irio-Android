@@ -125,6 +125,7 @@ internal class LinuxShellToolProvider(
         val finished = mutableListOf<String>()
         var transcript = ""
         var outcome = ToolOutcome.FAILED
+        var runningCommand = ""
         suspend fun publish(current: String? = null) {
             transcript = linuxSandboxJoinSections(finished + listOfNotNull(current))
             context.onUpdate(
@@ -132,6 +133,7 @@ internal class LinuxShellToolProvider(
                     toolActive = true,
                     toolName = LinuxShellTool.NAME,
                     toolOutput = transcript,
+                    runningCommand = runningCommand,
                 ),
             )
         }
@@ -177,7 +179,9 @@ internal class LinuxShellToolProvider(
                     publish()
                     continue
                 }
+                runningCommand = command
                 var block = linuxSandboxTerminalTranscript(command, "")
+                publish(block)
                 var sawProgress = false
                 var finalProgress: LinuxSandboxCommandProgress? = null
                 val result = LinuxSandboxSession.runCommand(
@@ -196,6 +200,7 @@ internal class LinuxShellToolProvider(
                     )
                     publish(block)
                 }
+                runningCommand = ""
                 if (finalProgress?.let { it.exitCode == 0 && !it.timedOut } != true) outcome = ToolOutcome.FAILED
                 if (!sawProgress) block = linuxSandboxTerminalTranscript(command, result)
                 finished += block
