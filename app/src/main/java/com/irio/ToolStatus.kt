@@ -5,9 +5,15 @@ import androidx.compose.ui.graphics.Color
 /** Display-only command suffix; leave execution arguments and background-management labels alone. */
 internal fun ProcessEvent.withCommandHint(status: String): String {
     if (kind != ProcessEventKind.TOOL || toolName != LinuxShellTool.NAME) return status
-    val command = if (live) runningCommand else {
-        linuxSandboxSelectCommands(toolArguments, LinuxSandboxStore.COMMANDS_UNLIMITED).commands.joinToString("; ")
+    val selection = linuxSandboxSelectCommands(toolArguments, LinuxSandboxStore.COMMANDS_UNLIMITED, backgroundEnabled = true)
+    if (selection.commands.isEmpty() && selection.background.isNotEmpty()) {
+        return when {
+            toolOutcome == ToolOutcome.FAILED || toolOutcome == ToolOutcome.STOPPED -> status
+            live -> tr("创建中")
+            else -> tr("已创建后台命令")
+        }
     }
+    val command = if (live) runningCommand else selection.commands.joinToString("; ")
     return if (command.isBlank()) status else "$status - $command"
 }
 

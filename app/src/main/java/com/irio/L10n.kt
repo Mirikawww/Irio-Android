@@ -1190,6 +1190,8 @@ private val English = mapOf(
     "Linux 沙盒当前不可用。" to "The Linux sandbox is unavailable.",
     "Linux 沙盒已关闭。" to "The Linux sandbox is off.",
     "已运行命令" to "Ran a command",
+    "创建中" to "Creating",
+    "已创建后台命令" to "Created background commands",
     "处理后台命令" to "Checking background commands",
     "已处理后台命令" to "Checked background commands",
     "后台命令" to "Background commands",

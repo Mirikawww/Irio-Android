@@ -17,11 +17,21 @@ class CommandHintTest {
     }
 
     @Test fun emptyLegacyAndBackgroundManagementEventsKeepTheirOriginalStatus() {
-        for (arguments in listOf("", "{}", "{\"commands\":[]}", "{\"background\":[\"server start\"]}")) {
+        for (arguments in listOf("", "{}", "{\"commands\":[]}")) {
             assertEquals("status", shell(arguments).withCommandHint("status"))
         }
         assertEquals("status", shell("{\"commands\":[\"echo ok\"]}")
             .copy(toolName = LinuxBackgroundTool.NAME).withCommandHint("status"))
+    }
+
+    @Test fun backgroundCreationUsesItsOwnStatusWithoutMaskingFailures() {
+        val event = shell("""{"commands":[],"background":["server start"]}""")
+        assertEquals("创建中", event.copy(live = true).withCommandHint("运行中"))
+        assertEquals("已创建后台命令", event.copy(toolOutcome = ToolOutcome.SUCCESS).withCommandHint("已运行命令"))
+        assertEquals("运行命令失败", event.copy(toolOutcome = ToolOutcome.FAILED).withCommandHint("运行命令失败"))
+        assertEquals("运行中已停止", event.copy(toolOutcome = ToolOutcome.STOPPED).withCommandHint("运行中已停止"))
+        assertEquals("Creating", translate(AppLanguage.EN, "创建中"))
+        assertEquals("Created background commands", translate(AppLanguage.EN, "已创建后台命令"))
     }
 
     @Test fun currentCommandChangesInPlaceAndClearsWhenExecutionFinishes() {

@@ -152,6 +152,9 @@ class ProcessStatusIconTest {
                 shell.copy(live = true, runningCommand = "echo next") to "${tr("运行中")} - echo next",
                 shell.copy(toolOutcome = ToolOutcome.SUCCESS) to "${tr("已运行命令")} - $command",
                 shell.copy(toolOutcome = ToolOutcome.FAILED) to "${tr("运行命令失败")} - $command",
+                shell.copy(toolArguments = """{"commands":[],"background":["server start"]}""", live = true) to tr("创建中"),
+                shell.copy(toolArguments = """{"commands":[],"background":["server start"]}""", toolOutcome = ToolOutcome.SUCCESS) to tr("已创建后台命令"),
+                shell.copy(toolArguments = """{"commands":[],"background":["server start"]}""", toolOutcome = ToolOutcome.FAILED) to tr("运行命令失败"),
             )) {
                 current.value = event
                 frames()
