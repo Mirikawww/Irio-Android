@@ -7,11 +7,12 @@ internal fun ProcessEvent.withCommandHint(status: String): String {
     if (kind != ProcessEventKind.TOOL || toolName != LinuxShellTool.NAME) return status
     val selection = linuxSandboxSelectCommands(toolArguments, LinuxSandboxStore.COMMANDS_UNLIMITED, backgroundEnabled = true)
     if (selection.commands.isEmpty() && selection.background.isNotEmpty()) {
-        return when {
+        val label = when {
             toolOutcome == ToolOutcome.FAILED || toolOutcome == ToolOutcome.STOPPED -> status
             live -> tr("创建中")
             else -> tr("已创建后台命令")
         }
+        return "$label - ${selection.background.joinToString("; ")}"
     }
     val command = if (live) runningCommand else selection.commands.joinToString("; ")
     return if (command.isBlank()) status else "$status - $command"

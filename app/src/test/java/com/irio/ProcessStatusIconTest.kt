@@ -147,14 +147,20 @@ class ProcessStatusIconTest {
             val shell = ProcessEvent(20, ProcessEventKind.TOOL, toolName = LinuxShellTool.NAME,
                 toolArguments = org.json.JSONObject().put("commands", org.json.JSONArray().put(command)).toString(),
                 content = "fixture output")
+            val backgroundCommands = listOf("server start", "worker start", "echo 中文")
+            val background = shell.copy(toolArguments = org.json.JSONObject()
+                .put("commands", org.json.JSONArray())
+                .put("background", org.json.JSONArray(backgroundCommands)).toString())
+            val backgroundSuffix = " - ${backgroundCommands.joinToString("; ")}"
             for ((event, expected) in listOf(
                 shell.copy(live = true, runningCommand = command) to "${tr("运行中")} - $command",
                 shell.copy(live = true, runningCommand = "echo next") to "${tr("运行中")} - echo next",
                 shell.copy(toolOutcome = ToolOutcome.SUCCESS) to "${tr("已运行命令")} - $command",
                 shell.copy(toolOutcome = ToolOutcome.FAILED) to "${tr("运行命令失败")} - $command",
-                shell.copy(toolArguments = """{"commands":[],"background":["server start"]}""", live = true) to tr("创建中"),
-                shell.copy(toolArguments = """{"commands":[],"background":["server start"]}""", toolOutcome = ToolOutcome.SUCCESS) to tr("已创建后台命令"),
-                shell.copy(toolArguments = """{"commands":[],"background":["server start"]}""", toolOutcome = ToolOutcome.FAILED) to tr("运行命令失败"),
+                background.copy(live = true) to "${tr("创建中")}$backgroundSuffix",
+                background.copy(toolOutcome = ToolOutcome.SUCCESS) to "${tr("已创建后台命令")}$backgroundSuffix",
+                background.copy(toolOutcome = ToolOutcome.FAILED) to "${tr("运行命令失败")}$backgroundSuffix",
+                background.copy(toolOutcome = ToolOutcome.STOPPED) to "${toolStoppedLabel(LinuxShellTool.NAME)}$backgroundSuffix",
             )) {
                 current.value = event
                 frames()

@@ -24,12 +24,17 @@ class CommandHintTest {
             .copy(toolName = LinuxBackgroundTool.NAME).withCommandHint("status"))
     }
 
-    @Test fun backgroundCreationUsesItsOwnStatusWithoutMaskingFailures() {
-        val event = shell("""{"commands":[],"background":["server start"]}""")
-        assertEquals("创建中", event.copy(live = true).withCommandHint("运行中"))
-        assertEquals("已创建后台命令", event.copy(toolOutcome = ToolOutcome.SUCCESS).withCommandHint("已运行命令"))
-        assertEquals("运行命令失败", event.copy(toolOutcome = ToolOutcome.FAILED).withCommandHint("运行命令失败"))
-        assertEquals("运行中已停止", event.copy(toolOutcome = ToolOutcome.STOPPED).withCommandHint("运行中已停止"))
+    @Test fun backgroundCreationListsAllCommandsWithoutMaskingFailures() {
+        val commands = listOf("server start", "printf 'hello  world'", "printf 'a\\nb'", "echo 中文")
+        val arguments = JSONObject().put("commands", JSONArray()).put("background", JSONArray(commands)).toString()
+        val event = shell(arguments)
+        val suffix = " - ${commands.joinToString("; ")}"
+        assertEquals("创建中$suffix", event.copy(live = true).withCommandHint("运行中"))
+        assertEquals("创建中$suffix", event.copy(live = true, runningCommand = commands.first()).withCommandHint("运行中"))
+        assertEquals("已创建后台命令$suffix", event.copy(toolOutcome = ToolOutcome.SUCCESS).withCommandHint("已运行命令"))
+        assertEquals("运行命令失败$suffix", event.copy(toolOutcome = ToolOutcome.FAILED).withCommandHint("运行命令失败"))
+        assertEquals("运行中已停止$suffix", event.copy(toolOutcome = ToolOutcome.STOPPED).withCommandHint("运行中已停止"))
+        assertEquals(arguments, event.toolArguments)
         assertEquals("Creating", translate(AppLanguage.EN, "创建中"))
         assertEquals("Created background commands", translate(AppLanguage.EN, "已创建后台命令"))
     }
