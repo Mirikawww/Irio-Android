@@ -114,6 +114,8 @@ dependencies {
 
     // Composables UI
     implementation("com.composables:ui:0.2.0")
+    implementation("com.composables:composeunstyled-toggle-switch:2.7.0")
+    implementation("com.composables:composeunstyled-focus-ring:2.7.0")
     implementation("com.composables:composeunstyled-modal:2.7.0")
     implementation("com.composables:composeunstyled-dialog:2.7.0")
     implementation("com.composables:composeunstyled-dropdown-menu:2.7.0")

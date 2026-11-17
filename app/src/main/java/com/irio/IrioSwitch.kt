@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import com.composables.ui.components.Switch as ComposablesSwitch
 
 /** Preserve the existing switch while acknowledging actual user changes in either direction. */
 @Composable
@@ -20,7 +19,7 @@ internal fun IrioSwitch(
     content: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    ComposablesSwitch(
+    StretchSwitch(
         checked = checked,
         onCheckedChange = { next ->
             if (enabled && next != checked) {

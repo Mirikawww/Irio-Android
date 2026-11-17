@@ -57,9 +57,10 @@ class AcknowledgementsTest {
         assertTrue(license.contains("The Lora Project Authors"))
         assertTrue(license.contains("SIL OPEN FONT LICENSE"))
         val modified = acknowledgements.filter { it.adaptation == "本地修改" }.associateBy { it.id }
-        assertEquals(setOf("markdown", "unstyled"), modified.keys)
+        assertEquals(setOf("markdown", "unstyled", "composables"), modified.keys)
         assertTrue(modified.getValue("markdown").modification!!.contains("原始行号"))
         assertTrue(modified.getValue("unstyled").modification!!.contains("横向拖动"))
+        assertTrue(modified.getValue("composables").modification!!.contains("开关手柄"))
         assertEquals("本地适配", acknowledgements.single { it.id == "lucide" }.adaptation)
         for (id in listOf("proot", "talloc", "android-shmem")) {
             assertEquals(id, "打包适配", acknowledgements.single { it.id == id }.adaptation)

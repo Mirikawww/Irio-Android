@@ -870,6 +870,7 @@ private val English = mapOf(
     "Irio 修改了代码块模块：自动换行、原始行号、紧凑工具栏，以及源码容器的边距与圆角。" to "Irio modifies the code-block module for wrapping, source-line numbers, compact toolbars, and source-container spacing and corners.",
     "Irio 将所用 SVG 路径转换为原生 Compose 矢量，并保留上游图形与许可声明。" to "Irio converts the selected SVG paths into native Compose vectors, retaining the upstream geometry and license notices.",
     "Irio 调整滑块手势：确认点击或横向拖动后才更新数值，避免纵向滚动时误触。" to "Irio updates slider values only after a confirmed tap or horizontal drag, preventing accidental changes while scrolling vertically.",
+    "Irio 为开关手柄加入切换时的轻微拉伸动画。" to "Irio adds a subtle stretch animation to the switch thumb while toggling.",
     "沙盒组件仅作打包重定位：调整 libtalloc 的共享库名称与 RUNPATH；未修改这些组件的源码。" to "Sandbox components receive packaging relocations only: libtalloc's shared-library name and RUNPATH are adjusted. Their source code is not modified.",
     "图表" to "Diagram",
     "源代码" to "Source",
