@@ -45,19 +45,7 @@ internal fun LaboratorySettingsScreen(onBack: () -> Unit) {
                 SettingsSectionCard(title = tr("外观")) {
                     Row(
                         modifier = Modifier.settingsSwitchRow()
-                            .settingsSearchAnchor("laboratory.betterSettingsDisplay", edge = SettingsSearchEdge.Top),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(tr("更好的设置项展示"), modifier = Modifier.weight(1f), color = Theme[colors][onBackgroundColor])
-                        Switch(
-                            checked = ThemeStore.betterSettingsDisplay,
-                            accessibilityLabel = tr("更好的设置项展示"),
-                            onCheckedChange = { ThemeStore.saveBetterSettingsDisplay(context, it) },
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.settingsSwitchRow()
-                            .settingsSearchAnchor("laboratory.glyph", edge = SettingsSearchEdge.Bottom),
+                            .settingsSearchAnchor("laboratory.glyph"),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(

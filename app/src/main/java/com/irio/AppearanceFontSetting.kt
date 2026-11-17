@@ -49,17 +49,6 @@ import kotlin.math.roundToInt
 internal fun AppearanceFontSetting() {
     val context = LocalContext.current
     val anchor = Modifier.settingsSearchAnchor("appearance.font", edge = SettingsSearchEdge.Top)
-    if (!ThemeStore.betterSettingsDisplay) {
-        AppearanceChoiceSetting(
-            title = tr("字体"),
-            options = AppFont.entries,
-            selected = ThemeStore.appFont,
-            optionLabel = { tr(it.label) },
-            onSelect = { ThemeStore.saveAppFont(context, it) },
-            modifier = anchor,
-        )
-        return
-    }
     val systemWeight = rememberSystemFontWeightScale(enabled = true)
     CompositionLocalProvider(LocalSystemFontWeightScale provides systemWeight) {
         val serif = rememberAppFontFamily(AppFont.SERIF) ?: LoraRegularFamily

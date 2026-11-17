@@ -36,11 +36,12 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [33], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AppearanceFontCardsTest {
-    @Test fun optInReplacesOnlyFontTabsWithSideBySideRealFontPreviewsAndKeepsSelection() = runTest {
+    @Test fun fontCardsAlwaysShowRealFontPreviewsAndKeepSelectionRegardlessOfLegacyPreference() = runTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup().visible()
         val context = controller.get()
         ThemeStore.ensureLoaded(context)
-        val oldEnabled = ThemeStore.betterSettingsDisplay
+        val preferences = context.getSharedPreferences("appearance_settings", 0)
+        val oldEnabled = preferences.all["better_settings_display"] as? Boolean
         val oldFont = ThemeStore.appFont
         val oldLanguage = ThemeStore.language
         val clock = BroadcastFrameClock()
@@ -73,7 +74,8 @@ class AppearanceFontCardsTest {
         try {
             ThemeStore.saveLanguage(context, AppLanguage.ZH_CN)
             ThemeStore.saveAppFont(context, AppFont.SANS)
-            ThemeStore.saveBetterSettingsDisplay(context, false)
+            preferences.edit().putBoolean("better_settings_display", false).commit()
+            ThemeStore.reload(context)
             view.setParentCompositionContext(recomposer)
             context.setContentView(view)
             view.setContent {
@@ -82,11 +84,8 @@ class AppearanceFontCardsTest {
                 }
             }
             frames()
-            assertTrue(nodes().none { hasText(it, "Aa") })
-            assertEquals(Role.Tab, choice(AppFont.SANS).config[SemanticsProperties.Role])
-            ThemeStore.saveBetterSettingsDisplay(context, true)
-            frames()
-            assertEquals("Both fonts must be visible without selecting them first", 2, nodes().count { hasText(it, "Aa") })
+            assertEquals("Both font previews must appear even with the old preference disabled", 2,
+                nodes().count { hasText(it, "Aa") })
             for (language in AppLanguage.entries) for (scale in listOf(1f, 2f)) {
                 ThemeStore.saveLanguage(context, language)
                 density.value = Density(1f, scale)
@@ -149,17 +148,25 @@ class AppearanceFontCardsTest {
             assertEquals("serif", context.getSharedPreferences("appearance_settings", 0).getString("app_font", null))
             assertTrue(choice(AppFont.SERIF).config[SemanticsProperties.Selected])
             assertEquals(FontFamily.Default, layout(nodes().first { hasText(it, "Aa") }).layoutInput.style.fontFamily)
-            ThemeStore.saveBetterSettingsDisplay(context, false)
-            frames()
-            assertTrue(nodes().none { hasText(it, "Aa") })
-            assertEquals(Role.Tab, choice(AppFont.SERIF).config[SemanticsProperties.Role])
-            assertTrue(choice(AppFont.SERIF).config[SemanticsProperties.Selected])
+            for (legacy in listOf(true, null)) {
+                preferences.edit().apply {
+                    if (legacy == null) remove("better_settings_display") else putBoolean("better_settings_display", legacy)
+                }.commit()
+                ThemeStore.reload(context)
+                frames()
+                assertEquals("Legacy value $legacy must retain the font previews", 2, nodes().count { hasText(it, "Aa") })
+                assertEquals(Role.RadioButton, choice(AppFont.SERIF).config[SemanticsProperties.Role])
+                assertTrue(choice(AppFont.SERIF).config[SemanticsProperties.Selected])
+            }
             assertTrue(choice(AppFont.SANS).config[SemanticsActions.OnClick].action!!.invoke())
             frames()
             assertEquals(AppFont.SANS, ThemeStore.appFont)
         } finally {
             view.disposeComposition(); recomposer.close(); runner.cancel()
-            ThemeStore.saveBetterSettingsDisplay(context, oldEnabled)
+            preferences.edit().apply {
+                if (oldEnabled == null) remove("better_settings_display") else putBoolean("better_settings_display", oldEnabled)
+            }.commit()
+            ThemeStore.reload(context)
             ThemeStore.saveAppFont(context, oldFont)
             ThemeStore.saveLanguage(context, oldLanguage)
             controller.pause().stop().destroy()

@@ -206,7 +206,7 @@ class BubbleOpacityPreviewTest {
         }
     }
 
-    @Test fun previewCanBeDismissedFromOutsideAndOptOutDisablesIt() = runTest {
+    @Test fun previewCanBeDismissedFromOutsideAndReopenedWithoutOptIn() = runTest {
         withUi { f ->
             f.tap(.7f)
             assertNotNull(f.preview())
@@ -216,10 +216,8 @@ class BubbleOpacityPreviewTest {
             f.frames()
             f.frames(20)
             assertNull("Outside touches must close a timed preview immediately", f.preview())
-            ThemeStore.saveBetterSettingsDisplay(f.view.context, false)
-            f.frames()
             f.tap(.3f)
-            assertNull("The experiment is opt-in", f.preview())
+            assertNotNull("A later tap must reopen the always-available preview", f.preview())
         }
     }
 
@@ -244,7 +242,8 @@ class BubbleOpacityPreviewTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup().visible()
         val context = controller.get()
         ThemeStore.ensureLoaded(context)
-        val oldEnabled = ThemeStore.betterSettingsDisplay
+        val preferences = context.getSharedPreferences("appearance_settings", 0)
+        val oldEnabled = preferences.all["better_settings_display"] as? Boolean
         val oldOpacity = ThemeStore.bubbleOpacity
         val oldRadius = ThemeStore.inputCornerRadius
         val oldLanguage = ThemeStore.language
@@ -254,7 +253,8 @@ class BubbleOpacityPreviewTest {
         val view = ComposeView(context)
         val f = Fixture(this, view, clock)
         try {
-            ThemeStore.saveBetterSettingsDisplay(context, true)
+            preferences.edit().putBoolean("better_settings_display", false).commit()
+            ThemeStore.reload(context)
             ThemeStore.saveBubbleOpacity(context, 25)
             ThemeStore.saveInputCornerRadius(context, 16)
             ThemeStore.saveLanguage(context, AppLanguage.ZH_CN)
@@ -272,7 +272,10 @@ class BubbleOpacityPreviewTest {
             block(f)
         } finally {
             view.disposeComposition(); recomposer.close(); runner.cancel()
-            ThemeStore.saveBetterSettingsDisplay(context, oldEnabled)
+            preferences.edit().apply {
+                if (oldEnabled == null) remove("better_settings_display") else putBoolean("better_settings_display", oldEnabled)
+            }.commit()
+            ThemeStore.reload(context)
             ThemeStore.saveBubbleOpacity(context, oldOpacity)
             ThemeStore.saveInputCornerRadius(context, oldRadius)
             ThemeStore.saveLanguage(context, oldLanguage)

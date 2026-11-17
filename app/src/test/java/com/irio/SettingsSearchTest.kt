@@ -16,16 +16,12 @@ class SettingsSearchTest {
         }
     }
 
-    @Test fun betterSettingsDisplayIsSearchableInTheLaboratoryInBothLanguages() {
+    @Test fun retiredBetterSettingsDisplaySwitchIsNotSearchable() {
         for (language in AppLanguage.entries) {
-            val label = translate(language, "更好的设置项展示")
-            val hit = searchSettings(label, label = { translate(language, it) }).single()
-            assertEquals("laboratory.betterSettingsDisplay", hit.id)
-            assertEquals(hit.id, hit.anchor)
-            assertEquals("com.irio.LaboratorySettingsActivity", hit.destination.name)
-            assertEquals(translate(language, "实验室"), hit.page)
+            for (query in listOf("更好的设置项展示", "Better settings display")) {
+                assertTrue(searchSettings(query, label = { translate(language, it) }).isEmpty())
+            }
         }
-        assertEquals("Better settings display", translate(AppLanguage.EN, "更好的设置项展示"))
     }
 
     @Test fun laboratoryPageIsSearchableInBothLanguages() {

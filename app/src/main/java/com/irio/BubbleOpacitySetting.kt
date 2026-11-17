@@ -38,7 +38,7 @@ internal fun BubbleOpacitySetting() {
         valueRange = 0..100,
         valueLabel = { "$it%" },
         onValueChange = { ThemeStore.saveBubbleOpacity(context, it) },
-        preview = if (ThemeStore.betterSettingsDisplay) { value, covered -> BubbleOpacityPreview(value, covered) } else null,
+        preview = { value, covered -> BubbleOpacityPreview(value, covered) },
     )
 }
 

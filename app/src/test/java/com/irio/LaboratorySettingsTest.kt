@@ -44,7 +44,7 @@ class LaboratorySettingsTest {
         val vibrator = context.getSystemService(android.os.VibratorManager::class.java).defaultVibrator
         val vibration = shadowOf(vibrator)
         vibration.setHasVibrator(true)
-        preferences.edit().remove("better_settings_display").commit()
+        preferences.edit().putBoolean("glyph_fade", false).commit()
         preferences.edit().apply { preferences.all.keys.filter { it.startsWith("haptics_") }.forEach(::remove) }.commit()
         ThemeStore.reload(context)
         val clock = BroadcastFrameClock()
@@ -142,10 +142,10 @@ class LaboratorySettingsTest {
             assertTrue("The laboratory page must keep its settings title", nodes().any {
                 it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == tr("实验室") }
             })
-            assertTrue("The laboratory must expose the new setting", nodes().any {
+            assertFalse("The retired design opt-in must not remain on the page", nodes().any {
                 it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == tr("更好的设置项展示") }
             })
-            fun toggle(labelText: String = "更好的设置项展示"): SemanticsNode {
+            fun toggle(labelText: String = "文本淡入"): SemanticsNode {
                 nodes().singleOrNull {
                     it.config.contains(SemanticsProperties.ToggleableState) &&
                         it.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }.contains(tr(labelText))
@@ -163,7 +163,7 @@ class LaboratorySettingsTest {
                 toggle().config[SemanticsProperties.ToggleableState])
             assertTrue(toggle().config[SemanticsActions.OnClick].action!!.invoke())
             frames()
-            assertTrue(preferences.getBoolean("better_settings_display", false))
+            assertTrue(preferences.getBoolean("glyph_fade", false))
             laboratoryOpen.value = false; frames()
             ThemeStore.reload(context)
             laboratoryOpen.value = true; frames()
@@ -171,7 +171,7 @@ class LaboratorySettingsTest {
                 toggle().config[SemanticsProperties.ToggleableState])
             assertTrue(toggle().config[SemanticsActions.OnClick].action!!.invoke())
             frames()
-            assertFalse(preferences.getBoolean("better_settings_display", true))
+            assertFalse(preferences.getBoolean("glyph_fade", true))
             assertEquals(androidx.compose.ui.state.ToggleableState.Off,
                 toggle("触感反馈").config[SemanticsProperties.ToggleableState])
             tap(button("触感反馈"))
@@ -255,10 +255,10 @@ class LaboratorySettingsTest {
             frames()
             assertFalse("The child page must return to Laboratory", hapticsOpen.value)
             vibrator.cancel()
-            ThemeStore.saveBetterSettingsDisplay(context, true)
+            ThemeStore.saveGlyphFade(context, true)
             frames()
             assertFalse("Restoring/programmatically changing a switch must not replay touch feedback", vibration.isVibrating)
-            ThemeStore.saveBetterSettingsDisplay(context, false)
+            ThemeStore.saveGlyphFade(context, false)
             frames()
             repeat(2) {
                 vibrator.cancel()
@@ -318,8 +318,8 @@ class LaboratorySettingsTest {
                     is Boolean -> putBoolean(key, value)
                     is String -> putString(key, value)
                 } }
-                val original = originalSettings["better_settings_display"] as? Boolean
-                if (original == null) remove("better_settings_display") else putBoolean("better_settings_display", original)
+                val original = originalSettings["glyph_fade"] as? Boolean
+                if (original == null) remove("glyph_fade") else putBoolean("glyph_fade", original)
             }.commit()
             ThemeStore.reload(context)
         }

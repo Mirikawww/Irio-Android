@@ -543,7 +543,6 @@ private val English = mapOf(
     "其他" to "Other",
     "实验室" to "Laboratory",
     "外观" to "Appearance",
-    "更好的设置项展示" to "Better settings display",
     "触感" to "Haptics",
     "触感反馈" to "Haptic feedback",
     "发送消息" to "Send message",

@@ -355,9 +355,9 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     onValueChangeFinished = {
                         ThemeStore.saveInputCornerRadius(context, pendingInputCornerRadius)
                     },
-                    preview = if (ThemeStore.betterSettingsDisplay) { radius, covered ->
+                    preview = { radius, covered ->
                         InputCornerPreview(radius, covered)
-                    } else null,
+                    },
                 )
                 SettingsDependentContent(enabled = pendingInputCornerRadius != DefaultInputCornerRadiusDp) {
                     Checkbox(
