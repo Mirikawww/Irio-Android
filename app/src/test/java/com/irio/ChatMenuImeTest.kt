@@ -1,7 +1,9 @@
 package com.irio
 
 import android.os.Looper
+import android.os.SystemClock
 import android.app.Dialog
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -278,10 +280,62 @@ class ChatMenuImeTest {
                 }
                 val photos = item(tr("照片"))
                 val files = item(tr("文件"))
+                assertEquals("Attachment menu rows meet without a gap", 0f,
+                    files.boundsInRoot.top - photos.boundsInRoot.bottom, .5f)
                 assertTrue("Attachment menu must cover the plus trigger: files=${files.boundsInWindow}, trigger=${trigger.boundsInWindow}",
                     files.boundsInWindow.contains(trigger.boundsInWindow.center))
-                assertEquals("Attachment menu keeps a compact reference-style surface", 208f, photos.boundsInRoot.width, .5f)
-                assertEquals("Compact rows keep even icon spacing", 56f, photos.boundsInRoot.height, .5f)
+                for (row in listOf(photos, files)) {
+                    assertEquals(surface.boundsInRoot.left, row.boundsInRoot.left, .5f)
+                    assertEquals(surface.boundsInRoot.right, row.boundsInRoot.right, .5f)
+                    assertEquals(62f, row.boundsInRoot.height, .5f)
+                }
+                val decor = dialog.window!!.decorView
+                val location = IntArray(2).also(decor::getLocationInWindow)
+                fun pressedPixels(row: SemanticsNode, topItem: Boolean) {
+                    val bounds = row.boundsInWindow.translate(
+                        androidx.compose.ui.geometry.Offset(-location[0].toFloat(), -location[1].toFloat()),
+                    )
+                    val before = android.graphics.Bitmap.createBitmap(decor.width, decor.height, android.graphics.Bitmap.Config.ARGB_8888)
+                    val during = before.copy(android.graphics.Bitmap.Config.ARGB_8888, true)
+                    val down = SystemClock.uptimeMillis()
+                    fun dispatch(action: Int) {
+                        val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action,
+                            bounds.right - 30f, bounds.center.y, 0)
+                        try { decor.dispatchTouchEvent(event) } finally { event.recycle() }
+                    }
+                    try {
+                        decor.draw(android.graphics.Canvas(before))
+                        dispatch(MotionEvent.ACTION_DOWN)
+                        repeat(14) { frame() }
+                        decor.draw(android.graphics.Canvas(during))
+                        val rightX = bounds.right.toInt() - 2
+                        val centerX = bounds.center.x.toInt()
+                        val top = bounds.top.toInt()
+                        val bottom = bounds.bottom.toInt()
+                        val innerY = if (topItem) bottom - 1 else top
+                        val neighborY = if (topItem) bottom else top - 1
+                        val outerY = if (topItem) top + 1 else bottom - 2
+                        for (x in listOf(bounds.left.toInt() + 1, centerX, rightX)) {
+                            assertTrue("Pressed feedback must fill the row up to the shared edge: $topItem, x=$x",
+                                before.getPixel(x, innerY) != during.getPixel(x, innerY))
+                            assertEquals("Pressed feedback must stay out of the neighboring row: $topItem, x=$x",
+                                before.getPixel(x, neighborY), during.getPixel(x, neighborY))
+                        }
+                        assertTrue("Pressed feedback must reach the outer panel edge for row $topItem",
+                            before.getPixel(centerX, outerY) != during.getPixel(centerX, outerY))
+                        assertEquals("The outer corner must follow the round panel edge for row $topItem",
+                            before.getPixel(rightX, outerY), during.getPixel(rightX, outerY))
+                    } finally {
+                        dispatch(MotionEvent.ACTION_CANCEL)
+                        repeat(18) { frame() }
+                        before.recycle()
+                        during.recycle()
+                    }
+                }
+                if (!showIme) {
+                    pressedPixels(photos, topItem = true)
+                    pressedPixels(files, topItem = false)
+                }
                 for (name in listOf("photos", "files")) {
                     val icon = menuNodes.single { it.config.getOrElse(SemanticsProperties.TestTag) { "" } == "attachment-icon:$name" }
                     assertEquals(40f, icon.boundsInRoot.width, .5f)
