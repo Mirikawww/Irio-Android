@@ -3,6 +3,7 @@ package com.irio
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.text.input.TextFieldState
@@ -46,6 +47,7 @@ class ComposerPasteTest {
         val state = TextFieldState("existing draft")
         val focus = FocusRequester()
         val attached = mutableListOf<String>()
+        val files = mutableListOf<List<Uri>>()
         var sends = 0
         var frame = 0L
         try {
@@ -62,6 +64,7 @@ class ComposerPasteTest {
                         focusRequester = focus,
                         onEnterSend = { sends++ },
                         onPasteAsAttachment = { attached += it; true },
+                        onPasteAttachments = { files += it; true },
                     )
                 }
             }
@@ -79,27 +82,39 @@ class ComposerPasteTest {
                 }
             }
             fun descend(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descend)
-            fun paste(text: String) {
+            fun paste(clip: ClipData) {
                 (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
-                    .setPrimaryClip(ClipData.newPlainText("test", text))
+                    .setPrimaryClip(clip)
                 val root = (view.getChildAt(0) as ViewRootForTest).semanticsOwner.unmergedRootSemanticsNode
                 val editor = descend(root).single { it.config.contains(SemanticsActions.PasteText) }
                 assertTrue(editor.config[SemanticsActions.PasteText].action!!.invoke())
                 settle()
             }
+            fun pasteText(text: String) = paste(ClipData.newPlainText("test", text))
             settle()
             focus.requestFocus()
             settle()
             val pasted = "line\n".repeat(301)
-            paste(pasted)
+            pasteText(pasted)
             assertEquals(listOf(pasted), attached)
             assertEquals("existing draft", state.text.toString())
             assertEquals(0, sends)
             ThemeStore.saveLongTextPaste(context, false)
             settle()
-            paste("ordinary paste")
+            val image = Uri.parse("content://paste.fixture/image.png")
+            val pdf = Uri.parse("content://paste.fixture/document.pdf")
+            paste(ClipData("attachments", arrayOf("image/png", "application/pdf"), ClipData.Item(image)).apply {
+                addItem(ClipData.Item(pdf))
+            })
+            assertEquals("Real paste must forward every attachment even with long-text paste disabled", listOf(listOf(image, pdf)), files)
+            assertEquals("existing draft", state.text.toString())
+            paste(ClipData.newPlainText("mixed", "caption").apply { addItem(ClipData.Item(image)) })
+            assertEquals(listOf(image), files.last())
+            assertTrue(state.text.toString().contains("caption"))
+            pasteText("ordinary paste")
             assertTrue(state.text.toString().contains("ordinary paste"))
             assertEquals(1, attached.size)
+            assertEquals(0, sends)
             ThemeStore.saveLongTextPaste(context, true)
             state.edit { replace(0, length, "p".repeat(3000)) }
             settle()

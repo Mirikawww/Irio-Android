@@ -128,6 +128,7 @@ internal fun ComposerField(
     expandedFooter: (@Composable () -> Unit)? = null,
     onEnterSend: (() -> Unit)? = null,
     onPasteAsAttachment: ((String) -> Boolean)? = null,
+    onPasteAttachments: ((List<android.net.Uri>) -> Boolean)? = null,
     shape: Shape = rememberComposerFieldShape(),
 ) {
     val contentColor = Theme[colors][onFieldColor]
@@ -146,12 +147,18 @@ internal fun ComposerField(
     }
     val sendOnEnter = onEnterSend != null
     val pasteCallback = rememberUpdatedState(onPasteAsAttachment)
+    val attachmentCallback = rememberUpdatedState(onPasteAttachments)
+    val fieldEnabled = rememberUpdatedState(enabled)
     val pasteReceiver = remember {
-        LongTextPasteReceiver(
+        val textReceiver = LongTextPasteReceiver(
             enabled = { ThemeStore.longTextPaste && pasteCallback.value != null },
             threshold = { ThemeStore.longTextPasteThreshold },
             onAttach = { pasteCallback.value?.invoke(it) == true },
         )
+        val attachmentReceiver = AttachmentPasteReceiver { uris -> attachmentCallback.value?.invoke(uris) == true }
+        androidx.compose.foundation.content.ReceiveContentListener { content ->
+            if (!fieldEnabled.value) content else attachmentReceiver.onReceive(content)?.let(textReceiver::onReceive)
+        }
     }
     // Keep the editor composition alive across layouts: its focus collector cannot replay
     // the FocusInteraction that was emitted before an expansion/collapse.
@@ -188,7 +195,7 @@ internal fun ComposerField(
         BasicTextField(
             state = state,
             modifier = modifier
-                .then(if (onPasteAsAttachment != null) Modifier.contentReceiver(pasteReceiver) else Modifier)
+                .then(if (onPasteAsAttachment != null || onPasteAttachments != null) Modifier.contentReceiver(pasteReceiver) else Modifier)
                 .then(
                     if (sendOnEnter) {
                         Modifier.onPreviewKeyEvent { event ->

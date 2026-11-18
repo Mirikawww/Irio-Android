@@ -15,36 +15,43 @@ internal fun attachmentViewChooser(uri: Uri, attachment: ChatAttachment): Intent
     return Intent.createChooser(view, attachment.name)
 }
 
-internal fun Context.copyAttachment(uri: Uri): ChatAttachment? {
-    val name =
-        contentResolver
-            .query(
-                uri,
-                arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
-                null,
-                null,
-                null,
-            )
-            ?.use { cursor ->
-                if (!cursor.moveToFirst()) return@use null
-                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (nameIndex >= 0) cursor.getString(nameIndex) else null
-            }
-    val mimeType = contentResolver.getType(uri)?.lowercase()?.ifBlank { null } ?: mimeFromName(name)
-    val dir = File(filesDir, "attachments").apply { mkdirs() }
-    val target = File(dir, "${UUID.randomUUID()}${extensionFor(mimeType).ifBlank { "" }}")
-    contentResolver.openInputStream(uri)?.use { input ->
-        target.outputStream().use { output -> input.copyTo(output) }
-    } ?: return null
-    if (!target.exists() || target.length() <= 0L) {
-        target.delete()
-        return null
+internal fun Context.copyAttachment(uri: Uri, destination: File? = null): ChatAttachment? {
+    var target: File? = null
+    return try {
+        val name =
+            contentResolver
+                .query(
+                    uri,
+                    arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
+                    null,
+                    null,
+                    null,
+                )
+                ?.use { cursor ->
+                    if (!cursor.moveToFirst()) return@use null
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) cursor.getString(nameIndex) else null
+                }
+        val mimeType = contentResolver.getType(uri)?.lowercase()?.ifBlank { null } ?: mimeFromName(name)
+        val dir = File(filesDir, "attachments").apply { mkdirs() }
+        val file = destination ?: File(dir, "${UUID.randomUUID()}${extensionFor(mimeType).ifBlank { "" }}")
+        target = file
+        contentResolver.openInputStream(uri)?.use { input ->
+            file.outputStream().use { output -> input.copyTo(output) }
+        } ?: return null
+        if (!file.exists() || file.length() <= 0L) {
+            file.delete()
+            return null
+        }
+        ChatAttachment(
+            name = name?.ifBlank { null } ?: "attachment${extensionFor(mimeType)}",
+            mimeType = mimeType,
+            filePath = file.absolutePath,
+        )
+    } catch (_: Exception) {
+        target?.delete()
+        null
     }
-    return ChatAttachment(
-        name = name?.ifBlank { null } ?: "attachment${extensionFor(mimeType)}",
-        mimeType = mimeType,
-        filePath = target.absolutePath,
-    )
 }
 
 private fun mimeFromName(name: String?): String {

@@ -312,6 +312,7 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
                         ComposerField(
                             state = message,
                             onPasteAsAttachment = state::pasteTextAsAttachment,
+                            onPasteAttachments = state::pasteAttachments,
                             placeholder = tr("与 Irio 畅谈…"),
                             focusRequester = composerFocusRequester,
                             modifier =

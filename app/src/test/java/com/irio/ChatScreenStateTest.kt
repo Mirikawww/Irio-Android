@@ -48,6 +48,169 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE, shadows = [ChatScreenStateTest.CountingTokenizer::class])
 class ChatScreenStateTest {
+    private fun pastedFileUri(context: android.content.Context, file: java.io.File): android.net.Uri {
+        val authority = "com.irio.paste.fixture"
+        val provider = PastedFileProvider(file)
+        provider.attachInfo(context, android.content.pm.ProviderInfo().apply { this.authority = authority })
+        org.robolectric.shadows.ShadowContentResolver.registerProviderInternal(authority, provider)
+        return android.net.Uri.parse("content://$authority/${file.name}")
+    }
+
+    // FileProvider's Android path separator logic cannot represent Windows temp
+    // paths. Exercise the same ContentResolver contract with an isolated provider.
+    private class PastedFileProvider(private val file: java.io.File) : android.content.ContentProvider() {
+        override fun onCreate() = true
+        override fun getType(uri: android.net.Uri) = when (file.extension) {
+            "pdf" -> "application/pdf"
+            "png" -> "image/png"
+            else -> "text/plain"
+        }
+        override fun query(uri: android.net.Uri, projection: Array<out String>?, selection: String?,
+            selectionArgs: Array<out String>?, sortOrder: String?) =
+            android.database.MatrixCursor(arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE))
+                .apply { addRow(arrayOf<Any>(file.name, file.length())) }
+        override fun openFile(uri: android.net.Uri, mode: String) =
+            android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
+        override fun insert(uri: android.net.Uri, values: android.content.ContentValues?): android.net.Uri? = error("Read only fixture")
+        override fun delete(uri: android.net.Uri, selection: String?, selectionArgs: Array<out String>?) = error("Read only fixture")
+        override fun update(uri: android.net.Uri, values: android.content.ContentValues?, selection: String?,
+            selectionArgs: Array<out String>?) = error("Read only fixture")
+    }
+
+    private suspend fun TestScope.awaitAttachmentImports(state: ChatScreenState) {
+        repeat(200) {
+            runCurrent()
+            if (state.writingPastedText.isEmpty()) return
+            withContext(Dispatchers.IO) { Thread.sleep(10) }
+        }
+        assertTrue("Attachment import must finish", state.writingPastedText.isEmpty())
+    }
+
+    @Test fun pastedFilesKeepTheirBytesNamesAndMimeAndDoNotChangeTheDraft() = runTest {
+        withState { harness ->
+            val state = harness.state
+            val source = java.io.File.createTempFile("paste-fixture-", ".pdf", state.context.cacheDir)
+            val bytes = "%PDF-1.4 fixture bytes".toByteArray()
+            source.writeBytes(bytes)
+            val uri = pastedFileUri(state.context, source)
+            state.message.edit { append("keep this draft") }
+            state.pendingQuote = "keep quote"
+            try {
+                assertTrue(state.pasteAttachments(listOf(uri)))
+                assertEquals(1, state.pendingAttachments.size)
+                assertTrue(state.pendingAttachments.single().filePath in state.writingPastedText)
+                val before = state.messages
+                state.submitMessage()
+                assertEquals("Send must wait for pasted files", before, state.messages)
+                awaitAttachmentImports(state)
+                val attachment = state.pendingAttachments.single()
+                assertEquals(source.name, attachment.name)
+                assertEquals("application/pdf", attachment.mimeType)
+                assertArrayEquals(bytes, attachment.bytes())
+                assertEquals("keep this draft", state.message.text.toString())
+                assertEquals("keep quote", state.pendingQuote)
+                assertNull(state.composerStatus)
+            } finally {
+                state.pendingAttachments.forEach { java.io.File(it.filePath).delete() }
+                source.delete()
+            }
+        }
+    }
+
+    @Test fun pastedFilesFinishInTheirOriginatingDraftAndRemovedCardsStayRemoved() = runTest {
+        withState { harness ->
+            val state = harness.state
+            val source = java.io.File.createTempFile("paste-switch-", ".txt", state.context.cacheDir).apply { writeText("fixture") }
+            val uri = pastedFileUri(state.context, source)
+            val first = state.currentConversation
+            val second = ConversationStore.newConversation()
+            var copied: String? = null
+            try {
+                state.message.edit { append("first draft") }
+                assertTrue(state.pasteAttachments(listOf(uri)))
+                copied = state.pendingAttachments.single().filePath
+                state.swapComposer(first.id, second.id)
+                state.currentConversation = second
+                state.message.edit { append("second draft") }
+                awaitAttachmentImports(state)
+                assertTrue(state.pendingAttachments.isEmpty())
+                assertEquals("second draft", state.message.text.toString())
+                assertEquals(source.name, state.composerDrafts.getValue(first.id).attachments.single().name)
+                state.swapComposer(second.id, first.id)
+                state.currentConversation = first
+                assertEquals("first draft", state.message.text.toString())
+                assertEquals(copied, state.pendingAttachments.single().filePath)
+                assertTrue(state.pasteAttachments(listOf(uri)))
+                val removed = state.pendingAttachments.last().filePath
+                state.pendingAttachments = state.pendingAttachments.dropLast(1)
+                awaitAttachmentImports(state)
+                assertFalse(java.io.File(removed).exists())
+                assertEquals(1, state.pendingAttachments.size)
+            } finally {
+                copied?.let { java.io.File(it).delete() }; source.delete()
+            }
+        }
+    }
+
+    @Test fun unreadablePastedFilesAndLimitRejectionKeepExistingAttachmentsAndCleanCopies() = runTest {
+        withState { harness ->
+            val state = harness.state
+            val source = java.io.File.createTempFile("paste-limits-", ".txt", state.context.cacheDir).apply { writeText("fixture") }
+            val uri = pastedFileUri(state.context, source)
+            val existing = ChatAttachment("existing.txt", "text/plain", source.absolutePath)
+            state.pendingAttachments = listOf(existing)
+            try {
+                assertTrue(state.pasteAttachments(listOf(android.net.Uri.parse("content://missing.paste.provider/no-file"))))
+                awaitAttachmentImports(state)
+                assertEquals(listOf(existing), state.pendingAttachments)
+                assertEquals(tr("有附件无法读取"), state.composerStatus)
+                state.pendingAttachments = List(15) { existing }
+                assertTrue(state.pasteAttachments(listOf(uri)))
+                val rejectedPath = state.pendingAttachments.last().filePath
+                awaitAttachmentImports(state)
+                assertEquals(List(15) { existing }, state.pendingAttachments)
+                assertFalse(java.io.File(rejectedPath).exists())
+                assertEquals(tr("附件数量超过 15 个槽位（照片和视频各算半个）"), state.composerStatus)
+                assertTrue(source.exists())
+            } finally { source.delete() }
+        }
+    }
+
+    @Test fun pastedFilesShareLimitsAcrossConcurrentBatchesAndUseHalfSlotsForImages() = runTest {
+        withState { harness ->
+            val state = harness.state
+            val source = java.io.File.createTempFile("paste-concurrent-", ".txt", state.context.cacheDir).apply { writeText("fixture") }
+            val image = java.io.File.createTempFile("paste-image-", ".png", state.context.cacheDir).apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val paths = mutableSetOf<String>()
+            try {
+                val uri = pastedFileUri(state.context, source)
+                repeat(2) {
+                    assertTrue(state.pasteAttachments(List(8) { uri }))
+                    paths += state.pendingAttachments.map { it.filePath }
+                }
+                awaitAttachmentImports(state)
+                assertEquals("Concurrent imports must not each admit eight files past the shared limit", 8, state.pendingAttachments.size)
+                assertEquals(8f, attachmentSlots(state.pendingAttachments))
+                state.pendingAttachments.forEach { java.io.File(it.filePath).delete() }
+                state.pendingAttachments = emptyList()
+                val imageUri = pastedFileUri(state.context, image)
+                assertTrue(state.pasteAttachments(List(30) { imageUri }))
+                paths += state.pendingAttachments.map { it.filePath }
+                awaitAttachmentImports(state)
+                assertEquals(30, state.pendingAttachments.size)
+                assertEquals(15f, attachmentSlots(state.pendingAttachments))
+                assertTrue(state.pendingAttachments.all { it.isImage })
+                assertTrue(state.pasteAttachments(listOf(imageUri)))
+                paths += state.pendingAttachments.map { it.filePath }
+                awaitAttachmentImports(state)
+                assertEquals(30, state.pendingAttachments.size)
+                assertEquals(tr("附件数量超过 15 个槽位（照片和视频各算半个）"), state.composerStatus)
+            } finally {
+                paths.forEach { java.io.File(it).delete() }; source.delete(); image.delete()
+            }
+        }
+    }
+
     @Test fun actualRequestFailureVibratesWithItsOwnChoiceButNotForSuccessOrStop() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val context = RuntimeEnvironment.getApplication()
