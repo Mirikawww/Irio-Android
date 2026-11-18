@@ -11,6 +11,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewRootForTest
@@ -54,7 +55,7 @@ class AttachmentCardTest {
     @Test fun filesShowExtensionStemAndFileSize() = withCard("report.final.pdf", "application/pdf") { nodes, attachment, context ->
         val texts = texts(nodes)
         assertTrue("The title must omit the extension", "report.final" in texts)
-        assertTrue("The left tile must show the extension", "pdf" in texts)
+        assertTrue("The left tile must show the extension", "PDF" in texts)
         assertTrue("The subtitle must show the actual file size", Formatter.formatShortFileSize(context, attachment.size) in texts)
         assertFalse("The full filename is not a second title", attachment.name in texts)
     }
@@ -70,7 +71,7 @@ class AttachmentCardTest {
     }
 
     @Test fun videoUsesTheSameFileCardRatherThanAnImageThumbnail() = withCard("clip.mp4", "video/mp4") { nodes, attachment, context ->
-        assertEquals(listOf("mp4", "clip", Formatter.formatShortFileSize(context, attachment.size)), texts(nodes))
+        assertEquals(listOf("MP4", "clip", Formatter.formatShortFileSize(context, attachment.size)), texts(nodes))
     }
 
     @Test fun imagesOnlyShowASquareThumbnailEvenWhenThePreviewCannotBeDecoded() = withCard("photo.jpg", "image/jpeg") { nodes, _, _ ->
@@ -120,13 +121,13 @@ class AttachmentCardTest {
                 assertEquals(24f, ring.boundsInRoot.height, 0.01f)
                 assertTrue(ring.boundsInRoot.left >= card.boundsInRoot.left + 8f)
                 assertTrue(ring.boundsInRoot.right <= card.boundsInRoot.left + 48f)
-                assertTrue(texts(nodes).contains("txt"))
+                assertTrue(texts(nodes).contains("TXT"))
                 assertFalse(texts(nodes).any { it.contains("发送中") })
                 assertEquals(0.5f, ring.config[SemanticsProperties.ProgressBarRangeInfo].current, 0.01f)
                 progress.value = null
             },
         ) { nodes, _, _ ->
-            assertTrue(texts(nodes).contains("txt"))
+            assertTrue(texts(nodes).contains("TXT"))
             assertFalse(nodes.any { it.config.contains(SemanticsProperties.ProgressBarRangeInfo) })
         }
     }
@@ -176,6 +177,36 @@ class AttachmentCardTest {
         ) { nodes, attachment, context ->
             assertTrue(Formatter.formatShortFileSize(context, attachment.size) in texts(nodes))
             assertFalse("…" in texts(nodes))
+        }
+    }
+
+    @Test fun knownFormatsSelectDistinctDrawingsAndOtherMediaUsesTheMimeType() {
+        val samples = mapOf(
+            "txt" to AttachmentFileIcon.TEXT,
+            "md" to AttachmentFileIcon.MARKDOWN,
+            "pdf" to AttachmentFileIcon.PDF,
+            "docx" to AttachmentFileIcon.DOCUMENT,
+            "xlsx" to AttachmentFileIcon.SPREADSHEET,
+            "pptx" to AttachmentFileIcon.PRESENTATION,
+            "mp4" to AttachmentFileIcon.VIDEO,
+            "mp3" to AttachmentFileIcon.AUDIO,
+            "zip" to AttachmentFileIcon.ARCHIVE,
+            "json" to AttachmentFileIcon.CODE,
+        )
+        val vectors = samples.map { (extension, expected) ->
+            val icon = attachmentFileIcon(extension, "application/octet-stream")
+            assertEquals(expected, icon)
+            icon!!.vector.root[0]
+        }
+        assertEquals(samples.size, vectors.toSet().size)
+        assertEquals(AttachmentFileIcon.VIDEO, attachmentFileIcon("?", "video/x-matroska"))
+        assertEquals(AttachmentFileIcon.AUDIO, attachmentFileIcon("?", "audio/opus"))
+        assertNull(attachmentFileIcon("bin", "application/octet-stream"))
+    }
+
+    @Test fun markdownIconUsesTheThemeInkInLightAndDarkThemes() {
+        for (ink in listOf(Color.Black, Color.White)) {
+            assertEquals(ink, attachmentFileIconTint("md", ink))
         }
     }
 

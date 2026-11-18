@@ -79,13 +79,6 @@ internal fun AttachmentCard(
     val cardHeight = with(LocalDensity.current) { (34.sp.toDp() + 18.dp).coerceAtLeast(56.dp) }
     val tileSize = cardHeight - 16.dp
     val name = remember(attachment.name) { attachmentCardName(attachment.name) }
-    val badgeStyle = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold)
-    val measuredExtension = rememberTextMeasurer().measure(name.extension, badgeStyle, maxLines = 1)
-    val extensionLabel = if (measuredExtension.size.width <= with(LocalDensity.current) { (tileSize - 8.dp).roundToPx() }) {
-        name.extension
-    } else {
-        "?"
-    }
     val size = remember(attachment.filePath, loading) {
         if (loading) null else attachment.size
     }
@@ -130,12 +123,32 @@ internal fun AttachmentCard(
                         modifier = Modifier.size(tileSize).clip(tileShape).background(tileFill),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            extensionLabel,
-                            color = if (uploadProgress == null) content else content.copy(alpha = 0.28f),
-                            style = badgeStyle,
-                            maxLines = 1,
+                        val ink = if (uploadProgress == null) content else content.copy(alpha = 0.28f)
+                        val fileIcon = attachmentFileIcon(name.extension, attachment.mimeType)
+                        val label = if (fileIcon != null) name.extension.uppercase(Locale.ROOT) else name.extension
+                        val labelStyle = TextStyle(
+                            fontSize = if (fileIcon != null) 9.sp else 12.sp,
+                            lineHeight = if (fileIcon != null) 11.sp else 16.sp,
+                            fontWeight = FontWeight.SemiBold,
                         )
+                        val labelWidth = rememberTextMeasurer().measure(label, labelStyle, maxLines = 1).size.width
+                        val available = with(LocalDensity.current) { (tileSize - 8.dp).roundToPx() }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (fileIcon != null) {
+                                val iconTint = attachmentFileIconTint(name.extension, content).copy(alpha = ink.alpha)
+                                Box(Modifier.size(24.dp)) {
+                                    Icon(fileIcon.vector, contentDescription = null, tint = iconTint)
+                                    if (fileIcon == AttachmentFileIcon.PDF) {
+                                        Icon(
+                                            pdfAttachmentMark,
+                                            contentDescription = null,
+                                            tint = iconTint,
+                                        )
+                                    }
+                                }
+                            }
+                            Text(if (labelWidth <= available) label else "?", color = ink, style = labelStyle, maxLines = 1)
+                        }
                         if (uploadProgress != null) {
                             Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.48f), tileShape))
                             CircularAttachmentUploadIndicator(uploadProgress)
