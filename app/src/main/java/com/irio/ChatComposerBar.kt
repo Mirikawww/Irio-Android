@@ -128,25 +128,7 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
         }
 
         @Composable
-        fun AttachmentChips() {
-            if (pendingAttachments.isNotEmpty()) {
-                ChatAttachmentList(
-                    attachments = pendingAttachments,
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                    loadingFiles = writingPastedText,
-                    onRemove = { attachment ->
-                        pendingAttachments = pendingAttachments.filterNot { it == attachment }
-                    },
-                )
-            }
-        }
-
-        @Composable
-        fun RecordingComposerField(
-            expansionProgress: androidx.compose.runtime.State<Float>,
-            modifier: Modifier = Modifier,
-        ) {
+        fun RecordingComposerField() {
             val shape = rememberComposerFieldShape()
             val waveColor = Theme[colors][primaryColor]
             val fillColor = Theme[colors][fieldColor]
@@ -157,14 +139,6 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
             Box(
                 modifier =
                     Modifier.fillMaxWidth()
-                        .then(modifier)
-                        .composerAnimatedPadding(
-                            progress = expansionProgress,
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = 10.dp,
-                            bottom = 10.dp,
-                        )
                         .heightIn(min = 64.dp)
                         .irioSolidOrGlass(glass, fillColor, shape)
                         .border(1.dp, outlineColor, shape)
@@ -282,139 +256,137 @@ internal fun BoxScope.ChatComposerBar(state: ChatScreenState, availableHeight: D
                         onCancel = { pendingQuote = "" },
                     )
                 }
-                AttachmentChips()
-
-                AnimatedContent(
-                    targetState = sttRecording,
-                    transitionSpec = {
-                        (fadeIn(tween(180)) +
-                                expandVertically(
-                                    expandFrom = Alignment.CenterVertically,
-                                    animationSpec = tween(220),
-                                ))
-                            .togetherWith(
-                                fadeOut(tween(120)) +
-                                    shrinkVertically(
-                                        shrinkTowards = Alignment.CenterVertically,
-                                        animationSpec = tween(180),
-                                    )
-                            )
-                            .using(SizeTransform(clip = false))
+                ComposerAttachmentTray(
+                    attachments = pendingAttachments,
+                    loadingFiles = writingPastedText,
+                    expansion = expansion,
+                    expandedLayout = expandedLayout,
+                    onRemove = { attachment ->
+                        pendingAttachments = pendingAttachments.filterNot { it == attachment }
                     },
-                    label = "composer-recording-transition",
-                ) { recording ->
-                    if (recording) {
-                        RecordingComposerField(
-                            expansionProgress = expansion,
-                            modifier = if (expandedLayout) Modifier.weight(1f) else Modifier,
-                        )
-                    } else
-                        ComposerField(
-                            state = message,
-                            onPasteAsAttachment = state::pasteTextAsAttachment,
-                            onPasteAttachments = state::pasteAttachments,
-                            placeholder = tr("与 Irio 畅谈…"),
-                            focusRequester = composerFocusRequester,
-                            modifier =
-                                Modifier.fillMaxWidth()
-                                    .then(if (expandedLayout) Modifier.weight(1f) else Modifier)
-                                    .composerAnimatedPadding(
-                                        progress = expansion,
-                                        start = 16.dp,
-                                        end = 16.dp,
-                                        top = 10.dp,
-                                        bottom = 10.dp,
-                                    ),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                            accessibilityLabel = "Message",
-                            expanded = expandedLayout,
-                            expansion = expansion,
-                            onTextLayout = {
-                                if (!expandedLayout) composerLineCount = it.lineCount
-                            },
-                            lineLimits =
-                                TextFieldLineLimits.MultiLine(
-                                    minHeightInLines = 1,
-                                    maxHeightInLines = if (expandedLayout) Int.MAX_VALUE else 4,
-                                ),
-                            onEnterSend =
-                                if (ThemeStore.enterToSend) {
-                                    {
-                                        if (!generatingThisChat && canSend) {
-                                            composerFullscreen = false
-                                            if (editingMessageId != null) commitEdit()
-                                            else submitMessage()
-                                        }
-                                    }
-                                } else {
-                                    null
+                    modifier = if (expandedLayout) Modifier.weight(1f) else Modifier,
+                ) {
+                    AnimatedContent(
+                        targetState = sttRecording,
+                        modifier = if (expandedLayout) Modifier.weight(1f) else Modifier,
+                        transitionSpec = {
+                            (fadeIn(tween(180)) +
+                                    expandVertically(
+                                        expandFrom = Alignment.CenterVertically,
+                                        animationSpec = tween(220),
+                                    ))
+                                .togetherWith(
+                                    fadeOut(tween(120)) +
+                                        shrinkVertically(
+                                            shrinkTowards = Alignment.CenterVertically,
+                                            animationSpec = tween(180),
+                                        )
+                                )
+                                .using(SizeTransform(clip = false))
+                        },
+                        label = "composer-recording-transition",
+                    ) { recording ->
+                        if (recording) {
+                            RecordingComposerField()
+                        } else
+                            ComposerField(
+                                state = message,
+                                onPasteAsAttachment = state::pasteTextAsAttachment,
+                                onPasteAttachments = state::pasteAttachments,
+                                placeholder = tr("与 Irio 畅谈…"),
+                                focusRequester = composerFocusRequester,
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                accessibilityLabel = "Message",
+                                expanded = expandedLayout,
+                                expansion = expansion,
+                                onTextLayout = {
+                                    if (!expandedLayout) composerLineCount = it.lineCount
                                 },
-                            leading = { AttachmentButton() },
-                            trailing = {
-                                Column(
-                                    modifier =
-                                        if (composerLineCount >= 4)
-                                            Modifier.height(
-                                                with(LocalDensity.current) { 80.sp.toDp() }
-                                            )
-                                        else Modifier,
-                                    verticalArrangement = Arrangement.SpaceBetween,
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    if (composerLineCount >= 4) {
-                                        IconButton(
-                                            onClick = {
-                                                attachMenuOpen = false
-                                                composerFullscreen = true
-                                            },
-                                            style = ButtonStyle.Ghost,
-                                            buttonSize = ButtonSize.Small,
-                                            modifier = Modifier.size(32.dp),
-                                        ) {
-                                            Icon(
-                                                IrioIcons.Maximize2,
-                                                contentDescription = tr("全屏输入"),
-                                                modifier = Modifier.size(18.dp),
-                                                tint = content,
-                                            )
+                                lineLimits =
+                                    TextFieldLineLimits.MultiLine(
+                                        minHeightInLines = 1,
+                                        maxHeightInLines = if (expandedLayout) Int.MAX_VALUE else 4,
+                                    ),
+                                onEnterSend =
+                                    if (ThemeStore.enterToSend) {
+                                        {
+                                            if (!generatingThisChat && canSend) {
+                                                composerFullscreen = false
+                                                if (editingMessageId != null) commitEdit()
+                                                else submitMessage()
+                                            }
                                         }
-                                    }
-                                    SendButton()
-                                }
-                            },
-                            expandedFooter = {
-                                Column(Modifier.fillMaxWidth()) {
-                                    Row(
+                                    } else {
+                                        null
+                                    },
+                                leading = { AttachmentButton() },
+                                trailing = {
+                                    Column(
                                         modifier =
-                                            Modifier.fillMaxWidth()
-                                                .padding(horizontal = 20.dp, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                            if (composerLineCount >= 4)
+                                                Modifier.height(
+                                                    with(LocalDensity.current) { 80.sp.toDp() }
+                                                )
+                                            else Modifier,
+                                        verticalArrangement = Arrangement.SpaceBetween,
+                                        horizontalAlignment = Alignment.CenterHorizontally,
                                     ) {
-                                        AttachmentButton()
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
+                                        if (composerLineCount >= 4) {
                                             IconButton(
-                                                onClick = { composerFullscreen = false },
+                                                onClick = {
+                                                    attachMenuOpen = false
+                                                    composerFullscreen = true
+                                                },
                                                 style = ButtonStyle.Ghost,
                                                 buttonSize = ButtonSize.Small,
                                                 modifier = Modifier.size(32.dp),
                                             ) {
                                                 Icon(
-                                                    IrioIcons.Minimize2,
-                                                    contentDescription = tr("收起全屏输入"),
-                                                    modifier = Modifier.size(20.dp),
+                                                    IrioIcons.Maximize2,
+                                                    contentDescription = tr("全屏输入"),
+                                                    modifier = Modifier.size(18.dp),
                                                     tint = content,
                                                 )
                                             }
-                                            SendButton()
+                                        }
+                                        SendButton()
+                                    }
+                                },
+                                expandedFooter = {
+                                    Column(Modifier.fillMaxWidth()) {
+                                        Row(
+                                            modifier =
+                                                Modifier.fillMaxWidth()
+                                                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                        ) {
+                                            AttachmentButton()
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                IconButton(
+                                                    onClick = { composerFullscreen = false },
+                                                    style = ButtonStyle.Ghost,
+                                                    buttonSize = ButtonSize.Small,
+                                                    modifier = Modifier.size(32.dp),
+                                                ) {
+                                                    Icon(
+                                                        IrioIcons.Minimize2,
+                                                        contentDescription = tr("收起全屏输入"),
+                                                        modifier = Modifier.size(20.dp),
+                                                        tint = content,
+                                                    )
+                                                }
+                                                SendButton()
+                                            }
                                         }
                                     }
-                                }
-                            },
-                        )
+                                },
+                            )
+                    }
                 }
             }
         }

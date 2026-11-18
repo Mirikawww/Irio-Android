@@ -59,7 +59,7 @@ internal fun attachmentCardName(name: String): AttachmentCardName {
     )
 }
 
-/** One attachment surface for the composer, user messages and assistant messages. */
+/** Attachment preview for sent user and assistant messages. */
 @Composable
 internal fun AttachmentCard(
     attachment: ChatAttachment,
@@ -135,17 +135,7 @@ internal fun AttachmentCard(
                         val available = with(LocalDensity.current) { (tileSize - 8.dp).roundToPx() }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             if (fileIcon != null) {
-                                val iconTint = attachmentFileIconTint(name.extension, content).copy(alpha = ink.alpha)
-                                Box(Modifier.size(24.dp)) {
-                                    Icon(fileIcon.vector, contentDescription = null, tint = iconTint)
-                                    if (fileIcon == AttachmentFileIcon.PDF) {
-                                        Icon(
-                                            pdfAttachmentMark,
-                                            contentDescription = null,
-                                            tint = iconTint,
-                                        )
-                                    }
-                                }
+                                AttachmentFileGlyph(fileIcon, name.extension, ink)
                             }
                             Text(if (labelWidth <= available) label else "?", color = ink, style = labelStyle, maxLines = 1)
                         }

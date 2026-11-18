@@ -1,5 +1,9 @@
 package com.irio
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -7,6 +11,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
+import com.composables.ui.components.Icon
 
 /** File marks drawn for the compact attachment tile. Document-style marks share a fold and baseline. */
 internal enum class AttachmentFileIcon(private val mark: String) {
@@ -31,6 +36,17 @@ internal enum class AttachmentFileIcon(private val mark: String) {
 internal val pdfAttachmentMark: ImageVector by lazy {
     val curve = "M7.99 17.51C8.67 17.51 10.08 16.1 11.08 14.21C12.12 12.25 12.52 10.05 11.55 10.05C10.57 10.05 10.82 11.9 11.85 13.46C12.95 15.11 14.85 16.07 15.92 15.96C16.8 15.88 16.8 14.88 15.5 14.8C13.72 14.69 11.32 15.23 9.55 15.92C7.75 16.61 7.14 17.51 7.99 17.51Z"
     attachmentVector("attachment:pdf-mark", curve, 1.1f)
+}
+
+@Composable
+internal fun AttachmentFileGlyph(icon: AttachmentFileIcon, extension: String, ink: Color) {
+    val tint = attachmentFileIconTint(extension, ink).copy(alpha = ink.alpha)
+    Box(Modifier.size(24.dp)) {
+        Icon(icon.vector, contentDescription = null, tint = tint)
+        if (icon == AttachmentFileIcon.PDF) {
+            Icon(pdfAttachmentMark, contentDescription = null, tint = tint)
+        }
+    }
 }
 
 private fun attachmentVector(name: String, path: String, strokeWidth: Float): ImageVector =

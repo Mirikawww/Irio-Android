@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 
-/** Pending and sent attachments share a viewport with gutters inside the scrolling content. */
+/** Sent attachments scroll with their gutters inside the viewport. */
 @Composable
 internal fun ChatAttachmentList(
     attachments: List<ChatAttachment>,
