@@ -18,10 +18,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -36,25 +34,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.composables.ui.components.Icon
-import com.composables.ui.components.Text
 import com.composables.ui.theme.borderColor
 import com.composables.ui.theme.colors
 import com.composables.ui.theme.fieldColor
 import com.composables.ui.theme.onPanelColor
-import com.composables.ui.theme.panelColor
 import com.composeunstyled.theme.Theme
 import com.kyant.shapes.RoundedRectangle
-import java.io.File
-import java.util.Locale
 
 /** The field stays in the same slot while the strip opens upward above it. */
 @Composable
@@ -135,42 +125,12 @@ private fun PendingAttachmentChip(
     onRemove: () -> Unit,
 ) {
     val shape = remember { RoundedRectangle(11.dp) }
-    val thumbnailShape = remember { RoundedRectangle(6.dp) }
     val ink = Theme[colors][onPanelColor]
-    Row(
-        Modifier.heightIn(min = 36.dp)
-            .background(Theme[colors][panelColor], shape)
-            .border(1.dp, Theme[colors][borderColor], shape)
-            .padding(start = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    AttachmentChip(
+        attachment = attachment,
+        loading = loading,
+        modifier = Modifier.border(1.dp, Theme[colors][borderColor], shape),
     ) {
-        if (attachment.isImage) {
-            AsyncImage(
-                model = remember(attachment.filePath) { File(attachment.filePath) },
-                contentDescription = null,
-                modifier = Modifier.size(24.dp).clip(thumbnailShape).background(Theme[colors][fieldColor]),
-                contentScale = ContentScale.Crop,
-            )
-        } else {
-            val extension = remember(attachment.name) { attachmentCardName(attachment.name).extension }
-            val icon = attachmentFileIcon(extension, attachment.mimeType)
-            if (icon != null) {
-                AttachmentFileGlyph(icon, extension, ink)
-            } else {
-                Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-                    Text(extension.uppercase(Locale.ROOT), fontSize = 9.sp, color = ink, maxLines = 1)
-                }
-            }
-        }
-        Text(
-            attachment.name,
-            modifier = Modifier.padding(start = 6.dp).widthIn(max = 156.dp),
-            color = ink,
-            fontSize = 14.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (loading) Text("…", modifier = Modifier.padding(start = 4.dp), color = ink)
         val removeInteractions = remember { MutableInteractionSource() }
         Box(
             Modifier.size(width = 44.dp, height = 36.dp)

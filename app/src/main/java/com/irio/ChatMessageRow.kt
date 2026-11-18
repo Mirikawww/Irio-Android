@@ -550,7 +550,7 @@ internal fun AssistantAttachmentList(
                 } else if (attachment.isGeneratedVideo) {
                     GeneratedVideoAttachmentCard(attachment, onOpen = onOpen)
                 } else {
-                    AttachmentCard(attachment, onOpen = { onOpen(attachment) })
+                    AttachmentChip(attachment, onOpen = { onOpen(attachment) })
                 }
             }
         }

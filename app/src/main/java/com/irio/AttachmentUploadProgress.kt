@@ -7,11 +7,16 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -22,6 +27,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.composables.ui.theme.colors
+import com.composables.ui.theme.primaryColor
+import com.composeunstyled.theme.Theme
 import okhttp3.MediaType
 import okhttp3.RequestBody
 import okio.BufferedSink
@@ -85,6 +93,40 @@ internal class AttachmentUploadTracker {
     fun finish(conversationId: String, messageId: Long, requestId: Long) {
         val key = conversationId to messageId
         if (states[key]?.requestId == requestId) states.remove(key)
+    }
+}
+
+@Composable
+internal fun LinearAttachmentUploadIndicator(progress: AttachmentUploadProgress) {
+    val accent = Theme[colors][primaryColor]
+    val preparing = progress.totalBytes <= 0L
+    val fraction = if (preparing) 0f else
+        (progress.sentBytes.toFloat() / progress.totalBytes.toFloat()).coerceIn(0f, 1f)
+    val sweepPosition = if (preparing) {
+        rememberInfiniteTransition(label = "attachment preparation line").animateFloat(
+            initialValue = -0.28f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing)),
+            label = "attachment preparation sweep",
+        )
+    } else null
+    Canvas(
+        Modifier.fillMaxWidth().height(2.dp).clip(CircleShape).semantics {
+            contentDescription = if (preparing) tr("正在准备附件") else tr("附件请求发送中 %d%%").format(progress.percent)
+            progressBarRangeInfo = if (preparing) ProgressBarRangeInfo.Indeterminate else ProgressBarRangeInfo(fraction, 0f..1f)
+        },
+    ) {
+        drawRect(accent.copy(alpha = 0.18f))
+        val start = sweepPosition?.value ?: 0f
+        val length = if (preparing) 0.28f else fraction
+        if (length > 0f) {
+            drawRoundRect(
+                color = accent,
+                topLeft = Offset(start * size.width, 0f),
+                size = Size(length * size.width, size.height),
+                cornerRadius = CornerRadius(size.height / 2f),
+            )
+        }
     }
 }
 

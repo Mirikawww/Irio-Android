@@ -82,8 +82,8 @@ class ChatAttachmentLayoutTest {
 
     @Test fun shortSentListsStayRightAlignedAndKeepTheAvatarGap() {
         for (avatar in listOf(false, true)) withList(avatar = avatar, count = 1) { nodes ->
-            val image = images(nodes).single()
-            assertEquals(304f - if (avatar) 36f else 0f, image.positionInRoot.x + image.size.width, 0.5f)
+            val chip = openButtons(nodes).single()
+            assertEquals(304f - if (avatar) 36f else 0f, chip.positionInRoot.x + chip.size.width, 0.5f)
             assertEquals(0f, scroll(nodes).config[SemanticsProperties.HorizontalScrollAxisRange].maxValue(), 0.5f)
         }
     }
@@ -169,14 +169,60 @@ class ChatAttachmentLayoutTest {
             assertEquals(baseline, editor(nodes()).boundsInRoot)
         })
 
-    @Test fun sentFilesUseTheSameEdgeToEdgeViewport() = withList(count = 3, image = false) { nodes ->
+    @Test fun sentFilesUseTheSameEdgeToEdgeViewport() = withList(count = 6, image = false) { nodes ->
         val strip = scroll(nodes)
         assertEquals(0f, strip.boundsInRoot.left, 0.5f)
         assertEquals(320f, strip.boundsInRoot.right, 0.5f)
-        val cards = nodes.filter { it.config.contains(SemanticsActions.OnClick) }.sortedBy { it.positionInRoot.x }
-        assertEquals(3, cards.size)
+        val cards = openButtons(nodes)
+        assertEquals(6, cards.size)
         assertEquals(304f, cards.last().positionInRoot.x + cards.last().size.width, 0.5f)
     }
+
+    @Test fun sentAttachmentShowsTheFullFilenameOnItsOwnCompactSurface() =
+        withList(count = 1, image = false, check = { nodes ->
+            val chip = openButtons(nodes).single()
+            val label = nodes.single { it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == "file-1.txt" } }
+            assertEquals(36f, chip.size.height.toFloat(), 0.5f)
+            assertEquals(chip.boundsInRoot.center.y, label.boundsInRoot.center.y, 1f)
+            assertEquals(40f, label.boundsInRoot.left - chip.boundsInRoot.left, 0.5f)
+            assertEquals(10f, chip.boundsInRoot.right - label.boundsInRoot.right, 0.5f)
+            assertTrue(removeButtons(nodes).isEmpty())
+        }, checkPixels = { nodes, bitmap ->
+            val chip = openButtons(nodes).single().boundsInRoot
+            val y = chip.center.y.toInt()
+            val end = chip.right.toInt()
+            val outside = bitmap.getPixel(end + 2, y)
+            val fill = bitmap.getPixel(end - 2, y)
+            assertNotEquals("The chip has its own background", outside, fill)
+            assertEquals("The background extends below the label", fill, bitmap.getPixel(end - 12, chip.bottom.toInt() - 4))
+        })
+
+    @Test fun attachmentListShowsOneSharedProgressLineBelowTheViewport() =
+        withList(count = 6, image = false, progress = AttachmentUploadProgress(1L, 50L, 100L), check = { nodes ->
+            val strip = scroll(nodes).boundsInRoot
+            val line = nodes.single { it.config.contains(SemanticsProperties.ProgressBarRangeInfo) }
+            assertEquals(0.5f, line.config[SemanticsProperties.ProgressBarRangeInfo].current, 0.001f)
+            assertEquals(2f, line.boundsInRoot.height, 0.5f)
+            assertEquals(4f, line.boundsInRoot.top - strip.bottom, 0.5f)
+            assertEquals(16f, line.boundsInRoot.left, 0.5f)
+            assertEquals(304f, line.boundsInRoot.right, 0.5f)
+        }, checkPixels = { nodes, bitmap ->
+            val line = nodes.single { it.config.contains(SemanticsProperties.ProgressBarRangeInfo) }.boundsInRoot
+            val y = line.center.y.toInt()
+            val filled = bitmap.getPixel((line.left + line.width * 0.25f).toInt(), y)
+            val track = bitmap.getPixel((line.left + line.width * 0.75f).toInt(), y)
+            assertNotEquals("Half progress fills only the first half of the line", filled, track)
+        })
+
+    @Test fun attachmentPreparationUsesTheSameLineWithoutAPercentage() =
+        withList(count = 1, progress = AttachmentUploadProgress(1L)) { nodes ->
+            val chip = openButtons(nodes).single().boundsInRoot
+            val line = nodes.single { it.config.contains(SemanticsProperties.ProgressBarRangeInfo) }
+            assertEquals(androidx.compose.ui.semantics.ProgressBarRangeInfo.Indeterminate,
+                line.config[SemanticsProperties.ProgressBarRangeInfo])
+            assertEquals(chip.left, line.boundsInRoot.left, 0.5f)
+            assertEquals(chip.right, line.boundsInRoot.right, 0.5f)
+        }
 
     private fun assertFullWidthScroll(nodes: List<SemanticsNode>, endInset: Float = 0f) {
         val strip = scroll(nodes)
@@ -185,9 +231,9 @@ class ChatAttachmentLayoutTest {
         val axis = strip.config[SemanticsProperties.HorizontalScrollAxisRange]
         assertTrue(axis.maxValue() > 0f)
         assertEquals(0f, axis.value(), 0.5f)
-        val images = images(nodes)
-        val firstLeft = images.first().positionInRoot.x
-        val lastRight = images.last().positionInRoot.x + images.last().size.width
+        val chips = openButtons(nodes)
+        val firstLeft = chips.first().positionInRoot.x
+        val lastRight = chips.last().positionInRoot.x + chips.last().size.width
         assertEquals("Sent attachments start at the right end", 304f - endInset, lastRight, 0.5f)
         assertEquals("Leading gutter remains reachable", 16f, firstLeft + axis.maxValue(), 0.5f)
         val middleLeft = firstLeft + axis.maxValue() / 2f
@@ -207,8 +253,8 @@ class ChatAttachmentLayoutTest {
     private fun names(nodes: List<SemanticsNode>) = nodes.flatMap {
         it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.map { name -> name.text }
     }.filter { it.startsWith("photo-") }
-    private fun images(nodes: List<SemanticsNode>) = nodes.filter {
-        it.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }.any { name -> name.startsWith("photo-") }
+    private fun openButtons(nodes: List<SemanticsNode>) = nodes.filter {
+        it.config.contains(SemanticsActions.OnClick)
     }.sortedBy { it.positionInRoot.x }
 
     private fun withList(
@@ -217,6 +263,7 @@ class ChatAttachmentLayoutTest {
         text: String = "",
         count: Int,
         image: Boolean = true,
+        progress: AttachmentUploadProgress? = null,
         animate: ((List<ChatAttachment>, MutableState<List<ChatAttachment>>, (Int) -> Unit, () -> List<SemanticsNode>) -> Unit)? = null,
         checkPixels: ((List<SemanticsNode>, Bitmap) -> Unit)? = null,
         indication: IndicationNodeFactory? = null,
@@ -266,6 +313,7 @@ class ChatAttachmentLayoutTest {
                                         onOpenProcess = {}, onOpenAttachment = {},
                                         onCopy = {}, onQuote = {}, onAddReaction = {}, onRemoveReaction = {},
                                         onRetry = {}, canRetry = false,
+                                        uploadProgress = progress,
                                     )
                                 }
                             }
