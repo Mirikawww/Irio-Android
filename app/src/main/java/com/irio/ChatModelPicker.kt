@@ -1,5 +1,11 @@
 package com.irio
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -7,7 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -21,9 +29,13 @@ import com.irio.ImePreservingDropdownMenu as DropdownMenu
 import com.composables.ui.components.DropdownMenuAlignment
 import com.composables.ui.components.Icon
 import com.composables.ui.components.Text
+import com.composables.ui.components.focusRing
 import com.composables.ui.theme.colors
+import com.composables.ui.theme.defaultIndication
+import com.composables.ui.theme.indications
 import com.composables.ui.theme.mutedColor
 import com.composables.ui.theme.onBackgroundColor
+import com.composables.ui.theme.ringColor
 import com.composeunstyled.theme.Theme
 
 /** 模型列表的预计算行：文本与目标模型在 remember 里一次算好，滚动路径零文本处理。 */
@@ -167,12 +179,27 @@ internal fun ModelPicker(
             )
         },
     ) {
-        Button(
-            onClick = { onExpandedChange(!expanded) },
-            style = ButtonStyle.Ghost,
-            buttonSize = ButtonSize.Small,
-            shape = ToolbarCapsuleShape,
-            modifier = Modifier.semantics { contentDescription = tr("选择模型") },
+        val interactions = remember { MutableInteractionSource() }
+        // Preserve the Ghost button's geometry and ripple without its press scale.
+        Row(
+            modifier = Modifier
+                .semantics { contentDescription = tr("选择模型") }
+                .heightIn(min = 44.dp)
+                .focusRing(
+                    interactionSource = interactions,
+                    color = Theme[colors][ringColor],
+                    shape = ToolbarCapsuleShape,
+                )
+                .clip(ToolbarCapsuleShape)
+                .clickable(
+                    interactionSource = interactions,
+                    indication = Theme[indications][defaultIndication],
+                    role = Role.Button,
+                    onClick = { onExpandedChange(!expanded) },
+                )
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         ) {
             Text(
                 selectedDisplay.ifBlank { tr("选择模型") },

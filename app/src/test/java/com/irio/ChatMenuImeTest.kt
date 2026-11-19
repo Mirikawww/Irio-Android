@@ -260,7 +260,23 @@ class ChatMenuImeTest {
                 else label in node.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }
             }
             val trigger = triggerNode()
-            assertTrue(trigger.config[SemanticsActions.OnClick].action!!.invoke())
+            if (menu == Menu.MODEL && !backgroundRoundTrip) {
+                fun visualBounds() = descendants(triggerNode()).map { it.boundsInRoot }
+                val idleBounds = visualBounds()
+                val center = trigger.boundsInRoot.center
+                val downTime = SystemClock.uptimeMillis()
+                fun touch(action: Int) {
+                    val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, center.x, center.y, 0)
+                    try { assertTrue(host.dispatchTouchEvent(event)) } finally { event.recycle() }
+                }
+                touch(MotionEvent.ACTION_DOWN)
+                repeat(20) { frame() }
+                assertEquals("The model trigger and its content stay fixed during a press", idleBounds, visualBounds())
+                assertFalse("The model menu waits until release", expanded.value)
+                touch(MotionEvent.ACTION_UP)
+            } else {
+                assertTrue(trigger.config[SemanticsActions.OnClick].action!!.invoke())
+            }
             repeat(if (menu == Menu.ATTACH) 35 else 8) { frame() }
             if (menu != Menu.SEARCH && menu != Menu.LINK)
                 assertTrue("$menu menu must open", if (menu == Menu.ATTACH) attachmentState!!.attachMenuOpen else expanded.value)
