@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -146,6 +147,17 @@ internal fun ComposerField(
         }
     }
     val sendOnEnter = onEnterSend != null
+    val idleTracker = LocalChatIdleTracker.current
+    val userInputTransformation = remember(idleTracker, sendOnEnter, enterTransformation) {
+        if (idleTracker == null) {
+            if (sendOnEnter) enterTransformation else null
+        } else {
+            InputTransformation {
+                if (changes.changeCount > 0) idleTracker.recordInteraction()
+                if (sendOnEnter) with(enterTransformation) { transformInput() }
+            }
+        }
+    }
     val pasteCallback = rememberUpdatedState(onPasteAsAttachment)
     val attachmentCallback = rememberUpdatedState(onPasteAttachments)
     val fieldEnabled = rememberUpdatedState(enabled)
@@ -253,7 +265,7 @@ internal fun ComposerField(
             } else {
                 onKeyboardAction
             },
-            inputTransformation = if (sendOnEnter) enterTransformation else null,
+            inputTransformation = userInputTransformation,
             lineLimits = lineLimits,
             onTextLayout = { getResult ->
                 getResult()?.let {

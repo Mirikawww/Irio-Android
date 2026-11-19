@@ -7,8 +7,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -183,9 +186,11 @@ private fun ObserveChatPresentation(state: ChatScreenState) =
     }
 
 @Composable
-private fun RestoreChatConversations(state: ChatScreenState, restoreLastOpened: Boolean) =
+internal fun RestoreChatConversations(state: ChatScreenState, restoreLastOpened: Boolean) =
     with(state) {
         val clearingHistoryState = rememberUpdatedState(clearingHistory)
+        val idleTracker = LocalChatIdleTracker.current
+        var idleBlankConversationId by rememberSaveable { mutableStateOf<String?>(null) }
 
         // 普通冷启动保持空白；系统重建 Activity（包括进程被回收后的恢复）时回到上次会话。
         LaunchedEffect(Unit) {
@@ -193,17 +198,41 @@ private fun RestoreChatConversations(state: ChatScreenState, restoreLastOpened: 
             if (!clearingHistoryState.value) conversations = loaded
         }
 
-        // 普通冷启动保持空白；系统重建 Activity（包括进程被回收后的恢复）时回到上次会话。
         LaunchedEffect(Unit) {
-            if (!restoreLastOpened) return@LaunchedEffect
-            val restored = withContext(Dispatchers.IO) { ConversationStore.loadLastOpened(context) }
-            if (restored != null) {
-                cacheConversationContent(restored)
-                pendingConversationScroll = restored.id
-                swapComposer(currentConversation.id, restored.id)
-                currentConversation = restored
-                messages = restored.messages
-                // MessageIds 保证跨会话及进程内的消息 ID 不冲突。
+            // The restored blank screen gets a fresh in-memory conversation id.
+            if (idleBlankConversationId != null) idleBlankConversationId = currentConversation.id
+            idleTracker?.checkTimeout()
+            val loadToken = conversationLoadToken
+            if (restoreLastOpened && idleBlankConversationId == null && idleTracker?.isIdle != true) {
+                val restored = withContext(Dispatchers.IO) { ConversationStore.loadLastOpened(context) }
+                if (restored != null && conversationLoadToken == loadToken && idleTracker?.resetPending != true) {
+                    cacheConversationContent(restored)
+                    pendingConversationScroll = restored.id
+                    swapComposer(currentConversation.id, restored.id)
+                    currentConversation = restored
+                    messages = restored.messages
+                }
+            }
+            if (idleTracker == null) return@LaunchedEffect
+            snapshotFlow {
+                val canReset = idleTracker.resetPending && !clearingHistory && !sttRecording &&
+                    !sttTranscribing && currentConversation.id !in preparingIds
+                canReset to currentConversation.id.takeIf { messages.isEmpty() }
+            }.collect { (canReset, blankId) ->
+                if (idleBlankConversationId != null && idleBlankConversationId != blankId) {
+                    idleBlankConversationId = null
+                }
+                if (canReset && idleTracker.resetPending) {
+                    if (messages.isNotEmpty()) {
+                        newConversation(closeDrawer = false)
+                        drawerProgress = 0f
+                        modelMenuOpen = false
+                        contextRingOpen = false
+                        attachMenuOpen = false
+                    }
+                    idleBlankConversationId = currentConversation.id
+                    idleTracker.consumeReset()
+                }
             }
         }
 

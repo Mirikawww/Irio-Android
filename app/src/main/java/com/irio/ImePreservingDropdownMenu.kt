@@ -187,9 +187,11 @@ private fun MenuWindow(
     val composition = rememberCompositionContext()
     val currentContent by rememberUpdatedState(content)
     val dismiss by rememberUpdatedState(onDismiss)
-    DisposableEffect(parent) {
+    val idleTracker = LocalChatIdleTracker.current
+    DisposableEffect(parent, idleTracker) {
         val dialog = ComponentDialog(context, com.composeunstyled.modal.R.style.Modal)
         val window = requireNotNull(dialog.window)
+        if (idleTracker != null) window.trackChatIdleInput(idleTracker)
         // Set before show(), not from an effect inside the dialog content.
         if (keepIme) window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)

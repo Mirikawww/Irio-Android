@@ -76,12 +76,20 @@ import com.composables.ui.theme.switchThumbColor
 import com.composables.ui.theme.switchTrackColor
 import com.composables.ui.theme.textSelectionColors
 import com.composables.ui.theme.thumbColor
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.composeunstyled.LocalTextStyle
 import com.composeunstyled.theme.Theme
 import com.composeunstyled.theme.ThemeComposable
 import com.composeunstyled.theme.buildTheme
 
 fun ComponentActivity.setIrioContent(content: @Composable () -> Unit) {
+    val idleTracker = ChatIdleTracker.get(this)
+    window.trackChatIdleInput(idleTracker)
+    lifecycle.addObserver(object : DefaultLifecycleObserver {
+        override fun onResume(owner: LifecycleOwner) = idleTracker.checkTimeout()
+        override fun onPause(owner: LifecycleOwner) = idleTracker.checkpoint()
+    })
     ThemeStore.ensureLoaded(this)
     ProfileStore.ensureLoaded(this)
     enableEdgeToEdge(
@@ -98,7 +106,9 @@ fun ComponentActivity.setIrioContent(content: @Composable () -> Unit) {
         window.isNavigationBarContrastEnforced = false
     }
     setContent {
-        AppTheme(content)
+        CompositionLocalProvider(LocalChatIdleTracker provides idleTracker) {
+            AppTheme(content)
+        }
     }
 }
 
